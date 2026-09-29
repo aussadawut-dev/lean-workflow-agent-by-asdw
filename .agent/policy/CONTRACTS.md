@@ -2,6 +2,16 @@
 
 ## Task Contract
 
+Default form is one line, written first, before any file change:
+
+```
+Contract: risk=MEDIUM quality=STANDARD acceptance=go test ./... passes and printf 'a' | tally prints 1 1 1
+```
+
+Trivial tasks: `Contract: trivial (<reason>)`.
+
+The line is the whole contract at every risk and quality level. The fields below define what it means; write them out only if the user asks:
+
 - **Goal** — what must be true when finished.
 - **Scope** — files/areas in and out.
 - **Quality** — `STANDARD | HIGH | VERY_HIGH`.

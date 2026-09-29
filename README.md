@@ -20,6 +20,10 @@ Build your repository however you want. Lean Workflow does not prescribe languag
 
 As the project grows, agents fill in `.agent/PROJECT.md` with real commands and paths. Add your test/lint commands to its Quality Gate section to have the `Stop` hook enforce them.
 
+## Headless and CI use
+
+`claude -p` ignores `permissions.allow` in `.claude/settings.json` until the workspace is trusted. Open the repository once with interactive Claude and accept the trust dialog, or pass `--allowedTools` on the command line. Hooks, skills, and the reviewer subagent still load.
+
 ## Claude commands
 
 | Command | Use |

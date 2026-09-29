@@ -6,7 +6,7 @@ Task Contract -> Context -> Work -> Test -> Validate -> Review -> Quality Gate -
 
 ## Steps
 
-1. **Task Contract** — state goal, scope, quality floor, budget, risk. See `CONTRACTS.md`. Skip for trivial tasks.
+1. **Task Contract** — one contract line before any change. See `CONTRACTS.md`. Trivial tasks write `Contract: trivial (<reason>)`.
 2. **Context** — load the smallest sufficient context. See `CONTEXT.md`.
 3. **Work** — implement using the simplest valid path.
 4. **Test** — add/run tests for behavior changes. See `TESTING.md`.
@@ -23,7 +23,7 @@ A task is trivial when all hold:
 - One file, or a mechanical edit across a few files (rename, typo, formatting).
 - The goal is unambiguous.
 
-Trivial tasks skip the Task Contract and formal review. They still need evidence before DONE, such as a passing check or a stated reason none applies.
+Trivial tasks use the one-word contract and skip formal review. They still need evidence before DONE, such as a passing check or a stated reason none applies.
 
 ## Execution modes
 

@@ -46,7 +46,7 @@ while IFS= read -r cmd; do
     {
       echo "Quality Gate failed: $cmd"
       printf '%s\n' "$output" | tail -n 40
-      echo "Fix the failure, or report BLOCKED/FAILED with evidence. Do not declare DONE."
+      echo "If your change caused this, fix it. If it was already failing or is outside the task, do not touch it: report BLOCKED and ask. Do not declare DONE."
     } >&2
     rm -f "$cache"
     exit 2

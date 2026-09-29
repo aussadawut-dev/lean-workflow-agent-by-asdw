@@ -2,6 +2,20 @@
 
 Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, MINOR adds rules or files, PATCH clarifies wording.
 
+## 1.4.0
+
+Changes from dogfooding (a Go CLI, 5 headless runs). The Task Contract was never written, `TESTING.md` was never read, and policy files were rarely opened outside skills. Rules that work are the ones in `CLAUDE.md` and the hooks.
+
+- `CLAUDE.md` now carries the critical rules inline:
+  - a one-line contract as the first line before changing files;
+  - regression tests for bug fixes, shown failing before the fix and passing after;
+  - no reading of workflow internals unless the task needs them.
+- The Task Contract is one line at every risk and quality level. In round 2 the one-liner was written in 4/4 runs; the full block added nothing.
+- `/lean-task` is shorter and loads policy files only when needed.
+- Gate failures: fix only what your change caused. Pre-existing or out-of-scope failures are reported as `BLOCKED`, never patched under hook pressure. In round 2 the Stop hook pushed Claude into editing an unrelated test file.
+- Gate commands must exit non-zero on failure. `/lean-init` and `PROJECT.md` say so, with the `gofmt` example.
+- README note on headless and CI use.
+
 ## 1.3.0
 
 - Self-checks for the workflow files in `.github/lean-workflow/`:

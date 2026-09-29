@@ -31,7 +31,7 @@ Not defined.
 
 ### Quality Gate
 
-Commands run by the Claude `Stop` hook (`.claude/hooks/quality-gate.sh`) before a turn can finish. One command per line, fast checks first. Empty means the hook does nothing. Add commands once the project has them.
+Commands run by the Claude `Stop` hook (`.claude/hooks/quality-gate.sh`) before a turn can finish. One command per line, fast checks first. Each must exit non-zero on failure (e.g. `test -z "$(gofmt -l .)"`, not `gofmt -l .`). Empty means the hook does nothing. Add commands once the project has them.
 
 <!-- gate:start -->
 ```sh
