@@ -2,6 +2,10 @@
 
 Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, MINOR adds rules or files, PATCH clarifies wording.
 
+## 1.2.0
+
+- Policy files moved to `.agent/policy/`. `.agent/PROJECT.md` stays as the only project-owned file, so upgrades can replace `policy/` as a whole.
+
 ## 1.1.0
 
 - Claude-native layer in `.claude/`, pointing into `.agent/` with no rule duplication:
@@ -21,7 +25,7 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, MINOR adds ru
 
 Workflow files are separate from project files, so an upgrade replaces them without touching your code.
 
-1. Replace every file in `.agent/` except `PROJECT.md`.
+1. Replace `.agent/policy/`, `.agent/README.md`, and `.agent/CHANGELOG.md`. Never replace `.agent/PROJECT.md`.
 2. Replace `.claude/hooks/`, `.claude/agents/reviewer.md`, and `.claude/skills/lean-*/`. Keep your own agents and skills.
 3. In `CLAUDE.md`, replace everything above `## Project additions`. Keep your additions.
 4. Replace `AGENTS.md`, unless you edited it.

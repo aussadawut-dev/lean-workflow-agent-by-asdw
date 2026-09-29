@@ -17,7 +17,7 @@ This repository uses Lean Workflow Baseline #1. This file is the canonical agent
 
 - Prefer direct execution for simple or tightly coupled work.
 - Use subagents only for genuinely independent parallel work or isolated review/research.
-- Do not raise thinking/effort merely because a task is long; follow `.agent/MODELS.md`.
+- Do not raise thinking/effort merely because a task is long; follow `.agent/policy/MODELS.md`.
 - A `Stop` hook runs the Quality Gate commands in `.agent/PROJECT.md`. If it blocks, fix the failure or report `BLOCKED`/`FAILED`. Never edit the gate to get past it unless the user asks.
 - For `HIGH` review depth, use the `reviewer` subagent (`.claude/agents/reviewer.md`).
 - Workflow skills: `/lean-init` (fill `PROJECT.md`), `/lean-task` (Task Contract), `/lean-review` (risk-based review), `/lean-gate` (Quality Gate and Result Contract).

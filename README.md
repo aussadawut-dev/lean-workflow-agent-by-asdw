@@ -35,6 +35,8 @@ As the project grows, agents fill in `.agent/PROJECT.md` with real commands and 
 CLAUDE.md          Canonical entrypoint (Claude)
 AGENTS.md          Adapter for Codex / other agents
 .agent/            Operating rules for agents (not application code)
+  PROJECT.md       Project context, commands, Quality Gate (yours to edit)
+  policy/          Workflow rules (replaced on upgrade)
 .claude/
   settings.json    Hooks and permissions
   hooks/           Quality Gate (Stop) and SessionStart hooks

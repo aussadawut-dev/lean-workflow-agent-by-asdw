@@ -14,7 +14,7 @@ Use the smallest sufficient context. Load progressively.
 source
 ```
 
-Follow routes recorded in `PROJECT.md`. Area READMEs are optional and owned by the project; do not create hierarchy in advance.
+Follow routes recorded in `.agent/PROJECT.md`. Area READMEs are optional and owned by the project; do not create hierarchy in advance.
 
 ## Rules
 
@@ -22,4 +22,4 @@ Follow routes recorded in `PROJECT.md`. Area READMEs are optional and owned by t
 - Expand context only when the task or evidence requires it.
 - On retry or rework, use **delta context** (what changed and why), not a full rebuild.
 - Do not load every `.agent/` file by default.
-- Record newly learned conventions in `PROJECT.md`.
+- Record newly learned conventions in `.agent/PROJECT.md`.

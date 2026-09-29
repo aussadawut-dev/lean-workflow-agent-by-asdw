@@ -1,23 +1,29 @@
 # Agent policy router
 
-Lean Workflow Baseline 1.1.0. See `CHANGELOG.md` for changes and upgrading.
+Lean Workflow Baseline 1.2.0. See `CHANGELOG.md` for changes and upgrading.
 
 This directory holds operating rules for agents. It is not application structure and prescribes no language, framework, layout, package manager, database, or deployment model.
 
-Do **not** load every file by default. A trivial task (see `WORKFLOW.md`) needs none of them.
+## Layout
+
+- `PROJECT.md` — owned by the project. Agents and people update it.
+- `policy/` — owned by the workflow. Do not edit per project; upgrades replace it.
+- `CHANGELOG.md` — workflow versions and upgrade steps.
+
+Do **not** load every file by default. A trivial task (see `policy/WORKFLOW.md`) needs none of them.
 
 ## Read when needed
 
 - Running project commands or editing an unfamiliar area -> `PROJECT.md`
-- Non-trivial task: planning, states, execution mode -> `WORKFLOW.md`
-- Setting quality/budget/risk or reporting results -> `CONTRACTS.md`
-- Behavior change, bug fix, or tests -> `TESTING.md`
-- Quality floor, completion evidence -> `QUALITY.md`
-- Medium/high-risk review or reviewer role -> `REVIEW.md`
-- Model choice, subagent model, escalation -> `MODELS.md`
-- Unfamiliar area or context expansion -> `CONTEXT.md`
-- Tool selection, subagents, parallelism -> `TOOLS.md`
-- Failure, retry, or rework -> `RECOVERY.md`
+- Non-trivial task: planning, states, execution mode -> `policy/WORKFLOW.md`
+- Setting quality/budget/risk or reporting results -> `policy/CONTRACTS.md`
+- Behavior change, bug fix, or tests -> `policy/TESTING.md`
+- Quality floor, completion evidence -> `policy/QUALITY.md`
+- Medium/high-risk review or reviewer role -> `policy/REVIEW.md`
+- Model choice, subagent model, escalation -> `policy/MODELS.md`
+- Unfamiliar area or context expansion -> `policy/CONTEXT.md`
+- Tool selection, subagents, parallelism -> `policy/TOOLS.md`
+- Failure, retry, or rework -> `policy/RECOVERY.md`
 
 ## Routing rule
 
