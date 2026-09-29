@@ -42,9 +42,23 @@ AGENTS.md          Adapter for Codex / other agents
   hooks/           Quality Gate (Stop) and SessionStart hooks
   skills/          /lean-init, /lean-task, /lean-review, /lean-gate
   agents/          reviewer subagent
+.github/
+  workflows/lean-workflow.yml   CI for the workflow files only
+  lean-workflow/                Hook tests and structure checks
 ```
 
-Everything else belongs to your project. Replace this README with your project's own; the workflow description lives in `.agent/README.md`.
+Everything else belongs to your project.
+
+## Checks
+
+The workflow files test themselves. CI runs only when workflow files change, so it stays out of your project's CI. Run locally:
+
+```sh
+.github/lean-workflow/check-structure.sh   # referenced paths, settings, frontmatter
+.github/lean-workflow/test-hooks.sh        # Quality Gate and SessionStart hooks
+```
+
+Delete `.github/lean-workflow/` and `.github/workflows/lean-workflow.yml` if you do not want them. Replace this README with your project's own; the workflow description lives in `.agent/README.md`.
 
 ## Upgrading
 

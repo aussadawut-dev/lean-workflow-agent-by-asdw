@@ -1,0 +1,36 @@
+name: Lean Workflow
+
+on:
+  push:
+    paths:
+      - '.agent/**'
+      - '.claude/**'
+      - '.github/lean-workflow/**'
+      - '.github/workflows/lean-workflow.yml'
+      - 'CLAUDE.md'
+      - 'AGENTS.md'
+      - '.gitignore'
+  pull_request:
+    paths:
+      - '.agent/**'
+      - '.claude/**'
+      - '.github/lean-workflow/**'
+      - '.github/workflows/lean-workflow.yml'
+      - 'CLAUDE.md'
+      - 'AGENTS.md'
+      - '.gitignore'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ShellCheck
+        run: shellcheck .claude/hooks/*.sh .github/lean-workflow/*.sh
+
+      - name: Structure
+        run: .github/lean-workflow/check-structure.sh
+
+      - name: Hook tests
+        run: .github/lean-workflow/test-hooks.sh
