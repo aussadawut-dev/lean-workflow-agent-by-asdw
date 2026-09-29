@@ -1,0 +1,8 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Claude local state
+.claude/settings.local.json
+.claude/.gate-cache
