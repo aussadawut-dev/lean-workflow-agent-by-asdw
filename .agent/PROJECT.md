@@ -20,7 +20,7 @@ Shell scripts and Markdown only. No application, package manager, or build step.
 ## Commands
 
 ### Install
-Not defined. No dependencies. CI uses `shellcheck` (preinstalled on `ubuntu-latest`; not installed locally).
+Not defined. No dependencies. `shellcheck` is used by the gate and CI (`brew install shellcheck` locally; preinstalled on `ubuntu-latest`).
 
 ### Build
 Not defined.
@@ -29,7 +29,7 @@ Not defined.
 `.github/lean-workflow/test-hooks.sh` tests the Quality Gate and SessionStart hooks (13 checks, ~1s). Verified: passes, exits non-zero on failure.
 
 ### Lint
-`shellcheck .claude/hooks/*.sh .github/lean-workflow/*.sh` (CI only; `shellcheck` is not installed locally, so not run here).
+`shellcheck .claude/hooks/*.sh .github/lean-workflow/*.sh` (0.11.0; passes at default severity, same as CI).
 `.github/lean-workflow/check-structure.sh` checks referenced paths, settings, hook executability, frontmatter, and `PROJECT.md` gate markers (~0.2s). Verified: passes, exits non-zero on failure.
 
 ### Typecheck
@@ -41,6 +41,7 @@ Commands run by the Claude `Stop` hook (`.claude/hooks/quality-gate.sh`) before 
 
 <!-- gate:start -->
 ```sh
+shellcheck .claude/hooks/*.sh .github/lean-workflow/*.sh
 .github/lean-workflow/check-structure.sh
 .github/lean-workflow/test-hooks.sh
 ```

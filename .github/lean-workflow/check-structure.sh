@@ -18,27 +18,29 @@ for ref in $(printf '%s\n' "$docs" | xargs grep -hoE '\.(agent|claude)/[A-Za-z0-
 done
 
 # Router references relative to .agent/, e.g. `policy/REVIEW.md`.
-for ref in $(grep -oE '`(policy/)?[A-Z]+\.md`' .agent/README.md | tr -d '`' | sort -u); do
+# shellcheck disable=SC2016 # literal backticks in the pattern
+while read -r ref; do
   [ -e ".agent/$ref" ] || bad "missing .agent/$ref (from .agent/README.md)"
-done
+done < <(grep -oE '`(policy/)?[A-Z]+\.md`' .agent/README.md | tr -d '`' | sort -u)
 
 # Sibling references inside policy files, e.g. `CONTRACTS.md`.
 for file in .agent/policy/*.md; do
-  for ref in $(grep -oE '`[A-Z]+\.md`' "$file" | tr -d '`' | sort -u); do
+  # shellcheck disable=SC2016 # literal backticks in the pattern
+  while read -r ref; do
     [ -e ".agent/policy/$ref" ] || bad "missing .agent/policy/$ref (from $file)"
-  done
+  done < <(grep -oE '`[A-Z]+\.md`' "$file" | tr -d '`' | sort -u)
 done
 
 # CLAUDE.md imports.
-for ref in $(grep -oE '^@[^ ]+' CLAUDE.md | cut -c2-); do
+while read -r ref; do
   [ -e "$ref" ] || bad "missing import $ref (from CLAUDE.md)"
-done
+done < <(grep -oE '^@[^ ]+' CLAUDE.md | cut -c2-)
 
 # settings.json is valid and its hook scripts exist and are executable.
 if python3 -c 'import json,sys; json.load(open(sys.argv[1]))' .claude/settings.json 2>/dev/null; then
-  for script in $(grep -oE '\.claude/hooks/[A-Za-z0-9_.-]+' .claude/settings.json | sort -u); do
+  while read -r script; do
     [ -x "$script" ] || bad "hook not executable: $script"
-  done
+  done < <(grep -oE '\.claude/hooks/[A-Za-z0-9_.-]+' .claude/settings.json | sort -u)
 else
   bad "invalid JSON: .claude/settings.json"
 fi
