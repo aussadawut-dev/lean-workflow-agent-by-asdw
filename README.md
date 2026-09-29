@@ -12,7 +12,7 @@ Create a new repository from this one without its history:
 
 Then open it with Claude. That's it.
 
-- Claude reads `CLAUDE.md` (canonical) and the `Stop` hook in `.claude/settings.json`.
+- Claude reads `CLAUDE.md` (canonical) and `.claude/` (hooks, skills, reviewer subagent).
 - Codex and other agents read `AGENTS.md`, which defers to `CLAUDE.md`.
 - Workflow rules live in `.agent/`. Start at `.agent/README.md`.
 
@@ -20,13 +20,26 @@ Build your repository however you want. Lean Workflow does not prescribe languag
 
 As the project grows, agents fill in `.agent/PROJECT.md` with real commands and paths. Add your test/lint commands to its Quality Gate section to have the `Stop` hook enforce them.
 
+## Claude commands
+
+| Command | Use |
+|---|---|
+| `/lean-init` | Fill `.agent/PROJECT.md` from the real repository |
+| `/lean-task <task>` | Start non-trivial work with a Task Contract |
+| `/lean-review` | Review at the depth risk and quality require |
+| `/lean-gate` | Run the Quality Gate and report DONE or not |
+
 ## Layout
 
 ```
 CLAUDE.md          Canonical entrypoint (Claude)
 AGENTS.md          Adapter for Codex / other agents
 .agent/            Operating rules for agents (not application code)
-.claude/           Claude settings and Quality Gate hook
+.claude/
+  settings.json    Hooks and permissions
+  hooks/           Quality Gate (Stop) and SessionStart hooks
+  skills/          /lean-init, /lean-task, /lean-review, /lean-gate
+  agents/          reviewer subagent
 ```
 
 Everything else belongs to your project. Replace this README with your project's own; the workflow description lives in `.agent/README.md`.

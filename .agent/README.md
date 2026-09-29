@@ -1,6 +1,6 @@
 # Agent policy router
 
-Lean Workflow Baseline 1.0.0. See `CHANGELOG.md` for changes and upgrading.
+Lean Workflow Baseline 1.1.0. See `CHANGELOG.md` for changes and upgrading.
 
 This directory holds operating rules for agents. It is not application structure and prescribes no language, framework, layout, package manager, database, or deployment model.
 
