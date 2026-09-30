@@ -42,6 +42,14 @@ Modes only add steps: none of them lowers the quality floor. To switch, edit the
 by hand (`.lean/bin/mode.sh set <mode>` does the same thing) -- agents follow it and never change it
 on their own.
 
+`tracker` keeps the Result Contract on disk, one record per task:
+
+```sh
+.lean/bin/tracker.sh new "Rotate the signing keys" --contract "risk=HIGH quality=HIGH acceptance=..."
+.lean/bin/tracker.sh current                        # the record still open
+.lean/bin/tracker.sh state <record> DONE            # at the Quality Gate
+```
+
 `full` is for several sessions or machines working one backlog. Items live on their own git branch,
 one file per item, and a claim is a push to it, so two sessions cannot both take the same item:
 
@@ -75,9 +83,9 @@ CONTRIBUTING.md         How to change the workflow files.
   PROJECT.md            Context, commands, Quality Gate, workflow mode. <- yours to edit
   CHANGELOG.md          Workflow versions and upgrade steps.
   policy/               The rules. Replaced wholesale on upgrade.      <- do not edit
-  bin/                  Tools a session runs: mode.sh, queue.sh
+  bin/                  Tools a session runs: mode.sh, tracker.sh, queue.sh
   scripts/              check-structure.sh
-  tests/                test-mode.sh, test-hooks.sh, test-queue.sh
+  tests/                one per tool, plus test-hooks.sh
 
 .claude/                ZONE 2 - Claude runtime. Paths are fixed by Claude Code.
   settings.json         Hooks and permissions.
@@ -101,6 +109,7 @@ your project's CI. Run locally:
 ```sh
 .lean/scripts/check-structure.sh   # referenced paths, dead paths, settings, markers, exec bits
 .lean/tests/test-mode.sh           # the workflow mode config
+.lean/tests/test-tracker.sh        # tracking records
 .lean/tests/test-hooks.sh          # Quality Gate and SessionStart hooks
 .lean/tests/test-queue.sh          # the full mode queue and its claim protocol
 ```

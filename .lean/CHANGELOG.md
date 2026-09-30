@@ -47,10 +47,17 @@ then on -- not a judgement call an agent makes per task.
   step. Item headers are rewritten with `awk` and values passed through the environment, never
   spliced into a `sed` replacement: an owner holding `&`, `|` or a backslash used to corrupt the item
   into one nobody could claim, release, or close, while the claim reported success.
+- `.lean/bin/tracker.sh` owns the tracking record's header, so `tracker` mode is a tool rather than
+  prose: `new` writes the record with the date-and-slug name, the contract line and the Result
+  Contract's empty sections; `set` fills in the contract or the queue item a task learns as it goes;
+  `current` finds the record still `IN_PROGRESS`, so the Quality Gate step does not have to carry a
+  path; `state` closes it as one of the four states the workflow defines, and nothing else. The
+  sections stay the session's own writing.
 - New directory `.lean/bin/` for the workflow's own tools. It is deliberately not `.lean/scripts/`,
   which the README tells a project it may delete: those are self-checks for the workflow files,
   while `bin/` runs during a session -- the `SessionStart` hook reads `mode.sh` every time.
-- Tests: `.lean/tests/test-mode.sh` (43 checks) and `.lean/tests/test-queue.sh` (69 checks, against
+- Tests: `.lean/tests/test-mode.sh` (43 checks), `.lean/tests/test-tracker.sh` (52 checks) and
+  `.lean/tests/test-queue.sh` (69 checks, against
   a bare remote and up to four concurrent clones) are new, and `test-hooks.sh` goes from 55 to 67
   checks for the hook's mode reading. The queue's claim guarantee is tested by really running four
   claimers at once, not by simulating a stale base: exactly one wins, four claimers of four items
@@ -67,8 +74,8 @@ then on -- not a judgement call an agent makes per task.
   refusal moved onto the writes, so `list` and `show` still work from a checkout of the queue
   branch -- with no remote that checkout is the only copy of it.
 
-Upgrade. Add `.lean/bin/`, `.lean/policy/MODES.md`, `.lean/tests/test-mode.sh`, and
-`.lean/tests/test-queue.sh`. Replace `.claude/hooks/session-start.sh`,
+Upgrade. Add `.lean/bin/`, `.lean/policy/MODES.md`, `.lean/tests/test-mode.sh`,
+`.lean/tests/test-tracker.sh`, and `.lean/tests/test-queue.sh`. Replace `.claude/hooks/session-start.sh`,
 `.lean/scripts/check-structure.sh`, `.lean/tests/test-hooks.sh`, `.lean/README.md`, `CLAUDE.md`,
 `AGENTS.md`, the three skills that changed (`lean-task`, `lean-gate`, `lean-init`), and
 `.lean/CHANGELOG.md`. Then, in your own `PROJECT.md`, add the mode block -- copy

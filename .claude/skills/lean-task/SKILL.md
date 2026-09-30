@@ -7,10 +7,11 @@ argument-hint: <task description>
 Task: $ARGUMENTS
 
 1. The first line of your reply is the contract line from `CLAUDE.md`, before any tool call that changes files. Infer values; do not ask the user unless the goal itself is ambiguous. If unsure of risk, read `.lean/policy/CONTRACTS.md`.
-2. Check the mode: `.lean/bin/mode.sh get`. `standard` -- nothing extra. `tracker` -- open the tracking
-   record now. `full` -- claim the queue item first (`.lean/bin/queue.sh add <title>` if the task is not
-   in the queue yet), then open the record naming it. Rules and record shape: `.lean/policy/MODES.md`.
-   Unset: ask the user for the mode and record it before changing a file.
+2. Check the mode: `.lean/bin/mode.sh get`. `standard` -- nothing extra. `tracker` -- open the record
+   now: `.lean/bin/tracker.sh new "<title>" --contract "<your contract line>"`. `full` -- claim the queue
+   item first (`.lean/bin/queue.sh add <title>` if the task is not in the queue yet, then `claim <id>`),
+   then open the record with `--queue <id>`. Rules: `.lean/policy/MODES.md`. Unset: ask the user for the
+   mode and record it before changing a file.
 3. Read `.lean/PROJECT.md` for commands.
 4. Work, then test:
    - Behavior change: add tests for it and its edges.

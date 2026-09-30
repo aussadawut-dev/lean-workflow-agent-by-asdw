@@ -28,13 +28,22 @@ The value lives in the mode block of `.lean/PROJECT.md`, which upgrades never to
 ## tracker
 
 One record per Task Contract, in `.lean/tracker/`, named `<YYYY-MM-DD>-<slug>.md`. Trivial tasks
-(see `WORKFLOW.md`) need none.
+(see `WORKFLOW.md`) need none. `.lean/bin/tracker.sh` owns the header, you write the sections:
+
+```sh
+.lean/bin/tracker.sh new "<title>" --contract "<contract line>"   # prints the record path
+.lean/bin/tracker.sh set <record> queue <item id>                 # in full mode
+.lean/bin/tracker.sh current                                      # the record still IN_PROGRESS
+.lean/bin/tracker.sh state <record> <DONE|BLOCKED|FAILED>         # at the Quality Gate
+```
 
 - Open it when you write the contract line, with the contract and `state: IN_PROGRESS`.
 - Close it at the Quality Gate with the Result Contract from `CONTRACTS.md`, and commit it with the
-  change it describes.
+  change it describes. The state you set is the status you report; they cannot disagree.
 - It is the Result Contract on disk. Record what the diff cannot say -- why, what was ruled out,
   what is unverified -- not a second copy of the diff.
+- A record is found by path, file name, or slug, so a later session can close what an earlier one
+  opened.
 
 ```
 # <title>
@@ -64,7 +73,8 @@ Everything `tracker` does, and work is claimed before it starts. `.lean/bin/queu
 .lean/bin/queue.sh release <id>     # stopping without finishing
 ```
 
-- Claim before the first change, and name the item id in the tracking record's `queue:` field.
+- Claim before the first change, and name the item id in the tracking record's `queue:` field
+  (`tracker.sh new --queue <id>`, or `tracker.sh set <record> queue <id>`).
 - Exit 3 is the item's own answer -- held by someone else, not claimed, already done: take another
   item, and never edit the item file to take it anyway. Exit 4 is not an answer about the item: the
   queue branch kept moving under the write, nothing was decided, and the same command can be run

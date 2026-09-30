@@ -39,6 +39,9 @@ jobs:
       - name: Mode tests
         run: .lean/tests/test-mode.sh
 
+      - name: Tracker tests
+        run: .lean/tests/test-tracker.sh
+
       - name: Hook tests
         run: .lean/tests/test-hooks.sh
 
