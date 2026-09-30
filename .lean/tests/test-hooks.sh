@@ -290,6 +290,69 @@ CLAUDE_PROJECT_DIR="$dir" bash "$gate" --seed
 run_gate "$dir" '{}'
 expect_code "gate: a matching cache does not override a refusal" 2
 
+# 26. A gate command whose program is not installed blocks like any other
+# failure -- a gate that could not run has not passed -- but the message has to
+# say which of the two it is, because they need opposite responses: fix the
+# code, or report that the environment could not check it. Verified on the
+# container this repository is developed in, which ships no shellcheck -- the
+# very first gate command in .lean/PROJECT.md. With one message for both, every
+# turn there that touched a file ended as BLOCKED work over a clean diff.
+dir="$(fixture 'lean-no-such-tool --check')"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+expect_code "gate: a missing program still blocks" 2
+case "$err" in
+  *"Quality Gate could not run: lean-no-such-tool --check"*)
+    ok "gate: a missing program says the gate could not run" ;;
+  *) bad "gate: a missing program says the gate could not run (got: $err)" ;;
+esac
+case "$err" in
+  *"not a failure your change caused"*)
+    ok "gate: a missing program is named as the environment" ;;
+  *) bad "gate: a missing program is named as the environment (got: $err)" ;;
+esac
+case "$err" in
+  *"If your change caused this"*)
+    bad "gate: a missing program does not ask for a code fix (got: $err)" ;;
+  *) ok "gate: a missing program does not ask for a code fix" ;;
+esac
+
+# 27. The other half: a command that exists and fails keeps the ordinary
+# verdict. Without this the split could drift into calling every failure an
+# environment problem, which reads as "nothing here to fix" on a real
+# regression -- the same mistake as case 26, pointed the other way.
+dir="$(fixture "test -f '$work/never-created'")"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+expect_code "gate: a real failure still blocks" 2
+case "$err" in
+  *"Quality Gate failed: test -f"*) ok "gate: a real failure keeps the failure message" ;;
+  *) bad "gate: a real failure keeps the failure message (got: $err)" ;;
+esac
+case "$err" in
+  *"If your change caused this"*) ok "gate: a real failure still asks for a fix" ;;
+  *) bad "gate: a real failure still asks for a fix (got: $err)" ;;
+esac
+case "$err" in
+  *"could not run"*)
+    bad "gate: a real failure is not called an environment problem (got: $err)" ;;
+  *) ok "gate: a real failure is not called an environment problem" ;;
+esac
+
+# 28. A gate command that names a path rather than a program is this
+# repository's business even when it is missing: the shell reports that the same
+# way it reports an absent tool, so the split reads the command's shape, and
+# this pins the side of it that stays an ordinary failure.
+dir="$(fixture './scripts/gone.sh')"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+expect_code "gate: a missing script still blocks" 2
+case "$err" in
+  *"Quality Gate failed: ./scripts/gone.sh"*)
+    ok "gate: a missing script is a failure, not an environment problem" ;;
+  *) bad "gate: a missing script is a failure, not an environment problem (got: $err)" ;;
+esac
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

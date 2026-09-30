@@ -2,7 +2,10 @@
 # Quality Gate hook (Stop event).
 # Runs the commands between the gate markers in .lean/PROJECT.md.
 # No commands defined -> no-op. Failure -> exit 2, which blocks Claude
-# from finishing and returns the output to it.
+# from finishing and returns the output to it. A command the shell cannot find
+# exits 2 as well, because a gate that could not run is not a gate that passed,
+# but it says so in its own words: the answer to it is to report the environment,
+# not to repair code that nothing has actually found fault with.
 #
 # `--seed` records the current state and runs nothing. The SessionStart hook
 # calls it, so a session that changes nothing does not run the gate at its
@@ -74,16 +77,41 @@ if [ -n "$state" ] && [ ! -f "$failed" ] &&
 fi
 
 while IFS= read -r cmd; do
-  if ! output="$(bash -c "$cmd" 2>&1)"; then
-    {
+  output="$(bash -c "$cmd" 2>&1)" && continue
+  status=$?
+
+  # Why a command failed decides what to do about it, so the two cases say
+  # different things. Both block: a gate that could not run has not passed, and
+  # neither message may read as "carry on". Exit 127 is the shell reporting it
+  # found nothing to execute. A bare first word is a PATH lookup for a tool the
+  # environment is meant to provide; a first word holding a slash names a file
+  # this repository points at, and a missing one of those is the change's
+  # business, not the machine's. 126 (found, not executable) stays an ordinary
+  # failure for the same reason -- a dropped exec bit is usually in the diff.
+  # Everything else falls to the ordinary message, which sends the agent to
+  # look: "not your change" is the verdict that can wave a real failure through,
+  # so it is the narrow one.
+  read -r first _ <<< "$cmd"
+  case "$status:$first" in
+    127:*/*) missing=0 ;;
+    127:*)   missing=1 ;;
+    *)       missing=0 ;;
+  esac
+
+  {
+    if [ "$missing" -eq 1 ]; then
+      echo "Quality Gate could not run: $cmd"
+      printf '%s\n' "$output" | tail -n 40
+      echo "'$first' is not available in this environment, so this check never ran. That is a missing tool, not a failure your change caused. Do not edit code, the gate, or the tests to get past it: report BLOCKED, name the gate command that could not run and the tool it needs, say the change is unverified by that command, and do not declare DONE."
+    else
       echo "Quality Gate failed: $cmd"
       printf '%s\n' "$output" | tail -n 40
       echo "If your change caused this, fix it. If it was already failing or is outside the task, do not touch it: report BLOCKED and ask. Do not declare DONE."
-    } >&2
-    rm -f "$cache"
-    : > "$failed"
-    exit 2
-  fi
+    fi
+  } >&2
+  rm -f "$cache"
+  : > "$failed"
+  exit 2
 done <<< "$commands"
 
 rm -f "$failed"

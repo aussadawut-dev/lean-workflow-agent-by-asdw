@@ -4,6 +4,45 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
+## 2.3.0
+
+The Quality Gate tells a missing tool apart from a failing check. Both block; only one of them is
+about the change.
+
+- `quality-gate.sh` printed one verdict for every non-zero exit: `Quality Gate failed: <cmd>`, then
+  "If your change caused this, fix it. If it was already failing or is outside the task, do not touch
+  it: report BLOCKED and ask." Under that wording a command the shell never found reads as a check
+  that ran and said no, so the agent reports `BLOCKED` over a diff with nothing wrong with it.
+  Verified on the container Claude Code on the web runs in, which ships no `shellcheck` while
+  `shellcheck` is the first gate command in this repository's `.lean/PROJECT.md`: exit 2,
+  `shellcheck: command not found`, on every turn that touched a file.
+- Exit 127 from a bare command name now reports `Quality Gate could not run: <cmd>` and names the
+  tool, the environment, and the report it wants: `BLOCKED`, naming the gate command that could not
+  run and the check the change is therefore unverified by. It still exits 2, and the skip cache and
+  the `.claude/.gate-failed` marker treat it as the refusal it is. A message that let the turn finish
+  would be the fail-open, not the fix: a gate that could not run has not passed.
+- The split reads the command's shape, because 127 alone does not say whose problem it is. A bare
+  first word is a PATH lookup for a tool the environment owes the project; a first word holding a
+  slash names a file this repository points at, so a gate line whose script is missing stays an
+  ordinary failure. 126 (found, not executable) stays one too -- a dropped exec bit is usually in the
+  diff. Anything else falls to the ordinary message, which sends the agent to look, because "not your
+  change" is the verdict that can wave a real failure through.
+- `test-hooks.sh` is now 43 checks. Three are the regression and fail against the 2.2.0 hook: a
+  missing program must say the gate could not run, must name the environment, and must not carry the
+  "If your change caused this" line. Seven more pin what must not move with it -- a command that
+  exists and fails keeps the old verdict and is never called an environment problem, and a script
+  named by path is a failure when it is missing, not a missing tool.
+
+One fail-open this does not close: a gate command that swallows its own 127 still passes. `test -z
+"$(gofmt -l .)"` with no `gofmt` prints the shell's complaint inside the substitution and then tests
+an empty string, and that is the shape `.lean/PROJECT.md` recommends for formatters. The hook reads
+the status of the command it was given, and the status is 0. Judging the output instead would block a
+turn on any gate command that merely prints those words, which in a downstream install is every turn,
+so closing it needs its own evidence rather than a guess bolted onto this one.
+
+**Upgrading:** no steps. The gate blocks the same states it blocked before; one of them now explains
+itself differently.
+
 ## 2.2.0
 
 Review rounds are bounded. From this repository's own five-round run on one change, counted against
