@@ -4,8 +4,8 @@
 # No commands defined -> no-op. Failure -> exit 2, which blocks Claude
 # from finishing and returns the output to it. A command the shell cannot find
 # exits 2 as well, because a gate that could not run is not a gate that passed,
-# but it says so in its own words: the answer to it is to report the environment,
-# not to repair code that nothing has actually found fault with.
+# but it says so in its own words: the answer is to report the environment, not
+# to repair code that nothing has actually found fault with.
 #
 # `--seed` records the current state and runs nothing. The SessionStart hook
 # calls it, so a session that changes nothing does not run the gate at its
@@ -94,10 +94,10 @@ while IFS= read -r cmd; do
   # a word holding a quote or a dollar is a fragment the line was parsed into,
   # and a word opening with a dash is an option, which is nobody's package to
   # install -- a gate command wrapped over two lines hands its continuation here
-  # as a command of its own. None of the three earns the excuse. Both take the ordinary message, as do 126
-  # (found, will not execute -- usually an exec bit missing from the diff) and
-  # every other status: "not your change" is the verdict that can wave a real
-  # failure through, so it stays the narrow one.
+  # as a command of its own. None of the three earns the excuse; all three take
+  # the ordinary message, as do 126 (found, will not execute -- usually an exec
+  # bit missing from the diff) and every other status: "not your change" is the
+  # verdict that can wave a real failure through, so it stays the narrow one.
   #
   # Leading VAR=VALUE words are the shell's own business rather than the
   # program, so step past them -- the lookup for `CI=1 npm test` is `npm`, and
