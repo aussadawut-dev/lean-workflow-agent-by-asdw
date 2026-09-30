@@ -11,7 +11,7 @@ Task Contract -> Context -> Work -> Test -> Validate -> Review -> Quality Gate -
 3. **Work** — implement using the simplest valid path.
 4. **Test** — add/run tests for behavior changes. See `TESTING.md`.
 5. **Validate** — deterministic checks first (build, lint, typecheck, tests). Commands live in `.lean/PROJECT.md`.
-6. **Review** — depth by risk. See `REVIEW.md`.
+6. **Review** — depth by risk, one contract per review cycle, bounded rounds. See `REVIEW.md`.
 7. **Quality Gate** — verify evidence against the quality floor. See `QUALITY.md`.
 
 ## Trivial task

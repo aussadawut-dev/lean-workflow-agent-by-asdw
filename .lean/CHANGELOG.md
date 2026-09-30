@@ -4,6 +4,24 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
+## 2.2.0
+
+Review rounds are bounded. From a session that ran five of them on one change, and from counting
+where they went.
+
+- A `PASS` ends the review. Two of those five rounds came after a `PASS`, spent re-reviewing
+  non-blocking findings that had already been applied. Apply such findings; do not open a round to
+  check them.
+- After the second `REWORK` on one contract, report what is left rather than starting a third. The
+  cap is on spend, not on depth: the user can say continue, and it is their budget either way.
+- A review cycle covers one Task Contract. The most expensive round in that session came from
+  taking on a second task mid-cycle. The new work introduced a regression that reopened the loop
+  for the first task, and findings stopped mapping cleanly to a change.
+
+`REVIEW.md` has a `Rounds` section, `/lean-review` step 5 carries the cap, and `WORKFLOW.md` step 6
+routes to it. Review depth is unchanged: this bounds how many times a change is reviewed, never how
+deeply.
+
 ## 2.1.0
 
 The Quality Gate no longer skips a turn just because the working tree is clean.
