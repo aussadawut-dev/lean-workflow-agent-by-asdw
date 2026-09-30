@@ -42,8 +42,10 @@ One record per Task Contract, in `.lean/tracker/`, named `<YYYY-MM-DD>-<slug>.md
   change it describes. The state you set is the status you report; they cannot disagree.
 - It is the Result Contract on disk. Record what the diff cannot say -- why, what was ruled out,
   what is unverified -- not a second copy of the diff.
-- A record is found by path, file name, or slug, so a later session can close what an earlier one
-  opened.
+- A record is found by path (inside `.lean/tracker/`), file name, or slug, so a later session can
+  close what an earlier one opened. A slug matching several records resolves to the open one; still
+  ambiguous, it is refused with the matches named, and so is `current` with more than one record
+  open. Name the record you mean -- the tool does not guess which one to close.
 
 ```
 # <title>

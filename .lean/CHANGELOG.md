@@ -53,10 +53,18 @@ then on -- not a judgement call an agent makes per task.
   `current` finds the record still `IN_PROGRESS`, so the Quality Gate step does not have to carry a
   path; `state` closes it as one of the four states the workflow defines, and nothing else. The
   sections stay the session's own writing.
+- What that tool refuses is the substance of it, because a record that lies is worse than no record.
+  A title is written as one line, so a task description whose second line reads `state: DONE` cannot
+  open a record already claiming DONE. A resolved path must be inside the records directory, so a
+  mistyped or generated path cannot have its `state:` line rewritten and `show` is not a way to print
+  any readable file. A slug matching several records resolves to the open one and otherwise refuses,
+  naming the matches, rather than closing whichever sorts last. A glob character in a record name is
+  refused. Records are created with noclobber, so two sessions starting at once take different names.
+  Every one of those is pinned by a mutation recorded in `PROJECT.md`.
 - New directory `.lean/bin/` for the workflow's own tools. It is deliberately not `.lean/scripts/`,
   which the README tells a project it may delete: those are self-checks for the workflow files,
   while `bin/` runs during a session -- the `SessionStart` hook reads `mode.sh` every time.
-- Tests: `.lean/tests/test-mode.sh` (43 checks), `.lean/tests/test-tracker.sh` (52 checks) and
+- Tests: `.lean/tests/test-mode.sh` (43 checks), `.lean/tests/test-tracker.sh` (81 checks) and
   `.lean/tests/test-queue.sh` (69 checks, against
   a bare remote and up to four concurrent clones) are new, and `test-hooks.sh` goes from 55 to 67
   checks for the hook's mode reading. The queue's claim guarantee is tested by really running four

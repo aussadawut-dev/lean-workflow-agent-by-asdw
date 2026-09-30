@@ -59,10 +59,15 @@ for line in "# Add the login flow" "state: IN_PROGRESS" "contract: -" "started: 
     bad "new: the record has '$line' (got: $(head -6 "$record" | tr '\n' '/'))"
   fi
 done
+missing=""
 for section in "## Changes" "## Evidence" "## Not verified" "## Follow-ups"; do
-  grep -qxF "$section" "$record" || bad "new: the record has $section"
+  grep -qxF "$section" "$record" || missing="$missing $section"
 done
-ok "new: the record has the Result Contract's sections"
+if [ -z "$missing" ]; then
+  ok "new: the record has the Result Contract's sections"
+else
+  bad "new: the record has the Result Contract's sections (missing:$missing)"
+fi
 
 # 3. A contract line is full of characters a rewrite could mistake for syntax:
 # `=`, `&`, `|`, `/` and a backslash all appear in real acceptance checks. They
@@ -209,6 +214,104 @@ out="$(LC_ALL=C CLAUDE_PROJECT_DIR="$dir" bash "$tracker" new "Rétablir le caf�
 code=$?
 expect "locale: a non-ASCII record is created under LC_ALL=C" "$code" "0"
 contains "locale: the contract keeps its accents" "$(cat "$out")" "acceptance=café tests pass"
+
+# 16. A title comes from a task description and is routinely several lines. On
+# the record it is a heading; if its second line reaches the file it is read as a
+# header field, and a title ending in "state: DONE" would open a record already
+# claiming DONE -- with no evidence, and invisible to `current`, which is how the
+# Quality Gate step finds the record it must close.
+dir="$(fixture)"
+t "$dir" new "$(printf 'Fix the parser\nstate: DONE')"
+record="$out"
+expect "title: a title carrying a header line still creates a record" "$code" "0"
+expect "title: the record opens IN_PROGRESS" "$(grep -m1 '^state: ' "$record")" "state: IN_PROGRESS"
+expect "title: the header has one state line" "$(grep -c '^state: ' "$record")" "1"
+expect "title: the heading is one line" "$(head -1 "$record")" "# Fix the parser state: DONE"
+t "$dir" current
+expect "title: current still finds it" "$out" "$record"
+t "$dir" list
+contains "title: the listing shows it open" "$out" "IN_PROGRESS"
+
+# 17. The records directory is the whole of this tool's business. A path from
+# somewhere else -- mistyped, or generated -- must not have its state rewritten,
+# and `show` must not be a way to print any readable file.
+foreign="$work/foreign.md"
+printf '# not a record\nstate: draft\ncontract: -\nqueue: -\n\nbody\n' > "$foreign"
+before="$(cksum < "$foreign")"
+t "$dir" state "$foreign" DONE
+expect "outside: a path outside the records directory exits 2" "$code" "2"
+contains "outside: the refusal says why" "$out" "outside"
+expect "outside: the foreign file is untouched" "$(cksum < "$foreign")" "$before"
+t "$dir" show "$foreign"
+expect "outside: show refuses it too" "$code" "2"
+
+# 18. Two records for one slug on one day: resolving by slug must not pick one of
+# them silently. Closing the wrong record is a wrong DONE, which is the mistake
+# this tool exists to prevent.
+dir="$(fixture)"
+t "$dir" new "Dup task"
+first="$out"
+t "$dir" new "Dup task"
+second="$out"
+sum_first="$(cksum < "$first")"
+sum_second="$(cksum < "$second")"
+t "$dir" state dup-task DONE
+expect "ambiguous: a slug matching two open records is refused" "$code" "1"
+contains "ambiguous: the refusal lists the first" "$out" "$(basename "$first")"
+contains "ambiguous: the refusal lists the second" "$out" "$(basename "$second")"
+expect "ambiguous: neither record was touched" \
+  "$(cksum < "$first")$(cksum < "$second")" "$sum_first$sum_second"
+t "$dir" current
+expect "ambiguous: current refuses to pick between two open records" "$code" "1"
+contains "ambiguous: current lists them" "$out" "$(basename "$second")"
+
+# The exact name always works, and once one is closed the slug means the open one.
+t "$dir" state "$second" DONE
+expect "ambiguous: the exact name is never ambiguous" "$code" "0"
+t "$dir" state dup-task BLOCKED
+expect "ambiguous: with one open, the slug means that one" "$code" "0"
+expect "ambiguous: and it is the one that changed" "$(grep '^state: ' "$first")" "state: BLOCKED"
+expect "ambiguous: the closed one kept its state" "$(grep '^state: ' "$second")" "state: DONE"
+t "$dir" current
+expect "ambiguous: current is empty again once both are closed" "$code" "2"
+
+# 19. A name is a name, not a pattern: a stray `*` used to close whichever record
+# it happened to match.
+dir="$(fixture)"
+t "$dir" new "Glob me"
+record="$out"
+before="$(cksum < "$record")"
+t "$dir" state '*' FAILED
+expect "glob: a glob character is refused" "$code" "1"
+contains "glob: the refusal says why" "$out" "glob"
+expect "glob: the record is untouched" "$(cksum < "$record")" "$before"
+
+# 20. A header line whose value is empty is a line that exists: setting it is the
+# point. Only a missing line is an error, and it says which line is missing.
+dir="$(fixture)"
+t "$dir" new "Empty field"
+record="$out"
+sed -i.bak 's/^contract: -$/contract: /' "$record"
+rm -f "$record.bak"
+t "$dir" set empty-field contract "risk=LOW quality=STANDARD acceptance=none"
+expect "empty value: an empty header value is settable" "$code" "0"
+expect "empty value: the value landed" "$(grep '^contract: ' "$record")" \
+  "contract: risk=LOW quality=STANDARD acceptance=none"
+grep -v '^queue: ' "$record" > "$record.tmp" && mv "$record.tmp" "$record"
+t "$dir" set empty-field queue some-item
+expect "missing line: setting a field with no line exits 1" "$code" "1"
+contains "missing line: the message names the line" "$out" "no 'queue' line"
+
+# 21. A record whose header does not parse is named as malformed in the listing
+# rather than shown with an empty state, which reads like a record with no state.
+dir="$(fixture)"
+t "$dir" new "Broken header"
+record="$out"
+sed -i.bak '1a\
+' "$record"
+rm -f "$record.bak"
+t "$dir" list
+contains "malformed: the listing says so" "$out" "MALFORMED"
 
 echo
 echo "$pass passed, $fail failed"
