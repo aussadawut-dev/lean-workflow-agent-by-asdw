@@ -156,5 +156,39 @@ for marker in 'gate:start' 'gate:end'; do
   [ "$count" = "1" ] || bad "expected one $marker marker in .lean/PROJECT.md, found $count"
 done
 
+# Model registry age. `.lean/policy/MODELS.md` names tiers; the registry in .lean/PROJECT.md
+# names the model each tier resolves to when a subagent is spawned. Model generations turn
+# over faster than that file gets reread, and a stale registry is worse than none, because
+# the agent trusts it instead of falling back. The names cannot be checked from here -- no
+# list of current models is in this repository -- so the date is. A project carrying no
+# registry is not failed: MODELS.md's fallback covers it. Half a registry is, since a lost
+# marker would otherwise read as no registry and skip the check in silence.
+models_start="$(grep -c -- '<!-- models:start -->' .lean/PROJECT.md)"
+models_end="$(grep -c -- '<!-- models:end -->' .lean/PROJECT.md)"
+if [ "$models_start$models_end" != "00" ]; then
+  if [ "$models_start" != "1" ] || [ "$models_end" != "1" ]; then
+    bad "expected one models:start and one models:end marker in .lean/PROJECT.md, found $models_start and $models_end"
+  else
+    verified="$(awk '/<!-- models:start -->/ { inside = 1; next }
+                     /<!-- models:end -->/   { inside = 0 }
+                     inside' .lean/PROJECT.md |
+      grep -m1 -oE '^verified: [0-9]{4}-[0-9]{2}-[0-9]{2}$' | cut -d' ' -f2)"
+    # python3 is already required above, for settings.json. Date arithmetic in shell is not
+    # portable between the GNU and BSD `date` this template runs on; this is.
+    age="$(python3 -c 'import datetime,sys
+print((datetime.date.today() - datetime.date.fromisoformat(sys.argv[1])).days)' \
+      "${verified:-}" 2>/dev/null)"
+    if [ -z "$verified" ]; then
+      bad "model registry in .lean/PROJECT.md has no 'verified: YYYY-MM-DD' line"
+    elif [ -z "$age" ]; then
+      bad "model registry in .lean/PROJECT.md: cannot read verified date $verified"
+    elif [ "$age" -lt 0 ]; then
+      bad "model registry in .lean/PROJECT.md is dated $verified, in the future: a date not yet reached verifies nothing"
+    elif [ "$age" -gt 90 ]; then
+      bad "model registry in .lean/PROJECT.md was verified $verified, $age days ago (limit 90): check each tier against the models available now, then move the verified date forward"
+    fi
+  fi
+fi
+
 if [ "$fail" -eq 0 ]; then echo "structure ok"; fi
 [ "$fail" -eq 0 ]

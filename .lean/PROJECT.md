@@ -6,7 +6,7 @@ Update it as the project takes shape. "Not defined" is not an error: it means th
 
 ## Purpose
 
-Lean Workflow Baseline: a repository template (Claude primary, `AGENTS.md` adapter for other agents) that gives a project a quality-driven coding workflow. It contains workflow files only, no application code. Current version: 2.4.1 (see `.lean/CHANGELOG.md`).
+Lean Workflow Baseline: a repository template (Claude primary, `AGENTS.md` adapter for other agents) that gives a project a quality-driven coding workflow. It contains workflow files only, no application code. Current version: 2.5.0 (see `.lean/CHANGELOG.md`).
 
 ## Architecture
 
@@ -27,10 +27,11 @@ Not defined.
 
 ### Test
 `.lean/tests/test-hooks.sh` tests the Quality Gate and SessionStart hooks (55 checks, ~5.3s). Verified: passes, exits non-zero on failure, and every term of the gate's state hash plus both of its refusal guards are covered -- removing any one of them fails a check. The gate's two verdicts are covered as a pair: a command the shell cannot find must be reported as an environment problem, and a command that exists and fails must not be -- including a wrapper that hands back another program's 127. Every term deciding that split is pinned on its own: remove the status test, either half of the command-name test, the resolve test or the assignment strip and a check fails.
+`.lean/tests/test-structure.sh` tests the model registry age check in `.lean/scripts/check-structure.sh` (11 checks, ~2.9s), each in a throwaway copy of the repository. Verified: passes, exits non-zero on failure, and the window, its edge, the future-date guard and the half-a-registry guard each fail a check when removed. It also runs the check against this repository, so the suite goes red on the day the shipped registry goes stale rather than only the gate.
 
 ### Lint
 `shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh` (0.11.0; passes at default severity, same as CI).
-`.lean/scripts/check-structure.sh` checks referenced paths, retired paths, settings, hook executability, frontmatter, `.gitignore` entries for the gate's state files, and `PROJECT.md` gate markers (~0.3s). Verified: passes, exits non-zero on failure.
+`.lean/scripts/check-structure.sh` checks referenced paths, retired paths, settings, hook executability, frontmatter, `.gitignore` entries for the gate's state files, `PROJECT.md` gate markers, and the age of the model registry below (~0.3s). Verified: passes, exits non-zero on failure.
 
 ### Typecheck
 Not defined.
@@ -44,8 +45,23 @@ Commands run by the Claude `Stop` hook (`.claude/hooks/quality-gate.sh`) before 
 shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh
 .lean/scripts/check-structure.sh
 .lean/tests/test-hooks.sh
+.lean/tests/test-structure.sh
 ```
 <!-- gate:end -->
+
+## Model registry
+
+Which model each tier in `.lean/policy/MODELS.md` resolves to when a subagent is spawned. Aliases, not pinned version ids: an alias tracks the current generation, a pinned id goes out of date without saying so. Re-verify the entries against the models the session actually offers, then move `verified` forward; `.lean/scripts/check-structure.sh` fails once that date is more than 90 days old.
+
+<!-- models:start -->
+verified: 2026-09-30
+
+| tier | model |
+| --- | --- |
+| fast | haiku |
+| default | sonnet |
+| strongest | opus |
+<!-- models:end -->
 
 ## Important paths
 

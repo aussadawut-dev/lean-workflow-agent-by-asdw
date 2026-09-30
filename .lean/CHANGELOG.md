@@ -4,6 +4,56 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
+## 2.5.0
+
+The tier a contract picks now resolves to a model the repository names, instead of one the agent
+remembers.
+
+`policy/MODELS.md` routed work to a fast, a default, or a strongest model and stopped there: no
+file in the workflow said which model any of those is. The names were supplied at the spawn site,
+from the agent's own knowledge of what shipped by its training cutoff. Seen in a run that
+dispatched two bounded workers on a version id recalled rather than read -- the routing was right,
+the model was a guess, and nothing in the repository could tell the two apart. Every other link in
+the chain is written down: `policy/CONTRACTS.md` infers risk, `policy/QUALITY.md` and
+`policy/REVIEW.md` set depth, `policy/MODELS.md` maps depth to a tier. Only the last hop was
+unwritten, and it is the one that goes out of date on its own.
+
+- `policy/MODELS.md` gains `Resolving a tier to a model`. The tiers stay abstract, which is what
+  keeps that file from going stale on an upgrade cycle it does not control. The names live in a
+  `Model registry` in `PROJECT.md`, which is project-owned and untouched by upgrades. An alias is
+  preferred over a pinned version id: an alias tracks the current generation, a pinned id goes out
+  of date without saying so. No registry, a stale one, or an entry the runtime rejects falls back
+  to the tier descriptions and names the model that actually ran; an id from memory is the drift
+  the registry exists to catch, so it is never the fallback.
+- `CLAUDE.md`'s reviewer rule says where `strongest model available` is defined. The rule has been
+  in the file since 2.3.0 with nothing to read it off.
+- `scripts/check-structure.sh` fails once the registry's `verified` date is more than 90 days old.
+  The names cannot be checked from in here -- the repository holds no list of current models -- so
+  the date is checked instead, and keeping it current is made a task rather than a habit. A
+  registry dated in the future is rejected: it verifies nothing, and it is the cheapest way to
+  silence the check. A project carrying no registry is not failed, since the fallback covers it;
+  half a registry is, because a lost marker would otherwise read as no registry and skip the check
+  in silence.
+- `tests/test-structure.sh` is new: 11 checks, ~2.9s, each in a throwaway copy of the repository.
+  It covers the window, its edge at exactly 90 days, the future-date and malformed-date guards, a
+  registry with no date, half a registry, and no registry at all. Remove the limit, the edge, the
+  future-date guard or the half-a-registry guard and a check fails. It also runs the check against
+  this repository, so the suite goes red on the day the shipped registry goes stale rather than
+  only the gate. Added to the gate block and to CI; `scripts/check-structure.sh` had no test
+  before this.
+
+The cost is deliberate and worth stating: a dated check is a check that fires on a date nobody
+picked, and a stale registry blocks the gate on whatever task happens to be in flight. That is the
+trade for a registry that cannot rot quietly. The fix is a minute's work and the failure names it.
+
+Replace `.lean/policy/MODELS.md`, `.lean/scripts/check-structure.sh`, `CLAUDE.md`,
+`CONTRIBUTING.md`, `README.md`, `.github/workflows/lean-workflow.yml`, `.lean/README.md`, and
+`.lean/CHANGELOG.md`. Add `.lean/tests/test-structure.sh`. Then, in your own `.lean/PROJECT.md`:
+add `.lean/tests/test-structure.sh` to the gate block, and add a `Model registry` section with
+`<!-- models:start -->` / `<!-- models:end -->` markers, a `verified: YYYY-MM-DD` line, and one
+entry per tier -- upgrades do not write that file, and an install that skips this step keeps the
+fallback rather than failing.
+
 ## 2.4.1
 
 Rationale moved out of the files agents read on every task. No rule changed.
