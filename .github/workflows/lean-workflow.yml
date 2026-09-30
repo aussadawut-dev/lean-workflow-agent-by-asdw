@@ -3,21 +3,25 @@ name: Lean Workflow
 on:
   push:
     paths:
-      - '.agent/**'
+      - '.lean/**'
       - '.claude/**'
-      - '.github/lean-workflow/**'
       - '.github/workflows/lean-workflow.yml'
+      - '.github/pull_request_template.md'
       - 'CLAUDE.md'
       - 'AGENTS.md'
+      - 'CONTRIBUTING.md'
+      - 'README.md'
       - '.gitignore'
   pull_request:
     paths:
-      - '.agent/**'
+      - '.lean/**'
       - '.claude/**'
-      - '.github/lean-workflow/**'
       - '.github/workflows/lean-workflow.yml'
+      - '.github/pull_request_template.md'
       - 'CLAUDE.md'
       - 'AGENTS.md'
+      - 'CONTRIBUTING.md'
+      - 'README.md'
       - '.gitignore'
 
 jobs:
@@ -27,10 +31,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: ShellCheck
-        run: shellcheck .claude/hooks/*.sh .github/lean-workflow/*.sh
+        run: shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh
 
       - name: Structure
-        run: .github/lean-workflow/check-structure.sh
+        run: .lean/scripts/check-structure.sh
 
       - name: Hook tests
-        run: .github/lean-workflow/test-hooks.sh
+        run: .lean/tests/test-hooks.sh

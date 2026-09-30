@@ -28,7 +28,7 @@ Do not ask the user for these values. Use the defaults, infer risk, and state th
 - **Quality** — `STANDARD`, unless the user asks for more or risk is `HIGH` (then at least `HIGH`).
 - **Budget** — `BALANCED`.
 - **Risk** — inferred:
-  - `HIGH` — auth, permissions, payments, secrets, data deletion or migration, security boundaries, public API contracts, anything hard to reverse. Also any area listed under High-risk areas in `.agent/PROJECT.md`.
+  - `HIGH` — auth, permissions, payments, secrets, data deletion or migration, security boundaries, public API contracts, anything hard to reverse. Also any area listed under High-risk areas in `.lean/PROJECT.md`.
   - `MEDIUM` — behavior changes in shared code, multi-file refactors, dependency changes, configuration that affects runtime.
   - `LOW` — docs, comments, tests only, isolated local changes.
 - When unsure between two levels, choose the higher one.
@@ -39,7 +39,7 @@ Scale the report to the task. A trivial task needs one line.
 
 - **Status** — `DONE | BLOCKED | FAILED`.
 - **Changes** — what changed and where.
-- **Evidence** — commands run and their outcomes, tests added/run.
+- **Evidence** — commands run and their outcomes, tests added/run, which review round the change is on, and the range that review covered against the range that ships.
 - **Not verified** — anything skipped, with reason.
 - **Follow-ups** — remaining work, if any.
 

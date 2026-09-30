@@ -14,11 +14,11 @@ Then open it with Claude. That's it.
 
 - Claude reads `CLAUDE.md` (canonical) and `.claude/` (hooks, skills, reviewer subagent).
 - Codex and other agents read `AGENTS.md`, which defers to `CLAUDE.md`.
-- Workflow rules live in `.agent/`. Start at `.agent/README.md`.
+- Workflow rules live in `.lean/`. Start at `.lean/README.md`.
 
 Build your repository however you want. Lean Workflow does not prescribe language, framework, architecture, package manager, database, or deployment model.
 
-As the project grows, agents fill in `.agent/PROJECT.md` with real commands and paths. Add your test/lint commands to its Quality Gate section to have the `Stop` hook enforce them.
+As the project grows, agents fill in `.lean/PROJECT.md` with real commands and paths. Add your test/lint commands to its Quality Gate section to have the `Stop` hook enforce them.
 
 ## Headless and CI use
 
@@ -28,42 +28,69 @@ As the project grows, agents fill in `.agent/PROJECT.md` with real commands and 
 
 | Command | Use |
 |---|---|
-| `/lean-init` | Fill `.agent/PROJECT.md` from the real repository |
+| `/lean-init` | Fill `.lean/PROJECT.md` from the real repository |
 | `/lean-task <task>` | Start non-trivial work with a Task Contract |
 | `/lean-review` | Review at the depth risk and quality require |
 | `/lean-gate` | Run the Quality Gate and report DONE or not |
 
 ## Layout
 
+Three zones. Each has one job and one owner.
+
 ```
-CLAUDE.md          Canonical entrypoint (Claude)
-AGENTS.md          Adapter for Codex / other agents
-.agent/            Operating rules for agents (not application code)
-  PROJECT.md       Project context, commands, Quality Gate (yours to edit)
-  policy/          Workflow rules (replaced on upgrade)
-.claude/
-  settings.json    Hooks and permissions
-  hooks/           Quality Gate (Stop) and SessionStart hooks
-  skills/          /lean-init, /lean-task, /lean-review, /lean-gate
-  agents/          reviewer subagent
-.github/
-  workflows/lean-workflow.yml   CI for the workflow files only
-  lean-workflow/                Hook tests and structure checks
+CLAUDE.md               Entrypoint for Claude. The canonical contract.
+AGENTS.md               Adapter for Codex and other agents. Defers to CLAUDE.md.
+CONTRIBUTING.md         How to change the workflow files.
+
+.lean/                  ZONE 1 - the workflow. Tool-agnostic; any agent can read it.
+  README.md             Router: which rule file to read, and when.
+  PROJECT.md            Project context, commands, Quality Gate.      <- yours to edit
+  CHANGELOG.md          Workflow versions and upgrade steps.
+  policy/               The rules. Replaced wholesale on upgrade.      <- do not edit
+  scripts/              check-structure.sh
+  tests/                test-hooks.sh
+
+.claude/                ZONE 2 - Claude runtime. Paths are fixed by Claude Code.
+  settings.json         Hooks and permissions.
+  hooks/                quality-gate.sh (Stop), session-start.sh (SessionStart)
+  skills/               /lean-init, /lean-task, /lean-review, /lean-gate
+  agents/               reviewer subagent
+
+.github/                ZONE 3 - GitHub platform only.
+  workflows/            CI for the workflow files, nothing else.
+  pull_request_template.md
 ```
 
-Everything else belongs to your project.
+Everything else belongs to your project. All three zone names are namespaced on purpose: your own
+`scripts/`, `tests/`, `docs/`, and root `CHANGELOG.md` never collide with the workflow's.
 
 ## Checks
 
-The workflow files test themselves. CI runs only when workflow files change, so it stays out of your project's CI. Run locally:
+The workflow files test themselves. CI runs only when workflow files change, so it stays out of
+your project's CI. Run locally:
 
 ```sh
-.github/lean-workflow/check-structure.sh   # referenced paths, settings, frontmatter
-.github/lean-workflow/test-hooks.sh        # Quality Gate and SessionStart hooks
+.lean/scripts/check-structure.sh   # referenced paths, dead paths, settings, frontmatter, exec bits
+.lean/tests/test-hooks.sh          # Quality Gate and SessionStart hooks
 ```
 
-Delete `.github/lean-workflow/` and `.github/workflows/lean-workflow.yml` if you do not want them. Replace this README with your project's own; the workflow description lives in `.agent/README.md`.
+## What to delete after copying
+
+These belong to this template, not to your project:
+
+- `.lean/scripts/`, `.lean/tests/`, and `.github/workflows/lean-workflow.yml` — self-checks for
+  the workflow files themselves. **If you delete these, clear the Quality Gate block in
+  `.lean/PROJECT.md` in the same go, or run `/lean-init` to refill it from your project.** The
+  block ships naming those three scripts, so leaving it is a `Stop` hook that fails on every turn,
+  and `CLAUDE.md` tells the agent not to repair a failure it did not cause — it will report
+  `BLOCKED` instead, every time.
+- `CONTRIBUTING.md` — how to contribute to this template.
+- This `README.md` — replace it with your own. The workflow's description lives in `.lean/README.md`.
+
+Keep `.github/pull_request_template.md`. It is the Result Contract, which is the format Lean
+Workflow asks every change to report in.
 
 ## Upgrading
 
-See `.agent/CHANGELOG.md`.
+See `.lean/CHANGELOG.md`. Read the entry for the version you are moving to before you start: a
+MAJOR entry carries migration steps that must run before the replace steps.
