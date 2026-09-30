@@ -6,7 +6,7 @@ Update it as the project takes shape. "Not defined" is not an error: it means th
 
 ## Purpose
 
-Lean Workflow Baseline: a repository template (Claude primary, `AGENTS.md` adapter for other agents) that gives a project a quality-driven coding workflow. It contains workflow files only, no application code. Current version: 2.4.0 (see `.lean/CHANGELOG.md`).
+Lean Workflow Baseline: a repository template (Claude primary, `AGENTS.md` adapter for other agents) that gives a project a quality-driven coding workflow. It contains workflow files only, no application code. Current version: 2.4.1 (see `.lean/CHANGELOG.md`).
 
 ## Architecture
 

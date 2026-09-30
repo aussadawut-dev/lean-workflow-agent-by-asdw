@@ -67,25 +67,14 @@ for file in .claude/skills/*/SKILL.md; do
   grep -q "^name: $dir\$" "$file" || bad "skill name does not match directory: $file"
 done
 
-# The HIGH-review path names the model rule. `.lean/policy/MODELS.md` puts the
-# strongest model on `HIGH` risk review, but `.claude/agents/reviewer.md` ships
+# The HIGH-review path must name the model rule. `.lean/policy/MODELS.md` puts the
+# strongest model on HIGH-risk review, but `.claude/agents/reviewer.md` ships
 # `model: inherit` -- deliberately, since pinned frontmatter breaks an install whose
 # plan lacks that model -- so the model is chosen only where the reviewer is spawned.
-# Through 2.2.0 no spawn site said so and the rule was a silent no-op: a session on a
-# weak model reviewed its own `HIGH` work at its own strength.
-#
-# The three spawn sites are read by path, and only while they still name the
-# `reviewer` subagent in that code-span form: a project that drops the subagent from
-# one of these files has nothing left here to enforce, and this script is a gate
-# command in every downstream install, so a false hit blocks every turn. The bare word
-# `reviewer` will not do as the guard -- it is ordinary domain vocabulary, so a project
-# that removed the bullet and writes about reviewers for any other reason would be
-# blocked on every turn by a rule it deliberately dropped.
-#
-# The anchor is the rule's phrase anywhere in the file, not on the spawn line: in
-# `/lean-review` the two are deliberately on different lines of wrapped prose. So it
-# catches the instruction being deleted, which is the regression that happened, and not
-# a file that keeps the phrase elsewhere while dropping the instruction.
+# Through 2.2.0 no spawn site said so and the rule was a silent no-op. Guarded on the
+# code-span form of the subagent name, never the bare word, so a project that drops
+# the subagent is not blocked on every turn by a rule it deliberately dropped. The
+# phrase may sit anywhere in the file: in /lean-review the two are on different lines.
 for file in CLAUDE.md .claude/skills/lean-task/SKILL.md .claude/skills/lean-review/SKILL.md; do
   [ -f "$file" ] || continue
   # shellcheck disable=SC2016 # literal backtick in the pattern
@@ -108,18 +97,13 @@ elif [ "$(printf '%s\n' "$found" | sort -u | grep -c .)" != "1" ]; then
   bad "workflow version differs between .lean/README.md and .lean/CHANGELOG.md: $(printf '%s' "$found" | tr '\n' ' ')"
 fi
 
-# Paths the 2.0.0 move retired. Only .lean/CHANGELOG.md may still name them, in
-# its history and its migration steps. The pattern is spelled [.]agent/ so this
-# file does not match itself, which is the idiom that file's verify step uses.
-# The file list comes from git, not the filesystem: a vendored or ignored file
-# that happens to name a retired path is not this repository's content, and in a
-# downstream install this script is a gate command, so a false hit there would
-# block every turn. A scan that cannot run is a failure, never a pass.
-# Drop this check once 1.x is out of circulation.
-# The retired-path scan and the .gitignore assertions below both need git: one
-# reads the index, the other asks by effect. The README's `npx degit` route
-# leaves no .git, so say that once instead of failing three times, each naming
-# the wrong cause.
+# Paths the 2.0.0 move retired. Only .lean/CHANGELOG.md may still name them, in its
+# history and its migration steps; the pattern below spells the dot as a class so
+# this file does not match itself. The match is textual, not by reference, so a
+# project owning a directory by either name should drop this check -- as should
+# everyone, once 1.x is out of circulation. This scan and the .gitignore assertions
+# below both need git, and the README's `npx degit` route leaves none, so say that
+# once instead of failing three times, each naming the wrong cause.
 retired='[.]agent/|[.]github/lean-workflow/'
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   bad "no git work tree: cannot check retired paths or .gitignore entries"
@@ -128,18 +112,12 @@ else
     bad "retired-path scan could not start: mktemp failed"
   else
     # git grep, not the filesystem: a vendored or ignored file that happens to
-    # name a retired path is not this repository's content, and in a downstream
-    # install this script is a gate command, so a false hit there would block
-    # every turn. --untracked still covers a new file a contributor has not
-    # staged yet, which is content. git chunks its own argument list, so there
-    # is no argv ceiling. `-a` rather than `-I`: `-I` skips whatever
-    # .gitattributes calls binary, so `*.md binary` would hide a real hit and
-    # this block reads a scan that cannot run as a failure, never a pass.
-    #
-    # The pattern matches text, not references: a property access followed by a
-    # division in minified code reads the same to it. Drop this check once 1.x is
-    # out of circulation -- or at once, in a project that owns a directory by
-    # either of these names.
+    # name a retired path is not this repository's content, and a false hit in a
+    # downstream install would block every turn. --untracked still covers a new
+    # file a contributor has not staged yet, which is content, and git chunks its
+    # own argument list, so there is no argv ceiling. `-a` rather than `-I`, so a
+    # .gitattributes binary marking cannot hide a real hit. A scan that cannot run
+    # is read as a failure below, never a pass.
     hits="$(git grep --no-color -a -nE --untracked "$retired" \
       -- ':(exclude).lean/CHANGELOG.md' 2>>"$scan_err")"
     status=$?
