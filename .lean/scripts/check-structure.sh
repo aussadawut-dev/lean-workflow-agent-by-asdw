@@ -72,15 +72,25 @@ done
 # `model: inherit` -- deliberately, since pinned frontmatter breaks an install whose
 # plan lacks that model -- so the model is chosen only where the reviewer is spawned.
 # Through 2.2.0 no spawn site said so and the rule was a silent no-op: a session on a
-# weak model reviewed its own `HIGH` work at its own strength. Only these three spawn
-# sites are read, and only while they still name the reviewer: a project's own skill
-# mentioning a reviewer is not this check's business, and a project that drops the
-# reviewer from one of these files has nothing left here to enforce. This script is a
-# gate command in every downstream install, so a false hit here blocks every turn.
+# weak model reviewed its own `HIGH` work at its own strength.
+#
+# The three spawn sites are read by path, and only while they still name the
+# `reviewer` subagent in that code-span form: a project that drops the subagent from
+# one of these files has nothing left here to enforce, and this script is a gate
+# command in every downstream install, so a false hit blocks every turn. The bare word
+# `reviewer` will not do as the guard -- it is ordinary domain vocabulary, so a project
+# that removed the bullet and writes about reviewers for any other reason would be
+# blocked on every turn by a rule it deliberately dropped.
+#
+# The anchor is the rule's phrase anywhere in the file, not on the spawn line: in
+# `/lean-review` the two are deliberately on different lines of wrapped prose. So it
+# catches the instruction being deleted, which is the regression that happened, and not
+# a file that keeps the phrase elsewhere while dropping the instruction.
 for file in CLAUDE.md .claude/skills/lean-task/SKILL.md .claude/skills/lean-review/SKILL.md; do
   [ -f "$file" ] || continue
-  grep -q 'reviewer' "$file" || continue
-  grep -qi 'strongest model' "$file" ||
+  # shellcheck disable=SC2016 # literal backtick in the pattern
+  grep -q 'reviewer` subagent' "$file" || continue
+  grep -qi 'strongest model available' "$file" ||
     bad "spawns the reviewer without the strongest-model rule from .lean/policy/MODELS.md: $file"
 done
 

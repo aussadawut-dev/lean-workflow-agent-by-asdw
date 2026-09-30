@@ -13,15 +13,20 @@ on that same fast model for `HIGH` risk work, and the result reported review at 
 true about the depth, silent about the reviewer. The evidence is structural and was checked on this
 repository before the fix: `/lean-task` step 5, `/lean-review` step 4 and `CLAUDE.md`'s reviewer
 line contained no mention of a model, and the new structure check below fails on all three of them
-at the parent commit.
+at the parent commit. For the absence half of that claim a scan is stronger than a run: no file
+named a model, so the behavior could not have occurred. The enforcing half was run rather than
+reasoned about -- this change's own `HIGH` review spawned the `reviewer` subagent with an explicit
+model override, so the primary instruction is followable and not merely aspirational, and the
+frontmatter's `model: inherit` is exactly what that spawn overrode.
 
 - `/lean-review` step 4 and `/lean-task` step 5 spawn the reviewer on the strongest model available
   to the session. `CLAUDE.md` carries the same instruction, because it sends an agent to the
   reviewer without going through either skill -- the same reason it carries the round bound inline.
-- Where the model cannot be chosen, the reviewer inherits the session model and the result names
-  which model reviewed. A rule that cannot be enforced everywhere is still worth reporting: the
-  reader can then see that the reviewer was no stronger than the author, which is the failure this
-  entry is about.
+- Where the reviewer did not run on the strongest model available, the result says so. The report
+  is conditioned on that outcome rather than on whether the model could be chosen: a session
+  already running the strongest model inherits it and loses nothing, so reporting an inherited
+  model as weaker would state something untrue. What is worth surfacing is the case this entry is
+  about -- a reviewer no stronger than the author.
 - `.claude/agents/reviewer.md` keeps `model: inherit`. Pinning the frontmatter would enforce the
   rule in one line and would break every install whose plan does not carry that model, in a
   repository whose whole purpose is to be copied into other projects. The frontmatter stays the
@@ -29,8 +34,13 @@ at the parent commit.
 - `.lean/scripts/check-structure.sh` fails if any of those three spawn sites stops naming the rule.
   A rule written in `policy/` and wired nowhere is exactly the failure above, and prose is the only
   place it can be wired, so a structural check is the only thing that holds it. The check reads the
-  three known spawn sites by path and skips a file that no longer names the reviewer: it is a gate
-  command in every install, so a project's own skill mentioning a reviewer is not its business.
+  three known spawn sites by path and skips a file that no longer names the `reviewer` subagent in
+  its code-span form: it is a gate command in every install, and the bare word is ordinary domain
+  vocabulary, so guarding on it would block every turn in a project that dropped the bullet and
+  writes about reviewers for any other reason. The anchor is the rule's phrase anywhere in the
+  file rather than on the spawn line, because in `/lean-review` the two sit on different lines of
+  wrapped prose: it catches the instruction being deleted, not a file that keeps the phrase
+  elsewhere while dropping the instruction.
 
 Review depth, risk rules, the round bound and the reviewer's own instructions are unchanged. MINOR
 rather than MAJOR: the rule did not change, its enforcement did.
