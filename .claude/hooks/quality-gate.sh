@@ -2,7 +2,10 @@
 # Quality Gate hook (Stop event).
 # Runs the commands between the gate markers in .lean/PROJECT.md.
 # No commands defined -> no-op. Failure -> exit 2, which blocks Claude
-# from finishing and returns the output to it.
+# from finishing and returns the output to it. A command the shell cannot find
+# exits 2 as well, because a gate that could not run is not a gate that passed,
+# but it says so in its own words: the answer is to report the environment, not
+# to repair code that nothing has actually found fault with.
 #
 # `--seed` records the current state and runs nothing. The SessionStart hook
 # calls it, so a session that changes nothing does not run the gate at its
@@ -74,16 +77,61 @@ if [ -n "$state" ] && [ ! -f "$failed" ] &&
 fi
 
 while IFS= read -r cmd; do
-  if ! output="$(bash -c "$cmd" 2>&1)"; then
-    {
+  output="$(bash -c "$cmd" 2>&1)" && continue
+  status=$?
+
+  # Why a command failed decides what to do about it, so the two cases say
+  # different things. Both block: a gate that could not run has not passed, and
+  # neither message may read as "carry on". 127 is the only status that can mean
+  # the shell found nothing to run, but it is not proof of it: a wrapper hands
+  # back the 127 of the program it ran, so `bash lint.sh` whose script calls a
+  # tool the diff never added comes back as 127 with bash plainly installed, and
+  # reading the command's shape alone would blame the environment for that and
+  # name bash as the thing to install. So three things have to hold before the
+  # gate says the environment is at fault: that status, a word the shell would
+  # have looked up that is a plain command name, and that name failing to
+  # resolve here. A word holding a slash names a file this repository points at,
+  # a word holding a quote or a dollar is a fragment the line was parsed into,
+  # and a word opening with a dash is an option, which is nobody's package to
+  # install -- a gate command wrapped over two lines hands its continuation here
+  # as a command of its own. None of the three earns the excuse; all three take
+  # the ordinary message, as do 126 (found, will not execute -- usually an exec
+  # bit missing from the diff) and every other status: "not your change" is the
+  # verdict that can wave a real failure through, so it stays the narrow one.
+  #
+  # Leading VAR=VALUE words are the shell's own business rather than the
+  # program, so step past them -- the lookup for `CI=1 npm test` is `npm`, and
+  # left in they would decide the verdict by whether `CI=1` resolves as a
+  # command, which nothing does. That strip is a regex over the line and cannot
+  # see quoting, so `FOO="a b" cmd` leaves `b"` behind: the fragment the name
+  # test exists to catch rather than trust.
+  lookup="$cmd"
+  while [[ "$lookup" =~ ^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+(.*)$ ]]; do
+    lookup="${BASH_REMATCH[1]}"
+  done
+  read -r first _ <<< "$lookup"
+
+  missing=0
+  if [ "$status" -eq 127 ] &&
+     [[ "$first" =~ ^[A-Za-z0-9_][A-Za-z0-9_.+:@-]*$ ]] &&
+     ! command -v -- "$first" >/dev/null 2>&1; then
+    missing=1
+  fi
+
+  {
+    if [ "$missing" -eq 1 ]; then
+      echo "Quality Gate could not run: $cmd"
+      printf '%s\n' "$output" | tail -n 40
+      echo "'$first' is not available in this environment, so this check never ran. That is a missing tool, not a failure your change caused. Do not edit code, the gate, or the tests to get past it: report BLOCKED, name the gate command that could not run and the tool it needs, say the change is unverified by that command, and do not declare DONE."
+    else
       echo "Quality Gate failed: $cmd"
       printf '%s\n' "$output" | tail -n 40
       echo "If your change caused this, fix it. If it was already failing or is outside the task, do not touch it: report BLOCKED and ask. Do not declare DONE."
-    } >&2
-    rm -f "$cache"
-    : > "$failed"
-    exit 2
-  fi
+    fi
+  } >&2
+  rm -f "$cache"
+  : > "$failed"
+  exit 2
 done <<< "$commands"
 
 rm -f "$failed"

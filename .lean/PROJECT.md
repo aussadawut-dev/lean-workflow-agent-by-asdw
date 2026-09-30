@@ -6,7 +6,7 @@ Update it as the project takes shape. "Not defined" is not an error: it means th
 
 ## Purpose
 
-Lean Workflow Baseline: a repository template (Claude primary, `AGENTS.md` adapter for other agents) that gives a project a quality-driven coding workflow. It contains workflow files only, no application code. Current version: 2.3.0 (see `.lean/CHANGELOG.md`).
+Lean Workflow Baseline: a repository template (Claude primary, `AGENTS.md` adapter for other agents) that gives a project a quality-driven coding workflow. It contains workflow files only, no application code. Current version: 2.4.0 (see `.lean/CHANGELOG.md`).
 
 ## Architecture
 
@@ -20,13 +20,13 @@ Shell scripts and Markdown only. No application, package manager, or build step.
 ## Commands
 
 ### Install
-Not defined. No dependencies. `shellcheck` is used by the gate and CI (`brew install shellcheck` locally; preinstalled on `ubuntu-latest`).
+Not defined. No dependencies. `shellcheck` is used by the gate and CI (`brew install shellcheck` locally; preinstalled on `ubuntu-latest`). A container without it -- Claude Code on the web is one -- makes the gate report an environment problem rather than a failure, and the change stays unlinted until it is installed (`apt-get install -y shellcheck`, verified in that container).
 
 ### Build
 Not defined.
 
 ### Test
-`.lean/tests/test-hooks.sh` tests the Quality Gate and SessionStart hooks (33 checks, ~5s). Verified: passes, exits non-zero on failure, and every term of the gate's state hash plus both of its refusal guards are covered -- removing any one of them fails a check.
+`.lean/tests/test-hooks.sh` tests the Quality Gate and SessionStart hooks (55 checks, ~5.3s). Verified: passes, exits non-zero on failure, and every term of the gate's state hash plus both of its refusal guards are covered -- removing any one of them fails a check. The gate's two verdicts are covered as a pair: a command the shell cannot find must be reported as an environment problem, and a command that exists and fails must not be -- including a wrapper that hands back another program's 127. Every term deciding that split is pinned on its own: remove the status test, either half of the command-name test, the resolve test or the assignment strip and a check fails.
 
 ### Lint
 `shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh` (0.11.0; passes at default severity, same as CI).

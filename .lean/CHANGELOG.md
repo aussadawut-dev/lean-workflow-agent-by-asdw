@@ -4,6 +4,76 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
+## 2.4.0
+
+The Quality Gate tells a missing tool apart from a failing check. Both block; only one of them is
+about the change.
+
+- `quality-gate.sh` printed one verdict for every non-zero exit: `Quality Gate failed: <cmd>`, then
+  "If your change caused this, fix it. If it was already failing or is outside the task, do not touch
+  it: report BLOCKED and ask." Under that wording a command the shell never found reads as a check
+  that ran and said no, so the agent reports `BLOCKED` over a diff with nothing wrong with it.
+  Verified on the container Claude Code on the web runs in, which ships no `shellcheck` while
+  `shellcheck` is the first gate command in this repository's `.lean/PROJECT.md`: exit 2,
+  `shellcheck: command not found`, on every turn that touched a file.
+- Exit 127 from a bare command name now reports `Quality Gate could not run: <cmd>` and names the
+  tool, the environment, and the report it wants: `BLOCKED`, naming the gate command that could not
+  run and the check the change is therefore unverified by. It still exits 2, and the skip cache and
+  the `.claude/.gate-failed` marker treat it as the refusal it is. A message that let the turn finish
+  would be the fail-open, not the fix: a gate that could not run has not passed.
+- Three things have to hold before the gate blames the environment: exit 127, a lookup word that is a
+  plain command name, and that name failing to resolve here. Each is there because the simpler rule
+  before it was wrong about a shape a real gate block contains, and each was caught by review rather
+  than reasoned out in advance. Shape alone was wrong for wrappers: 127 travels up from the program a
+  wrapper ran, so `bash lint.sh` whose script calls a tool the diff never added exits 127 with bash
+  plainly installed, and the first attempt called that an environment problem and named bash as the
+  tool to install. The lookup alone was wrong for quoting: the `VAR=VALUE` strip is a regex over the
+  line, so `FOO="a b" cmd` leaves `b"` as the word to look up, nothing resolves a fragment, and the
+  wrapper case came back exculpated one quoted assignment later. And the status is not optional
+  either: in `optional-linter ; pytest` the word that did not resolve is not the word that decided
+  the verdict,
+  so without that condition the excuse would bury a real test failure. It settles a compound line
+  only when the deciding command's status is not 127; one that ends in 127 anyway is still
+  attributed to its first word, which the paragraph below records.
+- A word holding a slash names a file this repository points at, so a gate line whose script is
+  missing stays an ordinary failure -- as does 126 (found, will not execute; usually an exec bit
+  missing from the diff), and every other status. A word opening with a dash is an option, and an
+  option is nobody's package to install: a gate command wrapped over two lines hands the extractor
+  its continuation as a command of its own, and an indented `-x ...` reaches the shell as a command
+  word and exits 127, so before the name had to start like a name the gate asked for `-x` to be
+  installed. The same line unindented exits 2 instead, rejected as bash's own invocation option,
+  which is why the case pinning this one is indented. Leading `VAR=VALUE` words are stepped over,
+  or the verdict would turn on whether `CI=1` resolves as a command, which nothing does. Everything
+  unclear
+  takes the ordinary message, which sends the agent to look, because "not your change" is the verdict
+  that can wave a real failure through.
+- `test-hooks.sh` is now 55 checks. Three are the regression proper and fail against the 2.2.0 hook
+  (2.3.0 left `quality-gate.sh` untouched, so that is the revision before this one):
+  a missing program must say the gate could not run, must name the environment, and must not carry
+  the "If your change caused this" line. The rest pin what must not move, one case per shape that got
+  a condition wrong -- the wrapper, the quoted assignment, the compound line, the wrapped gate
+  command's continuation, the script named by path, and a command that exists and fails -- and every
+  term of the classification is pinned on its own: remove the status test, either half of the
+  command-name test, the resolve test or the assignment strip and a check fails. The missing-tool
+  branch is asserted to record the refusal the way the other branch does, with its fixture seeded
+  first; without a cache to clear, the half of that assertion covering the cache passes whatever the
+  hook does.
+
+One fail-open this does not close: a gate command that swallows its own 127 still passes. `test -z
+"$(gofmt -l .)"` with no `gofmt` prints the shell's complaint inside the substitution and then tests
+an empty string, and that is the shape `.lean/PROJECT.md` recommends for formatters. A pipeline
+masks it the same way, since the status is the last stage's. The hook reads the status of the command
+it was given, and the status is 0. Judging the output instead would block a turn on any gate command
+that merely prints those words, which in a downstream install is every turn,
+so closing it needs its own evidence rather than a guess bolted onto this one. A related limit,
+on attribution rather than on the verdict: when a compound line reaches 127 through a fallback --
+`lean-optional || bash lint.sh`, where what is absent is the wrapper's own inner tool -- the excuse
+attaches to the first word and can cover a check that did fail. It still blocks, and nothing outside
+the command can say which stage produced the status.
+
+**Upgrading:** no steps. The gate blocks the same states it blocked before; one of them now explains
+itself differently.
+
 ## 2.3.0
 
 `MODELS.md` has put the strongest model on `HIGH` risk review since the rule was written, and

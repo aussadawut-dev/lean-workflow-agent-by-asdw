@@ -290,6 +290,173 @@ CLAUDE_PROJECT_DIR="$dir" bash "$gate" --seed
 run_gate "$dir" '{}'
 expect_code "gate: a matching cache does not override a refusal" 2
 
+# 26. A gate command whose program is not installed blocks like any other
+# failure -- a gate that could not run has not passed -- but the message has to
+# say which of the two it is, because they need opposite responses: fix the
+# code, or report that the environment could not check it. Verified on the
+# container this repository is developed in, which ships no shellcheck -- the
+# very first gate command in .lean/PROJECT.md. With one message for both, every
+# turn there that touched a file ended as BLOCKED work over a clean diff.
+dir="$(fixture 'lean-no-such-tool --check')"
+# Seeded first so a cache exists for the run to clear: without one, the cache
+# half of the refusal assertion below passes whatever the hook does with it.
+CLAUDE_PROJECT_DIR="$dir" bash "$gate" --seed
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+expect_code "gate: a missing program still blocks" 2
+case "$err" in
+  *"Quality Gate could not run: lean-no-such-tool --check"*)
+    ok "gate: a missing program says the gate could not run" ;;
+  *) bad "gate: a missing program says the gate could not run (got: $err)" ;;
+esac
+case "$err" in
+  *"not a failure your change caused"*)
+    ok "gate: a missing program is named as the environment" ;;
+  *) bad "gate: a missing program is named as the environment (got: $err)" ;;
+esac
+case "$err" in
+  *"If your change caused this"*)
+    bad "gate: a missing program does not ask for a code fix (got: $err)" ;;
+  *) ok "gate: a missing program does not ask for a code fix" ;;
+esac
+if [ -f "$dir/.claude/.gate-failed" ] && [ ! -f "$dir/.claude/.gate-cache" ]; then
+  ok "gate: a missing program records the refusal like any other"
+else
+  bad "gate: a missing program records the refusal like any other"
+fi
+
+# 27. The other half: a command that exists and fails keeps the ordinary
+# verdict. Without this the split could drift into calling every failure an
+# environment problem, which reads as "nothing here to fix" on a real
+# regression -- the same mistake as case 26, pointed the other way.
+dir="$(fixture "test -f '$work/never-created'")"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+expect_code "gate: a real failure still blocks" 2
+case "$err" in
+  *"Quality Gate failed: test -f"*) ok "gate: a real failure keeps the failure message" ;;
+  *) bad "gate: a real failure keeps the failure message (got: $err)" ;;
+esac
+case "$err" in
+  *"If your change caused this"*) ok "gate: a real failure still asks for a fix" ;;
+  *) bad "gate: a real failure still asks for a fix (got: $err)" ;;
+esac
+case "$err" in
+  *"could not run"*)
+    bad "gate: a real failure is not called an environment problem (got: $err)" ;;
+  *) ok "gate: a real failure is not called an environment problem" ;;
+esac
+
+# 28. A gate command that names a path rather than a program is this
+# repository's business even when it is missing: the shell reports that the same
+# way it reports an absent tool, so the split reads the command's shape, and
+# this pins the side of it that stays an ordinary failure.
+dir="$(fixture './scripts/gone.sh')"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+expect_code "gate: a missing script still blocks" 2
+case "$err" in
+  *"Quality Gate failed: ./scripts/gone.sh"*)
+    ok "gate: a missing script is a failure, not an environment problem" ;;
+  *) bad "gate: a missing script is a failure, not an environment problem (got: $err)" ;;
+esac
+
+# 29. 127 is not proof that the gate line's own program is absent: a wrapper
+# hands back the status of whatever it ran. `bash lint.sh` whose script calls a
+# tool the diff never added is the change's business, and the environment
+# message would tell the agent the opposite while naming bash -- which is
+# plainly installed, since it ran the script -- as the thing to install. So the
+# split asks whether the looked-up word resolves, not merely whether it holds a
+# slash, and this is the case that tells those two rules apart.
+dir="$(fixture 'bash scripts/lint.sh')"
+mkdir -p "$dir/scripts"
+printf '#!/usr/bin/env bash\n./tools/lint-tool --check\n' > "$dir/scripts/lint.sh"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+expect_code "gate: a wrapper whose inner program is missing still blocks" 2
+case "$err" in
+  *"Quality Gate failed: bash scripts/lint.sh"*)
+    ok "gate: a present wrapper is a failure, not a missing tool" ;;
+  *) bad "gate: a present wrapper is a failure, not a missing tool (got: $err)" ;;
+esac
+
+# 30. A leading VAR=VALUE is the shell's business, not the program. Left in the
+# lookup it decides the verdict by whether `LEAN_TEST=1` resolves as a command,
+# which nothing does, and then names an assignment as the tool to install -- so
+# this asserts the program by name, not just the branch.
+dir="$(fixture 'LEAN_TEST=1 lean-no-such-tool --check')"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+expect_code "gate: an assignment does not hide a missing program" 2
+case "$err" in
+  *"'lean-no-such-tool' is not available"*)
+    ok "gate: the message names the program, not the assignment" ;;
+  *) bad "gate: the message names the program, not the assignment (got: $err)" ;;
+esac
+
+# 31. The assignment strip is a regex over the line, so it cannot see quoting:
+# `FOO="a b" cmd` leaves `b"` as the word to look up. That is a fragment of the
+# line, not a name, and nothing resolves it -- so with the lookup alone the
+# verdict would be decided by a parse failure, and case 29's shape, one quoted
+# assignment later, would be exculpated all over again. A word that is not a
+# plain command name therefore takes the ordinary message: under-attributing
+# sends the agent to look, which is the safe direction, while over-attributing
+# is the bug this version exists to fix.
+dir="$(fixture 'LEAN_OPTS="-a b" bash scripts/lint.sh')"
+mkdir -p "$dir/scripts"
+printf '#!/usr/bin/env bash\n./tools/lint-tool --check\n' > "$dir/scripts/lint.sh"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+expect_code "gate: a quoted assignment value still blocks" 2
+case "$err" in
+  *'Quality Gate failed: LEAN_OPTS="-a b" bash scripts/lint.sh'*)
+    ok "gate: a fragment left by quoting is not called a missing tool" ;;
+  *) bad "gate: a fragment left by quoting is not called a missing tool (got: $err)" ;;
+esac
+case "$err" in
+  *"could not run"*)
+    bad "gate: a fragment does not claim the environment (got: $err)" ;;
+  *) ok "gate: a fragment does not claim the environment" ;;
+esac
+
+# 32. The status is a condition in its own right: in a compound line the word
+# that did not resolve need not be the word that decided the verdict. Here a
+# missing tool is tolerated and `false` is the check that actually says no -- the
+# shape of an optional linter in front of a real test run. The status is 1, so
+# the gate ran and something failed, and the environment's excuse would bury
+# that even though a tool really is absent. Note the first word is clean: with
+# `tool; false` the semicolon sticks to it and the name test below would refuse
+# the excuse for the wrong reason, so this case would pin nothing.
+dir="$(fixture 'lean-no-such-tool ; false')"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+expect_code "gate: a compound line that fails on its own still blocks" 2
+case "$err" in
+  *"Quality Gate failed: lean-no-such-tool ; false"*)
+    ok "gate: a status other than 127 is a failure whatever the first word is" ;;
+  *) bad "gate: a status other than 127 is a failure whatever the first word is (got: $err)" ;;
+esac
+
+# 33. A word that could not be a program name is not a missing tool. A gate
+# command wrapped over two lines hands the extractor its continuation as a
+# command of its own, and an option is nobody's package to install: the block is
+# malformed, which is this repository's business, so it takes the ordinary
+# message and sends the agent to look. The indent is load-bearing -- `-x` at the
+# very start of the line makes bash reject it as its own invocation option and
+# exit 2, and only an indented or assignment-prefixed one reaches the shell as a
+# command word and exits 127, which is the status that can claim the excuse. The
+# class allows `-` inside a name and refuses it in front; case 26's
+# `lean-no-such-tool` pins the half this case does not.
+dir="$(fixture '  -x code.txt')"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+expect_code "gate: an option-shaped word still blocks" 2
+case "$err" in
+  *"Quality Gate failed:   -x code.txt"*)
+    ok "gate: an option is not reported as a missing tool" ;;
+  *) bad "gate: an option is not reported as a missing tool (got: $err)" ;;
+esac
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
