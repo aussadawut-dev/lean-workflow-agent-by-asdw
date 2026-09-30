@@ -50,7 +50,7 @@ then on -- not a judgement call an agent makes per task.
 - New directory `.lean/bin/` for the workflow's own tools. It is deliberately not `.lean/scripts/`,
   which the README tells a project it may delete: those are self-checks for the workflow files,
   while `bin/` runs during a session -- the `SessionStart` hook reads `mode.sh` every time.
-- Tests: `.lean/tests/test-mode.sh` (35 checks) and `.lean/tests/test-queue.sh` (56 checks, against
+- Tests: `.lean/tests/test-mode.sh` (43 checks) and `.lean/tests/test-queue.sh` (69 checks, against
   a bare remote and up to four concurrent clones) are new, and `test-hooks.sh` goes from 55 to 67
   checks for the hook's mode reading. The queue's claim guarantee is tested by really running four
   claimers at once, not by simulating a stale base: exactly one wins, four claimers of four items
@@ -60,6 +60,12 @@ then on -- not a judgement call an agent makes per task.
   `check-structure.sh` now also checks the mode markers and the recorded value, and the exec bits of
   `.lean/bin/` when that directory is present -- scoped, because the hook deliberately accepts a
   project that removed it.
+- Smaller corrections from the second review round: a value left on a marker line is refused by name
+  rather than by "does not read back"; the queue's owner check looks for control characters, not for
+  non-ASCII, which under `LC_ALL=C` refused an ordinary `user.email`; a `LEAN_QUEUE_ATTEMPTS` that is
+  not a positive number is a usage error rather than a reported race; and the checked-out-branch
+  refusal moved onto the writes, so `list` and `show` still work from a checkout of the queue
+  branch -- with no remote that checkout is the only copy of it.
 
 Upgrade. Add `.lean/bin/`, `.lean/policy/MODES.md`, `.lean/tests/test-mode.sh`, and
 `.lean/tests/test-queue.sh`. Replace `.claude/hooks/session-start.sh`,

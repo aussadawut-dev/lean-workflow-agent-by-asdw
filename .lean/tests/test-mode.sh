@@ -19,6 +19,13 @@ expect() { # expect <label> <got> <want>
   if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 (got '$2', want '$3')"; fi
 }
 
+contains() { # contains <label> <haystack> <needle>
+  case "$2" in
+    *"$3"*) ok "$1" ;;
+    *) bad "$1 (got: $2)" ;;
+  esac
+}
+
 # A PROJECT.md holding the given lines between the mode markers. "none" ships no
 # block at all, which is what an install that skipped the upgrade step looks like.
 fixture() {
@@ -217,6 +224,27 @@ lines="$(grep -c '' "$dir/.lean/PROJECT.md")"
 run "$dir" set tracker >/dev/null
 expect "set: the recorded value changes" "$(run "$dir" get)" "tracker"
 intact "set: nothing outside the block moves" "$dir" "$lines"
+
+# 20. A value left on the start marker's line survives a rewrite of the lines
+# between the markers, and would be the one `get` returns afterwards -- so `set`
+# would report recording one mode while the project ran another. It refuses, and
+# says which line to move the value off.
+dir="$(malformed '<!-- mode:start --> full' '<!-- mode:end -->')"
+lines="$(grep -c '' "$dir/.lean/PROJECT.md")"
+expect "inline value: it is what get reads" "$(run "$dir" get)" "full"
+err="$(run "$dir" set standard 2>&1 >/dev/null)"
+expect "inline value: set refuses it" "$?" "1"
+contains "inline value: the refusal says where the value goes" "$err" "own line between the markers"
+expect "inline value: the recorded mode did not change" "$(run "$dir" get)" "full"
+intact "inline value: the rest of PROJECT.md survives the refusal" "$dir" "$lines"
+
+# 21. The same on the end marker's line.
+dir="$(malformed '<!-- mode:start -->' 'full <!-- mode:end -->')"
+lines="$(grep -c '' "$dir/.lean/PROJECT.md")"
+run "$dir" set standard >/dev/null 2>&1
+expect "inline value: a value before the end marker is refused too" "$?" "1"
+expect "inline value: that mode did not change either" "$(run "$dir" get)" "full"
+intact "inline value: and that file survives" "$dir" "$lines"
 
 echo
 echo "$pass passed, $fail failed"

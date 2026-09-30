@@ -105,6 +105,20 @@ case "${1:-get}" in
     [ "$start" -lt "$end" ] ||
       die "the markers in $project share line $start. Put $START and $END on separate lines; nothing was written."
 
+    # A value on a marker line survives the rewrite below and would be read
+    # instead of the new one. The verification further down catches that, but it
+    # can only say the result did not read back; this says what to fix.
+    inline="$(awk -v s="$START" -v n="$start" \
+      'NR == n { rest = substr($0, index($0, s) + length(s)); gsub(/[[:space:]]/, "", rest); print rest }' \
+      "$project")"
+    [ -z "$inline" ] ||
+      die "line $start of $project holds '$inline' after $START. The value goes on its own line between the markers; nothing was written."
+    inline="$(awk -v e="$END" -v n="$end" \
+      'NR == n { rest = substr($0, 1, index($0, e) - 1); gsub(/[[:space:]]/, "", rest); print rest }' \
+      "$project")"
+    [ -z "$inline" ] ||
+      die "line $end of $project holds '$inline' before $END. The value goes on its own line between the markers; nothing was written."
+
     total="$(grep -c '' "$project")"
     tmp="$(mktemp)" || exit 1
     trap 'rm -f "$tmp"' EXIT

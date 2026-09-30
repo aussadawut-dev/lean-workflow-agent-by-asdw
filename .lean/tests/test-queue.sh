@@ -322,6 +322,50 @@ contains "id: the refusal names the id" "$out" "not a usable queue id"
 q "$dir/A" add "$(printf 'two\nlines')"
 expect "add: a multi-line title makes a single-line id" "$out" "two-lines"
 
+# 23. An owner is checked for control characters, not for being ASCII. Plenty of
+# CI images run under LC_ALL=C, where a non-ASCII user.email would otherwise fail
+# every queue command with a reason that is not true of it.
+dir="$(pair)"
+q "$dir/A" add "Unicode owner"
+out="$(LC_ALL=C LEAN_QUEUE_OWNER='josé@test' CLAUDE_PROJECT_DIR="$dir/A" \
+  bash "$queue" claim unicode-owner 2>&1)"
+code=$?
+expect "locale: a non-ASCII owner is accepted under LC_ALL=C" "$code" "0"
+q "$dir/A" show unicode-owner
+contains "locale: the non-ASCII owner is recorded" "$out" "owner: josé@test"
+
+# 24. An attempt count that is not a positive number is a usage error. Left to
+# `seq` it printed its own error and then claimed the branch kept moving, which
+# asserts a race that never happened.
+for bad_value in abc 0 -1; do
+  out="$(LEAN_QUEUE_ATTEMPTS="$bad_value" CLAUDE_PROJECT_DIR="$dir/A" \
+    bash "$queue" claim unicode-owner 2>&1)"
+  code=$?
+  expect "attempts: '$bad_value' is a usage error, not a race" "$code" "1"
+  contains "attempts: the refusal names the value" "$out" "not '$bad_value'"
+done
+
+# 25. Checking the queue branch out to read it is a reasonable thing to do,
+# especially with no remote, where it is the only copy. Reads keep working;
+# only the writes refuse, because those would commit onto that checkout.
+solo="$(mktemp -d "$work/checkout.XXXX")"
+git init -q "$solo"
+git -C "$solo" config user.email solo@test
+git -C "$solo" config user.name solo
+echo x > "$solo/file.txt"
+git -C "$solo" add -A
+git -C "$solo" commit -qm init
+q "$solo" add "Read me while checked out"
+git -C "$solo" checkout -q lean-queue
+q "$solo" list
+contains "checkout: list still works from a checkout of the queue branch" "$out" "read-me-while-checked-out"
+q "$solo" show read-me-while-checked-out
+contains "checkout: show still works" "$out" "status: open"
+q "$solo" claim read-me-while-checked-out
+expect "checkout: a write refuses" "$code" "1"
+contains "checkout: the refusal says the branch is checked out" "$out" "is checked out"
+expect "checkout: the checkout is untouched" "$(git -C "$solo" status --porcelain)" ""
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

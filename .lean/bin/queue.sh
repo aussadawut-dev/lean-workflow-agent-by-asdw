@@ -41,21 +41,17 @@ die() { echo "$1" >&2; exit "${2:-1}"; }
 
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "not a git repository: $root"
 
-# The queue branch is written by plumbing, which does not know about checkouts:
-# aimed at a branch someone has checked out it would commit onto their work and
-# leave their index reporting the queue files as deleted. Refuse instead.
-checked_out="$(git symbolic-ref --short -q HEAD || true)"
-if [ "$branch" = "$checked_out" ] ||
-   git worktree list --porcelain 2>/dev/null | grep -qx "branch refs/heads/$branch"; then
-  die "the queue branch '$branch' is checked out; the queue never writes to a checked-out branch. Use another LEAN_QUEUE_BRANCH."
-fi
+case "$attempts" in
+  "" | *[!0-9]* | 0) die "LEAN_QUEUE_ATTEMPTS must be a positive whole number, not '$attempts'" ;;
+esac
+
 
 owner="${LEAN_QUEUE_OWNER:-$(git config user.email 2>/dev/null || true)}"
 [ -n "$owner" ] || owner="$(id -un)@$(hostname 2>/dev/null || echo local)"
 # One header line per field, so an owner spanning lines would rewrite the item
 # into something no other session can read.
 case "$owner" in
-  *[![:print:]]*) die "the queue owner may not contain control characters or newlines: LEAN_QUEUE_OWNER=$owner" ;;
+  *[[:cntrl:]]*) die "the queue owner may not contain control characters or newlines: LEAN_QUEUE_OWNER=$owner" ;;
 esac
 
 # commit-tree needs an identity even where the repository has none configured.
@@ -190,6 +186,19 @@ publish() {
   return 0
 }
 
+# The queue branch is written by plumbing, which does not know about checkouts:
+# aimed at a branch someone has checked out it would commit onto their work and
+# leave their index reporting the queue files as deleted. Checked before a write
+# rather than at startup, so reading the queue from a checkout of it still works.
+assert_writable_branch() {
+  local checked_out
+  checked_out="$(git symbolic-ref --short -q HEAD || true)"
+  if [ "$branch" = "$checked_out" ] ||
+     git worktree list --porcelain 2>/dev/null | grep -qxF "branch refs/heads/$branch"; then
+    die "the queue branch '$branch' is checked out; the queue never writes to a checked-out branch. Switch that checkout away, or point LEAN_QUEUE_BRANCH at the queue's own branch."
+  fi
+}
+
 # A rejected push says nothing about this item: another session wrote another
 # item. Backing off by a random fraction of a second keeps several sessions from
 # re-colliding in lockstep.
@@ -211,6 +220,7 @@ require_id() { [ -n "${1:-}" ] || die "usage: queue.sh $2 <id>"; }
 # retry always fetches.
 transition() {
   local id="$1" verb="$2" attempt content status holder new commit
+  assert_writable_branch
   for attempt in $(seq 1 "$attempts"); do
     if [ "$attempt" != 1 ] || [ -z "${LEAN_QUEUE_NO_FETCH:-}" ]; then
       fetch_queue
@@ -260,6 +270,7 @@ transition() {
 
 add_item() {
   local title="$1" attempt base_id id n item commit
+  assert_writable_branch
   base_id="$(slug "$title")"
   [ -n "$base_id" ] || die "cannot make an id from: $title"
   for attempt in $(seq 1 "$attempts"); do
