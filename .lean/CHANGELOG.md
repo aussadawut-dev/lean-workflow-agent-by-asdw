@@ -21,9 +21,10 @@ migration steps below.
   - The workflow version is present in both `.lean/README.md` and `.lean/CHANGELOG.md` and agrees.
     `.lean/PROJECT.md` is project-owned and free-form, so its version line is not read: a project
     whose own `PROJECT.md` says `Current version: 1.2.3` must not fail the workflow's checks.
-  - `.agent/` and `.github/lean-workflow/` appear nowhere outside this file. This check exists
-    because the first attempt at this move left the root `README.md` pointing at both, and all
-    three gate commands passed anyway -- the path check had just been repointed at the new
+  - `.agent/` and `.github/lean-workflow/` appear nowhere outside this file. Every text file is
+    scanned, and the scan fails if it cannot complete rather than reading as clean. This check
+    exists because the first attempt at this move left the root `README.md` pointing at both, and
+    all three gate commands passed anyway -- the path check had just been repointed at the new
     namespace, so nothing was watching the old one.
 - `CONTRIBUTING.md` and `.github/pull_request_template.md` added. The PR template is the Result
   Contract from `policy/CONTRACTS.md`, so the repository reports its own changes in the format it
@@ -44,17 +45,19 @@ because a missing `PROJECT.md` is a no-op by design.
 2. `mkdir -p .lean/scripts .lean/tests`, then `git mv` `check-structure.sh` into `.lean/scripts/`
    and `test-hooks.sh` into `.lean/tests/`. Remove the empty `.github/lean-workflow/`.
 3. Take the workflow-owned files from the 2.0.0 release instead of editing them; they already use
-   the new paths. That is `.lean/README.md`, `.lean/policy/`, `.lean/scripts/`, `.lean/tests/`,
-   `.claude/hooks/`, `.claude/skills/lean-*/`, `.claude/agents/reviewer.md`, `AGENTS.md`, and
-   everything in `CLAUDE.md` above `## Project additions`.
+   the new paths. That is `.lean/README.md`, `.lean/CHANGELOG.md`, `.lean/policy/`,
+   `.lean/scripts/`, `.lean/tests/`, `.claude/hooks/`, `.claude/skills/lean-*/`,
+   `.claude/agents/reviewer.md`, and everything in `CLAUDE.md` above `## Project additions`.
+   Also `AGENTS.md`, unless you edited it. If you edited any of the others, diff before
+   overwriting. `.claude/settings.json` is not in this list: it names no retired path, and
+   `Upgrading` step 6 has you merge it by hand.
 4. Edit only what is yours. In `.lean/PROJECT.md` replace `.agent/` with `.lean/` and repoint the
    two script paths, including the ones inside its Quality Gate block. Do the same in your own
    `README.md` and any project file that named them.
 5. Update `.github/workflows/lean-workflow.yml`: the two script paths, the `shellcheck` glob, and
    the `paths:` filters.
 6. Confirm nothing was left behind, then validate:
-   - `git grep -l -e '[.]agent/' -e '[.]github/lean-workflow/'` should list only this file and
-     `.lean/scripts/check-structure.sh`, which both name those paths on purpose.
+   - `git grep -l -e '[.]agent/' -e '[.]github/lean-workflow/'` should list nothing but this file.
    - `ls .lean/.agent` should say no such directory.
    - `.lean/scripts/check-structure.sh` and `.lean/tests/test-hooks.sh` should both pass.
 

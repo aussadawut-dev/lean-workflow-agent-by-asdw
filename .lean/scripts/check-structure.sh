@@ -76,24 +76,29 @@ found="$( {
 } | grep -oE '[0-9]+\.[0-9]+\.[0-9]+$' )"
 n="$(printf '%s\n' "$found" | grep -c .)"
 if [ "$n" != "2" ]; then
-  bad "workflow version missing: expected it in .lean/README.md and .lean/CHANGELOG.md, found $n"
+  bad "workflow version: expected exactly one in each of .lean/README.md and .lean/CHANGELOG.md, found $n"
 elif [ "$(printf '%s\n' "$found" | sort -u | grep -c .)" != "1" ]; then
   bad "workflow version differs between .lean/README.md and .lean/CHANGELOG.md: $(printf '%s' "$found" | tr '\n' ' ')"
 fi
 
 # Paths the 2.0.0 move retired. Only .lean/CHANGELOG.md may still name them, in its
-# history and its migration steps; this file is skipped because it carries the pattern
-# itself. Drop this check once 1.x is out of circulation.
-while read -r hit; do
+# history and its migration steps. The pattern is spelled [.]agent/ so that this file
+# does not match itself, which is the idiom that file's own verify step uses. Every
+# text file is scanned: .gitignore is a workflow file here, and GitHub accepts both
+# .yml and .yaml. Drop this check once 1.x is out of circulation.
+scan_err="$(mktemp)"
+hits="$(find . -path ./.git -prune -o ! -path ./.lean/CHANGELOG.md -type f \
+  -exec grep -I -nE '[.]agent/|[.]github/lean-workflow/' /dev/null {} + 2>"$scan_err")"
+# Fail closed: an unreadable file or a broken scan must not read as a clean one.
+if [ -s "$scan_err" ]; then
+  bad "retired-path scan could not complete: $(head -n 1 "$scan_err")"
+fi
+rm -f "$scan_err"
+while IFS= read -r hit; do
   [ -n "$hit" ] && bad "retired path still referenced: $hit"
-done < <(
-  find . -path ./.git -prune -o -type f \
-      \( -name '*.md' -o -name '*.sh' -o -name '*.json' -o -name '*.yml' \) -print0 \
-    | tr '\0' '\n' \
-    | grep -vE '^\./\.lean/(CHANGELOG\.md|scripts/check-structure\.sh)$' \
-    | tr '\n' '\0' \
-    | xargs -0 -r grep -nE '\.agent/|\.github/lean-workflow/' 2>/dev/null
-)
+done <<EOF
+$hits
+EOF
 
 # Gate markers exist exactly once.
 for marker in 'gate:start' 'gate:end'; do
