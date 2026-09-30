@@ -14,7 +14,8 @@ one needs a single line under Status and nothing else. Delete sections that do n
 ## Evidence
 
 <!-- Commands run and their outcomes. Tests added or run. A bug fix shows its regression
-     test failing before the fix and passing after. -->
+     test failing before the fix and passing after. Which review round this is on, and the
+     range that review covered against the range this PR ships. -->
 
 ## Not verified
 
