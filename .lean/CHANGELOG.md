@@ -20,8 +20,8 @@ unwritten, and it is the one that goes out of date on its own.
 
 - `policy/MODELS.md` gains `Resolving a tier to a model`. The tiers stay abstract, which is what
   keeps that file from going stale on an upgrade cycle it does not control, and it names no model
-  of its own: `policy/` prescribes nothing vendor-specific. The names live in a `Model registry`
-  in `PROJECT.md`, which is project-owned and untouched by upgrades.
+  of its own. The names live in a `Model registry` in `PROJECT.md`, which is project-owned and
+  untouched by upgrades.
 - The registry is keyed by runtime. An agent reaching this repository through `AGENTS.md` spawns
   models this one cannot, so a single column of names would be wrong for everyone but its author.
   Each row is `| runtime | tier | model | verified |` and carries its own date, so one runtime's
@@ -37,22 +37,31 @@ unwritten, and it is the one that goes out of date on its own.
 - `scripts/check-structure.sh` checks what can be checked from in here. The names cannot be: no
   list of current models is in this repository. Its rows can, and the dates can. It fails when a
   runtime named does not cover every tier -- a half-filled registry is dated and trusted for the
-  tier it does not name -- and when the oldest row is more than 90 days old. A row dated in the
+  tier it does not name -- when a tier is spelled as one `MODELS.md` does not define, and when the
+  oldest row is more than 90 days old, naming the runtime to go and recheck. A row dated in the
   future is rejected: it verifies nothing, and it is the cheapest way to silence the check. Dates
   are read from each row's last cell, never scanned out of the block, or a pinned id carrying a
-  date of its own would date the registry by the model it is meant to be checking. A project
-  carrying no registry is not failed, since the fallback covers it; half a registry is, because a
-  lost marker would otherwise read as no registry and skip the check in silence.
-- `tests/test-structure.sh` is new: 22 checks, ~6.7s. `scripts/check-structure.sh` had no test
-  before this. Every case but one writes the registry it tests into a throwaway copy of the
-  repository rather than editing whatever the host `PROJECT.md` carries, so the suite holds in an
-  install that never adopted a registry -- verified at 22 passed with the `Model registry` section
-  deleted. The exception runs the check against this repository, so the suite goes red on the day
-  the shipped rows go stale rather than only the gate. Nine mutations of the check each fail a
-  case: dropping the age limit, moving it to 89 days, dropping the future-date, half-a-registry,
-  row-shape, empty-registry or tier-completeness guard, letting the block scan run past a closed
-  marker, and reading dates from the whole row instead of its last cell. Added to the gate block
-  and to CI.
+  date of its own would date the registry by the model it is meant to be checking.
+- The block is read strictly, because the failure mode of reading it loosely is silence. Markdown
+  does not require a table row's outer pipes, and a row written without them is one the check
+  cannot see: review found six rows dated 2019 passing as a current registry that way, complete
+  tier coverage and all, while an agent following `MODELS.md` reads exactly those rows. Any line
+  inside the markers that is not a row the check read is now a failure naming that line, which
+  covers prose left in the block as well. The separator row is recognised in both shapes GFM
+  allows, so a table formatted with alignment colons is not read as data.
+- A project carrying no registry is not failed, since the fallback covers it; half a registry is,
+  because a lost marker would otherwise read as no registry and skip the check in silence.
+- `tests/test-structure.sh` is new: 29 checks, ~9s. `scripts/check-structure.sh` had no test
+  before this. Every case that tests a registry writes it into a throwaway copy of the repository
+  rather than editing whatever the host `PROJECT.md` carries, so the suite holds in an install
+  that never adopted a registry -- verified at 29 passed with the `Model registry` section
+  deleted. One case runs the check against this repository instead, so the suite goes red on the
+  day the shipped rows go stale rather than only the gate. Thirteen mutations of the check each
+  fail a case: dropping the age limit, moving it to 89 days, dropping the future-date,
+  half-a-registry, row-shape, empty-registry, tier-completeness, unknown-tier or stray-line guard,
+  reverting the separator filter to the un-aligned shape, letting the block scan run past a closed
+  marker, dropping the runtime from the stale message, and reading dates from the whole row
+  instead of its runtime and date cells. Added to the gate block and to CI.
 
 The cost is deliberate and worth stating: a dated check is a check that fires on a date nobody
 picked, and a stale registry blocks the gate on whatever task happens to be in flight. That is the
@@ -65,7 +74,9 @@ Replace `.lean/policy/MODELS.md`, `.lean/scripts/check-structure.sh`, `CLAUDE.md
 `.lean/PROJECT.md`. Adopting a registry is optional and separate: an install that adds neither is
 not failed by the structure check, the test suite, or CI. To adopt one, add a `Model registry`
 section to `.lean/PROJECT.md` with `<!-- models:start -->` / `<!-- models:end -->` markers, a
-`| runtime | tier | model | verified |` header, and a row per tier for the runtime you are on.
+`| runtime | tier | model | verified |` header, and a row for each of `fast`, `default` and
+`strongest` for the runtime you are on. Rows need their outer pipes, and nothing else may sit
+between the markers.
 
 ## 2.4.1
 

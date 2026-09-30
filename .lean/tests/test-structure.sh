@@ -41,9 +41,12 @@ PY
 # editing right now, without dragging in build output a consumer's repo may hold.
 base="$work/base"
 mkdir -p "$base"
-if ! (cd "$repo" && git ls-files -z -co --exclude-standard | tar -cf - --null -T -) |
-     (cd "$base" && tar -xf -); then
-  echo "FAIL could not copy the repository into a fixture"
+(cd "$repo" && git ls-files -z -co --exclude-standard | tar -cf - --null -T -) |
+  (cd "$base" && tar -xf -)
+# Asserted on the result, not on the pipeline's status: both the `git` and the `tar -c`
+# status are masked by their pipelines, and `tar -x` on empty input exits 0.
+if [ ! -f "$base/.lean/scripts/check-structure.sh" ]; then
+  echo "FAIL could not copy the repository into a fixture (is $repo a git work tree?)"
   exit 1
 fi
 git -C "$base" init -q
@@ -127,6 +130,10 @@ expect_registry_fail "structure: a row verified 91 days ago fails"
 case "$out" in
   *"limit 90"*) ok "structure: the stale message names the limit" ;;
   *) bad "structure: the stale message names the limit (got: $out)" ;;
+esac
+case "$out" in
+  *"runtime claude has a row verified"*) ok "structure: the stale message names the runtime" ;;
+  *) bad "structure: the stale message names the runtime (got: $out)" ;;
 esac
 
 # 5. The edge of the window is inside it, not outside.
@@ -241,9 +248,57 @@ expect_pass "structure: a date inside a pinned model id is not the row's date"
 dir="$(fixture)"
 { header; rows claude "$today"; } | set_registry "$dir"
 file="$dir/.lean/PROJECT.md"
-sed 's/$/\r/' "$file" > "$file.new" && mv "$file.new" "$file"
+sed $'s/$/\r/' "$file" > "$file.new" && mv "$file.new" "$file"
+grep -q "$(printf '\r')" "$file" || bad "fixture: no CR was added, so the case proves nothing"
 run_check "$dir"
 expect_pass "structure: a CRLF PROJECT.md passes"
+
+# 17. Markdown does not require the outer pipes, so a row written without them is a row
+#     this check cannot see. Mixed with rows that have them, the block still parses and
+#     the unseen rows' dates never reach the limit -- a stale registry reading as current,
+#     which is the whole failure this feature exists to prevent.
+dir="$(fixture)"
+{ header; rows claude "$today"
+  printf 'codex | fast | m-f | %s\ncodex | default | m-d | %s\ncodex | strongest | m-s | %s\n' \
+    "$(days_ago 900)" "$(days_ago 900)" "$(days_ago 900)"
+} | set_registry "$dir"
+run_check "$dir"
+expect_registry_fail "structure: rows without outer pipes fail rather than being skipped"
+case "$out" in
+  *"not a table row"*) ok "structure: the message says the line was not read as a row" ;;
+  *) bad "structure: the message says the line was not read as a row (got: $out)" ;;
+esac
+
+# 18. Prose left inside the markers is unseen in the same way.
+dir="$(fixture)"
+{ header; rows claude "$today"; printf 'TODO: add the codex rows\n'; } | set_registry "$dir"
+run_check "$dir"
+expect_registry_fail "structure: prose inside the block fails"
+
+# 19. An alignment delimiter is the separator row in one of the two shapes GFM allows,
+#     not a data row. Reading it as one is a permanent failure over valid markdown.
+dir="$(fixture)"
+{ printf '| runtime | tier | model | verified |\n| :--- | :---: | ---: | --- |\n'
+  rows claude "$today"
+} | set_registry "$dir"
+run_check "$dir"
+expect_pass "structure: an alignment delimiter row is not read as a row"
+
+# 20. The tier keys are MODELS.md's and are case-sensitive. Without this a capitalised
+#     tier is accepted as a row for an unknown tier and counted as missing the real one,
+#     and the failure blames the wrong thing.
+dir="$(fixture)"
+{ header
+  printf '| claude | Fast | m-f | %s |\n' "$today"
+  printf '| claude | default | m-d | %s |\n' "$today"
+  printf '| claude | strongest | m-s | %s |\n' "$today"
+} | set_registry "$dir"
+run_check "$dir"
+expect_registry_fail "structure: a tier MODELS.md does not name fails"
+case "$out" in
+  *"the tiers are fast, default, strongest"*) ok "structure: the message names the tier keys" ;;
+  *) bad "structure: the message names the tier keys (got: $out)" ;;
+esac
 
 echo
 echo "$pass passed, $fail failed"
