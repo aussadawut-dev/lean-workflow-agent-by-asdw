@@ -26,6 +26,8 @@ change for evidence should carry its own.
 - A behavior change in a hook needs a case in `.lean/tests/test-hooks.sh`.
 - `.lean/policy/` is workflow-owned and replaced on upgrade. Project-specific rules belong in
   `.lean/PROJECT.md`, which upgrades never touch.
-- Bump the version in `.lean/CHANGELOG.md`, `.lean/README.md`, and `.lean/PROJECT.md`. The
-  structure check fails if the three disagree. MAJOR also covers moving paths an existing install
-  depends on, and needs a migration section in the changelog entry.
+- Bump the version in `.lean/CHANGELOG.md` and `.lean/README.md`. The structure check fails if
+  either is missing it or the two disagree. `.lean/PROJECT.md` mentions the version too, but it
+  is project-owned and not checked, so keep it in step by hand.
+- MAJOR also covers moving paths an existing install depends on. Such an entry needs migration
+  steps, and they must say to run before the `Upgrading` steps, not after.

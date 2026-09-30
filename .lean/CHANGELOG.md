@@ -4,24 +4,59 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 
 ## 2.0.0
 
-Layout only. No workflow rule changed, but every workflow path moved, so an existing install needs the migration below.
+Every workflow path moved. Nothing about how work is done changed, but the versioning rule at the
+top of this file was widened in the same commit: moving files an existing install depends on now
+counts as MAJOR, which is what makes this 2.0.0 instead of a MINOR. An existing install needs the
+migration steps below.
 
-- `.agent/` is now `.lean/`: one namespace for the whole workflow, instead of rules in `.agent/` and self-checks in `.github/`.
+- `.agent/` is now `.lean/`: one namespace for the whole workflow, instead of rules in `.agent/`
+  and self-checks in `.github/`.
 - Self-checks left `.github/`, which now holds GitHub platform files only:
   - `.github/lean-workflow/check-structure.sh` -> `.lean/scripts/check-structure.sh`
   - `.github/lean-workflow/test-hooks.sh` -> `.lean/tests/test-hooks.sh`
-- `check-structure.sh` also checks that the scripts in `.lean/scripts/` and `.lean/tests/` are executable, so a lost exec bit fails the structure check instead of CI.
-- `CONTRIBUTING.md` and `.github/pull_request_template.md` added. The PR template is the Result Contract from `policy/CONTRACTS.md`, so the repository reports its own changes in the format it asks for.
-- Zone names stay namespaced on purpose. A downstream project keeps its own `scripts/`, `tests/`, `docs/`, and root `CHANGELOG.md`, with nothing to rename and nothing to merge.
-- Entries below describe the `.agent/` paths that were current at the time. They are left as written.
+- `check-structure.sh` gained three checks:
+  - The scripts under `.lean/scripts/` and `.lean/tests/` are executable. This names a lost exec
+    bit on `test-hooks.sh` instead of leaving it to CI. `check-structure.sh`'s own exec bit is not
+    covered, because CI runs it by path and fails on permission before it can check anything.
+  - The workflow version is present in both `.lean/README.md` and `.lean/CHANGELOG.md` and agrees.
+    `.lean/PROJECT.md` is project-owned and free-form, so its version line is not read: a project
+    whose own `PROJECT.md` says `Current version: 1.2.3` must not fail the workflow's checks.
+  - `.agent/` and `.github/lean-workflow/` appear nowhere outside this file. This check exists
+    because the first attempt at this move left the root `README.md` pointing at both, and all
+    three gate commands passed anyway -- the path check had just been repointed at the new
+    namespace, so nothing was watching the old one.
+- `CONTRIBUTING.md` and `.github/pull_request_template.md` added. The PR template is the Result
+  Contract from `policy/CONTRACTS.md`, so the repository reports its own changes in the format it
+  asks for.
+- Zone names stay namespaced on purpose. A downstream project keeps its own `scripts/`, `tests/`,
+  `docs/`, and root `CHANGELOG.md`, with nothing to rename and nothing to merge.
+- Entries below describe the `.agent/` paths that were current when they were written. They are
+  left as written.
 
 ### Migrating from 1.x
 
+Run these **before** the `Upgrading` steps at the bottom of this file, not after. `git mv .agent
+.lean` when `.lean` already exists does not fail: it nests the old tree at `.lean/.agent/`, your
+`PROJECT.md` is no longer at `.lean/PROJECT.md`, and the `Stop` hook then silently does nothing,
+because a missing `PROJECT.md` is a no-op by design.
+
 1. `git mv .agent .lean`
-2. `mkdir -p .lean/scripts .lean/tests`, then `git mv` `check-structure.sh` into `.lean/scripts/` and `test-hooks.sh` into `.lean/tests/`. Remove the empty `.github/lean-workflow/`.
-3. Replace `.agent/` with `.lean/` in `CLAUDE.md`, `AGENTS.md`, `.claude/hooks/*.sh`, `.claude/skills/lean-*/SKILL.md`, `.claude/agents/reviewer.md`, and your own `.lean/PROJECT.md`.
-4. Update the Quality Gate block in `.lean/PROJECT.md` and the paths in `.github/workflows/lean-workflow.yml`.
-5. Run `.lean/scripts/check-structure.sh` and `.lean/tests/test-hooks.sh`.
+2. `mkdir -p .lean/scripts .lean/tests`, then `git mv` `check-structure.sh` into `.lean/scripts/`
+   and `test-hooks.sh` into `.lean/tests/`. Remove the empty `.github/lean-workflow/`.
+3. Take the workflow-owned files from the 2.0.0 release instead of editing them; they already use
+   the new paths. That is `.lean/README.md`, `.lean/policy/`, `.lean/scripts/`, `.lean/tests/`,
+   `.claude/hooks/`, `.claude/skills/lean-*/`, `.claude/agents/reviewer.md`, `AGENTS.md`, and
+   everything in `CLAUDE.md` above `## Project additions`.
+4. Edit only what is yours. In `.lean/PROJECT.md` replace `.agent/` with `.lean/` and repoint the
+   two script paths, including the ones inside its Quality Gate block. Do the same in your own
+   `README.md` and any project file that named them.
+5. Update `.github/workflows/lean-workflow.yml`: the two script paths, the `shellcheck` glob, and
+   the `paths:` filters.
+6. Confirm nothing was left behind, then validate:
+   - `git grep -l -e '[.]agent/' -e '[.]github/lean-workflow/'` should list only this file and
+     `.lean/scripts/check-structure.sh`, which both name those paths on purpose.
+   - `ls .lean/.agent` should say no such directory.
+   - `.lean/scripts/check-structure.sh` and `.lean/tests/test-hooks.sh` should both pass.
 
 ## 1.4.0
 
@@ -67,11 +102,16 @@ Changes from dogfooding (a Go CLI, 5 headless runs). The Task Contract was never
 
 Workflow files are separate from project files, so an upgrade replaces them without touching your code.
 
+If you are crossing a MAJOR version, read that entry above and run its migration steps first. A
+MAJOR moves paths, so the files step 1 names may not exist yet under the names it uses.
+
 1. Replace `.lean/policy/`, `.lean/README.md`, `.lean/CHANGELOG.md`, `.lean/scripts/`, and `.lean/tests/`. Never replace `.lean/PROJECT.md`.
 2. Replace `.claude/hooks/`, `.claude/agents/reviewer.md`, and `.claude/skills/lean-*/`. Keep your own agents and skills.
-3. Replace `.github/workflows/lean-workflow.yml`, unless you deleted it.
+3. Replace `.github/workflows/lean-workflow.yml`, unless you deleted it. Take
+   `.github/pull_request_template.md` too if you want it; it is new in 2.0.0 and yours to edit
+   afterwards.
 4. In `CLAUDE.md`, replace everything above `## Project additions`. Keep your additions.
 5. Replace `AGENTS.md`, unless you edited it.
 6. Merge `.claude/settings.json` by hand if you changed it.
 7. Run `.lean/scripts/check-structure.sh` and `.lean/tests/test-hooks.sh`.
-8. Read the new `CHANGELOG.md` entry for MAJOR changes that need action.
+8. Re-read the new `CHANGELOG.md` entry and confirm nothing in it is still outstanding.

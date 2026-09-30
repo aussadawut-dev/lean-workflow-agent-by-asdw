@@ -67,15 +67,33 @@ for file in .claude/skills/*/SKILL.md; do
   grep -q "^name: $dir\$" "$file" || bad "skill name does not match directory: $file"
 done
 
-# The version appears in three files; they must agree.
-versions="$( {
+# The workflow version, in the two workflow-owned files that carry it. Both must be
+# present and agree. .lean/PROJECT.md is project-owned and free-form -- a project's own
+# "Current version" line is none of this check's business -- so it is not read here.
+found="$( {
   grep -oE 'Baseline [0-9]+\.[0-9]+\.[0-9]+' .lean/README.md
-  grep -oE 'Current version: [0-9]+\.[0-9]+\.[0-9]+' .lean/PROJECT.md
   grep -m1 -oE '^## [0-9]+\.[0-9]+\.[0-9]+' .lean/CHANGELOG.md
-} | grep -oE '[0-9]+\.[0-9]+\.[0-9]+$' | sort -u )"
-if [ "$(printf '%s\n' "$versions" | grep -c .)" != "1" ]; then
-  bad "version differs across .lean/README.md, .lean/PROJECT.md, .lean/CHANGELOG.md: $(printf '%s' "$versions" | tr '\n' ' ')"
+} | grep -oE '[0-9]+\.[0-9]+\.[0-9]+$' )"
+n="$(printf '%s\n' "$found" | grep -c .)"
+if [ "$n" != "2" ]; then
+  bad "workflow version missing: expected it in .lean/README.md and .lean/CHANGELOG.md, found $n"
+elif [ "$(printf '%s\n' "$found" | sort -u | grep -c .)" != "1" ]; then
+  bad "workflow version differs between .lean/README.md and .lean/CHANGELOG.md: $(printf '%s' "$found" | tr '\n' ' ')"
 fi
+
+# Paths the 2.0.0 move retired. Only .lean/CHANGELOG.md may still name them, in its
+# history and its migration steps; this file is skipped because it carries the pattern
+# itself. Drop this check once 1.x is out of circulation.
+while read -r hit; do
+  [ -n "$hit" ] && bad "retired path still referenced: $hit"
+done < <(
+  find . -path ./.git -prune -o -type f \
+      \( -name '*.md' -o -name '*.sh' -o -name '*.json' -o -name '*.yml' \) -print0 \
+    | tr '\0' '\n' \
+    | grep -vE '^\./\.lean/(CHANGELOG\.md|scripts/check-structure\.sh)$' \
+    | tr '\n' '\0' \
+    | xargs -0 -r grep -nE '\.agent/|\.github/lean-workflow/' 2>/dev/null
+)
 
 # Gate markers exist exactly once.
 for marker in 'gate:start' 'gate:end'; do
