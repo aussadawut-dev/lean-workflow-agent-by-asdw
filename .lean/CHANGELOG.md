@@ -21,29 +21,37 @@ about the change.
   run and the check the change is therefore unverified by. It still exits 2, and the skip cache and
   the `.claude/.gate-failed` marker treat it as the refusal it is. A message that let the turn finish
   would be the fail-open, not the fix: a gate that could not run has not passed.
-- 127 alone does not say whose problem it is, so the hook asks whether the word the shell would have
-  looked up actually resolves. Reading the command's shape instead is not enough, and the first
-  attempt at this change proved it: a wrapper hands back the status of the program it ran, so
-  `bash lint.sh` whose script calls a tool the diff never added exits 127 with bash plainly
-  installed, and that attempt blamed the environment for it and named bash as the tool to install --
-  the review round that caught it is why the rule is a lookup and not a pattern. A word holding a
-  slash is exempt from the question: it names a file this repository points at, so a gate line whose
-  script is missing stays an ordinary failure. Leading `VAR=VALUE` words are stepped over, or the
-  verdict would turn on whether `CI=1` resolves as a command, which nothing does. 126 (found, will
-  not execute) stays ordinary too -- a dropped exec bit is usually in the diff -- as does everything
-  else, because "not your change" is the verdict that can wave a real failure through.
-- `test-hooks.sh` is now 48 checks. Three are the regression proper and fail against the 2.2.0 hook:
+- Three things have to hold before the gate blames the environment: exit 127, a lookup word that is a
+  plain command name, and that name failing to resolve here. Each is there because the simpler rule
+  before it was wrong about a shape a real gate block contains, and each was caught by review rather
+  than reasoned out in advance. Shape alone was wrong for wrappers: 127 travels up from the program a
+  wrapper ran, so `bash lint.sh` whose script calls a tool the diff never added exits 127 with bash
+  plainly installed, and the first attempt called that an environment problem and named bash as the
+  tool to install. The lookup alone was wrong for quoting: the `VAR=VALUE` strip is a regex over the
+  line, so `FOO="a b" cmd` leaves `b"` as the word to look up, nothing resolves a fragment, and the
+  wrapper case came back exculpated one quoted assignment later. The status alone was wrong for
+  compound lines: in `optional-linter ; pytest` the word that did not resolve is not the word that
+  decided the verdict, and the excuse would bury a real failure.
+- A word holding a slash names a file this repository points at, so a gate line whose script is
+  missing stays an ordinary failure -- as does 126 (found, will not execute; usually an exec bit
+  missing from the diff), and every other status. Leading `VAR=VALUE` words are stepped over, or the
+  verdict would turn on whether `CI=1` resolves as a command, which nothing does. Everything unclear
+  takes the ordinary message, which sends the agent to look, because "not your change" is the verdict
+  that can wave a real failure through.
+- `test-hooks.sh` is now 53 checks. Three are the regression proper and fail against the 2.2.0 hook:
   a missing program must say the gate could not run, must name the environment, and must not carry
-  the "If your change caused this" line. Two fail against the shape-reading attempt above: a present
-  wrapper is an ordinary failure, and an assignment is not a program's name. The other ten pin what
-  must not move -- a command that exists and fails keeps the old verdict and is never called an
-  environment problem, a script named by path is a failure when it is missing rather than a missing
-  tool, and the missing-tool branch records the refusal exactly as the other branch does.
+  the "If your change caused this" line. The rest pin what must not move, one case per shape that got
+  a condition wrong -- the wrapper, the quoted assignment, the compound line, the script named by
+  path, and a command that exists and fails -- and every term of the classification is pinned on its
+  own: remove the status test, the name test, the resolve test or the assignment strip and a check
+  fails. The missing-tool branch is asserted to record the refusal the way the other branch does,
+  with its fixture seeded first; without a cache to clear, the half of that assertion covering the
+  cache passes whatever the hook does.
 
 One fail-open this does not close: a gate command that swallows its own 127 still passes. `test -z
 "$(gofmt -l .)"` with no `gofmt` prints the shell's complaint inside the substitution and then tests
-an empty string, and that is the shape `.lean/PROJECT.md` recommends for formatters. The hook reads
-the status of the command it was given, and the status is 0. Judging the output instead would block a
+an empty string, and that is the shape `.lean/PROJECT.md` recommends for formatters. A pipeline masks it the same way, since the status is the last
+stage's. The hook reads the status of the command it was given, and the status is 0. Judging the output instead would block a
 turn on any gate command that merely prints those words, which in a downstream install is every turn,
 so closing it needs its own evidence rather than a guess bolted onto this one.
 

@@ -298,6 +298,9 @@ expect_code "gate: a matching cache does not override a refusal" 2
 # very first gate command in .lean/PROJECT.md. With one message for both, every
 # turn there that touched a file ended as BLOCKED work over a clean diff.
 dir="$(fixture 'lean-no-such-tool --check')"
+# Seeded first so a cache exists for the run to clear: without one, the cache
+# half of the refusal assertion below passes whatever the hook does with it.
+CLAUDE_PROJECT_DIR="$dir" bash "$gate" --seed
 echo change > "$dir/code.txt"
 run_gate "$dir" '{}'
 expect_code "gate: a missing program still blocks" 2
@@ -389,6 +392,49 @@ case "$err" in
   *"'lean-no-such-tool' is not available"*)
     ok "gate: the message names the program, not the assignment" ;;
   *) bad "gate: the message names the program, not the assignment (got: $err)" ;;
+esac
+
+# 31. The assignment strip is a regex over the line, so it cannot see quoting:
+# `FOO="a b" cmd` leaves `b"` as the word to look up. That is a fragment of the
+# line, not a name, and nothing resolves it -- so with the lookup alone the
+# verdict would be decided by a parse failure, and case 29's shape, one quoted
+# assignment later, would be exculpated all over again. A word that is not a
+# plain command name therefore takes the ordinary message: under-attributing
+# sends the agent to look, which is the safe direction, while over-attributing
+# is the bug this version exists to fix.
+dir="$(fixture 'LEAN_OPTS="-a b" bash scripts/lint.sh')"
+mkdir -p "$dir/scripts"
+printf '#!/usr/bin/env bash\n./tools/lint-tool --check\n' > "$dir/scripts/lint.sh"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+expect_code "gate: a quoted assignment value still blocks" 2
+case "$err" in
+  *'Quality Gate failed: LEAN_OPTS="-a b" bash scripts/lint.sh'*)
+    ok "gate: a fragment left by quoting is not called a missing tool" ;;
+  *) bad "gate: a fragment left by quoting is not called a missing tool (got: $err)" ;;
+esac
+case "$err" in
+  *"could not run"*)
+    bad "gate: a fragment does not claim the environment (got: $err)" ;;
+  *) ok "gate: a fragment does not claim the environment" ;;
+esac
+
+# 32. The status is a condition in its own right: in a compound line the word
+# that did not resolve need not be the word that decided the verdict. Here a
+# missing tool is tolerated and `false` is the check that actually says no -- the
+# shape of an optional linter in front of a real test run. The status is 1, so
+# the gate ran and something failed, and the environment's excuse would bury
+# that even though a tool really is absent. Note the first word is clean: with
+# `tool; false` the semicolon sticks to it and the name test below would refuse
+# the excuse for the wrong reason, so this case would pin nothing.
+dir="$(fixture 'lean-no-such-tool ; false')"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+expect_code "gate: a compound line that fails on its own still blocks" 2
+case "$err" in
+  *"Quality Gate failed: lean-no-such-tool ; false"*)
+    ok "gate: a status other than 127 is a failure whatever the first word is" ;;
+  *) bad "gate: a status other than 127 is a failure whatever the first word is (got: $err)" ;;
 esac
 
 echo
