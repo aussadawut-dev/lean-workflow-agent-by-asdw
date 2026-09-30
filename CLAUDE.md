@@ -7,6 +7,9 @@ This repository uses Lean Workflow Baseline #1. This file is the canonical agent
 - Before changing files, write one contract line as the first line of your reply:
   `Contract: risk=<LOW|MEDIUM|HIGH> quality=<STANDARD|HIGH|VERY_HIGH> acceptance=<observable check>`
   For a trivial task: `Contract: trivial (<reason>)`. Infer values; do not ask the user. Risk rules: `.lean/policy/CONTRACTS.md`.
+- This project runs one workflow mode: `standard`, `tracker`, or `full`. If the `SessionStart` hook
+  says none is recorded, ask the user which one before changing any file, record it with
+  `.lean/bin/mode.sh set <mode>`, and never ask again. What each mode adds: `.lean/policy/MODES.md`.
 - Use the smallest sufficient context. Do not read workflow internals (`.claude/hooks/`, `.lean/policy/`) unless the task needs them.
 - Behavior changes require meaningful tests.
 - Bug fixes require a regression test. Run it before the fix and show it fails, then show it passes after.

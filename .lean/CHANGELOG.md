@@ -4,6 +4,54 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
+## 2.5.0
+
+Workflow modes. A project decides once how much process it runs, and the decision is config from
+then on -- not a judgement call an agent makes per task.
+
+- `standard` is the workflow exactly as it was: nothing added. `tracker` adds one tracking record
+  per non-trivial task, committed under `.lean/tracker/`. `full` adds a task queue whose items are
+  claimed before work starts. The new `policy/MODES.md` holds the rules. Modes only add steps: none
+  of them lowers a floor, and `full` is not licence to skip what `standard` requires.
+- The value lives in a `mode:start`/`mode:end` block in `PROJECT.md`, which upgrades never touch, so
+  the choice survives them and a hand edit is the supported way to switch. `.lean/bin/mode.sh`
+  reads (`get`), validates (`check`), and records (`set`) it. Decoration around a hand-edited value
+  is stripped, since that edit is the documented path.
+- `session-start.sh` asks for the mode the first session it finds none recorded, states `tracker` and
+  `full` on every later session, and says nothing for `standard` -- the baseline earns no line of
+  context per session. A value that is not one of the three is reported, never guessed at: guessing
+  silently drops the records or the queue the project asked for. A project that removed
+  `.lean/bin/` is not asked for a mode it has no way to record.
+- `.lean/bin/queue.sh` is the `full` mode queue: `list`, `show`, `add`, `claim`, `release`, `done`.
+  Items live on their own branch (`lean-queue`, or `LEAN_QUEUE_BRANCH`), one file per item under
+  `queue/`. Every write is a commit built with plumbing against the branch as the remote has it and
+  then pushed, so two sessions claiming one item cannot both win: the second push is rejected as
+  non-fast-forward, and the loser re-reads the item and is told who holds it. Exit 3 is that answer.
+  Nothing is checked out and the working tree is never touched -- a queue that dirtied the tree would
+  change the Quality Gate's state and every diff a session reports. Without an `origin` remote it
+  degrades to local-only claims, which coordinate nothing outside the checkout.
+- New directory `.lean/bin/` for the workflow's own tools. It is deliberately not `.lean/scripts/`,
+  which the README tells a project it may delete: those are self-checks for the workflow files,
+  while `bin/` runs during a session -- the `SessionStart` hook reads `mode.sh` every time.
+- Tests: `.lean/tests/test-mode.sh` (24 checks) and `.lean/tests/test-queue.sh` (38 checks, against
+  a bare remote and two clones) are new, and `test-hooks.sh` goes from 55 to 67 checks for the
+  hook's mode reading. Each new file was verified by mutation: dropping mode.sh's strip of a
+  hand-edited value fails a check, force-pushing the claim commit instead of losing the race fails
+  six, and treating an unrecognized mode as `standard` fails the hook's mode cases.
+  `check-structure.sh` now also checks the mode markers, the recorded value, and the exec bits of
+  `.lean/bin/`.
+
+Upgrade. Add `.lean/bin/`, `.lean/policy/MODES.md`, `.lean/tests/test-mode.sh`, and
+`.lean/tests/test-queue.sh`. Replace `.claude/hooks/session-start.sh`,
+`.lean/scripts/check-structure.sh`, `.lean/tests/test-hooks.sh`, `.lean/README.md`, `CLAUDE.md`,
+`AGENTS.md`, the three skills that changed (`lean-task`, `lean-gate`, `lean-init`), and
+`.lean/CHANGELOG.md`. Then, in your own `PROJECT.md`, add the mode block -- copy
+the `## Workflow mode` section from this version, value `unset`, and the next session asks for the
+mode. If you run the workflow's own checks, add `.lean/bin/*.sh` to the shellcheck line and the two
+new test scripts to the Quality Gate block. Nothing moves, and an install that skips the
+`PROJECT.md` step keeps working: an unreadable mode reads as unset, which is a question, not a
+failure.
+
 ## 2.4.1
 
 Rationale moved out of the files agents read on every task. No rule changed.

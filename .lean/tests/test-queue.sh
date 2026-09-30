@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+# Tests for .lean/bin/queue.sh, the `full` mode task queue. Each case runs
+# against a throwaway bare remote with two clones, which is the arrangement the
+# claim protocol exists for: two sessions, one item.
+# Usage: .lean/tests/test-queue.sh
+
+set -u
+
+repo="$(cd "$(dirname "$0")/../.." && pwd)"
+queue="$repo/.lean/bin/queue.sh"
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+
+pass=0
+fail=0
+
+ok()  { pass=$((pass + 1)); echo "ok   $1"; }
+bad() { fail=$((fail + 1)); echo "FAIL $1"; }
+
+expect() { # expect <label> <got> <want>
+  if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 (got '$2', want '$3')"; fi
+}
+
+contains() { # contains <label> <haystack> <needle>
+  case "$2" in
+    *"$3"*) ok "$1" ;;
+    *) bad "$1 (got: $2)" ;;
+  esac
+}
+
+# A bare remote plus two clones with one commit on the default branch. Prints the
+# directory holding remote.git, A, and B.
+pair() {
+  local dir
+  dir="$(mktemp -d "$work/pair.XXXX")"
+  git init -q --bare "$dir/remote.git"
+  git clone -q "$dir/remote.git" "$dir/A" 2>/dev/null
+  git clone -q "$dir/remote.git" "$dir/B" 2>/dev/null
+  local clone
+  for clone in A B; do
+    git -C "$dir/$clone" config user.email "$clone@test"
+    git -C "$dir/$clone" config user.name "$clone"
+  done
+  echo start > "$dir/A/file.txt"
+  git -C "$dir/A" add -A
+  git -C "$dir/A" commit -qm init
+  git -C "$dir/A" push -q origin HEAD 2>/dev/null
+  git -C "$dir/B" fetch -q origin 2>/dev/null
+  echo "$dir"
+}
+
+# q <clone dir> <args...>; sets $out and $code
+q() {
+  local dir="$1"
+  shift
+  out="$(CLAUDE_PROJECT_DIR="$dir" bash "$queue" "$@" 2>&1)"
+  code=$?
+}
+
+# 1. An added item is open, owned by nobody, and visible to the other clone --
+# the queue is shared state or it is nothing.
+dir="$(pair)"
+q "$dir/A" add "Add login flow"
+expect "add: exits 0" "$code" "0"
+expect "add: prints the id derived from the title" "$out" "add-login-flow"
+q "$dir/A" list
+contains "list: shows the new item as open" "$out" "add-login-flow                           open     -"
+q "$dir/B" list
+contains "list: the other clone sees it" "$out" "add-login-flow"
+
+# 2. A second item with the same title gets its own id rather than overwriting.
+q "$dir/A" add "Add login flow"
+expect "add: a repeated title gets a distinct id" "$out" "add-login-flow-2"
+
+# 3. A claim records the owner, and the other clone can read it.
+q "$dir/A" claim add-login-flow
+expect "claim: exits 0" "$code" "0"
+q "$dir/B" show add-login-flow
+contains "claim: records the status" "$out" "status: claimed"
+contains "claim: records the owner" "$out" "owner: A@test"
+
+# 4. The race the protocol is for: B computes its claim against the queue as it
+# was before A's claim, so its push is rejected rather than silently winning.
+# Both clones hold the item open at that point, so a check on status alone would
+# hand it to both of them.
+dir="$(pair)"
+q "$dir/A" add "Ship the parser"
+q "$dir/B" list                      # B's last look at the queue: item open
+q "$dir/A" claim ship-the-parser
+expect "race: the first claim wins" "$code" "0"
+out="$(LEAN_QUEUE_NO_FETCH=1 CLAUDE_PROJECT_DIR="$dir/B" bash "$queue" claim ship-the-parser 2>&1)"
+code=$?
+expect "race: the second claim exits 3" "$code" "3"
+contains "race: the loser is told who holds it" "$out" "claimed by A@test"
+q "$dir/B" show ship-the-parser
+contains "race: the winner still owns the item" "$out" "owner: A@test"
+
+# 5. A claim on an item someone else holds is refused with the same code, with no
+# race involved.
+q "$dir/B" claim ship-the-parser
+expect "claim: an item held by someone else exits 3" "$code" "3"
+
+# 6. Re-claiming your own item is not a failure: a resumed session says so and
+# carries on.
+q "$dir/A" claim ship-the-parser
+expect "claim: re-claiming your own item exits 0" "$code" "0"
+contains "claim: re-claiming says it is already yours" "$out" "already claimed by you"
+
+# 7. Only the holder can close the item.
+q "$dir/B" "done" ship-the-parser
+expect "done: a non-holder exits 3" "$code" "3"
+contains "done: a non-holder is told who holds it" "$out" "claimed by A@test"
+
+# 8. The holder can, and a done item is not claimable again.
+q "$dir/A" "done" ship-the-parser
+expect "done: the holder closes the item" "$code" "0"
+q "$dir/B" claim ship-the-parser
+expect "claim: a done item exits 3" "$code" "3"
+contains "claim: a done item says it is not open" "$out" "not open (done)"
+
+# 9. release returns the item to the pool, and someone else can then take it.
+dir="$(pair)"
+q "$dir/A" add "Rotate the keys"
+q "$dir/A" claim rotate-the-keys
+q "$dir/B" release rotate-the-keys
+expect "release: a non-holder exits 3" "$code" "3"
+q "$dir/A" release rotate-the-keys
+expect "release: the holder releases the item" "$code" "0"
+q "$dir/B" show rotate-the-keys
+contains "release: the item is open again" "$out" "status: open"
+contains "release: the owner is cleared" "$out" "owner: -"
+q "$dir/B" claim rotate-the-keys
+expect "release: the other clone can claim it" "$code" "0"
+
+# 10. list orders by what a session needs first: open, then claimed, then done.
+dir="$(pair)"
+head_before="$(git -C "$dir/A" rev-parse HEAD)"
+q "$dir/A" add "Aaa done item"
+q "$dir/A" claim aaa-done-item
+q "$dir/A" "done" aaa-done-item
+q "$dir/A" add "Bbb claimed item"
+q "$dir/A" claim bbb-claimed-item
+q "$dir/A" add "Ccc open item"
+q "$dir/A" list
+order="$(printf '%s\n' "$out" | sed -n '2,$p' | awk '{print $2}' | tr '\n' ' ')"
+expect "list: open first, then claimed, then done" "$order" "open claimed done "
+
+# 11. The queue never touches the work: no checkout, no local branch, no change
+# to the tree or to HEAD. A queue that dirtied the tree would break the Quality
+# Gate's state and every diff the session reports.
+expect "queue: the working tree stays clean" "$(git -C "$dir/A" status --porcelain)" ""
+expect "queue: no local queue branch is created" \
+  "$(git -C "$dir/A" branch --list lean-queue)" ""
+expect "queue: HEAD is untouched" "$(git -C "$dir/A" rev-parse HEAD)" "$head_before"
+
+# 12. An id nobody added is an error, not an empty claim.
+q "$dir/A" claim no-such-item
+expect "claim: an unknown id exits 1" "$code" "1"
+contains "claim: an unknown id says so" "$out" "no such queue item"
+
+# 13. Without a remote the queue still works, on a local branch. Claims
+# coordinate nothing outside the checkout, which MODES.md says; the commands must
+# not fail for it.
+solo="$(mktemp -d "$work/solo.XXXX")"
+git init -q "$solo"
+git -C "$solo" config user.email solo@test
+git -C "$solo" config user.name solo
+echo x > "$solo/file.txt"
+git -C "$solo" add -A
+git -C "$solo" commit -qm init
+q "$solo" add "Local only"
+expect "no remote: add works" "$code" "0"
+q "$solo" claim local-only
+expect "no remote: claim works" "$code" "0"
+q "$solo" show local-only
+contains "no remote: the claim is recorded" "$out" "owner: solo@test"
+out="$(LEAN_QUEUE_OWNER=other@test CLAUDE_PROJECT_DIR="$solo" bash "$queue" claim local-only 2>&1)"
+code=$?
+expect "no remote: another owner is still refused" "$code" "3"
+expect "no remote: the working tree stays clean" "$(git -C "$solo" status --porcelain)" ""
+
+# 14. An explicit branch name is honoured, so two queues can share a repository.
+q "$solo" add "Second queue item"
+LEAN_QUEUE_BRANCH=other-queue CLAUDE_PROJECT_DIR="$solo" bash "$queue" add "Elsewhere" >/dev/null
+out="$(LEAN_QUEUE_BRANCH=other-queue CLAUDE_PROJECT_DIR="$solo" bash "$queue" list 2>&1)"
+contains "branch: the override holds its own items" "$out" "elsewhere"
+case "$out" in
+  *second-queue-item*) bad "branch: the override does not see the default queue (got: $out)" ;;
+  *) ok "branch: the override does not see the default queue" ;;
+esac
+
+echo
+echo "$pass passed, $fail failed"
+[ "$fail" -eq 0 ]
