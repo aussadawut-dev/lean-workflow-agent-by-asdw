@@ -47,3 +47,6 @@ jobs:
 
       - name: Queue tests
         run: .lean/tests/test-queue.sh
+
+      - name: Structure tests
+        run: .lean/tests/test-structure.sh

@@ -14,7 +14,7 @@ standard
 
 ## Purpose
 
-Lean Workflow Baseline: a repository template (Claude primary, `AGENTS.md` adapter for other agents) that gives a project a quality-driven coding workflow. It contains workflow files only, no application code. Current version: 2.5.0 (see `.lean/CHANGELOG.md`).
+Lean Workflow Baseline: a repository template (Claude primary, `AGENTS.md` adapter for other agents) that gives a project a quality-driven coding workflow. It contains workflow files only, no application code. Current version: 2.6.0 (see `.lean/CHANGELOG.md`).
 
 ## Architecture
 
@@ -38,10 +38,11 @@ Not defined.
 `.lean/tests/test-tracker.sh` tests the tracking records of `tracker` and `full` mode (81 checks, ~2s). Verified: passes, and each refusal is pinned by naming the mutation that removes it: writing the title unsanitised into the record fails 5 checks, dropping the records-directory containment check on a resolved path fails 4, picking the last of several slug matches instead of refusing fails 4, allowing glob characters in a record name fails 2, replacing `slug()` with `cut -c1-40` fails 23, and dropping the state validation fails 3.
 `.lean/tests/test-queue.sh` tests the `full` mode queue against a bare remote and up to four concurrent clones (69 checks, ~12s). Verified: passes; force-pushing the claim commit instead of losing the race fails 12 checks, and putting back the `sed "1,/^$/ s|^key: .*|key: value|"` that rewrote item headers before review fails 4 -- an owner holding `&` or a backslash corrupted the item.
 `.lean/tests/test-hooks.sh` tests the Quality Gate and SessionStart hooks (67 checks, ~7s). Verified: passes, exits non-zero on failure, and every term of the gate's state hash plus both of its refusal guards are covered -- removing any one of them fails a check. The gate's two verdicts are covered as a pair: a command the shell cannot find must be reported as an environment problem, and a command that exists and fails must not be -- including a wrapper that hands back another program's 127. Every term deciding that split is pinned on its own: remove the status test, either half of the command-name test, the resolve test or the assignment strip and a check fails.
+`.lean/tests/test-structure.sh` tests the model registry and workflow mode rules in `.lean/scripts/check-structure.sh` (44 checks, ~14s). Every case that tests a registry writes it into a throwaway copy of the repository rather than editing whatever this file carries, so the suite holds in an install that never adopted a registry: verified at 33 passed with the `Model registry` section deleted. One case runs the check against this repository instead, so the suite goes red on the day the shipped rows go stale rather than only the gate. The mode cases cover the three modes and `unset` passing, a typo failing by name, a lost marker failing, a `mode.sh` that cannot run failing, and the rule staying silent where the directory was removed -- which fails on the docs still naming the tools, not on the mode. Verified: passes, exits non-zero on failure, and fifteen mutations of the check each fail a case -- dropping the age limit, moving it to 89 days, dropping the future-date, half-a-registry, row-shape, empty-registry, tier-completeness, unknown-tier or stray-line guard, reverting the separator filter to the un-aligned shape, letting the block scan run past a closed marker, dropping the runtime from the stale message, reading dates from the whole row instead of its runtime and date cells, counting a bare CR as content, and keeping the CR in the stray line it reports.
 
 ### Lint
 `shellcheck .claude/hooks/*.sh .lean/bin/*.sh .lean/scripts/*.sh .lean/tests/*.sh` (0.11.0; passes at default severity, same as CI).
-`.lean/scripts/check-structure.sh` checks referenced paths, retired paths, settings, hook and tool executability, frontmatter, `.gitignore` entries for the gate's state files, and `PROJECT.md` gate and mode markers plus the recorded mode value (~0.3s). Verified: passes, exits non-zero on failure.
+`.lean/scripts/check-structure.sh` checks referenced paths, retired paths, settings, hook and tool executability, frontmatter, `.gitignore` entries for the gate's state files, `PROJECT.md` gate and mode markers plus the recorded mode value, and the model registry below -- row shape, the tier keys, a row per tier for every runtime named, and the oldest date (~0.3s). Verified: passes, exits non-zero on failure.
 
 ### Typecheck
 Not defined.
@@ -58,8 +59,23 @@ shellcheck .claude/hooks/*.sh .lean/bin/*.sh .lean/scripts/*.sh .lean/tests/*.sh
 .lean/tests/test-tracker.sh
 .lean/tests/test-hooks.sh
 .lean/tests/test-queue.sh
+.lean/tests/test-structure.sh
 ```
 <!-- gate:end -->
+
+## Model registry
+
+Which model each tier in `.lean/policy/MODELS.md` resolves to when a subagent is spawned. Keyed by runtime: this repository is agent-agnostic, and the model names one runtime accepts are not the names another one does. Add the rows for the runtime you run on once you have checked them against what it actually offers; never fill in rows for a runtime you are not on. Aliases, not pinned version ids, wherever the runtime has them: an alias tracks the current generation, a pinned id goes out of date without saying so. Each row carries its own date, so updating one runtime does not vouch for another.
+
+The shape is checked, so it is worth stating: the tier keys are `fast`, `default` and `strongest`, lower case, and every tier needs a row. The runtime key is the agent you are running as, lower case and matched only against itself -- `claude` for Claude Code, `codex` for an agent arriving through `AGENTS.md` as Codex. A runtime offering fewer than three distinct models repeats a name across its rows rather than leaving a tier out. Every row needs its outer pipes: markdown does not require them, and a row written without them is one `.lean/scripts/check-structure.sh` cannot read. It fails on any line with content in the block that is not a row it read -- blank lines are fine -- on a tier it does not know, on a runtime missing a tier, and once the oldest row is more than 90 days old.
+
+<!-- models:start -->
+| runtime | tier | model | verified |
+| --- | --- | --- | --- |
+| claude | fast | haiku | 2026-09-30 |
+| claude | default | sonnet | 2026-09-30 |
+| claude | strongest | opus | 2026-09-30 |
+<!-- models:end -->
 
 ## Important paths
 

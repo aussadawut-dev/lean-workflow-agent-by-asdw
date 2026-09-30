@@ -85,7 +85,7 @@ CONTRIBUTING.md         How to change the workflow files.
   policy/               The rules. Replaced wholesale on upgrade.      <- do not edit
   bin/                  Tools a session runs: mode.sh, tracker.sh, queue.sh
   scripts/              check-structure.sh
-  tests/                one per tool, plus test-hooks.sh
+  tests/                one per tool, plus test-hooks.sh and test-structure.sh
 
 .claude/                ZONE 2 - Claude runtime. Paths are fixed by Claude Code.
   settings.json         Hooks and permissions.
@@ -107,11 +107,12 @@ The workflow files test themselves. CI runs only when workflow files change, so 
 your project's CI. Run locally:
 
 ```sh
-.lean/scripts/check-structure.sh   # referenced paths, dead paths, settings, markers, exec bits
+.lean/scripts/check-structure.sh   # paths, settings, markers, exec bits, frontmatter, registry age
 .lean/tests/test-mode.sh           # the workflow mode config
 .lean/tests/test-tracker.sh        # tracking records
 .lean/tests/test-hooks.sh          # Quality Gate and SessionStart hooks
 .lean/tests/test-queue.sh          # the full mode queue and its claim protocol
+.lean/tests/test-structure.sh      # the structure check's model registry rules
 ```
 
 ## What to delete after copying

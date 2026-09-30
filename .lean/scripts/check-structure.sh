@@ -163,9 +163,10 @@ done
 # project under a mode nobody chose, dropping the tracking records or the queue
 # the project asked for. CLAUDE_PROJECT_DIR is pinned to the repository being
 # checked, which is not always the session's.
-# Scoped to projects that kept the directory: session-start.sh deliberately says
-# nothing about modes when mode.sh is gone, so a project that dropped .lean/bin/
-# must not be blocked here on every turn for a removal the hook accepts.
+# Scoped to projects that kept the directory: session-start.sh says nothing about
+# modes when mode.sh is gone, and this rule must not contradict it by demanding a
+# mode nobody can record. Such a project still fails the reference checks above
+# until it drops the docs that name the tools, which is its own business.
 if [ -d .lean/bin ]; then
   if [ -x .lean/bin/mode.sh ]; then
     if ! mode_err="$(CLAUDE_PROJECT_DIR="$PWD" .lean/bin/mode.sh check 2>&1)"; then
@@ -173,6 +174,120 @@ if [ -d .lean/bin ]; then
     fi
   else
     bad "missing or not executable: .lean/bin/mode.sh"
+  fi
+fi
+
+# Model registry. `.lean/policy/MODELS.md` names tiers; the registry in .lean/PROJECT.md
+# names the model each tier resolves to, per runtime -- an agent reaching this repository
+# through AGENTS.md spawns models this one cannot, so a single column of names would be
+# wrong for everyone but its author. The names cannot be checked from here, since no list
+# of current models is in this repository. What can be: that every line in the block is a
+# row the check reads, that the tiers are the ones MODELS.md defines, that each runtime
+# named covers all of them, and that the dates are current. Model generations turn over
+# faster than the file gets reread, and a stale or half-filled registry is worse than
+# none, because the agent trusts it instead of falling back. Each row carries its own
+# date, so one runtime's update does not vouch for another's; the oldest decides. A
+# project carrying no registry is not failed: MODELS.md's fallback covers it. Half a
+# registry is, since a lost marker would otherwise read as no registry and skip the check
+# in silence.
+models_start="$(grep -c -- '<!-- models:start -->' .lean/PROJECT.md)"
+models_end="$(grep -c -- '<!-- models:end -->' .lean/PROJECT.md)"
+if [ "$models_start$models_end" != "00" ]; then
+  if [ "$models_start" != "1" ] || [ "$models_end" != "1" ]; then
+    bad "expected one models:start and one models:end marker in .lean/PROJECT.md, found $models_start and $models_end"
+  else
+    tab="$(printf '\t')"
+    # Rows are read between their outer pipes, which markdown does not require. A row
+    # written without them is a row this check cannot see, and an unseen row is a stale
+    # date that passes, so any line with content inside the block that is not a row the
+    # loop below consumes is a failure rather than a skip. Prose left in the block fails
+    # the same way, for the same reason. Blank lines are not content: \r counts as
+    # neither, or a blank line on a CRLF checkout -- a bare \r -- would be reported as a
+    # stray line printing as empty, and the same file would pass on LF.
+    stray="$(awk '
+      /<!-- models:start -->/ { inside = 1 }
+      /<!-- models:end -->/   { inside = 0 }
+      inside && !/<!-- models:(start|end) -->/ && !/^[ \t]*\|/ && /[^ \t\r]/ {
+        gsub(/\r/, "")
+        print
+        exit
+      }
+    ' .lean/PROJECT.md)"
+    if [ -n "$stray" ]; then
+      bad "model registry in .lean/PROJECT.md has a line that is not a table row: ${stray#"${stray%%[![:space:]]*}"} -- every row needs its outer pipes, or the check cannot see it"
+    fi
+
+    # Cells of each table row, never a bare date scan over the block: a pinned version id
+    # may carry a date of its own, and reading that as the row's date would date the
+    # registry by the very model it is meant to be checking. No `next` on the start rule,
+    # so both markers on one line still close the block. A row is read only between its
+    # outer pipes, which is also what makes a CRLF checkout pass: the \r lands in the
+    # field after the last one, and nothing reads it. The separator row is dropped in
+    # either of the two shapes GFM allows, plain and alignment-marked.
+    rows="$(awk -F '|' '
+      /<!-- models:start -->/ { inside = 1 }
+      /<!-- models:end -->/   { inside = 0 }
+      inside && /^[ \t]*\|/ {
+        out = ""
+        for (i = 2; i < NF; i++) {
+          cell = $i
+          gsub(/^[ \t]+|[ \t]+$/, "", cell)
+          out = (i == 2) ? cell : out "\t" cell
+        }
+        print out
+      }' .lean/PROJECT.md | grep -vE "^(runtime${tab}|:?-+:?${tab})")"
+
+    if [ -z "$rows" ]; then
+      bad "model registry in .lean/PROJECT.md has no rows: a registry naming no model verifies nothing"
+    else
+      malformed="$(printf '%s\n' "$rows" |
+        grep -cvE "^[^${tab}]+${tab}[^${tab}]+${tab}[^${tab}]+${tab}[0-9]{4}-[0-9]{2}-[0-9]{2}$")"
+      unknown="$(printf '%s\n' "$rows" | cut -f2 | sort -u |
+        grep -vxE 'fast|default|strongest' | tr '\n' ' ')"
+      if [ "$malformed" != "0" ]; then
+        bad "model registry in .lean/PROJECT.md has $malformed row(s) that are not | runtime | tier | model | YYYY-MM-DD |"
+      elif [ -n "${unknown% }" ]; then
+        bad "model registry in .lean/PROJECT.md names tier(s) MODELS.md does not: ${unknown% } -- the tiers are fast, default, strongest, spelled in lower case"
+      else
+        # A runtime listed for some tiers only is dated and trusted for the tier it does
+        # not name. The tier names are MODELS.md's; both files are workflow-owned and
+        # move together.
+        while IFS= read -r runtime; do
+          [ -n "$runtime" ] || continue
+          missing=""
+          for tier in fast default strongest; do
+            printf '%s\n' "$rows" | cut -f1,2 | grep -qxF "$runtime$tab$tier" ||
+              missing="$missing $tier"
+          done
+          [ -n "$missing" ] &&
+            bad "model registry in .lean/PROJECT.md: runtime $runtime has no row for:$missing"
+        done <<EOF
+$(printf '%s\n' "$rows" | cut -f1 | sort -u)
+EOF
+
+        # python3 is already required above, for settings.json. Date arithmetic in shell is
+        # not portable between the GNU and BSD `date` this template runs on; this is. The
+        # oldest row's runtime comes back with the ages, so the failure names what to go
+        # and recheck.
+        ages="$(printf '%s\n' "$rows" | cut -f1,4 | python3 -c '
+import datetime, sys
+today = datetime.date.today()
+rows = [l.split("\t") for l in sys.stdin.read().splitlines() if l.strip()]
+ages = sorted(((today - datetime.date.fromisoformat(d)).days, r) for r, d in rows)
+print(ages[0][0], ages[-1][0], ages[-1][1])' 2>/dev/null)"
+        newest="${ages%% *}"
+        oldest_pair="${ages#* }"
+        oldest="${oldest_pair%% *}"
+        stale_runtime="${oldest_pair#* }"
+        if [ -z "$ages" ]; then
+          bad "model registry in .lean/PROJECT.md: could not evaluate its verified dates -- either python3 is missing here, or a date is one the calendar does not have"
+        elif [ "$newest" -lt 0 ]; then
+          bad "model registry in .lean/PROJECT.md has a row dated in the future: a date not yet reached verifies nothing"
+        elif [ "$oldest" -gt 90 ]; then
+          bad "model registry in .lean/PROJECT.md: runtime $stale_runtime has a row verified $oldest days ago (limit 90) -- check $stale_runtime's tiers against the models it offers now, then move its rows' dates forward"
+        fi
+      fi
+    fi
   fi
 fi
 

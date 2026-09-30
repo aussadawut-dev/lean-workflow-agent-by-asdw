@@ -12,9 +12,10 @@ shellcheck .claude/hooks/*.sh .lean/bin/*.sh .lean/scripts/*.sh .lean/tests/*.sh
 .lean/tests/test-tracker.sh
 .lean/tests/test-hooks.sh
 .lean/tests/test-queue.sh
+.lean/tests/test-structure.sh
 ```
 
-Those are the Quality Gate commands in `.lean/PROJECT.md`, and CI runs the same six.
+Those are the Quality Gate commands in `.lean/PROJECT.md`, and CI runs the same seven.
 
 Then fill in the pull request template. It is the Result Contract; a workflow that asks every
 change for evidence should carry its own.
@@ -26,8 +27,9 @@ change for evidence should carry its own.
   The `1.4.0` entry in `.lean/CHANGELOG.md` is the pattern: five headless runs, then rules
   *removed* because they were never read.
 - Prefer deleting a rule to adding one. Every line in here is loaded into someone's context.
-- A behavior change in a hook needs a case in `.lean/tests/test-hooks.sh`; one in `.lean/bin/` needs a
-  case in the matching `.lean/tests/test-mode.sh`, `test-tracker.sh`, or `test-queue.sh`.
+- A behavior change in a hook needs a case in `.lean/tests/test-hooks.sh`, one in
+  `.lean/scripts/check-structure.sh` a case in `.lean/tests/test-structure.sh`, and one in
+  `.lean/bin/` a case in the matching `test-mode.sh`, `test-tracker.sh`, or `test-queue.sh`.
 - `.lean/bin/` is workflow code that runs during a session, not a self-check. `.lean/scripts/` and
   `.lean/tests/` are the self-checks a project may delete; `bin/` is not.
 - `.lean/policy/` is workflow-owned and replaced on upgrade. Project-specific rules belong in
