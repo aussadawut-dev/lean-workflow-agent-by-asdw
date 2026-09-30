@@ -9,7 +9,7 @@ This directory holds the operating rules for agents and the self-checks for thos
 - `PROJECT.md` — owned by the project. Agents and people update it.
 - `policy/` — owned by the workflow. Do not edit per project; upgrades replace it.
 - `CHANGELOG.md` — workflow versions and upgrade steps.
-- `bin/` — the workflow's own tools: `mode.sh` (workflow mode), `queue.sh` (claimable task queue).
+- `bin/` — the workflow's own tools: `mode.sh` (workflow mode), `tracker.sh` (tracking records), `queue.sh` (claimable task queue).
 - `scripts/`, `tests/` — self-checks for the files in here. Not your project's own checks.
 
 Do **not** load every file by default. A trivial task (see `policy/WORKFLOW.md`) needs none of them.

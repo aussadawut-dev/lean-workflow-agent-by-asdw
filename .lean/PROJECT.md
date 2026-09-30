@@ -9,7 +9,7 @@ Update it as the project takes shape. "Not defined" is not an error: it means th
 `standard` | `tracker` | `full` -- what each one adds: `.lean/policy/MODES.md`. Asked once, on the first session that finds it unset, and recorded below. To change it later, edit the value by hand; nothing asks again.
 
 <!-- mode:start -->
-unset
+standard
 <!-- mode:end -->
 
 ## Purpose
