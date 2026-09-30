@@ -4,7 +4,7 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
-## 2.3.0
+## 2.4.0
 
 The Quality Gate tells a missing tool apart from a failing check. Both block; only one of them is
 about the change.
@@ -47,7 +47,8 @@ about the change.
   unclear
   takes the ordinary message, which sends the agent to look, because "not your change" is the verdict
   that can wave a real failure through.
-- `test-hooks.sh` is now 55 checks. Three are the regression proper and fail against the 2.2.0 hook:
+- `test-hooks.sh` is now 55 checks. Three are the regression proper and fail against the 2.2.0 hook
+  (2.3.0 left `quality-gate.sh` untouched, so that is the revision before this one):
   a missing program must say the gate could not run, must name the environment, and must not carry
   the "If your change caused this" line. The rest pin what must not move, one case per shape that got
   a condition wrong -- the wrapper, the quoted assignment, the compound line, the wrapped gate
@@ -72,6 +73,47 @@ the command can say which stage produced the status.
 
 **Upgrading:** no steps. The gate blocks the same states it blocked before; one of them now explains
 itself differently.
+
+## 2.3.0
+
+`MODELS.md` has put the strongest model on `HIGH` risk review since the rule was written, and
+nothing ever did it. `.claude/agents/reviewer.md` is `model: inherit` and no spawn site named a
+model, so the rule was a no-op that announced nothing: a session on a fast model spawned a reviewer
+on that same fast model for `HIGH` risk work, and the result reported review at `HIGH` depth --
+true about the depth, silent about the reviewer. The evidence is structural and was checked on this
+repository before the fix: `/lean-task` step 5, `/lean-review` step 4 and `CLAUDE.md`'s reviewer
+line contained no mention of a model, and the new structure check below fails on all three of them
+at the parent commit. For the absence half of that claim a scan is stronger than a run: no file
+named a model, so the behavior could not have occurred. The enforcing half was run rather than
+reasoned about -- this change's own `HIGH` review spawned the `reviewer` subagent with an explicit
+model override, so the primary instruction is followable and not merely aspirational, and the
+frontmatter's `model: inherit` is exactly what that spawn overrode.
+
+- `/lean-review` step 4 and `/lean-task` step 5 spawn the reviewer on the strongest model available
+  to the session. `CLAUDE.md` carries the same instruction, because it sends an agent to the
+  reviewer without going through either skill -- the same reason it carries the round bound inline.
+- Where the reviewer did not run on the strongest model available, the result says so. The report
+  is conditioned on that outcome rather than on whether the model could be chosen: a session
+  already running the strongest model inherits it and loses nothing, so reporting an inherited
+  model as weaker would state something untrue. What is worth surfacing is the case this entry is
+  about -- a reviewer no stronger than the author.
+- `.claude/agents/reviewer.md` keeps `model: inherit`. Pinning the frontmatter would enforce the
+  rule in one line and would break every install whose plan does not carry that model, in a
+  repository whose whole purpose is to be copied into other projects. The frontmatter stays the
+  fallback; the spawn site is where a model that depends on the session belongs.
+- `.lean/scripts/check-structure.sh` fails if any of those three spawn sites stops naming the rule.
+  A rule written in `policy/` and wired nowhere is exactly the failure above, and prose is the only
+  place it can be wired, so a structural check is the only thing that holds it. The check reads the
+  three known spawn sites by path and skips a file that no longer names the `reviewer` subagent in
+  its code-span form: it is a gate command in every install, and the bare word is ordinary domain
+  vocabulary, so guarding on it would block every turn in a project that dropped the bullet and
+  writes about reviewers for any other reason. The anchor is the rule's phrase anywhere in the
+  file rather than on the spawn line, because in `/lean-review` the two sit on different lines of
+  wrapped prose: it catches the instruction being deleted, not a file that keeps the phrase
+  elsewhere while dropping the instruction.
+
+Review depth, risk rules, the round bound and the reviewer's own instructions are unchanged. MINOR
+rather than MAJOR: the rule did not change, its enforcement did.
 
 ## 2.2.0
 
