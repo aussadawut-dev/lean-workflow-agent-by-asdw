@@ -67,6 +67,23 @@ for file in .claude/skills/*/SKILL.md; do
   grep -q "^name: $dir\$" "$file" || bad "skill name does not match directory: $file"
 done
 
+# The HIGH-review path names the model rule. `.lean/policy/MODELS.md` puts the
+# strongest model on `HIGH` risk review, but `.claude/agents/reviewer.md` ships
+# `model: inherit` -- deliberately, since pinned frontmatter breaks an install whose
+# plan lacks that model -- so the model is chosen only where the reviewer is spawned.
+# Through 2.2.0 no spawn site said so and the rule was a silent no-op: a session on a
+# weak model reviewed its own `HIGH` work at its own strength. Only these three spawn
+# sites are read, and only while they still name the reviewer: a project's own skill
+# mentioning a reviewer is not this check's business, and a project that drops the
+# reviewer from one of these files has nothing left here to enforce. This script is a
+# gate command in every downstream install, so a false hit here blocks every turn.
+for file in CLAUDE.md .claude/skills/lean-task/SKILL.md .claude/skills/lean-review/SKILL.md; do
+  [ -f "$file" ] || continue
+  grep -q 'reviewer' "$file" || continue
+  grep -qi 'strongest model' "$file" ||
+    bad "spawns the reviewer without the strongest-model rule from .lean/policy/MODELS.md: $file"
+done
+
 # The workflow version, in the two workflow-owned files that carry it. Both must be
 # present and agree. .lean/PROJECT.md is project-owned and free-form -- a project's own
 # "Current version" line is none of this check's business -- so it is not read here.

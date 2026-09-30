@@ -4,6 +4,37 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
+## 2.3.0
+
+`MODELS.md` has put the strongest model on `HIGH` risk review since the rule was written, and
+nothing ever did it. `.claude/agents/reviewer.md` is `model: inherit` and no spawn site named a
+model, so the rule was a no-op that announced nothing: a session on a fast model spawned a reviewer
+on that same fast model for `HIGH` risk work, and the result reported review at `HIGH` depth --
+true about the depth, silent about the reviewer. The evidence is structural and was checked on this
+repository before the fix: `/lean-task` step 5, `/lean-review` step 4 and `CLAUDE.md`'s reviewer
+line contained no mention of a model, and the new structure check below fails on all three of them
+at the parent commit.
+
+- `/lean-review` step 4 and `/lean-task` step 5 spawn the reviewer on the strongest model available
+  to the session. `CLAUDE.md` carries the same instruction, because it sends an agent to the
+  reviewer without going through either skill -- the same reason it carries the round bound inline.
+- Where the model cannot be chosen, the reviewer inherits the session model and the result names
+  which model reviewed. A rule that cannot be enforced everywhere is still worth reporting: the
+  reader can then see that the reviewer was no stronger than the author, which is the failure this
+  entry is about.
+- `.claude/agents/reviewer.md` keeps `model: inherit`. Pinning the frontmatter would enforce the
+  rule in one line and would break every install whose plan does not carry that model, in a
+  repository whose whole purpose is to be copied into other projects. The frontmatter stays the
+  fallback; the spawn site is where a model that depends on the session belongs.
+- `.lean/scripts/check-structure.sh` fails if any of those three spawn sites stops naming the rule.
+  A rule written in `policy/` and wired nowhere is exactly the failure above, and prose is the only
+  place it can be wired, so a structural check is the only thing that holds it. The check reads the
+  three known spawn sites by path and skips a file that no longer names the reviewer: it is a gate
+  command in every install, so a project's own skill mentioning a reviewer is not its business.
+
+Review depth, risk rules, the round bound and the reviewer's own instructions are unchanged. MINOR
+rather than MAJOR: the rule did not change, its enforcement did.
+
 ## 2.2.0
 
 Review rounds are bounded. From this repository's own five-round run on one change, counted against
