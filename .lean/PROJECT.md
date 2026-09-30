@@ -6,7 +6,7 @@ Update it as the project takes shape. "Not defined" is not an error: it means th
 
 ## Purpose
 
-Lean Workflow Baseline: a repository template (Claude primary, `AGENTS.md` adapter for other agents) that gives a project a quality-driven coding workflow. It contains workflow files only, no application code. Current version: 2.0.0 (see `.lean/CHANGELOG.md`).
+Lean Workflow Baseline: a repository template (Claude primary, `AGENTS.md` adapter for other agents) that gives a project a quality-driven coding workflow. It contains workflow files only, no application code. Current version: 2.1.0 (see `.lean/CHANGELOG.md`).
 
 ## Architecture
 
@@ -14,7 +14,7 @@ Shell scripts and Markdown only. No application, package manager, or build step.
 
 - `CLAUDE.md` canonical agent contract; `AGENTS.md` adapter that defers to it.
 - `.lean/` the workflow: `policy/` rules (replaced on upgrade), `PROJECT.md` (project-owned), `CHANGELOG.md`, and `scripts/` + `tests/` self-checks.
-- `.claude/` Claude runtime: `settings.json`, hooks (`quality-gate.sh` on `Stop`, `session-start.sh`), skills (`lean-init`, `lean-task`, `lean-review`, `lean-gate`), `reviewer` subagent.
+- `.claude/` Claude runtime: `settings.json`, hooks (`quality-gate.sh` on `Stop`, `session-start.sh` on `SessionStart`, which seeds the gate's state cache), skills (`lean-init`, `lean-task`, `lean-review`, `lean-gate`), `reviewer` subagent.
 - `.github/` GitHub platform only: `workflows/lean-workflow.yml` runs the self-checks in CI when workflow files change; `pull_request_template.md`.
 
 ## Commands
@@ -26,7 +26,7 @@ Not defined. No dependencies. `shellcheck` is used by the gate and CI (`brew ins
 Not defined.
 
 ### Test
-`.lean/tests/test-hooks.sh` tests the Quality Gate and SessionStart hooks (13 checks, ~1s). Verified: passes, exits non-zero on failure.
+`.lean/tests/test-hooks.sh` tests the Quality Gate and SessionStart hooks (17 checks, ~2s). Verified: passes, exits non-zero on failure.
 
 ### Lint
 `shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh` (0.11.0; passes at default severity, same as CI).

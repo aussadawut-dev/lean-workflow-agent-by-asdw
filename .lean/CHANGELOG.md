@@ -2,6 +2,26 @@
 
 Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves files an existing install depends on. MINOR adds rules or files. PATCH clarifies wording.
 
+## 2.1.0
+
+The Quality Gate no longer skips a turn just because the working tree is clean.
+
+- `quality-gate.sh` decided whether to skip by asking whether the tree was dirty. Committing makes
+  a tree clean, so an agent that changed files, committed them and ended its turn was never gated.
+  That is the normal shape of a headless or CI run, and this hook is the only rule in the workflow
+  that cannot be talked out of running. Verified before the fix, with a gate of `false`:
+  uncommitted changes exited 2, the same changes committed exited 0.
+- Skipping is now decided only by the recorded state, which already covered the commit, the
+  uncommitted diff and untracked content. The clean-tree shortcut sat two lines above that
+  comparison and returned before it was ever reached.
+- `quality-gate.sh --seed` records the state and runs nothing; `session-start.sh` calls it. Without
+  it, dropping the shortcut would make the gate run once per session even for a question that
+  touched no files. If the SessionStart hook does not fire, the gate runs once at the first turn
+  end rather than skipping -- the safe direction.
+- `test-hooks.sh` is now 17 checks. Test 5 asserted "clean tree skips", which was the bug itself;
+  it now asserts that committed work is gated. Three of the new checks fail against 2.0.0's hooks
+  and pass against these.
+
 ## 2.0.0
 
 Every workflow path moved. Nothing about how work is done changed, but the versioning rule at the
