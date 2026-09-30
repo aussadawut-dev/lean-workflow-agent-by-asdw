@@ -18,16 +18,16 @@ Use the deeper of the two. Example: risk `LOW` with quality `VERY_HIGH` gets `HI
 
 ## Rounds
 
-- A review cycle covers one Task Contract. A change stays in the cycle, and counts toward the cap,
-  when a finding from this cycle's review motivated it. Anything else arriving mid-cycle is new
-  work: its own contract line, its own cycle, its depth from its own risk. A contract opened
-  because the cap fired says so, so the spend stays visible.
+- A review cycle covers one Task Contract. A change stays in the cycle, and counts toward the
+  round cap below, when a finding from this cycle's review motivated it. Anything else arriving
+  mid-cycle is new work: its own contract line, its own cycle, its depth from its own risk. A
+  contract opened because the cap fired says so, so the spend stays visible.
 - After the second `REWORK` on one contract, the cycle gets one last pass, over a delta holding the
   fix for those findings plus whatever repair validation demands of that fix, and nothing else.
-  `PASS` ends the cycle. `REWORK` ends it as `BLOCKED`, naming what is unresolved — never `DONE`:
-  the delta that ships has to have been reviewed, not merely reviewed to the right depth. Going
-  further is the user's call and their budget. This bounds how often a change is reviewed, never how
-  deeply.
+  `PASS` there ends the cycle. `REWORK` there ends it as `BLOCKED`, naming what is unresolved —
+  never `DONE`: the delta that ships has to have been reviewed, not merely reviewed to the right
+  depth. Going further is the user's call and their budget. This bounds how often a change is
+  reviewed, never how deeply.
 - A `PASS` ends the review. Anything applied after it is new work under the one-contract rule
   above, whatever its size — its own contract line, no review when that contract is trivial, and no
   carve-out for small fixes. Inside a high-risk area `WORKFLOW.md`'s trivial test cannot be met at
