@@ -67,6 +67,13 @@ set_registry() {
   MODELS_BODY="$body" python3 "$work/setreg.py" "$1/.lean/PROJECT.md"
 }
 
+# block_of <dir> -- what sits between the registry markers, markers excluded.
+block_of() {
+  awk '/<!-- models:start -->/ { inside = 1; next }
+       /<!-- models:end -->/   { inside = 0 }
+       inside' "$1/.lean/PROJECT.md"
+}
+
 # head of a well-formed table
 header() { printf '| runtime | tier | model | verified |\n| --- | --- | --- | --- |\n'; }
 
@@ -298,6 +305,40 @@ expect_registry_fail "structure: a tier MODELS.md does not name fails"
 case "$out" in
   *"the tiers are fast, default, strongest"*) ok "structure: the message names the tier keys" ;;
   *) bad "structure: the message names the tier keys (got: $out)" ;;
+esac
+
+# 21. Blank lines inside the block are not content: the stray-line rule is about rows
+#     the check cannot see, and a blank line is not a row anyone wrote.
+dir="$(fixture)"
+{ header; printf '\n'; rows claude "$today"; } | set_registry "$dir"
+block_of "$dir" | grep -qx '' || bad "fixture: no blank line inside the block"
+run_check "$dir"
+expect_pass "structure: a blank line inside the block is not a stray line"
+
+# 22. On a CRLF checkout a blank line is a bare \r, which is neither space nor tab. A
+#     rule reading it as content fails a registry that is fine on LF, and prints the
+#     offending line as empty while blaming outer pipes.
+dir="$(fixture)"
+{ header; printf '\n'; rows claude "$today"; } | set_registry "$dir"
+file="$dir/.lean/PROJECT.md"
+sed $'s/$/\r/' "$file" > "$file.new" && mv "$file.new" "$file"
+grep -q "$(printf '\r')" "$file" || bad "fixture: no CR was added, so the case proves nothing"
+run_check "$dir"
+expect_pass "structure: a blank line in a CRLF registry is not a stray line"
+
+# 23. A stray line on a CRLF tree still has its CR when the check reports it, and a CR
+#     inside the message returns the terminal's cursor to column zero, overwriting the
+#     half of it that says what to do.
+dir="$(fixture)"
+{ header; rows claude "$today"; printf 'codex | fast | m-f | 2019-01-01\n'; } | set_registry "$dir"
+file="$dir/.lean/PROJECT.md"
+sed $'s/$/\r/' "$file" > "$file.new" && mv "$file.new" "$file"
+grep -q "$(printf '\r')" "$file" || bad "fixture: no CR was added, so the case proves nothing"
+run_check "$dir"
+expect_registry_fail "structure: a stray line on a CRLF tree fails"
+case "$out" in
+  *"2019-01-01 -- every row needs"*) ok "structure: the stray line is reported without its CR" ;;
+  *) bad "structure: the stray line is reported without its CR (got: $out)" ;;
 esac
 
 echo

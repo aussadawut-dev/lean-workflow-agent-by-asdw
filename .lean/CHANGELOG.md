@@ -44,24 +44,26 @@ unwritten, and it is the one that goes out of date on its own.
   date of its own would date the registry by the model it is meant to be checking.
 - The block is read strictly, because the failure mode of reading it loosely is silence. Markdown
   does not require a table row's outer pipes, and a row written without them is one the check
-  cannot see: review found six rows dated 2019 passing as a current registry that way, complete
-  tier coverage and all, while an agent following `MODELS.md` reads exactly those rows. Any line
-  inside the markers that is not a row the check read is now a failure naming that line, which
-  covers prose left in the block as well. The separator row is recognised in both shapes GFM
+  cannot see: review found three rows dated 2019, sitting in a six-row registry, passing as a
+  current one that way, complete tier coverage and all, while an agent following `MODELS.md` reads
+  exactly those rows. Any line with content inside the markers that is not a row the check read is
+  now a failure naming that line, which covers prose left in the block as well. Blank lines are
+  not content, on either line ending. The separator row is recognised in both shapes GFM
   allows, so a table formatted with alignment colons is not read as data.
 - A project carrying no registry is not failed, since the fallback covers it; half a registry is,
   because a lost marker would otherwise read as no registry and skip the check in silence.
-- `tests/test-structure.sh` is new: 29 checks, ~9s. `scripts/check-structure.sh` had no test
+- `tests/test-structure.sh` is new: 33 checks, ~10s. `scripts/check-structure.sh` had no test
   before this. Every case that tests a registry writes it into a throwaway copy of the repository
   rather than editing whatever the host `PROJECT.md` carries, so the suite holds in an install
-  that never adopted a registry -- verified at 29 passed with the `Model registry` section
+  that never adopted a registry -- verified at 33 passed with the `Model registry` section
   deleted. One case runs the check against this repository instead, so the suite goes red on the
-  day the shipped rows go stale rather than only the gate. Thirteen mutations of the check each
+  day the shipped rows go stale rather than only the gate. Fifteen mutations of the check each
   fail a case: dropping the age limit, moving it to 89 days, dropping the future-date,
   half-a-registry, row-shape, empty-registry, tier-completeness, unknown-tier or stray-line guard,
   reverting the separator filter to the un-aligned shape, letting the block scan run past a closed
-  marker, dropping the runtime from the stale message, and reading dates from the whole row
-  instead of its runtime and date cells. Added to the gate block and to CI.
+  marker, dropping the runtime from the stale message, reading dates from the whole row instead of
+  its runtime and date cells, counting a bare CR as content, and keeping the CR in the stray line
+  it reports. Added to the gate block and to CI.
 
 The cost is deliberate and worth stating: a dated check is a check that fires on a date nobody
 picked, and a stale registry blocks the gate on whatever task happens to be in flight. That is the

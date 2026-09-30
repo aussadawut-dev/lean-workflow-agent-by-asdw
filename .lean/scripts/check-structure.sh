@@ -178,13 +178,19 @@ if [ "$models_start$models_end" != "00" ]; then
     tab="$(printf '\t')"
     # Rows are read between their outer pipes, which markdown does not require. A row
     # written without them is a row this check cannot see, and an unseen row is a stale
-    # date that passes, so anything inside the block that is not a row the loop below
-    # consumes is a failure rather than a skip. Prose left in the block fails the same
-    # way, for the same reason.
+    # date that passes, so any line with content inside the block that is not a row the
+    # loop below consumes is a failure rather than a skip. Prose left in the block fails
+    # the same way, for the same reason. Blank lines are not content: \r counts as
+    # neither, or a blank line on a CRLF checkout -- a bare \r -- would be reported as a
+    # stray line printing as empty, and the same file would pass on LF.
     stray="$(awk '
       /<!-- models:start -->/ { inside = 1 }
       /<!-- models:end -->/   { inside = 0 }
-      inside && !/<!-- models:(start|end) -->/ && !/^[ \t]*\|/ && /[^ \t]/ { print; exit }
+      inside && !/<!-- models:(start|end) -->/ && !/^[ \t]*\|/ && /[^ \t\r]/ {
+        gsub(/\r/, "")
+        print
+        exit
+      }
     ' .lean/PROJECT.md)"
     if [ -n "$stray" ]; then
       bad "model registry in .lean/PROJECT.md has a line that is not a table row: ${stray#"${stray%%[![:space:]]*}"} -- every row needs its outer pipes, or the check cannot see it"
