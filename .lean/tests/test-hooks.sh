@@ -161,6 +161,103 @@ else
   bad "session: seeds the gate cache"
 fi
 
+# 16. The commit is part of the state: the second commit is gated too, not just
+# the first. Without the commit in the state both post-commit trees look alike.
+: > "$counter"
+dir="$(fixture "echo run >> '$counter'")"
+CLAUDE_PROJECT_DIR="$dir" bash "$gate" --seed
+for n in 1 2; do
+  echo "change $n" > "$dir/code.txt"
+  git -C "$dir" -c user.name=t -c user.email=t@t add -A
+  git -C "$dir" -c user.name=t -c user.email=t@t commit -qm "work $n"
+  run_gate "$dir" '{}'
+done
+runs="$(wc -l < "$counter" | tr -d ' ')"
+if [ "$runs" = "2" ]; then ok "gate: every commit is gated"; else bad "gate: every commit is gated (ran $runs of 2)"; fi
+
+# 17. The uncommitted diff is part of the state: two edits to one tracked file
+# look identical to git status, so only the diff itself distinguishes them.
+: > "$counter"
+dir="$(fixture "echo run >> '$counter'")"
+echo first > "$dir/t.txt"
+git -C "$dir" -c user.name=t -c user.email=t@t add -A
+git -C "$dir" -c user.name=t -c user.email=t@t commit -qm add-t
+echo second > "$dir/t.txt"
+run_gate "$dir" '{}'
+echo third > "$dir/t.txt"
+run_gate "$dir" '{}'
+runs="$(wc -l < "$counter" | tr -d ' ')"
+if [ "$runs" = "2" ]; then ok "gate: a further edit to a tracked file re-runs"; else bad "gate: a further edit to a tracked file re-runs (ran $runs of 2)"; fi
+
+# 18. Editing the gate commands re-runs the gate.
+: > "$counter"
+dir="$(fixture "echo run >> '$counter'")"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+sed -i.bak "s|echo run >> |echo edited >> |" "$dir/.lean/PROJECT.md"
+run_gate "$dir" '{}'
+runs="$(wc -l < "$counter" | tr -d ' ')"
+if [ "$runs" = "2" ]; then ok "gate: editing the gate commands re-runs"; else bad "gate: editing the gate commands re-runs (ran $runs of 2)"; fi
+
+# 19. A state the gate refused is not blessed by a later seed.
+dir="$(fixture 'false')"
+echo broken > "$dir/code.txt"
+run_gate "$dir" '{}'
+expect_code "gate: refuses broken work" 2
+CLAUDE_PROJECT_DIR="$dir" bash "$gate" --seed
+run_gate "$dir" '{}'
+expect_code "gate: a seed does not bless a refused state" 2
+
+# 20. The same, once the broken work is committed.
+dir="$(fixture 'false')"
+echo broken > "$dir/code.txt"
+git -C "$dir" -c user.name=t -c user.email=t@t add -A
+git -C "$dir" -c user.name=t -c user.email=t@t commit -qm broken
+run_gate "$dir" '{}'
+expect_code "gate: refuses committed broken work" 2
+CLAUDE_PROJECT_DIR="$dir" bash "$gate" --seed
+run_gate "$dir" '{}'
+expect_code "gate: a seed does not bless refused committed work" 2
+
+# 21. A refusal is recorded, and a passing run clears it.
+dir="$(fixture "test -f '$work/flag'")"
+rm -f "$work/flag"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+expect_code "gate: refuses while the check fails" 2
+if [ -f "$dir/.claude/.gate-failed" ]; then ok "gate: a refusal is recorded"; else bad "gate: a refusal is recorded"; fi
+: > "$work/flag"
+run_gate "$dir" '{}'
+expect_code "gate: passes once the check passes" 0
+if [ ! -f "$dir/.claude/.gate-failed" ]; then ok "gate: a pass clears the refusal"; else bad "gate: a pass clears the refusal"; fi
+
+# 22. A new untracked file changes the state even when it is empty: its content
+# adds nothing, so only git status sees that it appeared.
+: > "$counter"
+dir="$(fixture "echo run >> '$counter'")"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+: > "$dir/appeared.txt"
+run_gate "$dir" '{}'
+runs="$(wc -l < "$counter" | tr -d ' ')"
+if [ "$runs" = "2" ]; then ok "gate: a new empty untracked file re-runs"; else bad "gate: a new empty untracked file re-runs (ran $runs of 2)"; fi
+
+# 23. The gate commands are part of the state in their own right. With
+# .lean/PROJECT.md ignored by git, no other term in the state can see an edit
+# to it: it is neither in the diff nor among the untracked files.
+: > "$counter"
+dir="$(fixture "echo run >> '$counter'")"
+printf '.lean/PROJECT.md*\n' >> "$dir/.gitignore"
+git -C "$dir" rm -q --cached .lean/PROJECT.md
+git -C "$dir" -c user.name=t -c user.email=t@t add -A
+git -C "$dir" -c user.name=t -c user.email=t@t commit -qm "ignore PROJECT.md"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+sed -i.bak "s|echo run >> |echo edited >> |" "$dir/.lean/PROJECT.md"
+run_gate "$dir" '{}'
+runs="$(wc -l < "$counter" | tr -d ' ')"
+if [ "$runs" = "2" ]; then ok "gate: the gate commands are part of the state"; else bad "gate: the gate commands are part of the state (ran $runs of 2)"; fi
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

@@ -1,6 +1,8 @@
 # Changelog
 
-Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves files an existing install depends on. MINOR adds rules or files. PATCH clarifies wording.
+Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves files an existing
+install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
+was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
 ## 2.1.0
 
@@ -18,9 +20,28 @@ The Quality Gate no longer skips a turn just because the working tree is clean.
   it, dropping the shortcut would make the gate run once per session even for a question that
   touched no files. If the SessionStart hook does not fire, the gate runs once at the first turn
   end rather than skipping -- the safe direction.
-- `test-hooks.sh` is now 17 checks. Test 5 asserted "clean tree skips", which was the bug itself;
-  it now asserts that committed work is gated. Three of the new checks fail against 2.0.0's hooks
-  and pass against these.
+- A refused verdict now outlives the turn. A failing run records the state in
+  `.claude/.gate-failed`, and seeding declines while that marker exists, so a new session cannot
+  bless work the gate has already refused. Without it, seeding undid the fix after any SessionStart,
+  and on a dirty broken tree it was worse than 2.0.0, which blocked. A passing run clears the
+  marker.
+- `git ls-files --others -z | xargs -0 cat` in the state became a hazard once seed mode stopped
+  draining stdin: with no untracked files, GNU xargs points the child's stdin at /dev/null but BSD
+  xargs does not, so `cat` there would read the hook's own input. It is a read loop now.
+- `check-structure.sh` gained three guards for this machinery: the gate's state files must be in
+  `.gitignore` (otherwise each run's state includes the file the last run wrote and the gate never
+  settles), `--seed` must not appear in `.claude/settings.json` (wiring it to Stop disables the gate
+  in silence), and the retired-path scan now reads `git ls-files` rather than walking the working
+  tree, so a vendored or ignored file naming a retired path cannot block a downstream project's
+  every turn.
+- `test-hooks.sh` is now 30 checks. Test 5 asserted "clean tree skips", which was the bug itself; it
+  now asserts that committed work is gated. Every term of the state hash is covered: remove any one
+  of the five and a check fails. Restoring 2.0.0's clean-tree shortcut fails six.
+
+**Upgrading to this from 2.0.0 or earlier:** if your Quality Gate currently fails, the first turn
+after the upgrade will block, because the gate now runs on states it used to skip. `CLAUDE.md` tells
+the agent not to repair a failure it did not cause, so it will report `BLOCKED` rather than fix it.
+Clear the failure, or empty the gate block in `.lean/PROJECT.md`, before you start.
 
 ## 2.0.0
 

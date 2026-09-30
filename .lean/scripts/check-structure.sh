@@ -81,24 +81,53 @@ elif [ "$(printf '%s\n' "$found" | sort -u | grep -c .)" != "1" ]; then
   bad "workflow version differs between .lean/README.md and .lean/CHANGELOG.md: $(printf '%s' "$found" | tr '\n' ' ')"
 fi
 
-# Paths the 2.0.0 move retired. Only .lean/CHANGELOG.md may still name them, in its
-# history and its migration steps. The pattern is spelled [.]agent/ so that this file
-# does not match itself, which is the idiom that file's own verify step uses. Every
-# text file is scanned: .gitignore is a workflow file here, and GitHub accepts both
-# .yml and .yaml. Drop this check once 1.x is out of circulation.
-scan_err="$(mktemp)"
-hits="$(find . -path ./.git -prune -o ! -path ./.lean/CHANGELOG.md -type f \
-  -exec grep -I -nE '[.]agent/|[.]github/lean-workflow/' /dev/null {} + 2>"$scan_err")"
-# Fail closed: an unreadable file or a broken scan must not read as a clean one.
-if [ -s "$scan_err" ]; then
-  bad "retired-path scan could not complete: $(head -n 1 "$scan_err")"
-fi
-rm -f "$scan_err"
-while IFS= read -r hit; do
-  [ -n "$hit" ] && bad "retired path still referenced: $hit"
-done <<EOF
+# Paths the 2.0.0 move retired. Only .lean/CHANGELOG.md may still name them, in
+# its history and its migration steps. The pattern is spelled [.]agent/ so this
+# file does not match itself, which is the idiom that file's verify step uses.
+# The file list comes from git, not the filesystem: a vendored or ignored file
+# that happens to name a retired path is not this repository's content, and in a
+# downstream install this script is a gate command, so a false hit there would
+# block every turn. A scan that cannot run is a failure, never a pass.
+# Drop this check once 1.x is out of circulation.
+retired='[.]agent/|[.]github/lean-workflow/'
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  bad "retired-path scan needs a git work tree"
+elif ! scan_err="$(mktemp)" || [ -z "$scan_err" ]; then
+  bad "retired-path scan could not start: mktemp failed"
+else
+  scan_files=()
+  while IFS= read -r -d '' file; do
+    [ "$file" = ".lean/CHANGELOG.md" ] && continue
+    scan_files+=("$file")
+  done < <(git ls-files -z 2>>"$scan_err")
+
+  hits=""
+  if [ "${#scan_files[@]}" -gt 0 ]; then
+    hits="$(grep -I -nH -E "$retired" "${scan_files[@]}" 2>>"$scan_err")"
+    status=$?
+    [ "$status" -gt 1 ] && bad "retired-path scan could not complete (grep exit $status)"
+  fi
+  [ -s "$scan_err" ] && bad "retired-path scan reported: $(head -n 1 "$scan_err")"
+  rm -f "$scan_err"
+
+  while IFS= read -r hit; do
+    [ -n "$hit" ] && bad "retired path still referenced: $hit"
+  done <<EOF
 $hits
 EOF
+fi
+
+# The gate's own state files must stay untracked, or each run's state includes
+# the file the previous run wrote and the gate never settles.
+for ignored in '.claude/.gate-cache' '.claude/.gate-failed'; do
+  grep -qxF "$ignored" .gitignore || bad "missing from .gitignore: $ignored"
+done
+
+# --seed records state and runs nothing, so wiring it to Stop disables the gate
+# in silence. It belongs in session-start.sh, never in settings.json.
+if grep -q -- '--seed' .claude/settings.json; then
+  bad "--seed must not appear in .claude/settings.json (it would disable the gate)"
+fi
 
 # Gate markers exist exactly once.
 for marker in 'gate:start' 'gate:end'; do

@@ -18,6 +18,7 @@ seed=0
 root="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 project="$root/.lean/PROJECT.md"
 cache="$root/.claude/.gate-cache"
+failed="$root/.claude/.gate-failed"
 
 if [ "$seed" -eq 0 ]; then
   input="$(cat)"
@@ -44,10 +45,21 @@ cd "$root" || exit 0
 # uncommitted diff, and the content of untracked files.
 state=""
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  state="$( { printf '%s\n' "$commands"; git rev-parse HEAD 2>/dev/null; git diff HEAD 2>/dev/null; git status --porcelain; git ls-files --others --exclude-standard -z | xargs -0 cat 2>/dev/null; } | cksum)"
+  state="$( {
+    printf '%s\n' "$commands"
+    git rev-parse HEAD 2>/dev/null
+    git diff HEAD 2>/dev/null
+    git status --porcelain
+    git ls-files --others --exclude-standard -z |
+      while IFS= read -r -d '' f; do cat "$f" 2>/dev/null; done
+  } | cksum)"
 fi
 
+# Seeding records a baseline for a session that changes nothing. It must never
+# bless a state the gate has already refused: a failing run leaves the marker
+# below, and until a run passes, seeding declines and the gate keeps running.
 if [ "$seed" -eq 1 ]; then
+  [ -f "$failed" ] && exit 0
   [ -n "$state" ] && printf '%s' "$state" > "$cache"
   exit 0
 fi
@@ -67,9 +79,11 @@ while IFS= read -r cmd; do
       echo "If your change caused this, fix it. If it was already failing or is outside the task, do not touch it: report BLOCKED and ask. Do not declare DONE."
     } >&2
     rm -f "$cache"
+    : > "$failed"
     exit 2
   fi
 done <<< "$commands"
 
+rm -f "$failed"
 [ -n "$state" ] && printf '%s' "$state" > "$cache"
 exit 0

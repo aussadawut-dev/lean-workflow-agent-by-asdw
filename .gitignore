@@ -6,3 +6,4 @@
 # Claude local state
 .claude/settings.local.json
 .claude/.gate-cache
+.claude/.gate-failed
