@@ -17,9 +17,11 @@ this rule. Every rule the section stated it still states; only the argument for 
 
 `.claude/hooks/quality-gate.sh` and `.lean/scripts/check-structure.sh` carried design notes at
 roughly two comment lines per three lines of code. The notes that explain a term still stand; the
-ones re-deriving the cases behind it are gone, and the 2.4.0 entry below plus the 55 checks in
-`.lean/tests/test-hooks.sh` hold those cases instead. Trimmed 15 comment lines from the gate and 23
-from the structure check, and 7 from `REVIEW.md`.
+ones re-deriving the cases behind it are gone. Those cases stay in the entry that introduced each:
+2.4.0 below for the gate's missing-tool split, 2.3.0 for the structure check's spawn-site guard. The
+gate's are pinned besides by the 55 checks in `.lean/tests/test-hooks.sh`, which covers the hooks and
+not the structure check. Trimmed 15 comment lines from the gate and 22 from the structure check,
+and 7 from `REVIEW.md`.
 
 Replace `.lean/policy/REVIEW.md`, `.lean/scripts/check-structure.sh`,
 `.claude/hooks/quality-gate.sh`, `.lean/README.md`, and `.lean/CHANGELOG.md`. Nothing moves.

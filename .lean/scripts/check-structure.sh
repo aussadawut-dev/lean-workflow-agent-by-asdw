@@ -114,9 +114,10 @@ else
     # git grep, not the filesystem: a vendored or ignored file that happens to
     # name a retired path is not this repository's content, and a false hit in a
     # downstream install would block every turn. --untracked still covers a new
-    # file a contributor has not staged yet, which is content. `-a` rather than
-    # `-I`, so a .gitattributes binary marking cannot hide a real hit. A scan that
-    # cannot run is read as a failure below, never a pass.
+    # file a contributor has not staged yet, which is content, and git chunks its
+    # own argument list, so there is no argv ceiling. `-a` rather than `-I`, so a
+    # .gitattributes binary marking cannot hide a real hit. A scan that cannot run
+    # is read as a failure below, never a pass.
     hits="$(git grep --no-color -a -nE --untracked "$retired" \
       -- ':(exclude).lean/CHANGELOG.md' 2>>"$scan_err")"
     status=$?
