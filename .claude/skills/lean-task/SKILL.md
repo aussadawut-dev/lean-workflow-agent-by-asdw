@@ -12,5 +12,5 @@ Task: $ARGUMENTS
    - Behavior change: add tests for it and its edges.
    - Bug fix: write the regression test first, run it and show the failure, then fix and show it passes.
 4. Run the Quality Gate commands from `.lean/PROJECT.md`.
-5. Review at the deeper of risk and quality. `HIGH` depth: use the `reviewer` subagent. Read `.lean/policy/REVIEW.md` only for `MEDIUM` or `HIGH`.
+5. Review at the deeper of risk and quality. `HIGH` depth: use the `reviewer` subagent, spawned on the strongest model available to this session -- it is `model: inherit`, so otherwise the `HIGH` rule in `.lean/policy/MODELS.md` never fires. If the reviewer did not run on the strongest model available, say so in the result. Read `.lean/policy/REVIEW.md` only for `MEDIUM` or `HIGH`.
 6. Finish with the Result Contract: Status, Changes, Evidence, Not verified, Follow-ups.
