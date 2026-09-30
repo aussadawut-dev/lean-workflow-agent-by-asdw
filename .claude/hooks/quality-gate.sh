@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Quality Gate hook (Stop event).
-# Runs the commands between the gate markers in .agent/PROJECT.md.
+# Runs the commands between the gate markers in .lean/PROJECT.md.
 # No commands defined -> no-op. Failure -> exit 2, which blocks Claude
 # from finishing and returns the output to it.
 
 set -u
 
 root="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-project="$root/.agent/PROJECT.md"
+project="$root/.lean/PROJECT.md"
 cache="$root/.claude/.gate-cache"
 
 input="$(cat)"

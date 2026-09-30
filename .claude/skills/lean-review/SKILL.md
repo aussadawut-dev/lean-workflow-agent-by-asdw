@@ -6,9 +6,9 @@ argument-hint: [diff range or scope]
 
 Scope: $ARGUMENTS (default: uncommitted changes)
 
-1. Read `.agent/policy/REVIEW.md`.
-2. Confirm deterministic validation already passed. If it has not run, run the Quality Gate commands from `.agent/PROJECT.md` first.
-3. Determine depth: the deeper of risk and quality floor from the Task Contract. If there is no contract, infer risk per `.agent/policy/CONTRACTS.md`.
+1. Read `.lean/policy/REVIEW.md`.
+2. Confirm deterministic validation already passed. If it has not run, run the Quality Gate commands from `.lean/PROJECT.md` first.
+3. Determine depth: the deeper of risk and quality floor from the Task Contract. If there is no contract, infer risk per `.lean/policy/CONTRACTS.md`.
 4. Review:
    - `LOW` — self-check against acceptance criteria.
    - `MEDIUM` — focused diff review yourself.

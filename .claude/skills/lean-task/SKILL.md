@@ -6,11 +6,11 @@ argument-hint: <task description>
 
 Task: $ARGUMENTS
 
-1. The first line of your reply is the contract line from `CLAUDE.md`, before any tool call that changes files. Infer values; do not ask the user unless the goal itself is ambiguous. If unsure of risk, read `.agent/policy/CONTRACTS.md`.
-2. Read `.agent/PROJECT.md` for commands.
+1. The first line of your reply is the contract line from `CLAUDE.md`, before any tool call that changes files. Infer values; do not ask the user unless the goal itself is ambiguous. If unsure of risk, read `.lean/policy/CONTRACTS.md`.
+2. Read `.lean/PROJECT.md` for commands.
 3. Work, then test:
    - Behavior change: add tests for it and its edges.
    - Bug fix: write the regression test first, run it and show the failure, then fix and show it passes.
-4. Run the Quality Gate commands from `.agent/PROJECT.md`.
-5. Review at the deeper of risk and quality. `HIGH` depth: use the `reviewer` subagent. Read `.agent/policy/REVIEW.md` only for `MEDIUM` or `HIGH`.
+4. Run the Quality Gate commands from `.lean/PROJECT.md`.
+5. Review at the deeper of risk and quality. `HIGH` depth: use the `reviewer` subagent. Read `.lean/policy/REVIEW.md` only for `MEDIUM` or `HIGH`.
 6. Finish with the Result Contract: Status, Changes, Evidence, Not verified, Follow-ups.

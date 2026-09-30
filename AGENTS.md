@@ -2,7 +2,7 @@
 
 This repository uses Lean Workflow Baseline #1. The canonical contract is `CLAUDE.md`.
 
-**Before any task, read `CLAUDE.md` and `.agent/README.md`. Do not start work without them.**
+**Before any task, read `CLAUDE.md` and `.lean/README.md`. Do not start work without them.**
 
 If you cannot read them, these rules still apply:
 

@@ -4,7 +4,7 @@
 - Run independent tool calls in parallel; sequence dependent ones.
 - Use `DIRECT` execution by default.
 - Use subagents only for genuinely independent parallel work or isolated review/research. Not for simple, tightly coupled, or shared-context work.
-- Use the commands in `.agent/PROJECT.md` for build, test, lint, typecheck.
+- Use the commands in `.lean/PROJECT.md` for build, test, lint, typecheck.
 - Claude: prefer the workflow skills (`/lean-init`, `/lean-task`, `/lean-review`, `/lean-gate`) and the `reviewer` subagent in `.claude/` over ad-hoc equivalents. They load the policy files on demand.
 - Do not add dependencies, frameworks, or process files unless the task requires them.
 - Confirm before destructive or outward-facing actions.

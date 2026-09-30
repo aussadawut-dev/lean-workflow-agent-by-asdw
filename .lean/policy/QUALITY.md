@@ -22,7 +22,7 @@ DONE requires all of:
 4. Review completed at the required depth (deeper of risk and quality; see `REVIEW.md`).
 5. No unreported skipped checks.
 
-For Claude, the `Stop` hook enforces step 2 when Quality Gate commands are defined in `.agent/PROJECT.md`.
+For Claude, the `Stop` hook enforces step 2 when Quality Gate commands are defined in `.lean/PROJECT.md`.
 
 **No evidence, no DONE.**
 **No useful evidence, no extra tokens.**

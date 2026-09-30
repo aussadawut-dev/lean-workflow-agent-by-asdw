@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests for .claude/hooks/*.sh. Each case runs in a throwaway git repo.
-# Usage: .github/lean-workflow/test-hooks.sh
+# Usage: .lean/tests/test-hooks.sh
 
 set -u
 
@@ -21,7 +21,7 @@ bad() { fail=$((fail + 1)); echo "FAIL $1"; }
 fixture() {
   local dir
   dir="$(mktemp -d "$work/repo.XXXX")"
-  mkdir -p "$dir/.agent" "$dir/.claude"
+  mkdir -p "$dir/.lean" "$dir/.claude"
   cp "$repo/.gitignore" "$dir/.gitignore"
   {
     echo "# Project Context"
@@ -35,7 +35,7 @@ fixture() {
     printf '%s\n' "$@"
     echo '```'
     echo "<!-- gate:end -->"
-  } > "$dir/.agent/PROJECT.md"
+  } > "$dir/.lean/PROJECT.md"
   git -C "$dir" init -q
   git -C "$dir" -c user.name=t -c user.email=t@t add -A
   git -C "$dir" -c user.name=t -c user.email=t@t commit -qm init
@@ -122,7 +122,7 @@ case "$out" in
 esac
 
 # 11. Session hook is silent once Purpose is filled
-sed -i.bak 's/^Not defined yet\.$/A real project./' "$dir/.agent/PROJECT.md"
+sed -i.bak 's/^Not defined yet\.$/A real project./' "$dir/.lean/PROJECT.md"
 out="$(CLAUDE_PROJECT_DIR="$dir" bash "$session")"
 if [ -z "$out" ]; then ok "session: silent when filled"; else bad "session: silent when filled (got: $out)"; fi
 

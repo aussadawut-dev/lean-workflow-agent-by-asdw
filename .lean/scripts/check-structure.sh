@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Structural checks for the workflow files: referenced paths exist,
 # settings are valid, hooks are executable, skills and agents have
-# frontmatter. Usage: .github/lean-workflow/check-structure.sh
+# frontmatter. Usage: .lean/scripts/check-structure.sh
 
 set -u
 
@@ -12,22 +12,22 @@ bad() { fail=$((fail + 1)); echo "FAIL $1"; }
 
 docs="$(find . -path ./.git -prune -o -name '*.md' -type f -print | sort)"
 
-# Repo-root references to workflow files, e.g. `.agent/policy/REVIEW.md`.
-for ref in $(printf '%s\n' "$docs" | xargs grep -hoE '\.(agent|claude)/[A-Za-z0-9_./-]+\.(md|sh|json)' | sort -u); do
+# Repo-root references to workflow files, e.g. `.lean/policy/REVIEW.md`.
+for ref in $(printf '%s\n' "$docs" | xargs grep -hoE '\.(lean|claude)/[A-Za-z0-9_./-]+\.(md|sh|json)' | sort -u); do
   [ -e "$ref" ] || bad "missing $ref"
 done
 
-# Router references relative to .agent/, e.g. `policy/REVIEW.md`.
+# Router references relative to .lean/, e.g. `policy/REVIEW.md`.
 # shellcheck disable=SC2016 # literal backticks in the pattern
 while read -r ref; do
-  [ -e ".agent/$ref" ] || bad "missing .agent/$ref (from .agent/README.md)"
-done < <(grep -oE '`(policy/)?[A-Z]+\.md`' .agent/README.md | tr -d '`' | sort -u)
+  [ -e ".lean/$ref" ] || bad "missing .lean/$ref (from .lean/README.md)"
+done < <(grep -oE '`(policy/)?[A-Z]+\.md`' .lean/README.md | tr -d '`' | sort -u)
 
 # Sibling references inside policy files, e.g. `CONTRACTS.md`.
-for file in .agent/policy/*.md; do
+for file in .lean/policy/*.md; do
   # shellcheck disable=SC2016 # literal backticks in the pattern
   while read -r ref; do
-    [ -e ".agent/policy/$ref" ] || bad "missing .agent/policy/$ref (from $file)"
+    [ -e ".lean/policy/$ref" ] || bad "missing .lean/policy/$ref (from $file)"
   done < <(grep -oE '`[A-Z]+\.md`' "$file" | tr -d '`' | sort -u)
 done
 
@@ -45,6 +45,12 @@ else
   bad "invalid JSON: .claude/settings.json"
 fi
 
+# Workflow scripts are executable, so CI and the docs can run them by path.
+for script in .lean/scripts/*.sh .lean/tests/*.sh; do
+  [ -f "$script" ] || continue
+  [ -x "$script" ] || bad "not executable: $script"
+done
+
 # Skills and agents need name and description frontmatter.
 for file in .claude/skills/*/SKILL.md .claude/agents/*.md; do
   [ -f "$file" ] || continue
@@ -61,10 +67,20 @@ for file in .claude/skills/*/SKILL.md; do
   grep -q "^name: $dir\$" "$file" || bad "skill name does not match directory: $file"
 done
 
+# The version appears in three files; they must agree.
+versions="$( {
+  grep -oE 'Baseline [0-9]+\.[0-9]+\.[0-9]+' .lean/README.md
+  grep -oE 'Current version: [0-9]+\.[0-9]+\.[0-9]+' .lean/PROJECT.md
+  grep -m1 -oE '^## [0-9]+\.[0-9]+\.[0-9]+' .lean/CHANGELOG.md
+} | grep -oE '[0-9]+\.[0-9]+\.[0-9]+$' | sort -u )"
+if [ "$(printf '%s\n' "$versions" | grep -c .)" != "1" ]; then
+  bad "version differs across .lean/README.md, .lean/PROJECT.md, .lean/CHANGELOG.md: $(printf '%s' "$versions" | tr '\n' ' ')"
+fi
+
 # Gate markers exist exactly once.
 for marker in 'gate:start' 'gate:end'; do
-  count="$(grep -c "<!-- $marker -->" .agent/PROJECT.md)"
-  [ "$count" = "1" ] || bad "expected one $marker marker in .agent/PROJECT.md, found $count"
+  count="$(grep -c "<!-- $marker -->" .lean/PROJECT.md)"
+  [ "$count" = "1" ] || bad "expected one $marker marker in .lean/PROJECT.md, found $count"
 done
 
 if [ "$fail" -eq 0 ]; then echo "structure ok"; fi
