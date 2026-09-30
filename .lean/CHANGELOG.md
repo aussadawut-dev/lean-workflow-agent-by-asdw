@@ -6,21 +6,34 @@ was being bypassed -- the rule did not change, its enforcement did. PATCH clarif
 
 ## 2.2.0
 
-Review rounds are bounded. From a session that ran five of them on one change, and from counting
-where they went.
+Review rounds are bounded. From this repository's own five-round run on one change, counted against
+the branch rather than recalled: rounds 1 to 3 each returned `REWORK`, round 4 was the first
+independent look at the regression fix and found seven things, round 5 found the fail-open described
+below. One round followed a `PASS`, not two.
 
-- A `PASS` ends the review. Two of those five rounds came after a `PASS`, spent re-reviewing
-  non-blocking findings that had already been applied. Apply such findings; do not open a round to
-  check them.
-- After the second `REWORK` on one contract, report what is left rather than starting a third. The
-  cap is on spend, not on depth: the user can say continue, and it is their budget either way.
-- A review cycle covers one Task Contract. The most expensive round in that session came from
-  taking on a second task mid-cycle. The new work introduced a regression that reopened the loop
-  for the first task, and findings stopped mapping cleanly to a change.
+- A review cycle covers one Task Contract, and a change counts toward the cap when its motivation is
+  a finding from that cycle's review. This is the rule that removes the avoidable rounds. The most
+  expensive round in that run came from taking on a second task mid-cycle: its new code introduced a
+  regression that reopened the loop for the first task, and findings stopped mapping to a change.
+- After the second `REWORK` on one contract, the cycle gets one last pass over the delta that fixes
+  those findings, then stops. A capped cycle still holding a `REWORK` is `BLOCKED`, never `DONE`: a
+  delta no reviewer has seen cannot satisfy condition 4 in `QUALITY.md`. Without that last pass a
+  capped cycle would always ship its final fix unreviewed, and on this branch every round found
+  something real in the previous round's fix, four times out of four.
+- A `PASS` ends the review, and only a trivial change may be applied afterwards without one. The
+  bound is there because "cheap and clearly right" is judged by the agent that wrote the code, after
+  the last independent look. On this branch that licence produced a real defect: round 4 passed, its
+  seven advisory findings were applied, and one of them swapped a filesystem `grep -I` for
+  `git grep -I`. Filesystem `grep` reads binary-ness from content; `git grep` honours
+  `.gitattributes`, so a repository setting `*.md binary` skipped every markdown file while the scan
+  reported clean -- a fail-open in a gate command every project runs on every turn. Round 5 caught
+  it. An unbounded version of this rule means round 5 never happens.
 
-`REVIEW.md` has a `Rounds` section, `/lean-review` step 5 carries the cap, and `WORKFLOW.md` step 6
-routes to it. Review depth is unchanged: this bounds how many times a change is reviewed, never how
-deeply.
+`REVIEW.md` has a `Rounds` section; `CLAUDE.md` carries the bound inline, because it sends an agent
+to the `reviewer` subagent without going through the skill; `/lean-review` step 5 cites the section
+from both the `PASS` and `REWORK` branches rather than restating it; `RECOVERY.md` and `WORKFLOW.md`
+route to it. Review depth is unchanged. The round count lives only in the review report, so it does
+not survive a new session -- one reason the cap is a floor on care, not a mechanism.
 
 ## 2.1.0
 

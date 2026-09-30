@@ -25,4 +25,6 @@ Do not switch silently and do not stall waiting for an answer; continue with wha
 - Do not use the strongest model by default.
 - Do not spend more effort merely because a task is long.
 - Escalate one step at a time and record the reason.
+- When `REVIEW.md`'s round cap fires, the report may recommend a stronger model for a further
+  round. It does not license taking that round unasked.
 - Never lower the quality floor to save budget.

@@ -18,16 +18,22 @@ Use the deeper of the two. Example: risk `LOW` with quality `VERY_HIGH` gets `HI
 
 ## Rounds
 
-Review costs a full context each round, so the loop needs an end.
+Review costs a full context each round, so the loop needs an end that is not the budget running out.
 
-- A `PASS` ends the review. Apply the non-blocking findings that are cheap and clearly right, but
-  do not open another round to check them. The next review, if the work earns one, covers them.
-- After the second `REWORK` on one contract, stop and report what is left rather than starting a
-  third round. The user decides whether to keep going; it is their budget. This caps the spend, not
-  the depth.
-- A review cycle covers one Task Contract. Work that arrives mid-cycle gets its own contract and
-  its own review, even in the same files. Bolting it on restarts the rounds already paid for and
-  hides which change a finding belongs to.
+- A review cycle covers one Task Contract. A change stays in the cycle, and counts toward the cap,
+  when its motivation is a finding from this cycle's review. Anything else is new work: its own
+  contract line, its own cycle. A contract opened because the cap fired says so, so the spend
+  already made stays visible.
+- After the second `REWORK` on one contract, the cycle gets one last pass, over the delta that fixes
+  those findings and nothing else. `PASS` there ends the cycle. `REWORK` there ends it as `BLOCKED`,
+  naming what is unresolved -- never `DONE`, because a delta no reviewer has seen cannot satisfy
+  condition 4 in `QUALITY.md`. Going further is the user's call and their budget. This bounds how
+  often a change is reviewed, never how deeply.
+- A `PASS` ends the review. Afterwards you may apply a non-blocking finding only if the change is
+  trivial by the test in `WORKFLOW.md` -- no behaviour change, or one an existing test already
+  covers and you run. Anything larger is new work under the first rule: its own contract, its own
+  review. The agent calling it cheap is the one who wrote the code, and the last independent look
+  is already behind it.
 
 ## Independent reviewer
 

@@ -13,8 +13,9 @@ Scope: $ARGUMENTS (default: uncommitted changes)
    - `LOW` — self-check against acceptance criteria.
    - `MEDIUM` — focused diff review yourself.
    - `HIGH` — spawn the `reviewer` subagent with the Task Contract and diff range only. Do not pass your reasoning.
-5. On `REWORK`, fix the findings, re-run validation, and review again with delta context only.
-   Stop after the second `REWORK`: report what is left and let the user decide on a third.
-   A `PASS` ends the review. Apply what is cheap and clearly right, but do not open a round
-   to check it. New work that arrives mid-cycle is its own contract, not an addition to this one.
-6. Report the verdict and findings in the Review Contract format.
+5. Act on the verdict under `Rounds` in `.lean/policy/REVIEW.md`, which bounds both branches:
+   - `PASS` — the review is over. It says what you may still apply without another round.
+   - `REWORK` — fix the findings, re-run validation, review again with delta context only. It caps
+     the rounds on one contract and says when the result is `BLOCKED` rather than `DONE`.
+6. Report the verdict and findings in the Review Contract format, and say which round this was: the
+   count lives nowhere else, so a later session cannot recover it.
