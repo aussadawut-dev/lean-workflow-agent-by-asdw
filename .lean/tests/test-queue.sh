@@ -49,6 +49,24 @@ pair() {
   echo "$dir"
 }
 
+# A bare remote plus n clones (c1..cn) with one commit on the default branch, for
+# the cases that need several sessions writing at once. Prints the directory.
+fleet() {
+  local n="$1" dir i
+  dir="$(mktemp -d "$work/fleet.XXXX")"
+  git init -q --bare "$dir/remote.git"
+  for i in $(seq 1 "$n"); do
+    git clone -q "$dir/remote.git" "$dir/c$i" 2>/dev/null
+    git -C "$dir/c$i" config user.email "c$i@test"
+    git -C "$dir/c$i" config user.name "c$i"
+  done
+  echo start > "$dir/c1/file.txt"
+  git -C "$dir/c1" add -A
+  git -C "$dir/c1" commit -qm init
+  git -C "$dir/c1" push -q origin HEAD 2>/dev/null
+  echo "$dir"
+}
+
 # q <clone dir> <args...>; sets $out and $code
 q() {
   local dir="$1"
@@ -188,6 +206,121 @@ case "$out" in
   *second-queue-item*) bad "branch: the override does not see the default queue (got: $out)" ;;
   *) ok "branch: the override does not see the default queue" ;;
 esac
+
+# 15. An owner is a string, not a pattern. `&`, `|` and a backslash are ordinary
+# characters in an email or a hostname, and splicing them into a rewrite
+# corrupted the item: the claim reported success while writing a header nobody
+# could read, so the item could never be claimed, released, or closed again.
+dir="$(pair)"
+q "$dir/A" add "Escape the owner"
+weird='a&b|c\1@test'
+out="$(LEAN_QUEUE_OWNER="$weird" CLAUDE_PROJECT_DIR="$dir/A" bash "$queue" claim escape-the-owner 2>&1)"
+code=$?
+expect "owner: a claim by an owner with sed metacharacters exits 0" "$code" "0"
+q "$dir/B" show escape-the-owner
+contains "owner: the owner is recorded verbatim" "$out" "owner: $weird"
+contains "owner: the item still parses" "$out" "status: claimed"
+out="$(LEAN_QUEUE_OWNER="$weird" CLAUDE_PROJECT_DIR="$dir/A" bash "$queue" release escape-the-owner 2>&1)"
+code=$?
+expect "owner: the same owner can release it again" "$code" "0"
+
+# 16. The claim protocol, run for real: several sessions racing one item, no
+# staged staleness. Exactly one may win, and the item must end up owned by the
+# one that did.
+dir="$(fleet 4)"
+q "$dir/c1" add "One item many claimers"
+for i in 1 2 3 4; do
+  (
+    res="$(CLAUDE_PROJECT_DIR="$dir/c$i" bash "$queue" claim one-item-many-claimers 2>&1)"
+    echo "$? $res" > "$dir/result.$i"
+  ) &
+done
+wait
+won=0
+for i in 1 2 3 4; do
+  read -r rc rest < "$dir/result.$i"
+  [ "$rc" = "0" ] && { won=$((won + 1)); winner="c$i"; }
+  case "$rc $rest" in
+    0*) ;;
+    3*"claimed by"*) ;;
+    4*"kept moving"*) ;;
+    *) bad "race: a loser reported something else (got: $rc $rest)" ;;
+  esac
+done
+expect "race: exactly one of four concurrent claimers wins" "$won" "1"
+q "$dir/c1" show one-item-many-claimers
+contains "race: the item is owned by the winner" "$out" "owner: ${winner:-none}@test"
+
+# 17. The other half: concurrent writers on *different* items are not a race at
+# all, and none of them may be starved out. A rejected push says nothing about
+# this item, so it is retried rather than reported as held -- which is what
+# `exit 3` would have claimed, sending an agent away from an open item.
+dir="$(fleet 4)"
+for i in 1 2 3 4; do
+  q "$dir/c1" add "Item number $i"
+done
+for i in 1 2 3 4; do
+  (
+    CLAUDE_PROJECT_DIR="$dir/c$i" bash "$queue" claim "item-number-$i" >/dev/null 2>&1
+    echo "$?" > "$dir/result.$i"
+  ) &
+done
+wait
+codes="$(cat "$dir"/result.1 "$dir"/result.2 "$dir"/result.3 "$dir"/result.4 | tr '\n' ' ')"
+expect "concurrency: four claims of four items all succeed" "$codes" "0 0 0 0 "
+
+# 18. Adding is the first thing a session does in `full` mode, so it is retried
+# on a rejected push like any other write.
+dir="$(fleet 4)"
+for i in 1 2 3 4; do
+  (
+    CLAUDE_PROJECT_DIR="$dir/c$i" bash "$queue" add "Concurrent add $i" >/dev/null 2>&1
+    echo "$?" > "$dir/result.$i"
+  ) &
+done
+wait
+codes="$(cat "$dir"/result.1 "$dir"/result.2 "$dir"/result.3 "$dir"/result.4 | tr '\n' ' ')"
+expect "concurrency: four concurrent adds all succeed" "$codes" "0 0 0 0 "
+q "$dir/c1" list
+added="$(printf '%s\n' "$out" | grep -c 'concurrent-add-')"
+expect "concurrency: all four items are in the queue" "$added" "4"
+
+# 19. Running out of attempts is not the same answer as "someone holds it": one
+# is a transient the caller should retry, the other is a decision about the item.
+# Staged with one attempt against a stale base, which is a guaranteed rejection.
+dir="$(pair)"
+q "$dir/A" add "Exhausted retries"
+q "$dir/B" list
+q "$dir/A" add "Something else"
+out="$(LEAN_QUEUE_NO_FETCH=1 LEAN_QUEUE_ATTEMPTS=1 CLAUDE_PROJECT_DIR="$dir/B" \
+  bash "$queue" claim exhausted-retries 2>&1)"
+code=$?
+expect "retries: running out of attempts exits 4, not 3" "$code" "4"
+contains "retries: the message says nothing was decided" "$out" "nothing about this item was decided"
+
+# 20. The queue writes with plumbing, which does not know about checkouts: aimed
+# at the branch the session has checked out it would commit onto that work and
+# leave the index reporting the queue files as deleted.
+dir="$(pair)"
+head_before="$(git -C "$dir/A" rev-parse HEAD)"
+current="$(git -C "$dir/A" rev-parse --abbrev-ref HEAD)"
+out="$(LEAN_QUEUE_BRANCH="$current" CLAUDE_PROJECT_DIR="$dir/A" bash "$queue" add "Onto my branch" 2>&1)"
+code=$?
+expect "checkout: a queue aimed at the checked-out branch is refused" "$code" "1"
+contains "checkout: the refusal says why" "$out" "is checked out"
+expect "checkout: no commit was added to it" "$(git -C "$dir/A" rev-parse HEAD)" "$head_before"
+expect "checkout: the tree is still clean" "$(git -C "$dir/A" status --porcelain)" ""
+
+# 21. An id is a path in the queue tree. One that climbs out of it, or holds
+# anything but the characters a slug is made of, is refused before any write.
+q "$dir/A" claim "../../etc/passwd"
+expect "id: a traversing id is refused" "$code" "1"
+contains "id: the refusal names the id" "$out" "not a usable queue id"
+
+# 22. A title spanning lines still makes a one-line id: the id becomes a path and
+# a header value, and a newline in either makes the item unreadable.
+q "$dir/A" add "$(printf 'two\nlines')"
+expect "add: a multi-line title makes a single-line id" "$out" "two-lines"
 
 echo
 echo "$pass passed, $fail failed"

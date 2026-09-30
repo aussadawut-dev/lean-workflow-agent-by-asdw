@@ -65,8 +65,12 @@ Everything `tracker` does, and work is claimed before it starts. `.lean/bin/queu
 ```
 
 - Claim before the first change, and name the item id in the tracking record's `queue:` field.
-- Exit 3 on a claim means the item is held: take another item, and never edit the item file to take
-  it anyway.
+- Exit 3 is the item's own answer -- held by someone else, not claimed, already done: take another
+  item, and never edit the item file to take it anyway. Exit 4 is not an answer about the item: the
+  queue branch kept moving under the write, nothing was decided, and the same command can be run
+  again. Exit 1 is a usage or argument error.
+- The queue never writes to a branch that is checked out, and it refuses rather than commit onto your
+  work. Item ids are lowercase slugs; `add` derives one from the title.
 - A task the user hands you directly is still work: `add` it, then claim it, so a second session
   does not start the same thing.
 - Release what you will not finish. An abandoned claim blocks the item for everyone.

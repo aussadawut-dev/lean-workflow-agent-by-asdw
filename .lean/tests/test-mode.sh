@@ -148,6 +148,76 @@ dir="$(fixture standard)"
 run "$dir" frobnicate >/dev/null 2>&1
 expect "usage: an unknown subcommand exits 1" "$?" "1"
 
+# 16. A malformed block is the expected input, not an exotic one: hand-editing it
+# is the documented way to switch modes. PROJECT.md also carries the Quality Gate
+# commands the Stop hook runs, so a rewrite that misreads the block would take
+# the gate and the project's own notes with it. These three cases pin that
+# nothing is written unless the block is a start line and a separate end line.
+malformed() { # malformed <block lines...>; prints the repo path
+  local dir
+  dir="$(mktemp -d "$work/bad.XXXX")"
+  mkdir -p "$dir/.lean"
+  {
+    echo "# Project Context"
+    echo
+    printf '%s\n' "$@"
+    echo
+    echo "## Commands"
+    echo
+    echo "<!-- gate:start -->"
+    echo "true"
+    echo "<!-- gate:end -->"
+    echo
+    echo "## High-risk areas"
+  } > "$dir/.lean/PROJECT.md"
+  echo "$dir"
+}
+
+intact() { # intact <label> <dir> <line count>
+  local dir="$2"
+  if [ "$(grep -c '' "$dir/.lean/PROJECT.md")" = "$3" ] &&
+     [ "$(grep -c '<!-- gate:start -->' "$dir/.lean/PROJECT.md")" = "1" ] &&
+     [ "$(grep -c '<!-- gate:end -->' "$dir/.lean/PROJECT.md")" = "1" ] &&
+     grep -q '^## High-risk areas$' "$dir/.lean/PROJECT.md"; then
+    ok "$1"
+  else
+    bad "$1 ($(grep -c '' "$dir/.lean/PROJECT.md") lines, wanted $3)"
+  fi
+}
+
+dir="$(malformed '<!-- mode:start --> tracker <!-- mode:end -->')"
+lines="$(grep -c '' "$dir/.lean/PROJECT.md")"
+expect "collapsed block: the value between the markers still reads" "$(run "$dir" get)" "tracker"
+run "$dir" set standard >/dev/null 2>&1
+expect "collapsed block: set refuses it" "$?" "1"
+intact "collapsed block: the rest of PROJECT.md survives the refusal" "$dir" "$lines"
+
+# 17. Markers in the wrong order: there is no block, so there is nothing to read
+# and nothing to write.
+dir="$(malformed '<!-- mode:end -->' 'tracker' '<!-- mode:start -->')"
+lines="$(grep -c '' "$dir/.lean/PROJECT.md")"
+expect "reversed markers: read as unset" "$(run "$dir" get)" "unset"
+run "$dir" set full >/dev/null 2>&1
+expect "reversed markers: set refuses" "$?" "1"
+intact "reversed markers: the rest of PROJECT.md survives the refusal" "$dir" "$lines"
+
+# 18. A duplicated marker is ambiguous, and guessing which one bounds the value
+# is how the wrong region gets rewritten.
+dir="$(malformed '<!-- mode:start -->' 'tracker' '<!-- mode:start -->' 'full' '<!-- mode:end -->')"
+lines="$(grep -c '' "$dir/.lean/PROJECT.md")"
+expect "duplicate marker: read as unset" "$(run "$dir" get)" "unset"
+run "$dir" set full >/dev/null 2>&1
+expect "duplicate marker: set refuses" "$?" "1"
+intact "duplicate marker: the rest of PROJECT.md survives the refusal" "$dir" "$lines"
+
+# 19. The write a well-formed block does get: same line count, same gate block,
+# only the value between the markers replaced.
+dir="$(malformed '<!-- mode:start -->' 'unset' '<!-- mode:end -->')"
+lines="$(grep -c '' "$dir/.lean/PROJECT.md")"
+run "$dir" set tracker >/dev/null
+expect "set: the recorded value changes" "$(run "$dir" get)" "tracker"
+intact "set: nothing outside the block moves" "$dir" "$lines"
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

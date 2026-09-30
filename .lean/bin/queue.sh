@@ -5,9 +5,13 @@
 #   queue.sh list                open items first, then claimed, then done
 #   queue.sh show <id>
 #   queue.sh add <title>         prints the new id
-#   queue.sh claim <id>          exit 3 if someone else holds it
+#   queue.sh claim <id>          exit 3: someone else holds it
 #   queue.sh release <id>
 #   queue.sh done <id>
+#
+# Exit codes: 0 done, 1 usage or a bad argument, 3 the item's state says no
+# (held by someone else, not claimed, already done), 4 the queue branch kept
+# moving under this write -- nothing was decided, so try again.
 #
 # Items live on their own branch -- `lean-queue`, or LEAN_QUEUE_BRANCH -- one
 # file per item at queue/<id>.md. Nothing is checked out and the working tree is
@@ -17,6 +21,9 @@
 # the second push is rejected as non-fast-forward, and the loser re-reads the
 # item and reports who holds it. A repository with no `origin` keeps the branch
 # locally and claims are local only.
+#
+# A write rejected because the branch moved is retried (LEAN_QUEUE_ATTEMPTS, default
+# 8) with a short randomized backoff before it gives up with exit 4.
 #
 # Identity is LEAN_QUEUE_OWNER, else git's user.email. To take over a claim
 # whose owner is gone, run with LEAN_QUEUE_OWNER set to the recorded owner.
@@ -28,13 +35,28 @@ cd "$root" || exit 1
 
 branch="${LEAN_QUEUE_BRANCH:-lean-queue}"
 remote="${LEAN_QUEUE_REMOTE:-origin}"
+attempts="${LEAN_QUEUE_ATTEMPTS:-8}"
 
 die() { echo "$1" >&2; exit "${2:-1}"; }
 
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "not a git repository: $root"
 
+# The queue branch is written by plumbing, which does not know about checkouts:
+# aimed at a branch someone has checked out it would commit onto their work and
+# leave their index reporting the queue files as deleted. Refuse instead.
+checked_out="$(git symbolic-ref --short -q HEAD || true)"
+if [ "$branch" = "$checked_out" ] ||
+   git worktree list --porcelain 2>/dev/null | grep -qx "branch refs/heads/$branch"; then
+  die "the queue branch '$branch' is checked out; the queue never writes to a checked-out branch. Use another LEAN_QUEUE_BRANCH."
+fi
+
 owner="${LEAN_QUEUE_OWNER:-$(git config user.email 2>/dev/null || true)}"
 [ -n "$owner" ] || owner="$(id -un)@$(hostname 2>/dev/null || echo local)"
+# One header line per field, so an owner spanning lines would rewrite the item
+# into something no other session can read.
+case "$owner" in
+  *[![:print:]]*) die "the queue owner may not contain control characters or newlines: LEAN_QUEUE_OWNER=$owner" ;;
+esac
 
 # commit-tree needs an identity even where the repository has none configured.
 if [ -z "$(git config user.email 2>/dev/null || true)" ]; then
@@ -67,6 +89,15 @@ now() { date -u '+%Y-%m-%dT%H:%M:%SZ'; }
 
 item_path() { echo "queue/$1.md"; }
 
+# An id becomes a path in the queue tree and a word in every message about it.
+check_id() {
+  case "$1" in
+    "" | -*) die "not a usable queue id: '$1'" ;;
+    *[!a-z0-9._-]*) die "not a usable queue id: '$1' (lowercase letters, digits, '.', '_' and '-' only)" ;;
+    *..*) die "not a usable queue id: '$1'" ;;
+  esac
+}
+
 read_item() {
   local base
   base="$(base_commit)"
@@ -81,17 +112,42 @@ list_ids() {
   git ls-tree --name-only "$base:queue" 2>/dev/null | sed -n 's/\.md$//p'
 }
 
-# Header fields are the lines between the title and the first blank line.
-field() { printf '%s\n' "$1" | sed -n "1,/^\$/ s/^$2: //p" | head -1; }
+# Header fields are the lines between the title and the first blank line. Read
+# and written with awk, never sed: a value holding `&`, `|` or a backslash is an
+# ordinary owner string, and sed would splice it into the replacement. The values
+# reach awk through the environment rather than -v, which expands backslash
+# escapes and turned an owner holding `\1` into a control character.
+field() {
+  QK="$2" awk '
+    BEGIN { key = ENVIRON["QK"] }
+    NF == 0 { exit }
+    index($0, key ": ") == 1 { print substr($0, length(key) + 3); exit }
+  ' <<< "$1"
+}
 
 set_field() {
-  printf '%s\n' "$1" | sed "1,/^\$/ s|^$2: .*|$2: $3|"
+  QK="$2" QV="$3" awk '
+    BEGIN { key = ENVIRON["QK"]; value = ENVIRON["QV"] }
+    !body && NF == 0 { body = 1 }
+    !body && index($0, key ": ") == 1 { print key ": " value; next }
+    { print }
+  ' <<< "$1"
+}
+
+# Every field a later session reads has to survive the rewrite, or the item is
+# wedged: nothing can claim, release or close it again.
+check_header() {
+  local content="$1" key
+  for key in status owner updated; do
+    [ -n "$(field "$content" "$key")" ] || return 1
+  done
+  return 0
 }
 
 # Build a commit adding or replacing one item, and print its sha. Uses a
 # throwaway index so the repository's own index and working tree are untouched.
 build_commit() {
-  local id="$1" content="$2" message="$3" base tree blob commit index
+  local id="$1" content="$2" message="$3" base index status
   base="$(base_commit)"
   index="$(mktemp)" || return 1
   rm -f "$index"
@@ -106,13 +162,12 @@ build_commit() {
     git update-index --add --cacheinfo "100644,$blob,$(item_path "$id")" || exit 1
     tree="$(git write-tree)" || exit 1
     if [ -n "$base" ]; then
-      commit="$(git commit-tree "$tree" -p "$base" -m "$message")" || exit 1
+      git commit-tree "$tree" -p "$base" -m "$message" || exit 1
     else
-      commit="$(git commit-tree "$tree" -m "$message")" || exit 1
+      git commit-tree "$tree" -m "$message" || exit 1
     fi
-    printf '%s\n' "$commit"
   )
-  local status=$?
+  status=$?
   rm -f "$index"
   return $status
 }
@@ -120,21 +175,29 @@ build_commit() {
 # Move the queue branch to $1, but only if it still points where this commit was
 # built on. A rejected push or a failed compare-and-swap means someone else got
 # there first; that is the race the claim protocol is made of, so it is a plain
-# non-zero return, not an error message.
+# non-zero return. The reason is kept in $push_err for the caller that runs out
+# of attempts, since an auth or network failure looks the same from here.
+push_err=""
 publish() {
   local commit="$1" old
   if [ "$has_remote" = 1 ]; then
-    git push -q "$remote" "$commit:refs/heads/$branch" 2>/dev/null || return 1
+    push_err="$(git push -q "$remote" "$commit:refs/heads/$branch" 2>&1)" || return 1
     git update-ref "$(base_ref)" "$commit"
     return 0
   fi
   old="$(base_commit)"
-  git update-ref "refs/heads/$branch" "$commit" "$old" 2>/dev/null || return 1
+  push_err="$(git update-ref "refs/heads/$branch" "$commit" "$old" 2>&1)" || return 1
   return 0
 }
 
+# A rejected push says nothing about this item: another session wrote another
+# item. Backing off by a random fraction of a second keeps several sessions from
+# re-colliding in lockstep.
+backoff() { sleep "0.$((RANDOM % 4 + 1))"; }
+
 slug() {
   printf '%s' "$1" |
+    tr '\n\t' '  ' |
     tr '[:upper:]' '[:lower:]' |
     sed 's/[^a-z0-9]\{1,\}/-/g; s/^-*//; s/-*$//' |
     cut -c1-40 |
@@ -143,12 +206,12 @@ slug() {
 
 require_id() { [ -n "${1:-}" ] || die "usage: queue.sh $2 <id>"; }
 
-# One attempt to write a state change, retried while the branch moves under it.
-# The first fetch is skipped under LEAN_QUEUE_NO_FETCH, which is how the tests
-# stage a genuine lost race; a retry always fetches.
+# One state change, retried while the branch moves under it. The first fetch is
+# skipped under LEAN_QUEUE_NO_FETCH, which is how the tests stage a lost race; a
+# retry always fetches.
 transition() {
   local id="$1" verb="$2" attempt content status holder new commit
-  for attempt in 1 2 3; do
+  for attempt in $(seq 1 "$attempts"); do
     if [ "$attempt" != 1 ] || [ -z "${LEAN_QUEUE_NO_FETCH:-}" ]; then
       fetch_queue
     fi
@@ -170,7 +233,7 @@ transition() {
         new="$(set_field "$content" status claimed)"
         new="$(set_field "$new" owner "$owner")"
         ;;
-      release | done)
+      release | "done")
         [ "$status" = "claimed" ] || die "not claimed ($status): $id" 3
         [ "$holder" = "$owner" ] || die "claimed by $holder, not you: $id" 3
         if [ "$verb" = "release" ]; then
@@ -183,14 +246,40 @@ transition() {
     esac
 
     new="$(set_field "$new" updated "$(now)")"
+    check_header "$new" || die "refusing to write $id: the rewritten item lost a header field"
     commit="$(build_commit "$id" "$new" "queue: $verb $id ($owner)")" ||
       die "could not build the queue commit for $id"
     if publish "$commit"; then
       echo "$verb $id"
       return 0
     fi
+    backoff
   done
-  die "could not $verb $id: the queue branch moved under every attempt" 3
+  die "could not $verb $id in $attempts attempts: the queue branch kept moving, so nothing about this item was decided. Last git message: ${push_err:-none}" 4
+}
+
+add_item() {
+  local title="$1" attempt base_id id n item commit
+  base_id="$(slug "$title")"
+  [ -n "$base_id" ] || die "cannot make an id from: $title"
+  for attempt in $(seq 1 "$attempts"); do
+    fetch_queue
+    id="$base_id"
+    n=1
+    while read_item "$id" >/dev/null 2>&1; do
+      n=$((n + 1))
+      id="$base_id-$n"
+    done
+    item="$(printf '# %s\nstatus: open\nowner: -\nupdated: %s\n' "$title" "$(now)")"
+    commit="$(build_commit "$id" "$item" "queue: add $id")" ||
+      die "could not build the queue commit for $id"
+    if publish "$commit"; then
+      echo "$id"
+      return 0
+    fi
+    backoff
+  done
+  die "could not add '$title' in $attempts attempts: the queue branch kept moving, so nothing was added. Last git message: ${push_err:-none}" 4
 }
 
 case "${1:-list}" in
@@ -210,6 +299,7 @@ case "${1:-list}" in
 
   show)
     require_id "${2:-}" show
+    check_id "$2"
     fetch_queue
     read_item "$2" || die "no such queue item: $2"
     ;;
@@ -218,25 +308,13 @@ case "${1:-list}" in
     shift
     title="$*"
     [ -n "$title" ] || die "usage: queue.sh add <title>"
-    fetch_queue
-    base_id="$(slug "$title")"
-    [ -n "$base_id" ] || die "cannot make an id from: $title"
-    id="$base_id"
-    n=1
-    while read_item "$id" >/dev/null 2>&1; do
-      n=$((n + 1))
-      id="$base_id-$n"
-    done
-    item="$(printf '# %s\nstatus: open\nowner: -\nupdated: %s\n' "$title" "$(now)")"
-    commit="$(build_commit "$id" "$item" "queue: add $id")" ||
-      die "could not build the queue commit for $id"
-    publish "$commit" || die "could not add $id: the queue branch moved; try again"
-    echo "$id"
+    add_item "$title"
     ;;
 
   claim | release | "done")
     verb="$1"
     require_id "${2:-}" "$verb"
+    check_id "$2"
     transition "$2" "$verb"
     ;;
 

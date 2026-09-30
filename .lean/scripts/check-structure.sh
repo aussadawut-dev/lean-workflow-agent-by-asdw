@@ -163,12 +163,17 @@ done
 # project under a mode nobody chose, dropping the tracking records or the queue
 # the project asked for. CLAUDE_PROJECT_DIR is pinned to the repository being
 # checked, which is not always the session's.
-if [ -x .lean/bin/mode.sh ]; then
-  if ! mode_err="$(CLAUDE_PROJECT_DIR="$PWD" .lean/bin/mode.sh check 2>&1)"; then
-    bad "${mode_err:-invalid workflow mode in .lean/PROJECT.md}"
+# Scoped to projects that kept the directory: session-start.sh deliberately says
+# nothing about modes when mode.sh is gone, so a project that dropped .lean/bin/
+# must not be blocked here on every turn for a removal the hook accepts.
+if [ -d .lean/bin ]; then
+  if [ -x .lean/bin/mode.sh ]; then
+    if ! mode_err="$(CLAUDE_PROJECT_DIR="$PWD" .lean/bin/mode.sh check 2>&1)"; then
+      bad "${mode_err:-invalid workflow mode in .lean/PROJECT.md}"
+    fi
+  else
+    bad "missing or not executable: .lean/bin/mode.sh"
   fi
-else
-  bad "missing or not executable: .lean/bin/mode.sh"
 fi
 
 if [ "$fail" -eq 0 ]; then echo "structure ok"; fi
