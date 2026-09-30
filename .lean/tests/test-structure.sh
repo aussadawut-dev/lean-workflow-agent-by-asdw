@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Tests for .lean/scripts/check-structure.sh, covering the model registry age
-# check. Each case runs the script inside a throwaway copy of this repository.
+# Tests for the model registry rules in .lean/scripts/check-structure.sh. Each case
+# runs the script inside a throwaway copy of this repository, over a registry the
+# case writes itself -- never one the host .lean/PROJECT.md happens to carry, so the
+# suite holds in an install that never adopted a registry.
 # Usage: .lean/tests/test-structure.sh
 
 set -u
@@ -15,12 +17,32 @@ fail=0
 ok()  { pass=$((pass + 1)); echo "ok   $1"; }
 bad() { fail=$((fail + 1)); echo "FAIL $1"; }
 
+# Replaces the whole registry block, or appends one where there is none, so a case
+# gets the registry it asked for either way. Body on $MODELS_BODY; empty removes it.
+cat > "$work/setreg.py" <<'PY'
+import os, re, sys
+
+path = sys.argv[1]
+body = os.environ["MODELS_BODY"]
+if body and not body.endswith("\n"):
+    body += "\n"  # $(cat) drops it, and a row glued to the end marker is outside the block
+block = "<!-- models:start -->\n" + body + "<!-- models:end -->\n" if body else ""
+text = open(path).read()
+pattern = r"<!-- models:start -->.*?<!-- models:end -->\n"
+if re.search(pattern, text, re.S):
+    text = re.sub(pattern, lambda _: block, text, flags=re.S)
+elif block:
+    text = text.rstrip("\n") + "\n\n" + block
+open(path, "w").write(text)
+PY
+
 # The check reads the repository it sits in, so a case needs a whole copy of it.
-# The working tree, not `git ls-files`: a case must see the file a contributor is
-# editing right now. Built once, then copied per case.
+# Tracked plus untracked-not-ignored: a case must see the file a contributor is
+# editing right now, without dragging in build output a consumer's repo may hold.
 base="$work/base"
 mkdir -p "$base"
-if ! (cd "$repo" && tar -cf - --exclude=./.git .) | (cd "$base" && tar -xf -); then
+if ! (cd "$repo" && git ls-files -z -co --exclude-standard | tar -cf - --null -T -) |
+     (cd "$base" && tar -xf -); then
   echo "FAIL could not copy the repository into a fixture"
   exit 1
 fi
@@ -28,12 +50,29 @@ git -C "$base" init -q
 git -C "$base" -c user.name=t -c user.email=t@t add -A
 git -C "$base" -c user.name=t -c user.email=t@t commit -qm init
 
-# A fresh copy per case: a counter would not survive, since the call is a subshell.
 fixture() {
   local dir
   dir="$(mktemp -d "$work/case.XXXX")"
   cp -a "$base/." "$dir/"
   echo "$dir"
+}
+
+# set_registry <dir>; block body on stdin, empty stdin for no registry at all.
+set_registry() {
+  local body
+  body="$(cat)"
+  MODELS_BODY="$body" python3 "$work/setreg.py" "$1/.lean/PROJECT.md"
+}
+
+# head of a well-formed table
+header() { printf '| runtime | tier | model | verified |\n| --- | --- | --- | --- |\n'; }
+
+# rows <runtime> <date> -- one row per tier, all on the same date
+rows() { printf '| %s | fast | m-f | %s |\n| %s | default | m-d | %s |\n| %s | strongest | m-s | %s |\n' "$1" "$2" "$1" "$2" "$1" "$2"; }
+
+days_ago() {
+  python3 -c 'import datetime,sys
+print(datetime.date.today() - datetime.timedelta(days=int(sys.argv[1])))' "$1"
 }
 
 # run_check <dir>; sets $code and $out
@@ -42,43 +81,11 @@ run_check() {
   code=$?
 }
 
-days_ago() {
-  python3 -c 'import datetime,sys
-print(datetime.date.today() - datetime.timedelta(days=int(sys.argv[1])))' "$1"
-}
-
-# set_verified <dir> <date>
-set_verified() {
-  local file="$1/.lean/PROJECT.md"
-  sed "s/^verified: .*/verified: $2/" "$file" > "$file.new" && mv "$file.new" "$file"
-}
-
-# drop_lines <dir> <regex>
-drop_lines() {
-  local file="$1/.lean/PROJECT.md"
-  grep -v -- "$2" "$file" > "$file.new" && mv "$file.new" "$file"
-}
-
-# drop_registry <dir> -- removes the whole block, markers included.
-drop_registry() {
-  python3 - "$1/.lean/PROJECT.md" <<'PY'
-import re, sys
-p = sys.argv[1]
-s = open(p).read()
-s = re.sub(r'<!-- models:start -->.*?<!-- models:end -->\n', '', s, flags=re.S)
-open(p, 'w').write(s)
-PY
-}
-
-expect_code() {
-  if [ "$code" -eq "$2" ]; then ok "$1"; else bad "$1 (exit $code, want $2)"; fi
-}
-
 expect_pass() {
   if [ "$code" -eq 0 ]; then ok "$1"; else bad "$1 (exit $code, want 0: $out)"; fi
 }
 
-# names the registry, so a case cannot pass on an unrelated failure it caused.
+# Names the registry, so a case cannot pass on an unrelated failure it caused.
 expect_registry_fail() {
   if [ "$code" -eq 0 ]; then
     bad "$1 (exit 0, want non-zero)"
@@ -89,6 +96,8 @@ expect_registry_fail() {
   fi
 }
 
+today="$(days_ago 0)"
+
 # 1. The fixture itself is sound, so every case below starts from a passing check.
 dir="$(fixture)"
 run_check "$dir"
@@ -98,59 +107,143 @@ case "$out" in
   *) bad "structure: a passing run says so (got: $out)" ;;
 esac
 
-# 2. The registry this repository ships is inside the window. Without this the
-#    suite would still pass on the day the shipped date goes stale, while every
-#    turn in the repository is blocked by the gate.
+# 2. The registry this repository ships, checked where it actually lives. Without
+#    this the suite would stay green on the day the shipped dates go stale, while
+#    every turn in the repository is blocked by the gate.
 run_check "$repo"
-expect_pass "structure: the repository's own registry is current"
+expect_pass "structure: this repository's own PROJECT.md passes as it stands"
 
-# 3. Past the window.
+# 3. A registry the case wrote itself, so the cases below do not depend on the host.
 dir="$(fixture)"
-set_verified "$dir" "$(days_ago 91)"
+{ header; rows claude "$today"; } | set_registry "$dir"
 run_check "$dir"
-expect_registry_fail "structure: a registry verified 91 days ago fails"
+expect_pass "structure: a registry verified today passes"
+
+# 4. Past the window.
+dir="$(fixture)"
+{ header; rows claude "$(days_ago 91)"; } | set_registry "$dir"
+run_check "$dir"
+expect_registry_fail "structure: a row verified 91 days ago fails"
 case "$out" in
   *"limit 90"*) ok "structure: the stale message names the limit" ;;
   *) bad "structure: the stale message names the limit (got: $out)" ;;
 esac
 
-# 4. The edge of the window is inside it, not outside.
+# 5. The edge of the window is inside it, not outside.
 dir="$(fixture)"
-set_verified "$dir" "$(days_ago 90)"
+{ header; rows claude "$(days_ago 90)"; } | set_registry "$dir"
 run_check "$dir"
-expect_pass "structure: a registry verified 90 days ago still passes"
+expect_pass "structure: a row verified 90 days ago still passes"
 
-# 5. A date not yet reached verifies nothing, and is the cheapest way to silence
+# 6. A date not yet reached verifies nothing, and is the cheapest way to silence
 #    the check.
 dir="$(fixture)"
-set_verified "$dir" "$(days_ago -1)"
+{ header; rows claude "$(days_ago -1)"; } | set_registry "$dir"
 run_check "$dir"
-expect_registry_fail "structure: a verified date in the future fails"
+expect_registry_fail "structure: a row dated in the future fails"
 
-# 6. A date the calendar does not have.
+# 7. A date the calendar does not have.
 dir="$(fixture)"
-set_verified "$dir" "2026-13-45"
+{ header; rows claude 2026-13-45; } | set_registry "$dir"
 run_check "$dir"
-expect_registry_fail "structure: a malformed verified date fails"
+expect_registry_fail "structure: a malformed date fails"
 
-# 7. Markers but no date: undated entries are the drift itself.
+# 8. Undated rows are the drift itself.
 dir="$(fixture)"
-drop_lines "$dir" '^verified: '
+{ printf '| runtime | tier | model |\n| --- | --- | --- |\n'
+  printf '| claude | fast | m-f |\n| claude | default | m-d |\n| claude | strongest | m-s |\n'
+} | set_registry "$dir"
 run_check "$dir"
-expect_registry_fail "structure: a registry with no verified line fails"
+expect_registry_fail "structure: rows with no verified column fail"
+# The verdict alone is not the point: without the shape check these rows reach the
+# date arithmetic and fail as an unreadable date, which names the wrong problem.
+case "$out" in
+  *"| runtime | tier | model | YYYY-MM-DD |"*) ok "structure: the message names the row shape" ;;
+  *) bad "structure: the message names the row shape (got: $out)" ;;
+esac
 
-# 8. A lost marker must not read as no registry.
+# 9. Markers and a header, but nothing named.
 dir="$(fixture)"
-drop_lines "$dir" 'models:end'
+header | set_registry "$dir"
+run_check "$dir"
+expect_registry_fail "structure: a registry with no rows fails"
+
+# 10. A lost marker must not read as no registry.
+dir="$(fixture)"
+{ header; rows claude "$today"; } | set_registry "$dir"
+file="$dir/.lean/PROJECT.md"
+grep -v 'models:end' "$file" > "$file.new" && mv "$file.new" "$file"
+grep -q 'models:end' "$file" && bad "fixture: the end marker was not removed"
 run_check "$dir"
 expect_registry_fail "structure: a registry missing its end marker fails"
 
-# 9. No registry at all is a project that has not adopted one, not a failure:
-#    .lean/policy/MODELS.md falls back to the tier descriptions.
+# 11. Both markers on one line count as one each, so the block must still close on
+#     the line that opens it. A whole valid registry below them is what makes this
+#     case discriminating: a scan that runs to end of file would read those rows and
+#     call an empty block a current registry.
 dir="$(fixture)"
-drop_registry "$dir"
+printf '' | set_registry "$dir"
+{ printf '\n<!-- models:start --> <!-- models:end -->\n\n'
+  header
+  rows claude "$today"
+} >> "$dir/.lean/PROJECT.md"
+run_check "$dir"
+expect_registry_fail "structure: both markers on one line close the block"
+case "$out" in
+  *"has no rows"*) ok "structure: rows below a closed block are not read" ;;
+  *) bad "structure: rows below a closed block are not read (got: $out)" ;;
+esac
+
+# 12. No registry at all is a project that has not adopted one, not a failure:
+#     .lean/policy/MODELS.md falls back to the tier descriptions.
+dir="$(fixture)"
+printf '' | set_registry "$dir"
+grep -q 'models:start' "$dir/.lean/PROJECT.md" && bad "fixture: the registry was not removed"
 run_check "$dir"
 expect_pass "structure: no registry is not a failure"
+
+# 13. Per-runtime dates: one runtime's update does not vouch for another's.
+dir="$(fixture)"
+{ header; rows claude "$today"; rows codex "$(days_ago 91)"; } | set_registry "$dir"
+run_check "$dir"
+expect_registry_fail "structure: a second runtime's stale rows fail while the first is fresh"
+
+dir="$(fixture)"
+{ header; rows claude "$today"; rows codex "$(days_ago 30)"; } | set_registry "$dir"
+run_check "$dir"
+expect_pass "structure: two runtimes on different fresh dates pass"
+
+# 14. A runtime listed for some tiers only is dated and trusted for the tier it
+#     does not name.
+dir="$(fixture)"
+{ header; rows claude "$today"
+  printf '| codex | fast | m-f | %s |\n' "$today"
+} | set_registry "$dir"
+run_check "$dir"
+expect_registry_fail "structure: a runtime missing tiers fails"
+case "$out" in
+  *"codex has no row for: default strongest"*) ok "structure: the message names the missing tiers" ;;
+  *) bad "structure: the message names the missing tiers (got: $out)" ;;
+esac
+
+# 15. A pinned version id carries a date of its own. Reading that as the row's
+#     date would date the registry by the model it is meant to be checking.
+dir="$(fixture)"
+{ header
+  printf '| codex | fast | some-model-2019-01-01 | %s |\n' "$today"
+  printf '| codex | default | some-model-2019-01-01 | %s |\n' "$today"
+  printf '| codex | strongest | some-model-2019-01-01 | %s |\n' "$today"
+} | set_registry "$dir"
+run_check "$dir"
+expect_pass "structure: a date inside a pinned model id is not the row's date"
+
+# 16. A CRLF checkout must not turn a present date into a missing one.
+dir="$(fixture)"
+{ header; rows claude "$today"; } | set_registry "$dir"
+file="$dir/.lean/PROJECT.md"
+sed 's/$/\r/' "$file" > "$file.new" && mv "$file.new" "$file"
+run_check "$dir"
+expect_pass "structure: a CRLF PROJECT.md passes"
 
 echo
 echo "$pass passed, $fail failed"

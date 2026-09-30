@@ -27,7 +27,7 @@ Not defined.
 
 ### Test
 `.lean/tests/test-hooks.sh` tests the Quality Gate and SessionStart hooks (55 checks, ~5.3s). Verified: passes, exits non-zero on failure, and every term of the gate's state hash plus both of its refusal guards are covered -- removing any one of them fails a check. The gate's two verdicts are covered as a pair: a command the shell cannot find must be reported as an environment problem, and a command that exists and fails must not be -- including a wrapper that hands back another program's 127. Every term deciding that split is pinned on its own: remove the status test, either half of the command-name test, the resolve test or the assignment strip and a check fails.
-`.lean/tests/test-structure.sh` tests the model registry age check in `.lean/scripts/check-structure.sh` (11 checks, ~2.9s), each in a throwaway copy of the repository. Verified: passes, exits non-zero on failure, and the window, its edge, the future-date guard and the half-a-registry guard each fail a check when removed. It also runs the check against this repository, so the suite goes red on the day the shipped registry goes stale rather than only the gate.
+`.lean/tests/test-structure.sh` tests the model registry rules in `.lean/scripts/check-structure.sh` (22 checks, ~6.7s). Every case but one runs in a throwaway copy of the repository over a registry it writes itself, so the suite holds in an install that never adopted a registry: verified at 22 passed with the `Model registry` section deleted. The exception runs the check against this repository, so the suite goes red on the day the shipped rows go stale rather than only the gate. Verified: passes, exits non-zero on failure, and nine mutations of the check -- dropping the age limit, moving it to 89 days, dropping the future-date, half-a-registry, row-shape, empty-registry or tier-completeness guard, letting the block scan run past a closed marker, and reading dates from the whole row instead of its last cell -- each fail a check.
 
 ### Lint
 `shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh` (0.11.0; passes at default severity, same as CI).
@@ -51,16 +51,14 @@ shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh
 
 ## Model registry
 
-Which model each tier in `.lean/policy/MODELS.md` resolves to when a subagent is spawned. Aliases, not pinned version ids: an alias tracks the current generation, a pinned id goes out of date without saying so. Re-verify the entries against the models the session actually offers, then move `verified` forward; `.lean/scripts/check-structure.sh` fails once that date is more than 90 days old.
+Which model each tier in `.lean/policy/MODELS.md` resolves to when a subagent is spawned. Keyed by runtime: this repository is agent-agnostic, and the model names one runtime accepts are not the names another one does. Add the rows for the runtime you run on once you have checked them against what it actually offers; never fill in rows for a runtime you are not on. Aliases, not pinned version ids, wherever the runtime has them: an alias tracks the current generation, a pinned id goes out of date without saying so. Each row carries its own date, so updating one runtime does not vouch for another; `.lean/scripts/check-structure.sh` fails once the oldest is more than 90 days old.
 
 <!-- models:start -->
-verified: 2026-09-30
-
-| tier | model |
-| --- | --- |
-| fast | haiku |
-| default | sonnet |
-| strongest | opus |
+| runtime | tier | model | verified |
+| --- | --- | --- | --- |
+| claude | fast | haiku | 2026-09-30 |
+| claude | default | sonnet | 2026-09-30 |
+| claude | strongest | opus | 2026-09-30 |
 <!-- models:end -->
 
 ## Important paths

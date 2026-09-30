@@ -82,7 +82,7 @@ These belong to this template, not to your project:
 - `.lean/scripts/`, `.lean/tests/`, and `.github/workflows/lean-workflow.yml` — self-checks for
   the workflow files themselves. **If you delete these, clear the Quality Gate block in
   `.lean/PROJECT.md` in the same go, or run `/lean-init` to refill it from your project.** The
-  block ships naming those three scripts, so leaving it is a `Stop` hook that fails on every turn,
+  block ships naming those four commands, so leaving it is a `Stop` hook that fails on every turn,
   and `CLAUDE.md` tells the agent not to repair a failure it did not cause — it will report
   `BLOCKED` instead, every time.
 - `CONTRIBUTING.md` — how to contribute to this template.

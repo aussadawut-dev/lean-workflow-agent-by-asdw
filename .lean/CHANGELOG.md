@@ -6,8 +6,8 @@ was being bypassed -- the rule did not change, its enforcement did. PATCH clarif
 
 ## 2.5.0
 
-The tier a contract picks now resolves to a model the repository names, instead of one the agent
-remembers.
+The tier a contract picks now resolves to a model the repository names, per runtime, instead of
+one the agent remembers.
 
 `policy/MODELS.md` routed work to a fast, a default, or a strongest model and stopped there: no
 file in the workflow said which model any of those is. The names were supplied at the spawn site,
@@ -19,40 +19,53 @@ the chain is written down: `policy/CONTRACTS.md` infers risk, `policy/QUALITY.md
 unwritten, and it is the one that goes out of date on its own.
 
 - `policy/MODELS.md` gains `Resolving a tier to a model`. The tiers stay abstract, which is what
-  keeps that file from going stale on an upgrade cycle it does not control. The names live in a
-  `Model registry` in `PROJECT.md`, which is project-owned and untouched by upgrades. An alias is
-  preferred over a pinned version id: an alias tracks the current generation, a pinned id goes out
-  of date without saying so. No registry, a stale one, or an entry the runtime rejects falls back
-  to the tier descriptions and names the model that actually ran; an id from memory is the drift
-  the registry exists to catch, so it is never the fallback.
+  keeps that file from going stale on an upgrade cycle it does not control, and it names no model
+  of its own: `policy/` prescribes nothing vendor-specific. The names live in a `Model registry`
+  in `PROJECT.md`, which is project-owned and untouched by upgrades.
+- The registry is keyed by runtime. An agent reaching this repository through `AGENTS.md` spawns
+  models this one cannot, so a single column of names would be wrong for everyone but its author.
+  Each row is `| runtime | tier | model | verified |` and carries its own date, so one runtime's
+  update does not vouch for another's. An agent adds the rows for the runtime it is on once it has
+  checked them against what that runtime offers, and fills in no other runtime's.
+- An alias is preferred over a pinned version id where the runtime has one: an alias tracks the
+  current generation, a pinned id goes out of date without saying so. No registry, no rows for the
+  runtime in hand, or an entry the runtime rejects falls back to the tier descriptions and names
+  the model that actually ran; an id from memory is the drift the registry exists to catch, so it
+  is never the fallback.
 - `CLAUDE.md`'s reviewer rule says where `strongest model available` is defined. The rule has been
   in the file since 2.3.0 with nothing to read it off.
-- `scripts/check-structure.sh` fails once the registry's `verified` date is more than 90 days old.
-  The names cannot be checked from in here -- the repository holds no list of current models -- so
-  the date is checked instead, and keeping it current is made a task rather than a habit. A
-  registry dated in the future is rejected: it verifies nothing, and it is the cheapest way to
-  silence the check. A project carrying no registry is not failed, since the fallback covers it;
-  half a registry is, because a lost marker would otherwise read as no registry and skip the check
-  in silence.
-- `tests/test-structure.sh` is new: 11 checks, ~2.9s, each in a throwaway copy of the repository.
-  It covers the window, its edge at exactly 90 days, the future-date and malformed-date guards, a
-  registry with no date, half a registry, and no registry at all. Remove the limit, the edge, the
-  future-date guard or the half-a-registry guard and a check fails. It also runs the check against
-  this repository, so the suite goes red on the day the shipped registry goes stale rather than
-  only the gate. Added to the gate block and to CI; `scripts/check-structure.sh` had no test
-  before this.
+- `scripts/check-structure.sh` checks what can be checked from in here. The names cannot be: no
+  list of current models is in this repository. Its rows can, and the dates can. It fails when a
+  runtime named does not cover every tier -- a half-filled registry is dated and trusted for the
+  tier it does not name -- and when the oldest row is more than 90 days old. A row dated in the
+  future is rejected: it verifies nothing, and it is the cheapest way to silence the check. Dates
+  are read from each row's last cell, never scanned out of the block, or a pinned id carrying a
+  date of its own would date the registry by the model it is meant to be checking. A project
+  carrying no registry is not failed, since the fallback covers it; half a registry is, because a
+  lost marker would otherwise read as no registry and skip the check in silence.
+- `tests/test-structure.sh` is new: 22 checks, ~6.7s. `scripts/check-structure.sh` had no test
+  before this. Every case but one writes the registry it tests into a throwaway copy of the
+  repository rather than editing whatever the host `PROJECT.md` carries, so the suite holds in an
+  install that never adopted a registry -- verified at 22 passed with the `Model registry` section
+  deleted. The exception runs the check against this repository, so the suite goes red on the day
+  the shipped rows go stale rather than only the gate. Nine mutations of the check each fail a
+  case: dropping the age limit, moving it to 89 days, dropping the future-date, half-a-registry,
+  row-shape, empty-registry or tier-completeness guard, letting the block scan run past a closed
+  marker, and reading dates from the whole row instead of its last cell. Added to the gate block
+  and to CI.
 
 The cost is deliberate and worth stating: a dated check is a check that fires on a date nobody
 picked, and a stale registry blocks the gate on whatever task happens to be in flight. That is the
-trade for a registry that cannot rot quietly. The fix is a minute's work and the failure names it.
+trade for a registry that cannot rot quietly. The fix is a minute's work and the failure names the
+runtime to recheck.
 
 Replace `.lean/policy/MODELS.md`, `.lean/scripts/check-structure.sh`, `CLAUDE.md`,
 `CONTRIBUTING.md`, `README.md`, `.github/workflows/lean-workflow.yml`, `.lean/README.md`, and
-`.lean/CHANGELOG.md`. Add `.lean/tests/test-structure.sh`. Then, in your own `.lean/PROJECT.md`:
-add `.lean/tests/test-structure.sh` to the gate block, and add a `Model registry` section with
-`<!-- models:start -->` / `<!-- models:end -->` markers, a `verified: YYYY-MM-DD` line, and one
-entry per tier -- upgrades do not write that file, and an install that skips this step keeps the
-fallback rather than failing.
+`.lean/CHANGELOG.md`. Add `.lean/tests/test-structure.sh`, and add it to the gate block in your own
+`.lean/PROJECT.md`. Adopting a registry is optional and separate: an install that adds neither is
+not failed by the structure check, the test suite, or CI. To adopt one, add a `Model registry`
+section to `.lean/PROJECT.md` with `<!-- models:start -->` / `<!-- models:end -->` markers, a
+`| runtime | tier | model | verified |` header, and a row per tier for the runtime you are on.
 
 ## 2.4.1
 
