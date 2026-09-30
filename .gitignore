@@ -7,3 +7,7 @@
 .claude/settings.local.json
 .claude/.gate-cache
 .claude/.gate-failed
+
+# Merge and patch debris, which --untracked would otherwise scan
+*.orig
+*.rej

@@ -26,7 +26,7 @@ Not defined. No dependencies. `shellcheck` is used by the gate and CI (`brew ins
 Not defined.
 
 ### Test
-`.lean/tests/test-hooks.sh` tests the Quality Gate and SessionStart hooks (32 checks, ~5s). Verified: passes, exits non-zero on failure, and every term of the gate's state hash plus both of its refusal guards are covered -- removing any one of them fails a check.
+`.lean/tests/test-hooks.sh` tests the Quality Gate and SessionStart hooks (33 checks, ~5s). Verified: passes, exits non-zero on failure, and every term of the gate's state hash plus both of its refusal guards are covered -- removing any one of them fails a check.
 
 ### Lint
 `shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh` (0.11.0; passes at default severity, same as CI).

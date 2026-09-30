@@ -35,10 +35,14 @@ The Quality Gate no longer skips a turn just because the working tree is clean.
   settles), `--seed` must not appear in `.claude/settings.json` (wiring it to Stop disables the gate
   in silence), and the retired-path scan now runs `git grep --untracked` rather than walking the
   working tree, so a vendored or ignored file naming a retired path cannot block a downstream
-  project's every turn, while a new file a contributor has not staged yet is still covered. The
-  `.gitignore` entries are asked for by effect, via `git check-ignore`, so any equivalent pattern
-  passes.
-- `test-hooks.sh` is now 32 checks. Test 5 asserted "clean tree skips", which was the bug itself; it
+  project's every turn, while a new file a contributor has not staged yet is still covered. It
+  matches text rather than references, so a project that owns a directory by either name should
+  delete the check rather than satisfy it. `.gitignore` also covers `*.orig` and `*.rej` now: a
+  conflicted merge of this very move is how such a file appears, and scanning untracked content
+  would otherwise let it block the gate. The `.gitignore` entries are asked for by effect, via
+  `git check-ignore`, so any equivalent pattern passes -- and both that and the scan need a git
+  work tree, which the `npx degit` install route does not leave behind.
+- `test-hooks.sh` is now 33 checks. Test 5 asserted "clean tree skips", which was the bug itself; it
   now asserts that committed work is gated. Every term of the state hash is covered: remove any one
   of the five and a check fails. Both guards that keep a refusal from being skipped are pinned
   separately, so removing either one fails a check even though the other would still hold.

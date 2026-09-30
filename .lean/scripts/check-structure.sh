@@ -89,38 +89,51 @@ fi
 # downstream install this script is a gate command, so a false hit there would
 # block every turn. A scan that cannot run is a failure, never a pass.
 # Drop this check once 1.x is out of circulation.
+# The retired-path scan and the .gitignore assertions below both need git: one
+# reads the index, the other asks by effect. The README's `npx degit` route
+# leaves no .git, so say that once instead of failing three times, each naming
+# the wrong cause.
 retired='[.]agent/|[.]github/lean-workflow/'
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  bad "retired-path scan needs a git work tree"
-elif ! scan_err="$(mktemp)" || [ -z "$scan_err" ]; then
-  bad "retired-path scan could not start: mktemp failed"
+  bad "no git work tree: cannot check retired paths or .gitignore entries"
 else
-  # git grep, not the filesystem: a vendored or ignored file that happens to name
-  # a retired path is not this repository's content, and in a downstream install
-  # this script is a gate command, so a false hit there would block every turn.
-  # --untracked still covers a new file a contributor has not staged yet, which
-  # is content. git chunks its own argument list, so there is no argv ceiling.
-  # A scan that cannot run is a failure, never a pass.
-  hits="$(git grep --no-color -I -nE --untracked "$retired" \
-    -- ':(exclude).lean/CHANGELOG.md' 2>>"$scan_err")"
-  status=$?
-  [ "$status" -gt 1 ] && bad "retired-path scan could not complete (git grep exit $status)"
-  [ -s "$scan_err" ] && bad "retired-path scan reported: $(head -n 1 "$scan_err")"
-  rm -f "$scan_err"
+  if ! scan_err="$(mktemp)" || [ -z "$scan_err" ]; then
+    bad "retired-path scan could not start: mktemp failed"
+  else
+    # git grep, not the filesystem: a vendored or ignored file that happens to
+    # name a retired path is not this repository's content, and in a downstream
+    # install this script is a gate command, so a false hit there would block
+    # every turn. --untracked still covers a new file a contributor has not
+    # staged yet, which is content. git chunks its own argument list, so there
+    # is no argv ceiling. `-a` rather than `-I`: `-I` skips whatever
+    # .gitattributes calls binary, so `*.md binary` would hide a real hit and
+    # this block reads a scan that cannot run as a failure, never a pass.
+    #
+    # The pattern matches text, not references: a property access followed by a
+    # division in minified code reads the same to it. Drop this check once 1.x is
+    # out of circulation -- or at once, in a project that owns a directory by
+    # either of these names.
+    hits="$(git grep --no-color -a -nE --untracked "$retired" \
+      -- ':(exclude).lean/CHANGELOG.md' 2>>"$scan_err")"
+    status=$?
+    [ "$status" -gt 1 ] && bad "retired-path scan could not complete (git grep exit $status)"
+    [ -s "$scan_err" ] && bad "retired-path scan reported: $(head -n 1 "$scan_err")"
+    rm -f "$scan_err"
 
-  while IFS= read -r hit; do
-    [ -n "$hit" ] && bad "retired path still referenced: $hit"
-  done <<EOF
+    while IFS= read -r hit; do
+      [ -n "$hit" ] && bad "retired path still referenced: $hit"
+    done <<EOF
 $hits
 EOF
-fi
+  fi
 
-# The gate's own state files must stay untracked, or each run's state includes
-# the file the previous run wrote and the gate never settles. Asked by effect, so
-# any equivalent .gitignore pattern passes.
-for ignored in '.claude/.gate-cache' '.claude/.gate-failed'; do
-  git check-ignore -q "$ignored" || bad "not ignored by git: $ignored"
-done
+  # The gate's own state files must stay untracked, or each run's state includes
+  # the file the previous run wrote and the gate never settles. Asked by effect,
+  # so any equivalent .gitignore pattern passes.
+  for ignored in '.claude/.gate-cache' '.claude/.gate-failed'; do
+    git check-ignore -q "$ignored" || bad "not ignored by git: $ignored"
+  done
+fi
 
 # --seed records state and runs nothing, so wiring it to Stop disables the gate
 # in silence. It belongs in session-start.sh, never in a settings file --

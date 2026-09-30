@@ -275,7 +275,15 @@ fi
 
 # 25. Second: a cache that does match is still not skipped while the refusal
 # stands. Built by seeding with the marker briefly out of the way, which is the
-# state two concurrent sessions could otherwise leave behind.
+# state two concurrent sessions could otherwise leave behind. This tests the
+# guard only while the marker is gitignored: untracked and visible, recreating
+# it would change the state by itself and the gate would run for that reason
+# instead, so the dependency is asserted rather than assumed.
+if git -C "$dir" check-ignore -q .claude/.gate-failed; then
+  ok "gate: the refusal marker is invisible to the state"
+else
+  bad "gate: the refusal marker is invisible to the state (case 25 tests nothing without it)"
+fi
 rm -f "$dir/.claude/.gate-failed"
 CLAUDE_PROJECT_DIR="$dir" bash "$gate" --seed
 : > "$dir/.claude/.gate-failed"
