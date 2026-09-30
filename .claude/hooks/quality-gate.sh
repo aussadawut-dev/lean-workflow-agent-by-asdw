@@ -82,20 +82,34 @@ while IFS= read -r cmd; do
 
   # Why a command failed decides what to do about it, so the two cases say
   # different things. Both block: a gate that could not run has not passed, and
-  # neither message may read as "carry on". Exit 127 is the shell reporting it
-  # found nothing to execute. A bare first word is a PATH lookup for a tool the
-  # environment is meant to provide; a first word holding a slash names a file
-  # this repository points at, and a missing one of those is the change's
-  # business, not the machine's. 126 (found, not executable) stays an ordinary
-  # failure for the same reason -- a dropped exec bit is usually in the diff.
-  # Everything else falls to the ordinary message, which sends the agent to
-  # look: "not your change" is the verdict that can wave a real failure through,
-  # so it is the narrow one.
-  read -r first _ <<< "$cmd"
+  # neither message may read as "carry on". 127 is the only status that can mean
+  # the shell found nothing to run, but it is not proof of it: a wrapper hands
+  # back the 127 of the program it ran, so `bash lint.sh` whose script calls a
+  # tool the diff never added comes back as 127 with bash plainly installed.
+  # Reading the command's shape alone would blame the environment for that, and
+  # name bash as the thing to install. So ask instead: does the word the shell
+  # would have looked up actually resolve here? A name that does not is a tool
+  # this environment owes the project. A word holding a slash is exempt from the
+  # question -- it names a file this repository points at, and a missing one of
+  # those is the change's business however it resolves. Everything else takes
+  # the ordinary message, 126 (found, will not execute -- usually an exec bit
+  # missing from the diff) included: "not your change" is the verdict that can
+  # wave a real failure through, so it stays the narrow one.
+  #
+  # Leading VAR=VALUE words are the shell's own business rather than the
+  # program, so step past them: the lookup for `CI=1 npm test` is `npm`. Left in,
+  # they would decide the verdict by whether `CI=1` resolves as a command, which
+  # it never does, and then name an assignment as the tool to install.
+  lookup="$cmd"
+  while [[ "$lookup" =~ ^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+(.*)$ ]]; do
+    lookup="${BASH_REMATCH[1]}"
+  done
+  read -r first _ <<< "$lookup"
+
+  missing=0
   case "$status:$first" in
-    127:*/*) missing=0 ;;
-    127:*)   missing=1 ;;
-    *)       missing=0 ;;
+    127:*/*) ;;
+    127:*)   command -v -- "$first" >/dev/null 2>&1 || missing=1 ;;
   esac
 
   {

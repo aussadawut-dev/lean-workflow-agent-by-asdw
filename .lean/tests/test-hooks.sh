@@ -316,6 +316,11 @@ case "$err" in
     bad "gate: a missing program does not ask for a code fix (got: $err)" ;;
   *) ok "gate: a missing program does not ask for a code fix" ;;
 esac
+if [ -f "$dir/.claude/.gate-failed" ] && [ ! -f "$dir/.claude/.gate-cache" ]; then
+  ok "gate: a missing program records the refusal like any other"
+else
+  bad "gate: a missing program records the refusal like any other"
+fi
 
 # 27. The other half: a command that exists and fails keeps the ordinary
 # verdict. Without this the split could drift into calling every failure an
@@ -351,6 +356,39 @@ case "$err" in
   *"Quality Gate failed: ./scripts/gone.sh"*)
     ok "gate: a missing script is a failure, not an environment problem" ;;
   *) bad "gate: a missing script is a failure, not an environment problem (got: $err)" ;;
+esac
+
+# 29. 127 is not proof that the gate line's own program is absent: a wrapper
+# hands back the status of whatever it ran. `bash lint.sh` whose script calls a
+# tool the diff never added is the change's business, and the environment
+# message would tell the agent the opposite while naming bash -- which is
+# plainly installed, since it ran the script -- as the thing to install. So the
+# split asks whether the looked-up word resolves, not merely whether it holds a
+# slash, and this is the case that tells those two rules apart.
+dir="$(fixture 'bash scripts/lint.sh')"
+mkdir -p "$dir/scripts"
+printf '#!/usr/bin/env bash\n./tools/lint-tool --check\n' > "$dir/scripts/lint.sh"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+expect_code "gate: a wrapper whose inner program is missing still blocks" 2
+case "$err" in
+  *"Quality Gate failed: bash scripts/lint.sh"*)
+    ok "gate: a present wrapper is a failure, not a missing tool" ;;
+  *) bad "gate: a present wrapper is a failure, not a missing tool (got: $err)" ;;
+esac
+
+# 30. A leading VAR=VALUE is the shell's business, not the program. Left in the
+# lookup it decides the verdict by whether `LEAN_TEST=1` resolves as a command,
+# which nothing does, and then names an assignment as the tool to install -- so
+# this asserts the program by name, not just the branch.
+dir="$(fixture 'LEAN_TEST=1 lean-no-such-tool --check')"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+expect_code "gate: an assignment does not hide a missing program" 2
+case "$err" in
+  *"'lean-no-such-tool' is not available"*)
+    ok "gate: the message names the program, not the assignment" ;;
+  *) bad "gate: the message names the program, not the assignment (got: $err)" ;;
 esac
 
 echo
