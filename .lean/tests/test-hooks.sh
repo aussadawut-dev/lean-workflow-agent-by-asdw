@@ -437,6 +437,26 @@ case "$err" in
   *) bad "gate: a status other than 127 is a failure whatever the first word is (got: $err)" ;;
 esac
 
+# 33. A word that could not be a program name is not a missing tool. A gate
+# command wrapped over two lines hands the extractor its continuation as a
+# command of its own, and an option is nobody's package to install: the block is
+# malformed, which is this repository's business, so it takes the ordinary
+# message and sends the agent to look. The indent is load-bearing -- `-x` at the
+# very start of the line makes bash reject it as its own invocation option and
+# exit 2, and only an indented or assignment-prefixed one reaches the shell as a
+# command word and exits 127, which is the status that can claim the excuse. The
+# class allows `-` inside a name and refuses it in front; case 26's
+# `lean-no-such-tool` pins the half this case does not.
+dir="$(fixture '  -x code.txt')"
+echo change > "$dir/code.txt"
+run_gate "$dir" '{}'
+expect_code "gate: an option-shaped word still blocks" 2
+case "$err" in
+  *"Quality Gate failed:   -x code.txt"*)
+    ok "gate: an option is not reported as a missing tool" ;;
+  *) bad "gate: an option is not reported as a missing tool (got: $err)" ;;
+esac
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

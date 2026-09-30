@@ -91,8 +91,10 @@ while IFS= read -r cmd; do
   # gate says the environment is at fault: that status, a word the shell would
   # have looked up that is a plain command name, and that name failing to
   # resolve here. A word holding a slash names a file this repository points at,
-  # and a word holding a quote or a dollar is a fragment the line was parsed
-  # into; neither earns the excuse. Both take the ordinary message, as do 126
+  # a word holding a quote or a dollar is a fragment the line was parsed into,
+  # and a word opening with a dash is an option, which is nobody's package to
+  # install -- a gate command wrapped over two lines hands its continuation here
+  # as a command of its own. None of the three earns the excuse. Both take the ordinary message, as do 126
   # (found, will not execute -- usually an exec bit missing from the diff) and
   # every other status: "not your change" is the verdict that can wave a real
   # failure through, so it stays the narrow one.
@@ -111,7 +113,7 @@ while IFS= read -r cmd; do
 
   missing=0
   if [ "$status" -eq 127 ] &&
-     [[ "$first" =~ ^[A-Za-z0-9_.+:@-]+$ ]] &&
+     [[ "$first" =~ ^[A-Za-z0-9_][A-Za-z0-9_.+:@-]*$ ]] &&
      ! command -v -- "$first" >/dev/null 2>&1; then
     missing=1
   fi

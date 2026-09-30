@@ -36,15 +36,20 @@ about the change.
   attributed to its first word, which the paragraph below records.
 - A word holding a slash names a file this repository points at, so a gate line whose script is
   missing stays an ordinary failure -- as does 126 (found, will not execute; usually an exec bit
-  missing from the diff), and every other status. Leading `VAR=VALUE` words are stepped over, or the
+  missing from the diff), and every other status. A word opening with a dash is an option, and an
+  option is nobody's package to install: a gate command wrapped over two lines hands the extractor
+  its continuation as a command of its own, and an indented `-x ...` reaches the shell as a command
+  word and exits 127, so before the name had to start like a name the gate asked for `-x` to be
+  installed. The same line unindented exits 2 instead, rejected as bash's own invocation option,
+  which is why the case pinning this one is indented. Leading `VAR=VALUE` words are stepped over, or the
   verdict would turn on whether `CI=1` resolves as a command, which nothing does. Everything unclear
   takes the ordinary message, which sends the agent to look, because "not your change" is the verdict
   that can wave a real failure through.
-- `test-hooks.sh` is now 53 checks. Three are the regression proper and fail against the 2.2.0 hook:
+- `test-hooks.sh` is now 55 checks. Three are the regression proper and fail against the 2.2.0 hook:
   a missing program must say the gate could not run, must name the environment, and must not carry
   the "If your change caused this" line. The rest pin what must not move, one case per shape that got
-  a condition wrong -- the wrapper, the quoted assignment, the compound line, the script named by
-  path, and a command that exists and fails -- and every term of the classification is pinned on its
+  a condition wrong -- the wrapper, the quoted assignment, the compound line, the wrapped gate
+  command's continuation, the script named by path, and a command that exists and fails -- and every term of the classification is pinned on its
   own: remove the status test, the name test, the resolve test or the assignment strip and a check
   fails. The missing-tool branch is asserted to record the refusal the way the other branch does,
   with its fixture seeded first; without a cache to clear, the half of that assertion covering the
