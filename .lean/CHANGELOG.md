@@ -4,6 +4,26 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
+## 2.4.1
+
+Rationale moved out of the files agents read on every task. No rule changed.
+
+`policy/REVIEW.md`'s `Rounds` section argued for its own shape inside a file every `MEDIUM` and
+`HIGH` task loads. It now states only the rules. The argument, kept here: every carve-out tried for
+small fixes applied after a `PASS` failed, by licensing too much or forbidding too much -- the agent
+calling a change small is the one who wrote it, and the last independent look is already behind it.
+Inside a high-risk area even a typo costs a full cycle, and that is the price of the area, not of
+this rule. Every rule the section stated it still states; only the argument for them moved here.
+
+`.claude/hooks/quality-gate.sh` and `.lean/scripts/check-structure.sh` carried design notes at
+roughly two comment lines per three lines of code. The notes that explain a term still stand; the
+ones re-deriving the cases behind it are gone, and the 2.4.0 entry below plus the 55 checks in
+`.lean/tests/test-hooks.sh` hold those cases instead. Trimmed 15 comment lines from the gate and 23
+from the structure check, and 7 from `REVIEW.md`.
+
+Replace `.lean/policy/REVIEW.md`, `.lean/scripts/check-structure.sh`,
+`.claude/hooks/quality-gate.sh`, `.lean/README.md`, and `.lean/CHANGELOG.md`. Nothing moves.
+
 ## 2.4.0
 
 The Quality Gate tells a missing tool apart from a failing check. Both block; only one of them is
