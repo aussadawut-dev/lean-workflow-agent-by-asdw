@@ -47,10 +47,12 @@ about the change.
   unclear
   takes the ordinary message, which sends the agent to look, because "not your change" is the verdict
   that can wave a real failure through.
-- `test-hooks.sh` is now 55 checks. Three are the regression proper and fail against the 2.2.0 hook
-  (2.3.0 left `quality-gate.sh` untouched, so that is the revision before this one):
-  a missing program must say the gate could not run, must name the environment, and must not carry
-  the "If your change caused this" line. The rest pin what must not move, one case per shape that got
+- `test-hooks.sh` is now 55 checks. Four fail against the 2.2.0 hook, which is the revision before
+  this change because 2.3.0 left `quality-gate.sh` untouched. Three are the regression proper: a
+  missing program must say the gate could not run, must name the environment, and must not carry the
+  "If your change caused this" line. The fourth is the check that the message names the program
+  rather than an assignment, which fails there for the same reason -- 2.2.0 has no second message for
+  anything to be named in. The rest pin what must not move, one case per shape that got
   a condition wrong -- the wrapper, the quoted assignment, the compound line, the wrapped gate
   command's continuation, the script named by path, and a command that exists and fails -- and every
   term of the classification is pinned on its own: remove the status test, either half of the
