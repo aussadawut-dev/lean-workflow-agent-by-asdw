@@ -29,9 +29,11 @@ about the change.
   plainly installed, and the first attempt called that an environment problem and named bash as the
   tool to install. The lookup alone was wrong for quoting: the `VAR=VALUE` strip is a regex over the
   line, so `FOO="a b" cmd` leaves `b"` as the word to look up, nothing resolves a fragment, and the
-  wrapper case came back exculpated one quoted assignment later. The status alone was wrong for
-  compound lines: in `optional-linter ; pytest` the word that did not resolve is not the word that
-  decided the verdict, and the excuse would bury a real failure.
+  wrapper case came back exculpated one quoted assignment later. And the status is not optional either: in
+  `optional-linter ; pytest` the word that did not resolve is not the word that decided the verdict,
+  so without that condition the excuse would bury a real test failure. It settles a compound line
+  only when the deciding command's status is not 127; one that ends in 127 anyway is still
+  attributed to its first word, which the paragraph below records.
 - A word holding a slash names a file this repository points at, so a gate line whose script is
   missing stays an ordinary failure -- as does 126 (found, will not execute; usually an exec bit
   missing from the diff), and every other status. Leading `VAR=VALUE` words are stepped over, or the
@@ -53,7 +55,11 @@ One fail-open this does not close: a gate command that swallows its own 127 stil
 an empty string, and that is the shape `.lean/PROJECT.md` recommends for formatters. A pipeline masks it the same way, since the status is the last
 stage's. The hook reads the status of the command it was given, and the status is 0. Judging the output instead would block a
 turn on any gate command that merely prints those words, which in a downstream install is every turn,
-so closing it needs its own evidence rather than a guess bolted onto this one.
+so closing it needs its own evidence rather than a guess bolted onto this one. A related limit,
+on attribution rather than on the verdict: when a compound line reaches 127 through a fallback --
+`lean-optional || bash lint.sh`, where what is absent is the wrapper's own inner tool -- the excuse
+attaches to the first word and can cover a check that did fail. It still blocks, and nothing outside
+the command can say which stage produced the status.
 
 **Upgrading:** no steps. The gate blocks the same states it blocked before; one of them now explains
 itself differently.
