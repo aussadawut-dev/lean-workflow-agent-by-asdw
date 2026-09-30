@@ -31,9 +31,12 @@ Review costs a full context each round, so the loop needs an end that is not the
   -- never `DONE`: the delta that ships has to have been reviewed, not merely reviewed to the right
   depth. Going further is the user's call and their budget. This bounds how often a change is
   reviewed, never how deeply.
-- A `PASS` ends the review. Afterwards you may apply a non-blocking finding only if it is comment or
-  prose text, or if it changes no behaviour and a check you run covers it. Anything else is new work
-  under the one-contract rule above. The agent calling a change cheap is the one who wrote it, and
+- A `PASS` ends the review. Afterwards you may apply a non-blocking finding only when one of these
+  holds: it is a comment; it is prose that states no rule an agent follows; or it changes no
+  behaviour and a check you run covers it. Anything else is new work under the one-contract rule
+  above. Note which side of that line the files in here fall on: the rules an agent follows are
+  prose, so editing one of those sentences is a behaviour change, and only the explanation around
+  them is safe to correct unreviewed. The agent calling a change cheap is the one who wrote it, and
   the last independent look is already behind it.
 
 ## Independent reviewer

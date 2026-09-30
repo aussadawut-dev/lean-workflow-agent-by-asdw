@@ -39,7 +39,7 @@ Scale the report to the task. A trivial task needs one line.
 
 - **Status** — `DONE | BLOCKED | FAILED`.
 - **Changes** — what changed and where.
-- **Evidence** — commands run and their outcomes, tests added/run, and which review round the change is on.
+- **Evidence** — commands run and their outcomes, tests added/run, which review round the change is on, and the range that review covered.
 - **Not verified** — anything skipped, with reason.
 - **Follow-ups** — remaining work, if any.
 

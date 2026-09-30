@@ -21,9 +21,9 @@ below. One round followed a `PASS`, not two.
   delta no reviewer has seen cannot satisfy condition 4 in `QUALITY.md`. Without that last pass a
   capped cycle would always ship its final fix unreviewed, and on this branch every round found
   something real in the previous round's fix, four times out of four.
-- A `PASS` ends the review, and only a trivial change may be applied afterwards without one. The
-  bound is there because "cheap and clearly right" is judged by the agent that wrote the code, after
-  the last independent look. On this branch that licence produced a real defect: round 4 passed, its
+- A `PASS` ends the review, and afterwards only a comment, prose that states no rule, or a covered
+  change that alters no behaviour may be applied without one. The bound is there because "cheap and
+  clearly right" is judged by the agent that wrote the code, after the last independent look. On this branch that licence produced a real defect: round 4 passed, its
   seven advisory findings were applied, and one of them swapped a filesystem `grep -I` for
   `git grep -I`. Filesystem `grep` reads binary-ness from content; `git grep` honours
   `.gitattributes`, so a repository setting `*.md binary` skipped every markdown file while the scan
@@ -31,7 +31,11 @@ below. One round followed a `PASS`, not two.
   it. An unbounded version of this rule means round 5 never happens, which makes this the rule that
   removes a round rather than the one above. The bound is stated about the change, not borrowed from
   `WORKFLOW.md`'s trivial test: that test requires `LOW` risk, and `CONTRACTS.md` makes every change
-  inside a high-risk area `HIGH`, so borrowing it would have forbidden fixing a typo in this file.
+  inside a high-risk area `HIGH`, so borrowing it would have forbidden fixing a typo in this file. A
+  plain "comment or prose text" was no better in the other direction: the rules an agent follows are
+  prose, and `.lean/policy/` holds nothing else, so it would have licensed rewriting any rule here
+  unreviewed -- the cap included. Hence the split between prose that states a rule and the
+  explanation around it.
 
 Run the corrected history through all three rules and the layout change is two `REWORK` rounds and
 then a confirm pass, with the gate fix as its own short cycle. Round 3 found something real in round

@@ -12,7 +12,7 @@ This repository uses Lean Workflow Baseline #1. This file is the canonical agent
 - Bug fixes require a regression test. Run it before the fix and show it fails, then show it passes after.
 - Run deterministic validation before semantic review.
 - Review depth is the deeper of risk and quality floor.
-- Review rounds are bounded: a `PASS` ends review, and only a change that alters no behaviour may
+- Review rounds are bounded: a `PASS` ends review, and only a change that alters no rule and no behaviour may
   follow it. The second `REWORK` on one contract gets one last pass, then stops. Rounds:
   `.lean/policy/REVIEW.md`.
 - Never silently downgrade the requested quality floor.
