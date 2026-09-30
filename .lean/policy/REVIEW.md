@@ -20,20 +20,21 @@ Use the deeper of the two. Example: risk `LOW` with quality `VERY_HIGH` gets `HI
 
 Review costs a full context each round, so the loop needs an end that is not the budget running out.
 
-- A review cycle covers one Task Contract. A change stays in the cycle, and counts toward the cap,
-  when its motivation is a finding from this cycle's review. Anything else is new work: its own
-  contract line, its own cycle. A contract opened because the cap fired says so, so the spend
-  already made stays visible.
-- After the second `REWORK` on one contract, the cycle gets one last pass, over the delta that fixes
-  those findings and nothing else. `PASS` there ends the cycle. `REWORK` there ends it as `BLOCKED`,
-  naming what is unresolved -- never `DONE`, because a delta no reviewer has seen cannot satisfy
-  condition 4 in `QUALITY.md`. Going further is the user's call and their budget. This bounds how
-  often a change is reviewed, never how deeply.
-- A `PASS` ends the review. Afterwards you may apply a non-blocking finding only if the change is
-  trivial by the test in `WORKFLOW.md` -- no behaviour change, or one an existing test already
-  covers and you run. Anything larger is new work under the first rule: its own contract, its own
-  review. The agent calling it cheap is the one who wrote the code, and the last independent look
-  is already behind it.
+- A review cycle covers one Task Contract. A change stays in the cycle, and counts toward the round
+  cap below, when its motivation is a finding from this cycle's review. Work that arrives mid-cycle
+  for any other reason is new work: its own contract line, its own cycle, and its depth set by its
+  own risk rather than inherited from this one. A contract opened because the cap fired says so, so
+  the spend already made stays visible.
+- After the second `REWORK` on one contract, the cycle gets one last pass. The delta it reviews must
+  hold the fix for those findings, plus whatever repair validation demands of that fix, and nothing
+  else. `PASS` there ends the cycle. `REWORK` there ends it as `BLOCKED`, naming what is unresolved
+  -- never `DONE`: the delta that ships has to have been reviewed, not merely reviewed to the right
+  depth. Going further is the user's call and their budget. This bounds how often a change is
+  reviewed, never how deeply.
+- A `PASS` ends the review. Afterwards you may apply a non-blocking finding only if it is comment or
+  prose text, or if it changes no behaviour and a check you run covers it. Anything else is new work
+  under the one-contract rule above. The agent calling a change cheap is the one who wrote it, and
+  the last independent look is already behind it.
 
 ## Independent reviewer
 

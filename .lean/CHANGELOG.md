@@ -12,9 +12,10 @@ independent look at the regression fix and found seven things, round 5 found the
 below. One round followed a `PASS`, not two.
 
 - A review cycle covers one Task Contract, and a change counts toward the cap when its motivation is
-  a finding from that cycle's review. This is the rule that removes the avoidable rounds. The most
-  expensive round in that run came from taking on a second task mid-cycle: its new code introduced a
-  regression that reopened the loop for the first task, and findings stopped mapping to a change.
+  a finding from that cycle's review. The most expensive round in that run came from taking on a
+  second task mid-cycle: its new code introduced a regression that reopened the loop for the first
+  task, and findings stopped mapping to a change. This rule separates the two, it does not shorten
+  either.
 - After the second `REWORK` on one contract, the cycle gets one last pass over the delta that fixes
   those findings, then stops. A capped cycle still holding a `REWORK` is `BLOCKED`, never `DONE`: a
   delta no reviewer has seen cannot satisfy condition 4 in `QUALITY.md`. Without that last pass a
@@ -27,13 +28,24 @@ below. One round followed a `PASS`, not two.
   `git grep -I`. Filesystem `grep` reads binary-ness from content; `git grep` honours
   `.gitattributes`, so a repository setting `*.md binary` skipped every markdown file while the scan
   reported clean -- a fail-open in a gate command every project runs on every turn. Round 5 caught
-  it. An unbounded version of this rule means round 5 never happens.
+  it. An unbounded version of this rule means round 5 never happens, which makes this the rule that
+  removes a round rather than the one above. The bound is stated about the change, not borrowed from
+  `WORKFLOW.md`'s trivial test: that test requires `LOW` risk, and `CONTRACTS.md` makes every change
+  inside a high-risk area `HIGH`, so borrowing it would have forbidden fixing a typo in this file.
 
-`REVIEW.md` has a `Rounds` section; `CLAUDE.md` carries the bound inline, because it sends an agent
-to the `reviewer` subagent without going through the skill; `/lean-review` step 5 cites the section
-from both the `PASS` and `REWORK` branches rather than restating it; `RECOVERY.md` and `WORKFLOW.md`
-route to it. Review depth is unchanged. The round count lives only in the review report, so it does
-not survive a new session -- one reason the cap is a floor on care, not a mechanism.
+Run the corrected history through all three rules and the layout change is two `REWORK` rounds and
+then a confirm pass, with the gate fix as its own short cycle. Round 3 found something real in round
+2's fix, so that confirm pass plausibly returns `REWORK` too: three rounds ending `BLOCKED`, handed
+to the user. That is the honest projection, not two rounds and done.
+
+`REVIEW.md` has a `Rounds` section; `CLAUDE.md` carries both halves of the bound inline, because it
+sends an agent to the `reviewer` subagent without going through the skill; `/lean-review` step 5
+cites the section from the `PASS` and `REWORK` branches rather than restating it; `RECOVERY.md` lists
+the capped case under `Blocked`, and `WORKFLOW.md` routes to the section. `QUALITY.md` condition 4
+and `/lean-gate` now ask that review covered the delta that ships, not only that it ran at the right
+depth -- `DONE` is decided on that path, and it does not read `REVIEW.md`. The round count goes in
+the Result Contract's Evidence, which travels with the branch and is already a section of the pull
+request template, so a fresh session can recover it. Review depth is unchanged.
 
 ## 2.1.0
 

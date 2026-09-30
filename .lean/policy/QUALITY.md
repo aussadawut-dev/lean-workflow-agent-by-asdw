@@ -19,7 +19,7 @@ DONE requires all of:
 1. Task Contract acceptance checks satisfied with evidence.
 2. Deterministic validation passed (or not-applicable stated).
 3. Tests present for behavior changes.
-4. Review completed at the required depth (deeper of risk and quality; see `REVIEW.md`).
+4. Review completed at the required depth (deeper of risk and quality; see `REVIEW.md`), covering the delta that ships.
 5. No unreported skipped checks.
 
 For Claude, the `Stop` hook enforces step 2 when Quality Gate commands are defined in `.lean/PROJECT.md`.
