@@ -22,7 +22,7 @@ below. One round followed a `PASS`, not two.
   capped cycle would always ship its final fix unreviewed, and on this branch every round found
   something real in the previous round's fix, four times out of four.
 - A `PASS` ends the review, and anything applied afterwards is new work with its own contract line.
-  There is no carve-out for small fixes. Four were tried here and each one leaked. "Cheap and clearly
+  There is no carve-out for small fixes. Four were tried here and each one failed. "Cheap and clearly
   right" was unbounded, and on this branch that licence produced a real defect: round 4 passed, its
   seven advisory findings were applied, and one of them swapped a filesystem `grep -I` for
   `git grep -I`. Filesystem `grep` reads binary-ness from content; `git grep` honours
@@ -35,8 +35,11 @@ below. One round followed a `PASS`, not two.
   rules an agent follows are prose and `.lean/policy/` holds nothing else. Conditioning the prose
   half left the comment half: rewording the `<!-- gate:start -->` marker in `.lean/PROJECT.md` is a
   comment edit that turns the `Stop` hook into a silent no-op, verified. The carve-out went instead
-  of gaining a fifth wording, and it costs nothing to lose: `WORKFLOW.md` already lets a trivial task
-  skip formal review, so the whole price of a typo is one contract line.
+  of gaining a fifth wording. What that costs depends on where the fix lands: where `WORKFLOW.md`'s
+  trivial test can be met it is one contract line and no review, and inside a high-risk area it
+  cannot be met at all, so a typo in one of these policy files costs a full `HIGH` cycle. That is the
+  price of the area rather than of this rule -- the same price the borrowed trivial test charged --
+  and it buys a rule with no wording left to argue with.
 
 Run the corrected history through all three rules and the layout change is two `REWORK` rounds and
 then a confirm pass, with the gate fix as its own short cycle. Round 3 found something real in round

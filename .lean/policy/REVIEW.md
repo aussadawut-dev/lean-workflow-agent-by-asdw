@@ -33,10 +33,12 @@ Review costs a full context each round, so the loop needs an end that is not the
   reviewed, never how deeply.
 - A `PASS` ends the review. Anything applied afterwards is new work under the one-contract rule
   above, whatever its size: its own contract line, and no review when that contract is trivial.
-  There is no carve-out for small fixes, because there is no cost to route around -- `WORKFLOW.md`
-  already lets a trivial task skip formal review, so the whole price of a typo is one line. Every
-  carve-out tried here leaked: the agent calling a change small is the one who wrote it, and the
-  last independent look is already behind it.
+  There is no carve-out for small fixes. Where `WORKFLOW.md`'s trivial test can be met the whole
+  price is one contract line and no review; inside a high-risk area it cannot be met at all, because
+  every change there is `HIGH` risk, so even a typo costs a full cycle -- the price of the area, not
+  of this rule. Every carve-out tried here failed anyway, by licensing too much or forbidding too
+  much: the agent calling a change small is the one who wrote it, and the last independent look is
+  already behind it.
 
 ## Independent reviewer
 
