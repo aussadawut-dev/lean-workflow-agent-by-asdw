@@ -24,19 +24,25 @@ The Quality Gate no longer skips a turn just because the working tree is clean.
   `.claude/.gate-failed`, and seeding declines while that marker exists, so a new session cannot
   bless work the gate has already refused. Without it, seeding undid the fix after any SessionStart,
   and on a dirty broken tree it was worse than 2.0.0, which blocked. A passing run clears the
-  marker.
+  marker. The marker is local state and gitignored, so it does not travel between checkouts and
+  does not survive `git clean -xd`: after a clean, the next session starts with no memory of the
+  refusal.
 - `git ls-files --others -z | xargs -0 cat` in the state became a hazard once seed mode stopped
   draining stdin: with no untracked files, GNU xargs points the child's stdin at /dev/null but BSD
   xargs does not, so `cat` there would read the hook's own input. It is a read loop now.
 - `check-structure.sh` gained three guards for this machinery: the gate's state files must be in
   `.gitignore` (otherwise each run's state includes the file the last run wrote and the gate never
   settles), `--seed` must not appear in `.claude/settings.json` (wiring it to Stop disables the gate
-  in silence), and the retired-path scan now reads `git ls-files` rather than walking the working
-  tree, so a vendored or ignored file naming a retired path cannot block a downstream project's
-  every turn.
-- `test-hooks.sh` is now 30 checks. Test 5 asserted "clean tree skips", which was the bug itself; it
+  in silence), and the retired-path scan now runs `git grep --untracked` rather than walking the
+  working tree, so a vendored or ignored file naming a retired path cannot block a downstream
+  project's every turn, while a new file a contributor has not staged yet is still covered. The
+  `.gitignore` entries are asked for by effect, via `git check-ignore`, so any equivalent pattern
+  passes.
+- `test-hooks.sh` is now 32 checks. Test 5 asserted "clean tree skips", which was the bug itself; it
   now asserts that committed work is gated. Every term of the state hash is covered: remove any one
-  of the five and a check fails. Restoring 2.0.0's clean-tree shortcut fails six.
+  of the five and a check fails. Both guards that keep a refusal from being skipped are pinned
+  separately, so removing either one fails a check even though the other would still hold.
+  Restoring 2.0.0's clean-tree shortcut fails six.
 
 **Upgrading to this from 2.0.0 or earlier:** if your Quality Gate currently fails, the first turn
 after the upgrade will block, because the gate now runs on states it used to skip. `CLAUDE.md` tells

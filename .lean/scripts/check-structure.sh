@@ -95,18 +95,16 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 elif ! scan_err="$(mktemp)" || [ -z "$scan_err" ]; then
   bad "retired-path scan could not start: mktemp failed"
 else
-  scan_files=()
-  while IFS= read -r -d '' file; do
-    [ "$file" = ".lean/CHANGELOG.md" ] && continue
-    scan_files+=("$file")
-  done < <(git ls-files -z 2>>"$scan_err")
-
-  hits=""
-  if [ "${#scan_files[@]}" -gt 0 ]; then
-    hits="$(grep -I -nH -E "$retired" "${scan_files[@]}" 2>>"$scan_err")"
-    status=$?
-    [ "$status" -gt 1 ] && bad "retired-path scan could not complete (grep exit $status)"
-  fi
+  # git grep, not the filesystem: a vendored or ignored file that happens to name
+  # a retired path is not this repository's content, and in a downstream install
+  # this script is a gate command, so a false hit there would block every turn.
+  # --untracked still covers a new file a contributor has not staged yet, which
+  # is content. git chunks its own argument list, so there is no argv ceiling.
+  # A scan that cannot run is a failure, never a pass.
+  hits="$(git grep --no-color -I -nE --untracked "$retired" \
+    -- ':(exclude).lean/CHANGELOG.md' 2>>"$scan_err")"
+  status=$?
+  [ "$status" -gt 1 ] && bad "retired-path scan could not complete (git grep exit $status)"
   [ -s "$scan_err" ] && bad "retired-path scan reported: $(head -n 1 "$scan_err")"
   rm -f "$scan_err"
 
@@ -118,16 +116,21 @@ EOF
 fi
 
 # The gate's own state files must stay untracked, or each run's state includes
-# the file the previous run wrote and the gate never settles.
+# the file the previous run wrote and the gate never settles. Asked by effect, so
+# any equivalent .gitignore pattern passes.
 for ignored in '.claude/.gate-cache' '.claude/.gate-failed'; do
-  grep -qxF "$ignored" .gitignore || bad "missing from .gitignore: $ignored"
+  git check-ignore -q "$ignored" || bad "not ignored by git: $ignored"
 done
 
 # --seed records state and runs nothing, so wiring it to Stop disables the gate
-# in silence. It belongs in session-start.sh, never in settings.json.
-if grep -q -- '--seed' .claude/settings.json; then
-  bad "--seed must not appear in .claude/settings.json (it would disable the gate)"
-fi
+# in silence. It belongs in session-start.sh, never in a settings file --
+# including the gitignored local one, which is where someone would experiment.
+for settings in .claude/settings.json .claude/settings.local.json; do
+  [ -f "$settings" ] || continue
+  if grep -q -- '--seed' "$settings"; then
+    bad "--seed must not appear in $settings (it would disable the gate)"
+  fi
+done
 
 # Gate markers exist exactly once.
 for marker in 'gate:start' 'gate:end'; do

@@ -65,9 +65,11 @@ if [ "$seed" -eq 1 ]; then
 fi
 
 # Skip when nothing has changed since the last passing run, or since this
-# session began. Anything else runs, including a tree whose changes are all
-# committed.
-if [ -n "$state" ] && [ -f "$cache" ] && [ "$(cat "$cache")" = "$state" ]; then
+# session began, and no refusal is outstanding. Anything else runs, including a
+# tree whose changes are all committed. The marker is checked here as well as in
+# seed mode so that "never skip while a refusal stands" lives in one place.
+if [ -n "$state" ] && [ ! -f "$failed" ] &&
+   [ -f "$cache" ] && [ "$(cat "$cache")" = "$state" ]; then
   exit 0
 fi
 

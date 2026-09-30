@@ -244,7 +244,10 @@ if [ "$runs" = "2" ]; then ok "gate: a new empty untracked file re-runs"; else b
 
 # 23. The gate commands are part of the state in their own right. With
 # .lean/PROJECT.md ignored by git, no other term in the state can see an edit
-# to it: it is neither in the diff nor among the untracked files.
+# to it: it is neither in the diff nor among the untracked files. The trailing
+# `*` in the ignore pattern is load-bearing -- it also covers the .bak that
+# `sed -i.bak` leaves, which git status would otherwise report, making this
+# check pass without the commands being in the state at all.
 : > "$counter"
 dir="$(fixture "echo run >> '$counter'")"
 printf '.lean/PROJECT.md*\n' >> "$dir/.gitignore"
@@ -257,6 +260,27 @@ sed -i.bak "s|echo run >> |echo edited >> |" "$dir/.lean/PROJECT.md"
 run_gate "$dir" '{}'
 runs="$(wc -l < "$counter" | tr -d ' ')"
 if [ "$runs" = "2" ]; then ok "gate: the gate commands are part of the state"; else bad "gate: the gate commands are part of the state (ran $runs of 2)"; fi
+
+# 24. Two guards keep a refusal from being skipped, and each is pinned on its
+# own. First: while a refusal stands, seeding writes no cache at all.
+dir="$(fixture 'false')"
+echo broken > "$dir/code.txt"
+run_gate "$dir" '{}'
+CLAUDE_PROJECT_DIR="$dir" bash "$gate" --seed
+if [ ! -f "$dir/.claude/.gate-cache" ]; then
+  ok "gate: a seed writes no cache while a refusal stands"
+else
+  bad "gate: a seed writes no cache while a refusal stands"
+fi
+
+# 25. Second: a cache that does match is still not skipped while the refusal
+# stands. Built by seeding with the marker briefly out of the way, which is the
+# state two concurrent sessions could otherwise leave behind.
+rm -f "$dir/.claude/.gate-failed"
+CLAUDE_PROJECT_DIR="$dir" bash "$gate" --seed
+: > "$dir/.claude/.gate-failed"
+run_gate "$dir" '{}'
+expect_code "gate: a matching cache does not override a refusal" 2
 
 echo
 echo "$pass passed, $fail failed"
