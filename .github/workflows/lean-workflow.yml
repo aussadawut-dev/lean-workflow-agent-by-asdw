@@ -38,3 +38,6 @@ jobs:
 
       - name: Hook tests
         run: .lean/tests/test-hooks.sh
+
+      - name: Structure tests
+        run: .lean/tests/test-structure.sh

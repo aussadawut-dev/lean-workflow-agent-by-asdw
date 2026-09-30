@@ -9,9 +9,10 @@ A change here reaches every project that upgrades, so it is held to the workflow
 shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh
 .lean/scripts/check-structure.sh
 .lean/tests/test-hooks.sh
+.lean/tests/test-structure.sh
 ```
 
-Those are the Quality Gate commands in `.lean/PROJECT.md`, and CI runs the same three.
+Those are the Quality Gate commands in `.lean/PROJECT.md`, and CI runs the same four.
 
 Then fill in the pull request template. It is the Result Contract; a workflow that asks every
 change for evidence should carry its own.
@@ -23,7 +24,8 @@ change for evidence should carry its own.
   The `1.4.0` entry in `.lean/CHANGELOG.md` is the pattern: five headless runs, then rules
   *removed* because they were never read.
 - Prefer deleting a rule to adding one. Every line in here is loaded into someone's context.
-- A behavior change in a hook needs a case in `.lean/tests/test-hooks.sh`.
+- A behavior change in a hook needs a case in `.lean/tests/test-hooks.sh`, and one in
+  `.lean/scripts/check-structure.sh` a case in `.lean/tests/test-structure.sh`.
 - `.lean/policy/` is workflow-owned and replaced on upgrade. Project-specific rules belong in
   `.lean/PROJECT.md`, which upgrades never touch.
 - Bump the version in `.lean/CHANGELOG.md` and `.lean/README.md`. The structure check fails if

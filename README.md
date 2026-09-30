@@ -48,7 +48,7 @@ CONTRIBUTING.md         How to change the workflow files.
   CHANGELOG.md          Workflow versions and upgrade steps.
   policy/               The rules. Replaced wholesale on upgrade.      <- do not edit
   scripts/              check-structure.sh
-  tests/                test-hooks.sh
+  tests/                test-hooks.sh, test-structure.sh
 
 .claude/                ZONE 2 - Claude runtime. Paths are fixed by Claude Code.
   settings.json         Hooks and permissions.
@@ -70,8 +70,9 @@ The workflow files test themselves. CI runs only when workflow files change, so 
 your project's CI. Run locally:
 
 ```sh
-.lean/scripts/check-structure.sh   # referenced paths, dead paths, settings, frontmatter, exec bits
+.lean/scripts/check-structure.sh   # referenced paths, dead paths, settings, frontmatter, exec bits, registry age
 .lean/tests/test-hooks.sh          # Quality Gate and SessionStart hooks
+.lean/tests/test-structure.sh      # the structure check's model registry rules
 ```
 
 ## What to delete after copying
@@ -81,7 +82,7 @@ These belong to this template, not to your project:
 - `.lean/scripts/`, `.lean/tests/`, and `.github/workflows/lean-workflow.yml` — self-checks for
   the workflow files themselves. **If you delete these, clear the Quality Gate block in
   `.lean/PROJECT.md` in the same go, or run `/lean-init` to refill it from your project.** The
-  block ships naming those three scripts, so leaving it is a `Stop` hook that fails on every turn,
+  block ships naming those four commands, so leaving it is a `Stop` hook that fails on every turn,
   and `CLAUDE.md` tells the agent not to repair a failure it did not cause — it will report
   `BLOCKED` instead, every time.
 - `CONTRIBUTING.md` — how to contribute to this template.
