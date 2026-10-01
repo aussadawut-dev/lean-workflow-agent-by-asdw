@@ -31,13 +31,22 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: ShellCheck
-        run: shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh
+        run: shellcheck .claude/hooks/*.sh .lean/bin/*.sh .lean/scripts/*.sh .lean/tests/*.sh
 
       - name: Structure
         run: .lean/scripts/check-structure.sh
 
+      - name: Mode tests
+        run: .lean/tests/test-mode.sh
+
+      - name: Tracker tests
+        run: .lean/tests/test-tracker.sh
+
       - name: Hook tests
         run: .lean/tests/test-hooks.sh
+
+      - name: Queue tests
+        run: .lean/tests/test-queue.sh
 
       - name: Structure tests
         run: .lean/tests/test-structure.sh

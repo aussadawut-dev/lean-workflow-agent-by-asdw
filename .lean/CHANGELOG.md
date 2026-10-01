@@ -4,6 +4,96 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
+## 2.6.0
+
+Workflow modes. A project decides once how much process it runs, and the decision is config from
+then on -- not a judgement call an agent makes per task.
+
+- `standard` is the workflow exactly as it was: nothing added. `tracker` adds one tracking record
+  per non-trivial task, committed under `.lean/tracker/`. `full` adds a task queue whose items are
+  claimed before work starts. The new `policy/MODES.md` holds the rules. Modes only add steps: none
+  of them lowers a floor, and `full` is not licence to skip what `standard` requires.
+- The value lives in a `mode:start`/`mode:end` block in `PROJECT.md`, which upgrades never touch, so
+  the choice survives them and a hand edit is the supported way to switch. `.lean/bin/mode.sh`
+  reads (`get`), validates (`check`), and records (`set`) it. Decoration around a hand-edited value
+  is stripped, since that edit is the documented path.
+- Because that hand edit is expected, a malformed block is expected input, and `PROJECT.md` also
+  carries the Quality Gate commands the `Stop` hook parses. So every read is bounded by the marker
+  line numbers, `set` replaces only the lines between them, and it verifies the result -- the value
+  reads back, the line count is the old one minus the block's contents, and the gate markers are
+  still there -- before overwriting anything. A block with the markers on one line, in the wrong
+  order, or duplicated reads as `unset` and refuses to be written to, naming what to fix. The first
+  version of this change did not: it rewrote such a block by deleting everything after the start
+  marker, gate block included, and reported success. Review caught it before release.
+- `session-start.sh` asks for the mode the first session it finds none recorded, states `tracker` and
+  `full` on every later session, and says nothing for `standard` -- the baseline earns no line of
+  context per session. A value that is not one of the three is reported, never guessed at: guessing
+  silently drops the records or the queue the project asked for. A project that removed
+  `.lean/bin/` is not asked for a mode it has no way to record.
+- `.lean/bin/queue.sh` is the `full` mode queue: `list`, `show`, `add`, `claim`, `release`, `done`.
+  Items live on their own branch (`lean-queue`, or `LEAN_QUEUE_BRANCH`), one file per item under
+  `queue/`. Every write is a commit built with plumbing against the branch as the remote has it and
+  then pushed, so two sessions claiming one item cannot both win: the second push is rejected as
+  non-fast-forward, and the loser re-reads the item and is told who holds it. Exit 3 is that answer.
+  Nothing is checked out and the working tree is never touched -- a queue that dirtied the tree would
+  change the Quality Gate's state and every diff a session reports. Aimed at a branch that *is*
+  checked out it refuses, rather than commit onto that work. Without an `origin` remote it degrades
+  to local-only claims, which coordinate nothing outside the checkout.
+- A rejected push is only a race when it is about this item, so a write is retried against the
+  branch's new state (8 attempts, short randomized backoff) and running out of attempts exits 4:
+  nothing was decided, run it again. Exit 3 stays the item's own answer -- held, not claimed, already
+  done -- so an agent told 3 can trust it and take another item. `add` retries the same way; before
+  review it failed outright, which meant three of four sessions starting at once failed their first
+  step. Item headers are rewritten with `awk` and values passed through the environment, never
+  spliced into a `sed` replacement: an owner holding `&`, `|` or a backslash used to corrupt the item
+  into one nobody could claim, release, or close, while the claim reported success.
+- `.lean/bin/tracker.sh` owns the tracking record's header, so `tracker` mode is a tool rather than
+  prose: `new` writes the record with the date-and-slug name, the contract line and the Result
+  Contract's empty sections; `set` fills in the contract or the queue item a task learns as it goes;
+  `current` finds the record still `IN_PROGRESS`, so the Quality Gate step does not have to carry a
+  path; `state` closes it as one of the four states the workflow defines, and nothing else. The
+  sections stay the session's own writing.
+- What that tool refuses is the substance of it, because a record that lies is worse than no record.
+  A title is written as one line, so a task description whose second line reads `state: DONE` cannot
+  open a record already claiming DONE. A resolved path must be inside the records directory, so a
+  mistyped or generated path cannot have its `state:` line rewritten and `show` is not a way to print
+  any readable file. A slug matching several records resolves to the open one and otherwise refuses,
+  naming the matches, rather than closing whichever sorts last. A glob character in a record name is
+  refused. Records are created with noclobber, so two sessions starting at once take different names.
+  Every one of those is pinned by a mutation recorded in `PROJECT.md`.
+- New directory `.lean/bin/` for the workflow's own tools. It is deliberately not `.lean/scripts/`,
+  which the README tells a project it may delete: those are self-checks for the workflow files,
+  while `bin/` runs during a session -- the `SessionStart` hook reads `mode.sh` every time.
+- Tests: `.lean/tests/test-mode.sh` (43 checks), `.lean/tests/test-tracker.sh` (81 checks) and
+  `.lean/tests/test-queue.sh` (69 checks, against
+  a bare remote and up to four concurrent clones) are new, and `test-hooks.sh` goes from 55 to 67
+  checks for the hook's mode reading. The queue's claim guarantee is tested by really running four
+  claimers at once, not by simulating a stale base: exactly one wins, four claimers of four items
+  all win, and four concurrent `add`s all succeed. Verified by mutation: force-pushing the claim
+  commit fails 12 checks, rewriting a header with `sed` fails 4, removing every guard on the mode
+  write fails 2, and treating an unrecognized mode as `standard` fails the hook's mode cases.
+  `check-structure.sh` now also checks the mode markers and the recorded value, and the exec bits of
+  `.lean/bin/` when that directory is present -- scoped to the mode rule, which must not demand a
+  mode where the hook says nothing and nothing can record one. A project that drops the tools still
+  has the docs naming them to drop.
+- Smaller corrections from the second review round: a value left on a marker line is refused by name
+  rather than by "does not read back"; the queue's owner check looks for control characters, not for
+  non-ASCII, which under `LC_ALL=C` refused an ordinary `user.email`; a `LEAN_QUEUE_ATTEMPTS` that is
+  not a positive number is a usage error rather than a reported race; and the checked-out-branch
+  refusal moved onto the writes, so `list` and `show` still work from a checkout of the queue
+  branch -- with no remote that checkout is the only copy of it.
+
+Upgrade, from 2.5.0. Add `.lean/bin/`, `.lean/policy/MODES.md`, `.lean/tests/test-mode.sh`,
+`.lean/tests/test-tracker.sh`, and `.lean/tests/test-queue.sh`. Replace `.claude/hooks/session-start.sh`,
+`.lean/scripts/check-structure.sh`, `.lean/tests/test-hooks.sh`, `.lean/README.md`, `CLAUDE.md`,
+`AGENTS.md`, the three skills that changed (`lean-task`, `lean-gate`, `lean-init`), and
+`.lean/CHANGELOG.md`. Then, in your own `PROJECT.md`, add the mode block -- copy
+the `## Workflow mode` section from this version, value `unset`, and the next session asks for the
+mode. If you run the workflow's own checks, add `.lean/bin/*.sh` to the shellcheck line and the two
+new test scripts to the Quality Gate block. Nothing moves, and an install that skips the
+`PROJECT.md` step keeps working: an unreadable mode reads as unset, which is a question, not a
+failure.
+
 ## 2.5.0
 
 The tier a contract picks now resolves to a model the repository names, per runtime, instead of

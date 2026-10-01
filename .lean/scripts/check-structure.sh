@@ -45,8 +45,10 @@ else
   bad "invalid JSON: .claude/settings.json"
 fi
 
-# Workflow scripts are executable, so CI and the docs can run them by path.
-for script in .lean/scripts/*.sh .lean/tests/*.sh; do
+# Workflow scripts are executable, so CI, the hooks, and the docs can run them by
+# path. .lean/bin/ is not a self-check: session-start.sh calls mode.sh on every
+# session, and a non-executable one would leave the mode unreadable in silence.
+for script in .lean/bin/*.sh .lean/scripts/*.sh .lean/tests/*.sh; do
   [ -f "$script" ] || continue
   [ -x "$script" ] || bad "not executable: $script"
 done
@@ -150,11 +152,30 @@ for settings in .claude/settings.json .claude/settings.local.json; do
   fi
 done
 
-# Gate markers exist exactly once.
-for marker in 'gate:start' 'gate:end'; do
+# Gate and mode markers exist exactly once.
+for marker in 'gate:start' 'gate:end' 'mode:start' 'mode:end'; do
   count="$(grep -c "<!-- $marker -->" .lean/PROJECT.md)"
   [ "$count" = "1" ] || bad "expected one $marker marker in .lean/PROJECT.md, found $count"
 done
+
+# The recorded workflow mode is one the policy defines. `unset` passes: the
+# SessionStart hook asks for it. A typo does not -- it would otherwise run the
+# project under a mode nobody chose, dropping the tracking records or the queue
+# the project asked for. CLAUDE_PROJECT_DIR is pinned to the repository being
+# checked, which is not always the session's.
+# Scoped to projects that kept the directory: session-start.sh says nothing about
+# modes when mode.sh is gone, and this rule must not contradict it by demanding a
+# mode nobody can record. Such a project still fails the reference checks above
+# until it drops the docs that name the tools, which is its own business.
+if [ -d .lean/bin ]; then
+  if [ -x .lean/bin/mode.sh ]; then
+    if ! mode_err="$(CLAUDE_PROJECT_DIR="$PWD" .lean/bin/mode.sh check 2>&1)"; then
+      bad "${mode_err:-invalid workflow mode in .lean/PROJECT.md}"
+    fi
+  else
+    bad "missing or not executable: .lean/bin/mode.sh"
+  fi
+fi
 
 # Model registry. `.lean/policy/MODELS.md` names tiers; the registry in .lean/PROJECT.md
 # names the model each tier resolves to, per runtime -- an agent reaching this repository

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Tests for the model registry rules in .lean/scripts/check-structure.sh. Each case
-# runs the script inside a throwaway copy of this repository, over a registry the
-# case writes itself -- never one the host .lean/PROJECT.md happens to carry, so the
-# suite holds in an install that never adopted a registry.
+# Tests for .lean/scripts/check-structure.sh: the model registry rules, and the
+# workflow mode rules below them. Each case runs the script inside a throwaway copy
+# of this repository, over a registry the case writes itself -- never one the host
+# .lean/PROJECT.md happens to carry, so the suite holds in an install that never
+# adopted a registry.
 # Usage: .lean/tests/test-structure.sh
 
 set -u
@@ -339,6 +340,89 @@ expect_registry_fail "structure: a stray line on a CRLF tree fails"
 case "$out" in
   *"2019-01-01 -- every row needs"*) ok "structure: the stray line is reported without its CR" ;;
   *) bad "structure: the stray line is reported without its CR (got: $out)" ;;
+esac
+
+# --- the workflow mode rules ------------------------------------------------
+# The structure check is what stops a project running under a mode nobody chose:
+# .lean/bin/mode.sh reads the value, and the hook only asks when there is none, so
+# a typo would otherwise sit there silently dropping the records or the queue the
+# project asked for.
+
+expect_mode_fail() {
+  if [ "$code" -eq 0 ]; then
+    bad "$1 (exit 0, want non-zero)"
+  elif printf '%s' "$out" | grep -qi 'mode'; then
+    ok "$1"
+  else
+    bad "$1 (failed, but not on the mode: $out)"
+  fi
+}
+
+set_mode() { # set_mode <dir> <value>
+  python3 - "$1/.lean/PROJECT.md" "$2" <<'PYEOF'
+import re, sys
+path, value = sys.argv[1], sys.argv[2]
+text = open(path).read()
+block = "<!-- mode:start -->\n" + value + "\n<!-- mode:end -->"
+text = re.sub(r"<!-- mode:start -->.*?<!-- mode:end -->", lambda _: block, text, flags=re.S)
+open(path, "w").write(text)
+PYEOF
+}
+
+# Each of the three modes passes, and so does an install that has not chosen yet:
+# the hook asks for that one, and failing the gate over it would block every turn.
+for value in standard tracker full unset; do
+  dir="$(fixture)"
+  set_mode "$dir" "$value"
+  run_check "$dir"
+  expect_pass "structure: the mode '$value' passes"
+done
+
+# Anything else is a typo, and the message names it.
+dir="$(fixture)"
+set_mode "$dir" "trackers"
+run_check "$dir"
+expect_mode_fail "structure: a mode that is not one of the three fails"
+case "$out" in
+  *"'trackers'"*) ok "structure: the failure names the recorded value" ;;
+  *) bad "structure: the failure names the recorded value (got: $out)" ;;
+esac
+
+# A lost marker leaves the value unreadable, which mode.sh reads as unset -- so the
+# markers are checked in their own right, or the block could rot away in silence.
+dir="$(fixture)"
+sed -i.bak 's|<!-- mode:end -->||' "$dir/.lean/PROJECT.md"
+rm -f "$dir/.lean/PROJECT.md.bak"
+run_check "$dir"
+expect_mode_fail "structure: a missing mode marker fails"
+
+# The tools have to be runnable: the SessionStart hook calls mode.sh every session,
+# and a non-executable one would leave the mode unreadable without saying so.
+dir="$(fixture)"
+chmod -x "$dir/.lean/bin/mode.sh"
+run_check "$dir"
+expect_mode_fail "structure: a mode.sh that cannot run fails"
+
+# A project that dropped .lean/bin/ altogether still fails -- on the documentation
+# that names the tools, which it has to drop too -- but never on the mode rule.
+# The hook says nothing about modes there, and the rule scoped to the directory is
+# what keeps the two from disagreeing about a mode nobody can record.
+dir="$(fixture)"
+rm -rf "$dir/.lean/bin"
+run_check "$dir"
+if [ "$code" -ne 0 ]; then
+  ok "structure: dropping .lean/bin/ fails while the docs still name it"
+else
+  bad "structure: dropping .lean/bin/ fails while the docs still name it (exit 0)"
+fi
+case "$out" in
+  *"missing .lean/bin/mode.sh"*) ok "structure: it fails on the dangling reference" ;;
+  *) bad "structure: it fails on the dangling reference (got: $out)" ;;
+esac
+case "$out" in
+  *"workflow mode"* | *"not executable: .lean/bin/mode.sh"*)
+    bad "structure: the mode rule fired without the directory (got: $out)" ;;
+  *) ok "structure: the mode rule does not fire without the directory" ;;
 esac
 
 echo
