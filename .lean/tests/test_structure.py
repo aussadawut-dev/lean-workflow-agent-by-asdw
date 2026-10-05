@@ -68,6 +68,10 @@ class StructureTests(unittest.TestCase):
         shutil.rmtree(self.root / ".agents/skills/lean-gate")
         self.assertIn("adapter", self.check(False).lower())
 
+    def test_clean_queue_adapter_is_required(self):
+        shutil.rmtree(self.root / ".agents/skills/clean-queue")
+        self.assertIn("adapter", self.check(False))
+
     def test_empty_description_is_rejected(self):
         path = self.root / ".agents/skills/lean-task/SKILL.md"
         lines = ["description: " if line.startswith("description:") else line for line in path.read_text().splitlines()]

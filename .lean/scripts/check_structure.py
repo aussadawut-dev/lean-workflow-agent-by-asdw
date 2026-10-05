@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 REQUIRED_SKILLS = ("lean-init", "lean-task", "lean-review", "lean-gate", "lean-scope",
-                   "lean-research", "lean-grill", "lean-multi-agent")
+                   "lean-research", "lean-grill", "lean-multi-agent", "clean-queue")
 
 
 def check(root):

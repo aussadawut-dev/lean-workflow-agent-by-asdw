@@ -14,13 +14,41 @@ The Bash hooks and `fcntl` lease tool support macOS, Linux and WSL with Python 3
 | `tracker` | Standard path plus one `docs/tracking/TCKNNN.md` or `TCKNNN-slug.md` for each workset. Record goal, acceptance criteria, task states, decisions, evidence, and next step. Create/update it before implementation and synchronize it after material progress. |
 | `full` | Tracker path plus an executable `.agents/queue/items/QNNNN.json` for each independently claimable task. Claim its exact ID through `.lean/scripts/workflow.py queue claim --id QNNNN --agent NAME --request-id UUID` before editing its scope; heartbeat during long work, complete with validation evidence, or release when unfinished. Synchronize queue then tracker before reporting DONE. |
 
-Use `python3 .lean/scripts/workflow.py configure <mode>` to select a mode. `standard -> tracker -> full` upgrades preserve prior records. Downgrades require a separate decision about existing records and active leases. Trivial work needs no tracker or queue item; full-mode edits to an existing claimed item's scope still require its claim.
+Use `python3 .lean/scripts/workflow.py configure <mode>` to select a mode. `standard -> tracker -> full` upgrades preserve prior records. Explicit downgrades use `downgrade <lower-mode> --dry-run`, then `--apply` when requested.
+Preview is read-only and reports blockers (exit 2); apply rechecks under the shared lease lock.
+All active claims block a downgrade. IN_PROGRESS/VALIDATING/REVIEWING trackers block standard.
+Pending queue items, and PLANNED/BLOCKED/FAILED trackers being paused by standard, require explicit
+`--keep-pending` acknowledgment. Keep every record and expired claim file; do not mark work DONE
+or release someone else's lease to enable a transition. Execution and quality floors are unchanged.
+Upgrade checks retained records before changing config. Reopen a DONE tracker in tracker mode if
+its queue remains unfinished before returning to full. Stop workers on older tooling before an
+upgrade; the lock coordinates CLI operations in one checkout, not manual edits or other checkouts. Trivial work needs no tracker or queue item; full-mode edits to an existing claimed item's scope still require its claim.
 
 In `full`, generate a random request ID before each claim attempt and keep it until the claim receipt is known. Retry with the same agent, queue ID, and request ID if the response is lost; the tool returns the same token. A new request ID cannot take over an existing lease. Only the token holder may heartbeat, release, or complete the claim. A retried completion with the same evidence removes a lease left by an interrupted completion.
 
 ```
 Task Contract -> Context -> Decide when needed -> Work -> Test -> Validate -> Review -> Quality Gate -> DONE
 ```
+
+## Queue cleanup
+
+Use `/clean-queue old` for DONE items completed strictly over 30 days ago, or `/clean-queue all`
+for every DONE item. Only explicit cleanup requests authorize apply; cleanup never runs merely
+because a task finishes or a mode changes. The CLI is `clean-queue old|all --dry-run|--apply`.
+Preview is read-only; apply locks and rechecks data. READY/BLOCKED records and trackers remain.
+
+Age uses timezone-aware `completed_at`, recorded in UTC by completion. Legacy undated DONE items
+are reported/skipped by old and eligible for all; do not infer dates. Archive snapshots retain
+original JSON bytes, checksum, IDs, evidence, custom fields and archive metadata without expiry.
+Keep `.agents/queue/history/` in version control. Browse it with `queue history [--id QNNNN]`.
+Archived DONE items still satisfy dependency and tracker checks; they cannot be claimed/listed as
+active work. Do not reuse archived IDs. Active claims on DONE records and invalid data block
+cleanup; valid live claims on retained READY items are preserved and do not block it.
+
+Each snapshot is published before source deletion. A process interruption may leave identical
+copies; history is authoritative and retry removes the leftover source. A changed duplicate is
+an error. A failed batch may have archived earlier items: report partial progress and retry after
+resolving the error, never delete files by hand to bypass it. Stop old-tooling workers before cleanup.
 
 ## Steps
 

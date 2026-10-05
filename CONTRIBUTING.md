@@ -2,7 +2,7 @@
 
 This repository is the workflow template, not an application. Changes reach downstream projects; keep them portable and backed by evidence.
 
-Read `AGENTS.md` and `.lean/README.md` first. Update the canonical contract before adapters when shared instructions change. Keep Claude/Codex procedure bodies shared and preserve the eight adapters' parity. Do not commit actual trackers, queue items, credentials or runtime state as template content.
+Read `AGENTS.md` and `.lean/README.md` first. Update the canonical contract before adapters when shared instructions change. Keep Claude/Codex procedure bodies shared and preserve the nine adapters' parity. Do not commit actual trackers, queue items, credentials or runtime state as template content.
 
 Run the Quality Gate before review:
 

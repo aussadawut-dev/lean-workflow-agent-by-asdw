@@ -1,6 +1,6 @@
 # Agent policy router
 
-Lean Workflow Baseline 3.0.0. See `CHANGELOG.md` for changes and migration steps.
+Lean Workflow Baseline 3.2.0. See `CHANGELOG.md` for changes and migration steps.
 
 This directory contains operating rules and their self-checks. It is not application structure and prescribes no stack or primary provider. `AGENTS.md` is canonical; `CLAUDE.md` imports it. Shared procedures in `.claude/skills/` have Codex adapters in `.agents/skills/`.
 
@@ -8,11 +8,15 @@ This directory contains operating rules and their self-checks. It is not applica
 
 Use `/lean-init` or `python3 .lean/scripts/workflow.py configure standard|tracker|full`. Add `--execution direct|delegated` for execution routing. `show` reads the settings, including a missing-file fallback; `check` validates mode and records. Missing configuration means unconfigured standard/direct, and onboarding prompts for a mode. Do not infer a heavier mode or discard accepted choices.
 
+Explicit mode lowering uses `downgrade <lower-mode> --dry-run` and `--apply`; add `--keep-pending` only to acknowledge paused work. Active leases block every downgrade; active trackers also block standard. Preview keeps all files intact; apply preserves records/execution and locks/rechecks before updating config. See `policy/WORKFLOW.md`.
+
 - `standard`: session contract, tests, validation, review and gate.
 - `tracker`: standard plus one workset tracker per non-trivial task.
 - `full`: tracker plus local lease-backed queue ownership.
 
 Direct execution is the portable default; delegated execution uses the Controller/worker procedure. Repository mode, execution strategy, model choice and review depth are separate. Unix tools support macOS/Linux/WSL; native Windows is not supported. Claude hooks are provider-specific; Codex runs the gate explicitly.
+
+Queue cleanup uses `/clean-queue old` (DONE older than 30 days) or `/clean-queue all` (all DONE). Preview/apply are available through `clean-queue old|all --dry-run|--apply`; original records move into project-owned queue history, not deletion. Trackers and unfinished items remain. Undated legacy DONE items are skipped by old. See `policy/WORKFLOW.md`.
 
 ## Layout and ownership
 

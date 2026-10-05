@@ -3,8 +3,11 @@
 
 import argparse
 import contextlib
+from datetime import datetime, timezone
 import fcntl
+import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -47,6 +50,22 @@ def read_json(path):
         return json.load(source)
 
 
+def utc_now():
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def timestamp(value):
+    if not isinstance(value, str):
+        fail("timestamp must be an ISO 8601 string with timezone")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        fail("invalid ISO 8601 timestamp")
+    if parsed.tzinfo is None:
+        fail("timestamp requires a timezone")
+    return parsed.timestamp()
+
+
 def config(root):
     path = root / ".lean/config.json"
     value = read_json(path) if path.exists() else {"mode": "standard", "configured": False}
@@ -67,6 +86,11 @@ def mode_at_least(root, minimum):
 
 
 def configure(root, mode, execution=None):
+    with locked(root):
+        configure_locked(root, mode, execution)
+
+
+def configure_locked(root, mode, execution=None):
     current = config(root)
     if MODES.index(mode) < MODES.index(current["mode"]):
         fail("mode downgrade is not automatic; resolve existing tracking and claims first")
@@ -103,6 +127,8 @@ def configure(root, mode, execution=None):
                 if lines:
                     out.write("\n")
                 out.write("# Local workflow leases\n.agent-runtime/\n")
+    if MODES.index(mode) > MODES.index(current["mode"]):
+        validate_records(root, mode)
     current.update(mode=mode, configured=True, execution=execution or current["execution"])
     write_json(root / ".lean/config.json", current)
     print(f"mode: {mode}")
@@ -132,8 +158,8 @@ def unchecked_tracker_items(content):
 
 
 def tracker_command(root, args):
-    mode_at_least(root, "tracker")
     with locked(root):
+        mode_at_least(root, "tracker")
         if args.action == "new":
             if not TRACKER.fullmatch(args.id) or not args.title.strip():
                 fail("valid tracker id and title are required")
@@ -171,11 +197,42 @@ def tracker_command(root, args):
             print(f"tracker {args.id}: {args.status}")
 
 
+def queue_history(root):
+    """Read immutable DONE snapshots; never expire records or rewrite history."""
+    result = {}
+    for path in sorted((root / ".agents/queue/history").glob("*.json")):
+        record = read_json(path)
+        if (not ID.fullmatch(path.stem) or not isinstance(record, dict)
+                or record.get("version") != 1 or record.get("reason") not in ("old", "all")
+                or not isinstance(record.get("content"), str)
+                or not isinstance(record.get("sha256"), str)):
+            fail(f"invalid queue history: {path}")
+        timestamp(record.get("archived_at"))
+        if hashlib.sha256(record["content"].encode("utf-8")).hexdigest() != record["sha256"]:
+            fail(f"queue history checksum mismatch: {path.stem}")
+        item = json.loads(record["content"])
+        if not isinstance(item, dict) or item.get("id") != path.stem or item.get("status") != "DONE":
+            fail(f"queue history must retain its original DONE id: {path.stem}")
+        result[path.stem] = record
+    return result
+
+
 def items(root):
     directory = root / ".agents/queue/items"
-    result = {}
-    for path in sorted(directory.glob("*.json")) if directory.exists() else []:
+    history = queue_history(root)
+    sources = [(root / ".agents/queue/history" / (key + ".json"), json.loads(record["content"]))
+               for key, record in history.items()]
+    for path in sorted(directory.glob("*.json")):
         value = read_json(path)
+        if path.stem in history:
+            # A published archive is authoritative after an interrupted unlink.
+            # A different source with the same id is reuse/corruption, not recovery.
+            if path.read_bytes() != history[path.stem]["content"].encode("utf-8"):
+                fail(f"archived queue id reused or modified: {path.stem}")
+            continue
+        sources.append((path, value))
+    result = {}
+    for path, value in sources:
         item_id = value.get("id") if isinstance(value, dict) else None
         if not isinstance(item_id, str) or not ID.fullmatch(item_id) or path.name != f"{item_id}.json":
             fail(f"invalid queue item id: {path}")
@@ -188,6 +245,9 @@ def items(root):
         if not isinstance(value.get("tracker"), str) or not TRACKER.fullmatch(value["tracker"]):
             fail(f"invalid tracker: {item_id}")
         tracker_file(root, value["tracker"])
+        for field in ("created_at", "completed_at"):
+            if field in value:
+                timestamp(value[field])
         for field in ("dependencies", "scopes"):
             if not isinstance(value.get(field), list) or not all(isinstance(x, str) for x in value[field]):
                 fail(f"invalid {field}: {item_id}")
@@ -221,10 +281,68 @@ def items(root):
     return result
 
 
-def check(root):
-    current = config(root)
-    tracker_statuses = {}
-    if current["mode"] in ("tracker", "full"):
+def clean_queue(root, selection, apply=False):
+    with locked(root, read_only=not apply):
+        current = config(root)
+        history = queue_history(root)
+        directory = root / ".agents/queue/items"
+        if directory.exists() or history:
+            _, all_items, claims = validate_records(root, current["mode"], include_retained=True)
+        else:
+            all_items, claims = {}, active_claims(root, cleanup=False)
+            validate_claims(all_items, claims)
+        cutoff = time.time() - 30 * 86400
+        selected, resumed, unknown = [], [], []
+        for path in sorted(directory.glob("*.json")):
+            item_id = path.stem
+            item = all_items[item_id]
+            if item_id in history:
+                resumed.append(item_id)
+                continue
+            if item["status"] != "DONE":
+                continue
+            if selection == "old" and "completed_at" not in item:
+                unknown.append(item_id)
+                continue
+            if selection == "all" or timestamp(item["completed_at"]) < cutoff:
+                selected.append(item_id)
+        report = {"selection": selection, "older_than_days": 30 if selection == "old" else None,
+                  "selected": selected, "resumed": resumed, "unknown_age": unknown,
+                  "archived": [], "applied": apply}
+        # Per-item commit: publish and sync full snapshot before removing source.
+        # A failed batch can be retried; earlier snapshots remain valid history.
+        if apply:
+            for item_id in selected + resumed:
+                path = directory / (item_id + ".json")
+                if item_id in claims:
+                    fail(f"active claim blocks cleanup: {item_id}")
+                if item_id not in history:
+                    content = path.read_bytes().decode("utf-8")
+                    record = {"version": 1, "archived_at": utc_now(), "reason": selection,
+                              "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+                              "content": content}
+                    destination = root / ".agents/queue/history" / (item_id + ".json")
+                    write_json(destination, record)
+                destination = root / ".agents/queue/history" / (item_id + ".json")
+                # Sync recovery snapshots too: a prior attempt may have failed at fsync.
+                with destination.open("rb") as snapshot:
+                    os.fsync(snapshot.fileno())
+                for parent in (destination.parent, destination.parent.parent):
+                    descriptor = os.open(str(parent), os.O_RDONLY)
+                    try:
+                        os.fsync(descriptor)
+                    finally:
+                        os.close(descriptor)
+                path.unlink()
+                report["archived"].append(item_id)
+        print(json.dumps(report, indent=2))
+        return 0
+
+
+def validate_records(root, mode, include_retained=False):
+    """Read-only validation; callers hold the workflow lock when applying changes."""
+    tracker_statuses, all_items, claims = {}, {}, {}
+    if mode in ("tracker", "full") or include_retained:
         if ".agent-runtime/" not in (root / ".gitignore").read_text().splitlines():
             fail("runtime leases are not ignored by git")
         for path in (root / "docs/tracking/TEMPLATE.md", root / "docs/tracking/README.md"):
@@ -247,47 +365,103 @@ def check(root):
                     fail(f"DONE tracker without evidence: {path}")
                 if unchecked_tracker_items(content):
                     fail(f"DONE tracker has unchecked acceptance criteria or tasks: {path}")
-    if current["mode"] == "full":
-        if not (root / ".agents/queue/items").is_dir():
+    if mode == "full" or include_retained:
+        if mode == "full" and not (root / ".agents/queue/items").is_dir():
             fail("missing queue items directory")
-        if not (root / ".agents/queue/README.md").is_file():
+        if mode == "full" and not (root / ".agents/queue/README.md").is_file():
             fail("missing queue guide")
-        with locked(root):
-            all_items = items(root)
-            validate_claims(all_items, active_claims(root))
+        all_items = items(root)
+        claims = active_claims(root, cleanup=False)
+        validate_claims(all_items, claims)
         for tracker_id, status in tracker_statuses.items():
-            if status == "DONE":
+            if mode == "full" and status == "DONE":
                 linked = [item for item in all_items.values() if item["tracker"] == tracker_id]
                 if not linked or any(item["status"] != "DONE" for item in linked):
                     fail(f"DONE tracker has unfinished queue items: {tracker_id}")
+    return tracker_statuses, all_items, claims
+
+
+def check(root):
+    with locked(root, read_only=True):
+        current = config(root)
+        validate_records(root, current["mode"])
     print(f"workflow ok: {current['mode']}")
 
 
+def downgrade(root, target, apply=False, keep_pending=False):
+    with locked(root, read_only=not apply):
+        current = config(root)
+        if MODES.index(target) >= MODES.index(current["mode"]):
+            fail("downgrade target must be lower than the current mode")
+        trackers, queue, claims = validate_records(root, current["mode"], include_retained=True)
+        pending_queue = sorted(key for key, item in queue.items() if item["status"] != "DONE")
+        pending_trackers = sorted(key for key, state in trackers.items() if state != "DONE")
+        running = sorted(key for key, state in trackers.items()
+                         if state in ("IN_PROGRESS", "VALIDATING", "REVIEWING"))
+        blockers = []
+        if claims:
+            blockers.append("active claims must be released or completed: " + ", ".join(sorted(claims)))
+        if target == "standard" and running:
+            blockers.append("active trackers must be resolved: " + ", ".join(running))
+        if (pending_queue or (target == "standard" and pending_trackers)) and not keep_pending:
+            blockers.append("use --keep-pending to acknowledge preserved, paused work")
+        report = {"from": current["mode"], "to": target, "execution": current["execution"],
+                  "trackers": len(trackers), "queue_items": len(queue),
+                  "pending_queue": pending_queue, "pending_trackers": pending_trackers,
+                  "active_claims": sorted(claims),
+                  "expired_claims": sorted(path.stem for path in
+                      (root / ".agent-runtime/claims").glob("*.json") if path.stem not in claims),
+                  "blockers": blockers, "applied": False}
+        if apply and not blockers:
+            current.update(mode=target, configured=True)
+            write_json(root / ".lean/config.json", current)
+            report["applied"] = True
+        print(json.dumps(report, indent=2))
+        return 2 if blockers else 0
+
+
 @contextlib.contextmanager
-def locked(root):
+def locked(root, read_only=False):
     runtime = root / ".agent-runtime"
-    runtime.mkdir(exist_ok=True)
-    with (runtime / "queue.lock").open("a+") as lock:
+    path = runtime / "queue.lock"
+    if read_only and not path.exists():
+        # Preview is advisory; apply always acquires the lock and rechecks.
+        yield
+        return
+    if not read_only:
+        runtime.mkdir(exist_ok=True)
+    with path.open("r" if read_only else "a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         yield
 
 
-def active_claims(root):
+def validate_claim(path, claim):
+    expiry = claim.get("expires_at") if isinstance(claim, dict) else None
+    try:
+        valid_expiry = type(expiry) in (int, float) and math.isfinite(expiry)
+    except OverflowError:
+        valid_expiry = False
+    if (not isinstance(claim, dict) or not ID.fullmatch(path.stem)
+            or claim.get("id") != path.stem
+            or not isinstance(claim.get("agent"), str) or not claim["agent"].strip()
+            or not isinstance(claim.get("token"), str) or not claim["token"].strip()
+            or not isinstance(claim.get("request_id"), str)
+            or not REQUEST_ID.fullmatch(claim["request_id"])
+            or not valid_expiry):
+        fail(f"invalid claim file: {path}")
+
+
+def active_claims(root, cleanup=True):
     directory = root / ".agent-runtime/claims"
-    directory.mkdir(parents=True, exist_ok=True)
+    if cleanup:
+        directory.mkdir(parents=True, exist_ok=True)
     active = {}
     for path in directory.glob("*.json"):
         claim = read_json(path)
-        if (not isinstance(claim, dict) or not ID.fullmatch(path.stem)
-                or claim.get("id") != path.stem
-                or not isinstance(claim.get("agent"), str) or not claim["agent"]
-                or not isinstance(claim.get("token"), str) or not claim["token"]
-                or not isinstance(claim.get("request_id"), str)
-                or not REQUEST_ID.fullmatch(claim["request_id"])
-                or not isinstance(claim.get("expires_at"), (int, float))):
-            fail(f"invalid claim file: {path}")
+        validate_claim(path, claim)
         if claim.get("expires_at", 0) <= time.time():
-            path.unlink()
+            if cleanup:
+                path.unlink()
         else:
             active[path.stem] = claim
     return active
@@ -316,17 +490,27 @@ def owned_claim(root, item_id, token):
     if not path.exists():
         fail(f"no active claim for {item_id}")
     claim = read_json(path)
-    if not isinstance(claim, dict) or claim.get("id") != item_id:
-        fail(f"invalid claim file for {item_id}")
-    if (claim.get("token") != token or not isinstance(claim.get("expires_at"), (int, float))
-            or claim["expires_at"] <= time.time()):
+    validate_claim(path, claim)
+    if claim["token"] != token or claim["expires_at"] <= time.time():
         fail(f"invalid or expired claim for {item_id}")
     return path, claim
 
 
 def queue_command(root, args):
-    mode_at_least(root, "full")
-    with locked(root):
+    with locked(root, read_only=args.action == "history"):
+        if args.action == "history":
+            items(root)  # Validate original data, dependencies and IDs as well as metadata.
+            history = queue_history(root)
+            if args.id:
+                if args.id not in history:
+                    fail(f"no archived queue item: {args.id}")
+                print(json.dumps(history[args.id], indent=2))
+            else:
+                print(json.dumps({key: {"title": json.loads(value["content"])["title"],
+                                        "archived_at": value["archived_at"], "reason": value["reason"]}
+                                  for key, value in history.items()}, indent=2))
+            return
+        mode_at_least(root, "full")
         if args.action in ("heartbeat", "release", "complete"):
             path, claim = owned_claim(root, args.id, args.token)
             if args.action == "release":
@@ -361,16 +545,20 @@ def queue_command(root, args):
                 fail(f"unfinished dependencies: {args.id}")
             item["status"] = "DONE"
             item["evidence"] = args.evidence
+            item["completed_at"] = utc_now()
             write_json(item_path, item)
             path.unlink()
             print(f"completed: {args.id}")
             return
 
         all_items = items(root)
+        archived_ids = set(queue_history(root))
         claims = active_claims(root)
         if args.action == "list":
             validate_claims(all_items, claims)
             for item_id, item in all_items.items():
+                if item_id in archived_ids:
+                    continue
                 owner = claims.get(item_id, {}).get("agent", "-")
                 print(f"{item_id} {item['status']} {owner} {item['tracker']} {item['title']}")
             return
@@ -379,6 +567,7 @@ def queue_command(root, args):
                 fail("agent id is required")
             if not REQUEST_ID.fullmatch(args.request_id):
                 fail("request id must be a stable random identifier of at least eight characters")
+            occupied = validate_claims(all_items, claims)
             existing = [(item_id, claim) for item_id, claim in claims.items() if claim["agent"] == args.agent]
             if existing and len(existing) == 1 and existing[0][1]["request_id"] == args.request_id:
                 if args.action == "claim-next" or args.id == existing[0][0]:
@@ -386,7 +575,6 @@ def queue_command(root, args):
                     return
             if existing:
                 fail(f"agent already owns an active claim: {args.agent}")
-            occupied = validate_claims(all_items, claims)
             if args.action == "claim":
                 candidates = [(args.id, all_items[args.id])] if args.id in all_items else []
             else:
@@ -414,6 +602,17 @@ def main():
     setup = commands.add_parser("configure")
     setup.add_argument("mode", choices=MODES)
     setup.add_argument("--execution", choices=EXECUTIONS)
+    lower = commands.add_parser("downgrade")
+    lower.add_argument("mode", choices=MODES)
+    choice = lower.add_mutually_exclusive_group(required=True)
+    choice.add_argument("--dry-run", action="store_true")
+    choice.add_argument("--apply", action="store_true")
+    lower.add_argument("--keep-pending", action="store_true")
+    clean = commands.add_parser("clean-queue")
+    clean.add_argument("selection", choices=("old", "all"))
+    clean_choice = clean.add_mutually_exclusive_group(required=True)
+    clean_choice.add_argument("--dry-run", action="store_true")
+    clean_choice.add_argument("--apply", action="store_true")
     commands.add_parser("show")
     commands.add_parser("check")
     tracker = commands.add_parser("tracker")
@@ -428,6 +627,8 @@ def main():
     queue = commands.add_parser("queue")
     actions = queue.add_subparsers(dest="action", required=True)
     actions.add_parser("list")
+    history = actions.add_parser("history")
+    history.add_argument("--id")
     claim = actions.add_parser("claim-next")
     claim.add_argument("--agent", required=True)
     claim.add_argument("--request-id", required=True)
@@ -446,6 +647,10 @@ def main():
     try:
         if args.command == "configure":
             configure(root, args.mode, args.execution)
+        elif args.command == "downgrade":
+            return downgrade(root, args.mode, args.apply, args.keep_pending)
+        elif args.command == "clean-queue":
+            return clean_queue(root, args.selection, args.apply)
         elif args.command == "show":
             print(json.dumps(config(root)))
         elif args.command == "check":

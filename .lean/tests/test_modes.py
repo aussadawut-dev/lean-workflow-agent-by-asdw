@@ -66,6 +66,7 @@ class WorkflowModeTests(unittest.TestCase):
                 self.tracker_doc("TCK001-other.md")
                 result = self.run_cli("check", success=False)
                 self.assertIn("duplicate tracker", result.stderr)
+                (self.root / "docs/tracking/TCK001-other.md").unlink()
 
     def test_failed_tracker_status_is_supported(self):
         self.run_cli("configure", "tracker")
@@ -358,6 +359,72 @@ class WorkflowModeTests(unittest.TestCase):
             item["evidence"] = evidence
             path.write_text(json.dumps(item))
             self.run_cli("check", success=False)
+
+    def test_invalid_lease_expiry_is_rejected_without_mutation(self):
+        self.run_cli("configure", "full")
+        self.tracker_doc()
+        item_path = self.item("Q0001", ["area:api"])
+        claim = json.loads(self.run_cli("queue", "claim", "--id", "Q0001", "--agent", "one").stdout)
+        claim_path = self.root / ".agent-runtime/claims/Q0001.json"
+        original_item = item_path.read_bytes()
+        for expiry in (float("nan"), float("inf"), float("-inf"), True, 10 ** 400, None, "future"):
+            for command in ("check", "release", "heartbeat", "complete"):
+                with self.subTest(expiry=expiry, command=command):
+                    item_path.write_bytes(original_item)
+                    claim_path.write_text(json.dumps(dict(claim, expires_at=expiry)))
+                    before = claim_path.read_bytes(), item_path.read_bytes()
+                    args = ("check",) if command == "check" else (
+                        "queue", command, "--id", "Q0001", "--token", claim["token"])
+                    if command == "complete":
+                        args += ("--evidence", "tests passed")
+                    result = self.run_cli(*args, success=False)
+                    self.assertIn("invalid claim", result.stderr)
+                    self.assertNotIn("Traceback", result.stderr)
+                    self.assertEqual(before, (claim_path.read_bytes(), item_path.read_bytes()))
+
+    def test_token_operations_reject_malformed_owned_claim(self):
+        self.run_cli("configure", "full")
+        self.tracker_doc()
+        item_path = self.item("Q0001", ["area:api"])
+        claim = json.loads(self.run_cli("queue", "claim", "--id", "Q0001", "--agent", "one").stdout)
+        claim_path = self.root / ".agent-runtime/claims/Q0001.json"
+        original_item = item_path.read_bytes()
+        for field, value in (("agent", ""), ("agent", "   "), ("request_id", "bad"),
+                             ("request_id", None), ("token", ""), ("token", "   ")):
+            for command in ("release", "heartbeat", "complete"):
+                with self.subTest(field=field, command=command):
+                    item_path.write_bytes(original_item)
+                    claim_path.write_text(json.dumps(dict(claim, **{field: value})))
+                    before = claim_path.read_bytes(), item_path.read_bytes()
+                    args = ("queue", command, "--id", "Q0001", "--token", value if field == "token" else claim["token"])
+                    if command == "complete":
+                        args += ("--evidence", "tests passed")
+                    self.run_cli(*args, success=False)
+                    self.assertEqual(before, (claim_path.read_bytes(), item_path.read_bytes()))
+
+    def test_claim_receipt_retry_revalidates_active_claims(self):
+        self.run_cli("configure", "full")
+        self.tracker_doc()
+        item_path = self.item("Q0001", ["area:api"])
+        self.item("Q0002", ["area:web"])
+        self.run_cli("queue", "claim", "--id", "Q0001", "--agent", "one", "--request-id", "receipt-retry-001")
+        self.run_cli("queue", "claim", "--id", "Q0002", "--agent", "two")
+        claim_paths = sorted((self.root / ".agent-runtime/claims").glob("*.json"))
+        original_claims = [path.read_bytes() for path in claim_paths]
+        original = item_path.read_text()
+        for changes in ({"status": "DONE", "evidence": "passed"}, {"scopes": ["area:web"]}):
+            item_path.write_text(json.dumps(dict(json.loads(original), **changes)))
+            for action in ("claim", "claim-next"):
+                with self.subTest(changes=changes, action=action):
+                    before = item_path.read_bytes()
+                    args = ("queue", action, "--agent", "one", "--request-id", "receipt-retry-001")
+                    if action == "claim":
+                        args += ("--id", "Q0001")
+                    self.run_cli(*args, success=False)
+                    self.assertEqual(item_path.read_bytes(), before)
+                    self.assertEqual([path.read_bytes() for path in claim_paths], original_claims)
+        item_path.write_text(original)
+        self.run_cli("queue", "claim", "--id", "Q0001", "--agent", "one", "--request-id", "receipt-retry-001")
 
     def test_lost_claim_receipt_can_be_recovered_with_request_id(self):
         self.run_cli("configure", "full")

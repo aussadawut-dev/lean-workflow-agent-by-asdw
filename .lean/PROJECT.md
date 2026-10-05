@@ -6,7 +6,7 @@ Update it as the project takes shape. "Not defined" is not an error: it means th
 
 ## Purpose
 
-Lean Workflow Baseline: a repository template with a shared Claude/Codex contract that gives a project a quality-driven coding workflow. It contains workflow files only, no application code. Current version: 3.0.0 (see `.lean/CHANGELOG.md`).
+Lean Workflow Baseline: a repository template with a shared Claude/Codex contract that gives a project a quality-driven coding workflow. It contains workflow files only, no application code. Current version: 3.2.0 (see `.lean/CHANGELOG.md`).
 
 ## Architecture
 
@@ -15,7 +15,7 @@ Bash scripts, Python 3.9+ standard-library tooling, JSON configuration and Markd
 - `AGENTS.md` canonical shared agent contract; `CLAUDE.md` runtime entrypoint importing it. The active agent owns this task; no provider-specific primary is imposed.
 - `.lean/` the workflow: `policy/` rules (replaced on upgrade), `PROJECT.md` (project-owned), `CHANGELOG.md`, and `scripts/` + `tests/` self-checks.
 - `.claude/` Claude runtime: `settings.json`, hooks (`quality-gate.sh` on `Stop`, `session-start.sh` on `SessionStart`, which seeds the gate's state cache), skills (`lean-init`, `lean-task`, `lean-review`, `lean-gate`), `reviewer` subagent.
-- `.agents/skills/` eight Codex adapters to shared procedures. `.lean/config.json` ships unconfigured standard/direct; no task records are included. Mode tooling supports macOS/Linux/WSL through Unix fcntl.
+- `.agents/skills/` nine Codex adapters to shared procedures. `.lean/config.json` ships unconfigured standard/direct; no task records are included. Mode tooling supports macOS/Linux/WSL through Unix fcntl.
 - `.github/` GitHub platform only: `workflows/lean-workflow.yml` runs the self-checks in CI when workflow files change; `pull_request_template.md`.
 
 ## Commands

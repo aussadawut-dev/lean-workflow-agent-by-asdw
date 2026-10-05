@@ -4,6 +4,45 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
+## 3.2.0
+
+Queue-only cleanup with retained history. `/clean-queue old` archives DONE items completed
+strictly more than 30 days ago; `/clean-queue all` archives every DONE item. READY/BLOCKED
+items and trackers stay in place. The ninth shared procedure has a matching Codex adapter.
+
+- The CLI supports `clean-queue old|all --dry-run|--apply`, with read-only preview and shared
+  lock/revalidation for apply. No background cleanup or automatic commit/push.
+- New queue completions record `completed_at` in UTC. Existing undated DONE items remain
+  compatible: old reports/skips them, all can archive them. Never infer age from mtime.
+- Each history snapshot retains original JSON bytes (including custom fields), SHA-256,
+  archive timestamp and selection. Dependency and tracker validation resolve history;
+  queue list/claims exclude it. `queue history [--id QNNNN]` browses retained snapshots,
+  including after a mode downgrade. History is project-owned and has no expiry.
+- Archive publication and filesystem sync precede source deletion. Identical leftover source
+  copies are recovery state, not new work; retry finishes deletion. Changed duplicate IDs or
+  damaged history fail validation. Batches are recoverable per item, not all-or-nothing.
+- Update tooling, procedures/adapters and checks together before cleanup; old tools cannot
+  resolve archived dependencies. Stop old-version workers and retain history in version control.
+
+## 3.1.0
+
+Explicit, record-preserving mode downgrades: `full -> tracker`, `tracker -> standard`, and
+`full -> standard`. Use `downgrade <mode> --dry-run` for a read-only JSON report and `--apply`
+for an atomic configuration change. Both report blockers; exit 2 means refused or blocked.
+
+- Active leases block all downgrades. IN_PROGRESS, VALIDATING and REVIEWING trackers block
+  standard mode. `--keep-pending` explicitly acknowledges paused queue items and, when moving
+  to standard, PLANNED/BLOCKED/FAILED trackers. Records, IDs, evidence, expired leases,
+  execution routing and project config extensions remain intact. No automatic DONE or deletion.
+- Configure still refuses implicit downgrades. Upgrade validation checks retained records before
+  publishing the higher mode; a DONE tracker with unfinished queue items must be reconciled
+  before returning to full (reopen its tracker, or resolve its queue with real evidence).
+- Configure, downgrade and worker operations share the queue lock, and worker mode checks run
+  after acquiring it. Preview never creates a lock or expires claims; without an existing lock,
+  its snapshot is advisory. Apply always locks and rechecks the current state.
+- Templates still ship unconfigured standard/direct with no project records. Existing projects
+  need no config migration; update tooling, docs and tests together and run their actual gate.
+
 ## 3.0.0
 
 The reusable Claude/Codex extensions now ship in the template. This is a MAJOR because canonical authority, model/review policy and setup behavior change.
