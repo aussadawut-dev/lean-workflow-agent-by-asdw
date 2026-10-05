@@ -1,33 +1,21 @@
 # Contributing
 
-This repository is the Lean Workflow template itself: workflow files only, no application code.
-A change here reaches every project that upgrades, so it is held to the workflow's own bar.
+This repository is the workflow template, not an application. Changes reach downstream projects; keep them portable and backed by evidence.
 
-## Before opening a pull request
+Read `AGENTS.md` and `.lean/README.md` first. Update the canonical contract before adapters when shared instructions change. Keep Claude/Codex procedure bodies shared and preserve the eight adapters' parity. Do not commit actual trackers, queue items, credentials or runtime state as template content.
+
+Run the Quality Gate before review:
 
 ```sh
 shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh
 .lean/scripts/check-structure.sh
 .lean/tests/test-hooks.sh
+python3 .lean/scripts/workflow.py check
+python3 -m unittest discover -s .lean/tests -p 'test_*.py'
 ```
 
-Those are the Quality Gate commands in `.lean/PROJECT.md`, and CI runs the same three.
+New behavior needs meaningful tests. A bug fix demonstrates its regression test failing before the repair and passing afterward. Use temporary repositories for tests; do not initialize task records in this template to test modes. Run deterministic checks before semantic review and use independent review for HIGH depth.
 
-Then fill in the pull request template. It is the Result Contract; a workflow that asks every
-change for evidence should carry its own.
+Keep `.lean/README.md` and `.lean/CHANGELOG.md` versions synchronized. MAJOR changes rules, canonical authority or existing paths; describe migration before replacement. MINOR adds compatible capabilities/enforcement; PATCH clarifies wording. Preserve historical changelog entries. See `.lean/CUSTOMIZING.md` for project-owned files and imports/upgrades. Retain the workflow LICENSE notice when downstream users copy it.
 
-## Rules for changing the workflow
-
-- `CLAUDE.md` is canonical. Edit it first, then sync the fallback rules in `AGENTS.md`.
-- A new rule needs evidence that the current behavior fails without it — a real run, not a hunch.
-  The `1.4.0` entry in `.lean/CHANGELOG.md` is the pattern: five headless runs, then rules
-  *removed* because they were never read.
-- Prefer deleting a rule to adding one. Every line in here is loaded into someone's context.
-- A behavior change in a hook needs a case in `.lean/tests/test-hooks.sh`.
-- `.lean/policy/` is workflow-owned and replaced on upgrade. Project-specific rules belong in
-  `.lean/PROJECT.md`, which upgrades never touch.
-- Bump the version in `.lean/CHANGELOG.md` and `.lean/README.md`. The structure check fails if
-  either is missing it or the two disagree. `.lean/PROJECT.md` mentions the version too, but it
-  is project-owned and not checked, so keep it in step by hand.
-- MAJOR also covers moving paths an existing install depends on. Such an entry needs migration
-  steps, and they must say to run before the `Upgrading` steps, not after.
+Complete the PR Result Contract with checks, regression evidence, review round/coverage and unverified work. Passing checks do not substitute for semantic review or authorize publishing another project's data.

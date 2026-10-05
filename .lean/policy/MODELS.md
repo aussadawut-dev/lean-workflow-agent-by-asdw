@@ -1,30 +1,57 @@
-# Models
+# Models and effort
 
-Only rules an agent can act on belong here. An agent usually cannot change its own model or reasoning effort mid-session.
+Choose the least costly available model and effort likely to satisfy the Task Contract. Risk and
+quality set the required work and review depth; budget guides optional spend. Repository mode
+(`standard`, `tracker`, or `full`) does not change model selection. Do not pin provider model IDs in
+this portable policy.
 
-## What the agent controls
+## Starting point
 
-- **Subagent model** — when spawning a subagent, pick the model for the job:
-  - Fast/cheap model — mechanical, well-specified work: search, locating code, renames, formatting.
-  - Default model — normal implementation and review.
-  - Strongest model — `HIGH` risk review, or work that failed twice with the default.
-- **Its own depth of work** — more reading, more checks, a second review pass. Spend this only with a useful reason.
+| Work | Model capability | Effort |
+|---|---|---|
+| Mechanical, well-specified work (locate, rename, format) | Economical available model | Low |
+| Normal implementation or focused review | Current/default capable model | Medium |
+| Hard reasoning, conflicting evidence, or a complex security/data boundary | Capable model for that task | High when the added reasoning is useful |
 
-## What the user controls
+These are starting points for settings the agent can select. Use the current session settings when
+the runtime does not let the agent change them; do not interrupt routine work just to match the
+table. Use a supported effort level at or above the starting point when useful; if none is
+available, assess the result against the quality floor. Check the actual options exposed by Claude
+or Codex before selecting a subagent. `CHEAP` favors the least
+costly capable option, `BALANCED` uses the normal starting point, and `EXPENSIVE` permits more spend
+when justified; none removes tests, validation, or required review. If the quality floor cannot be
+met within the budget, report the constraint.
 
-The session model and effort setting. Recommend a change to the user in one line when:
+## Independent review
 
-- The same task failed validation or review twice for reasons that look like reasoning limits.
-- Risk is `HIGH` and the current model is a fast/cheap one.
-- The work is mechanical and a cheaper model would do.
+`HIGH` review depth requires an independent reviewer and the checks in `REVIEW.md`. Select the least
+costly reviewer capable of examining the boundary at that depth. A fresh context that receives the
+Task Contract and diff, without the author's reasoning, provides independence; the reviewer does
+not have to use a stronger model than the author. Raise its effort or model when the boundary is
+complex or review evidence shows a reasoning limit. Report when the review was not independent.
 
-Do not switch silently and do not stall waiting for an answer; continue with what is available.
+## Runtime control
 
-## Rules
+- Claude: the session model and effort follow the user's/runtime's settings. The `reviewer`
+  subagent has `model: inherit` and inherits session effort. Claude can override its model for one
+  invocation when supported. Raise reviewer effort only through a supported runtime control; do
+  not edit the shared subagent definition for one task.
+- Codex: follow the session settings for the main agent. For an independent review, use a subagent
+  or fresh session; set its model and reasoning effort only when the available tool supports them
+  and the choice has a reason. Otherwise use the available defaults.
+- Never claim to have changed the main session or a subagent setting unless the runtime confirms it.
+  If a desired setting is unavailable, use a capable available option. If none can meet the floor,
+  report `BLOCKED` with the limitation. Recommend a user-controlled session change only when the
+  current setting threatens the quality floor or repeated reasoning failure warrants it.
 
-- Do not use the strongest model by default.
-- Do not spend more effort merely because a task is long.
-- Escalate one step at a time and record the reason.
-- When `REVIEW.md`'s round cap fires, the report may recommend a stronger model for a further
-  round. It does not license taking that round unasked.
-- Never lower the quality floor to save budget.
+## Premium dispatch evidence
+
+Before selecting a premium model or initiating additional usage billing, record the required outcome, material constraints, cheaper available option considered and concrete task-specific evidence that it cannot meet acceptance/quality. Provider names and prices belong to runtime evidence, not portable rules. A HIGH label, preference or broad complexity claim is insufficient. Use a cheaper capable option when that evidence is absent; otherwise gather it or report the constraint. User authorization is still required for additional paid usage; a dispatch justification is not billing permission.
+
+## Escalation
+
+Classify a failure before changing model or effort. Repair implementation, missing context, tools,
+or permissions at their source. For a demonstrated reasoning limit, increase one supported effort
+level first if the model remains capable; then consider a stronger model if needed. Change one
+variable per retry, record the reason, and stop at the review round cap in `REVIEW.md`. Do not spend
+more merely because a task is long, and never lower the quality floor to save budget.

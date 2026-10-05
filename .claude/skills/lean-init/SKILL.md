@@ -1,17 +1,14 @@
 ---
 name: lean-init
-description: Fill in .lean/PROJECT.md from the real repository (purpose, architecture, commands, important paths, Quality Gate). Use when PROJECT.md still says "Not defined", after adding the workflow to an existing project, or when the project's commands or structure changed.
+description: Choose workflow mode and execution routing, then fill PROJECT.md from real repository facts.
 ---
 
-Update `.lean/PROJECT.md` to match the repository as it is now.
-
-1. Read `.lean/PROJECT.md`.
-2. Inspect the repository shallowly: root files, manifests and build files (whatever exists, e.g. `package.json`, `go.mod`, `pyproject.toml`, `Cargo.toml`, `Makefile`), CI config, top-level directories, existing READMEs.
-3. Fill each section only with facts you found. Leave "Not defined" where the repository has no convention. Do not invent architecture or commands.
-4. For each command you record, run it once if it is safe and fast, and note whether it works.
-5. Put the fast, deterministic checks that must pass before a task is DONE (typically lint, typecheck, unit tests) between the `gate:start` and `gate:end` markers, one per line. Leave the block empty if none exist yet.
-   Every gate command must exit non-zero when the check fails. Some tools only print problems and exit 0; wrap them, e.g. `test -z "$(gofmt -l .)"` instead of `gofmt -l .`. Verify by running the command once.
-6. Add area READMEs you found under Documentation routes.
-7. Show the user a short summary of what changed and what is still undefined.
+1. Read `AGENTS.md`, `.lean/PROJECT.md`, and `python3 .lean/scripts/workflow.py show`. Missing `.lean/config.json` means unconfigured `standard`/`direct`; do not fail merely because the file is absent.
+2. Reuse any user-selected mode/execution, including explicit `$ARGUMENTS`. Otherwise, for initial setup ask the user to choose `standard` (session evidence), `tracker` (workset documents) or `full` (tracker plus claim queue). Explain that `direct` is the execution default and `delegated` enables Controller/worker routing; do not infer a heavier mode or delegation from project size. No need to ask again about an accepted choice.
+3. Run `python3 .lean/scripts/workflow.py configure <mode>` and add `--execution delegated` or `--execution direct` for an explicit execution change. Omission preserves execution. Mode upgrades preserve documents; downgrades need a separate decision about records and active leases.
+4. Inspect root files, manifests, CI, top-level directories and existing READMEs. Fill PROJECT sections only with found facts; leave undefined conventions as such. Do not prescribe an application stack, install new dependencies or reuse credentials for discovery.
+5. Run each safe/fast command once and note the result. Put deterministic checks between PROJECT's gate markers, one command per line. Each command must preserve failures. For a formatter, use `command -v gofmt >/dev/null && output=$(gofmt -l .) && test -z "$output"` rather than relying only on printed output or masking a missing tool in a substitution. Verify the selected command.
+6. Record actual documentation routes. Tracker/full mode creates tracking support guides/templates; full also creates a queue guide. Preserve existing project documents and retain the workflow LICENSE/notice when importing into an existing project.
+7. Run `python3 .lean/scripts/workflow.py check`. Report chosen mode/execution, changed facts and remaining undefined fields. Do not create application tasks or queue items merely to initialize the workflow.
 
 $ARGUMENTS

@@ -10,31 +10,8 @@ cd "$(dirname "$0")/../.." || exit 1
 fail=0
 bad() { fail=$((fail + 1)); echo "FAIL $1"; }
 
-docs="$(find . -path ./.git -prune -o -name '*.md' -type f -print | sort)"
-
-# Repo-root references to workflow files, e.g. `.lean/policy/REVIEW.md`.
-for ref in $(printf '%s\n' "$docs" | xargs grep -hoE '\.(lean|claude)/[A-Za-z0-9_./-]+\.(md|sh|json)' | sort -u); do
-  [ -e "$ref" ] || bad "missing $ref"
-done
-
-# Router references relative to .lean/, e.g. `policy/REVIEW.md`.
-# shellcheck disable=SC2016 # literal backticks in the pattern
-while read -r ref; do
-  [ -e ".lean/$ref" ] || bad "missing .lean/$ref (from .lean/README.md)"
-done < <(grep -oE '`(policy/)?[A-Z]+\.md`' .lean/README.md | tr -d '`' | sort -u)
-
-# Sibling references inside policy files, e.g. `CONTRACTS.md`.
-for file in .lean/policy/*.md; do
-  # shellcheck disable=SC2016 # literal backticks in the pattern
-  while read -r ref; do
-    [ -e ".lean/policy/$ref" ] || bad "missing .lean/policy/$ref (from $file)"
-  done < <(grep -oE '`[A-Z]+\.md`' "$file" | tr -d '`' | sort -u)
-done
-
-# CLAUDE.md imports.
-while read -r ref; do
-  [ -e "$ref" ] || bad "missing import $ref (from CLAUDE.md)"
-done < <(grep -oE '^@[^ ]+' CLAUDE.md | cut -c2-)
+# Git-visible Markdown enumeration is NUL-safe and excludes ignored dependencies.
+python3 .lean/scripts/check_structure.py || bad "shared structure checks failed"
 
 # settings.json is valid and its hook scripts exist and are executable.
 if python3 -c 'import json,sys; json.load(open(sys.argv[1]))' .claude/settings.json 2>/dev/null; then
@@ -49,49 +26,6 @@ fi
 for script in .lean/scripts/*.sh .lean/tests/*.sh; do
   [ -f "$script" ] || continue
   [ -x "$script" ] || bad "not executable: $script"
-done
-
-# Skills and agents need name and description frontmatter.
-for file in .claude/skills/*/SKILL.md .claude/agents/*.md; do
-  [ -f "$file" ] || continue
-  head -1 "$file" | grep -q '^---$' || { bad "no frontmatter: $file"; continue; }
-  front="$(awk 'NR > 1 && /^---$/ { exit } NR > 1 { print }' "$file")"
-  printf '%s\n' "$front" | grep -q '^name: ' || bad "no name: $file"
-  printf '%s\n' "$front" | grep -q '^description: ' || bad "no description: $file"
-done
-
-# Skill name matches its directory.
-for file in .claude/skills/*/SKILL.md; do
-  [ -f "$file" ] || continue
-  dir="$(basename "$(dirname "$file")")"
-  grep -q "^name: $dir\$" "$file" || bad "skill name does not match directory: $file"
-done
-
-# The HIGH-review path names the model rule. `.lean/policy/MODELS.md` puts the
-# strongest model on `HIGH` risk review, but `.claude/agents/reviewer.md` ships
-# `model: inherit` -- deliberately, since pinned frontmatter breaks an install whose
-# plan lacks that model -- so the model is chosen only where the reviewer is spawned.
-# Through 2.2.0 no spawn site said so and the rule was a silent no-op: a session on a
-# weak model reviewed its own `HIGH` work at its own strength.
-#
-# The three spawn sites are read by path, and only while they still name the
-# `reviewer` subagent in that code-span form: a project that drops the subagent from
-# one of these files has nothing left here to enforce, and this script is a gate
-# command in every downstream install, so a false hit blocks every turn. The bare word
-# `reviewer` will not do as the guard -- it is ordinary domain vocabulary, so a project
-# that removed the bullet and writes about reviewers for any other reason would be
-# blocked on every turn by a rule it deliberately dropped.
-#
-# The anchor is the rule's phrase anywhere in the file, not on the spawn line: in
-# `/lean-review` the two are deliberately on different lines of wrapped prose. So it
-# catches the instruction being deleted, which is the regression that happened, and not
-# a file that keeps the phrase elsewhere while dropping the instruction.
-for file in CLAUDE.md .claude/skills/lean-task/SKILL.md .claude/skills/lean-review/SKILL.md; do
-  [ -f "$file" ] || continue
-  # shellcheck disable=SC2016 # literal backtick in the pattern
-  grep -q 'reviewer` subagent' "$file" || continue
-  grep -qi 'strongest model available' "$file" ||
-    bad "spawns the reviewer without the strongest-model rule from .lean/policy/MODELS.md: $file"
 done
 
 # The workflow version, in the two workflow-owned files that carry it. Both must be

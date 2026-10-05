@@ -148,8 +148,32 @@ esac
 
 # 14. Session hook is silent once Purpose is filled
 sed -i.bak 's/^Not defined yet\.$/A real project./' "$dir/.lean/PROJECT.md"
+echo '{"mode":"standard","configured":true}' > "$dir/.lean/config.json"
 out="$(CLAUDE_PROJECT_DIR="$dir" bash "$session")"
 if [ -z "$out" ]; then ok "session: silent when filled"; else bad "session: silent when filled (got: $out)"; fi
+
+# 15. Session hook seeds the gate cache.
+dir="$(fixture)"
+echo '{"mode":"standard","configured":false}' > "$dir/.lean/config.json"
+out="$(CLAUDE_PROJECT_DIR="$dir" bash "$session")"
+case "$out" in
+  *"choose standard, tracker, or full"*) ok "session: prompts for mode before initial setup" ;;
+  *) bad "session: prompts for mode before initial setup (got: $out)" ;;
+esac
+echo '{"mode":"tracker","configured":true}' > "$dir/.lean/config.json"
+out="$(CLAUDE_PROJECT_DIR="$dir" bash "$session")"
+case "$out" in
+  *"choose standard, tracker, or full"*) bad "session: no mode prompt after setup (got: $out)" ;;
+  *) ok "session: no mode prompt after setup" ;;
+esac
+
+# Missing config uses the same onboarding as unconfigured standard mode.
+dir="$(fixture)"
+out="$(CLAUDE_PROJECT_DIR="$dir" bash "$session")"
+case "$out" in
+  *"choose standard, tracker, or full"*) ok "session: prompts when config is missing" ;;
+  *) bad "session: prompts when config is missing (got: $out)" ;;
+esac
 
 # 15. Session hook seeds the gate cache.
 dir="$(fixture 'false')"

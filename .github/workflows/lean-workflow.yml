@@ -5,6 +5,7 @@ on:
     paths:
       - '.lean/**'
       - '.claude/**'
+      - '.agents/skills/**'
       - '.github/workflows/lean-workflow.yml'
       - '.github/pull_request_template.md'
       - 'CLAUDE.md'
@@ -16,6 +17,7 @@ on:
     paths:
       - '.lean/**'
       - '.claude/**'
+      - '.agents/skills/**'
       - '.github/workflows/lean-workflow.yml'
       - '.github/pull_request_template.md'
       - 'CLAUDE.md'
@@ -30,6 +32,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
       - name: ShellCheck
         run: shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh
 
@@ -38,3 +44,9 @@ jobs:
 
       - name: Hook tests
         run: .lean/tests/test-hooks.sh
+
+      - name: Mode configuration
+        run: python3 .lean/scripts/workflow.py check
+
+      - name: Workflow regression tests
+        run: python3 -m unittest discover -s .lean/tests -p 'test_*.py'

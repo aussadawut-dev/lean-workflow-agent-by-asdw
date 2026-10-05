@@ -1,0 +1,9 @@
+{
+  "id": "Q0001",
+  "tracker": "TCK001",
+  "title": "Bounded executable task",
+  "status": "READY",
+  "dependencies": [],
+  "scopes": ["area:example"],
+  "evidence": null
+}

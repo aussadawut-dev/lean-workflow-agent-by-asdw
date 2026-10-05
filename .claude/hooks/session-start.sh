@@ -6,9 +6,14 @@
 
 root="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 project="$root/.lean/PROJECT.md"
+config="$root/.lean/config.json"
 
 # Kept quiet on purpose: this hook's stdout becomes Claude's context.
 "$(dirname "$0")/quality-gate.sh" --seed >/dev/null 2>&1 || true
+
+if [ ! -f "$config" ] || grep -q '"configured"[[:space:]]*:[[:space:]]*false' "$config"; then
+  echo "Lean Workflow: choose standard, tracker, or full with /lean-init; direct execution is the default, delegated is optional."
+fi
 
 [ -f "$project" ] || exit 0
 

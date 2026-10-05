@@ -42,7 +42,7 @@ Review costs a full context each round, so the loop needs an end that is not the
 
 ## Independent reviewer
 
-For `HIGH` depth, use a separate reviewer (for Claude, the `reviewer` subagent; otherwise a subagent or a fresh session) that sees the diff and Task Contract, not the worker's reasoning. If none is available, do a separate review pass against the Review Contract and state in the result that review was not independent.
+For `HIGH` depth, use a separate reviewer (Claude's `reviewer` subagent; for Codex, a subagent or a fresh session) that sees the diff and Task Contract, not the worker's reasoning. Select its model and effort per `MODELS.md`; independence does not require a stronger model. If none is available, do a separate review pass against the Review Contract, state that it was not independent, and report `BLOCKED` until the required review can run.
 
 ## Reviewer rules
 

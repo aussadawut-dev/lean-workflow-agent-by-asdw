@@ -4,6 +4,25 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
+## 3.0.0
+
+The reusable Claude/Codex extensions now ship in the template. This is a MAJOR because canonical authority, model/review policy and setup behavior change.
+
+- AGENTS is the provider-neutral canonical contract; CLAUDE imports it. The project chooses ownership. Eight shared skills have eight Codex adapters, including init/gate parity. Scope/research/grill and Controller/worker procedures are portable; no product stack, primary provider or volatile model IDs ship.
+- Config separates standard/tracker/full modes from direct/delegated execution. The fresh template is unconfigured standard/direct and contains no trackers, queue items or runtime leases. Unix mode/claim tooling preserves existing records and rejects implicit downgrades. Missing config prompts setup rather than silently skipping onboarding.
+- Portable least-cost-capable model/effort selection replaces the historical strongest-reviewer mandate. Premium dispatch needs task-specific cheaper-option evidence; paid usage still requires authorization. HIGH independent review is mandatory even when a reviewer is unavailable (report BLOCKED).
+- Structural checks cover both entrypoint imports, active canonical HIGH-review/model routing, both skill trees, eight adapters and relative targets. Git-visible Markdown scanning handles whitespace and excludes ignored dependencies. Before repair, seven new structure regression checks failed against the previous guard.
+- Duplicate tracker IDs are rejected in tracker and full checks; FAILED is a valid tracker state. Before repair, duplicate-ID cases passed check and FAILED was rejected by the CLI; new regression tests demonstrate both. Mode/claim tests exercise temporary repositories, including stable request receipts, ownership and completion evidence.
+- Workflow notice is preserved under `.lean/LICENSE`; root project licenses need not be overwritten on import. Current customizing/upgrade guidance replaces project-specific historical extension notes. Merge-debris ignore patterns remain, with lease/Python runtime exclusions added. Support is macOS/Linux/WSL (Bash, Git, Python 3.9+, Unix fcntl); native Windows and hosted/live runtime discovery are not claimed from local tests.
+- CI runs ShellCheck, structure, hook tests, mode checks and Python regression tests. PROJECT gate matches these commands; application gates remain project-owned.
+- Independent review caught two additional regressions before release: the installed smoke test assumed the host still had unconfigured template defaults, and completion allowed an unfinished dependency added after claim. Regression tests first failed on both. Smoke fixtures now isolate reusable assets and preserve configured hosts/licenses/records; completion rechecks current dependencies without losing a refused claim, and DONE dependencies are validated by check.
+
+### Migrating from 2.x or local extensions
+
+Before replacement, preserve existing CLAUDE/AGENTS additions, PROJECT, config, settings, records and local extensions. Move shared CLAUDE rules to AGENTS; make CLAUDE import it while preserving runtime-specific additions. Compare customized entrypoints rather than overwriting them. Keep configured tracker/full mode and all work records. If config has no execution field, direct is the compatibility default; projects with accepted mandatory delegation explicitly select delegated. Do not import another project's tasks or reset existing config to this template's unconfigured file.
+
+Update shared skills and adapters, policy, hooks, tooling/templates/tests and workflow CI together; merge gitignore/settings and retain the workflow notice. Read CUSTOMIZING.md, fill actual project commands, run its Quality Gate and required independent review. Legacy CLAUDE authority is tolerated by the structure guard during migration; two competing contracts are not.
+
 ## 2.4.0
 
 The Quality Gate tells a missing tool apart from a failing check. Both block; only one of them is
@@ -317,18 +336,10 @@ Changes from dogfooding (a Go CLI, 5 headless runs). The Task Contract was never
 
 ## Upgrading
 
-Workflow files are separate from project files, so an upgrade replaces them without touching your code.
+Read the target release's migration entry first, especially when crossing a MAJOR. Current import/upgrade authority is documented in `.lean/CUSTOMIZING.md`; historical entries above describe the arrangements at that time.
 
-If you are crossing a MAJOR version, read that entry above and run its migration steps first. A
-MAJOR moves paths, so the files step 1 names may not exist yet under the names it uses.
-
-1. Replace `.lean/policy/`, `.lean/README.md`, `.lean/CHANGELOG.md`, `.lean/scripts/`, and `.lean/tests/`. Never replace `.lean/PROJECT.md`.
-2. Replace `.claude/hooks/`, `.claude/agents/reviewer.md`, and `.claude/skills/lean-*/`. Keep your own agents and skills.
-3. Replace `.github/workflows/lean-workflow.yml`, unless you deleted it. Take
-   `.github/pull_request_template.md` too if you want it; it is new in 2.0.0 and yours to edit
-   afterwards.
-4. In `CLAUDE.md`, replace everything above `## Project additions`. Keep your additions.
-5. Replace `AGENTS.md`, unless you edited it.
-6. Merge `.claude/settings.json` by hand if you changed it.
-7. Run `.lean/scripts/check-structure.sh` and `.lean/tests/test-hooks.sh`.
-8. Re-read the new `CHANGELOG.md` entry and confirm nothing in it is still outstanding.
+1. Preserve project-owned PROJECT/config, records, local extensions and entrypoint additions.
+2. Upgrade policy/router/changelog, all shared skills and Codex adapters, hooks/reviewer, templates, tooling and installed self-tests together.
+3. Merge settings/gitignore/CI rather than replacing project permissions or application checks. Retain `.lean/LICENSE` and existing project licenses.
+4. Reconcile canonical ownership and project overrides explicitly; never silently reset mode, execution or primary agent.
+5. Run the actual project Quality Gate and workflow tests that remain installed. Complete required review over the final delta before reporting DONE.

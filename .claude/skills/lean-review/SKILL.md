@@ -1,6 +1,6 @@
 ---
 name: lean-review
-description: Review the current change at the depth Lean Workflow requires. Uses the reviewer subagent for HIGH depth. Use after implementation and deterministic validation, or when the user asks for a review.
+description: Review the current change at the depth Lean Workflow requires. Uses an independent reviewer for HIGH depth. Use after implementation and deterministic validation, or when the user asks for a review.
 argument-hint: [diff range or scope]
 ---
 
@@ -12,12 +12,11 @@ Scope: $ARGUMENTS (default: uncommitted changes)
 4. Review:
    - `LOW` — self-check against acceptance criteria.
    - `MEDIUM` — focused diff review yourself.
-   - `HIGH` — spawn the `reviewer` subagent with the Task Contract and diff range only. Do not
-     pass your reasoning. Spawn it on the strongest model available to this session: the agent is
-     `model: inherit`, so without that the reviewer is only as strong as the session that wrote the
-     change, which is what `.lean/policy/MODELS.md` rules out for `HIGH`. If it did not run on the
-     strongest model available -- whether because the model could not be chosen or because none is
-     stronger -- name in the result which model reviewed.
+   - `HIGH` — use an independent reviewer: Claude's `reviewer` subagent, or a Codex subagent or
+     fresh session. Give it the Task Contract and diff range only, without your reasoning. Select
+     its model and effort by `.lean/policy/MODELS.md`; `model: inherit` is Claude's portable
+     default. If no independent reviewer is available, follow `.lean/policy/REVIEW.md` and report
+     `BLOCKED`.
 5. Act on the verdict under `Rounds` in `.lean/policy/REVIEW.md`, which bounds both branches:
    - `PASS` — the review is over; anything applied after it is a new contract.
    - `REWORK` — fix the findings, re-run validation, review again with delta context only. It caps
