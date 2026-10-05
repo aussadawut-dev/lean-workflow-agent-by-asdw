@@ -72,11 +72,54 @@ class StructureTests(unittest.TestCase):
         shutil.rmtree(self.root / ".agents/skills/clean-queue")
         self.assertIn("adapter", self.check(False))
 
+    def test_model_update_adapter_is_required(self):
+        shutil.rmtree(self.root / ".agents/skills/lean-model-update")
+        self.assertIn("adapter", self.check(False))
+
+    def test_model_update_adapter_must_link_shared_procedure(self):
+        path = self.root / ".agents/skills/lean-model-update/SKILL.md"
+        path.write_text(path.read_text().replace("../../../.claude/skills/lean-model-update/SKILL.md", "../../../.claude/skills/lean-task/SKILL.md"))
+        self.assertIn("adapter", self.check(False))
+
+    def test_compress_adapter_is_required(self):
+        shutil.rmtree(self.root / ".agents/skills/lean-compress")
+        self.assertIn("adapter", self.check(False))
+
+    def test_compress_adapter_must_link_canonical_procedure(self):
+        path = self.root / ".agents/skills/lean-compress/SKILL.md"
+        path.write_text(path.read_text().replace("../../../.claude/skills/lean-compress/SKILL.md", "../../../.claude/skills/lean-task/SKILL.md"))
+        self.assertIn("adapter", self.check(False))
+
     def test_empty_description_is_rejected(self):
         path = self.root / ".agents/skills/lean-task/SKILL.md"
         lines = ["description: " if line.startswith("description:") else line for line in path.read_text().splitlines()]
         path.write_text("\n".join(lines) + "\n")
         self.check(False)
+
+    def test_internal_commands_cannot_be_exposed(self):
+        for name in ("lean-scope", "lean-research", "lean-grill", "lean-review", "lean-gate", "lean-multi-agent"):
+            with self.subTest(name=name):
+                path = self.root / ".claude/skills" / name / "SKILL.md"
+                original = path.read_text()
+                path.write_text(original.replace("user-invocable: false", "user-invocable: true"))
+                self.assertIn("command visibility", self.check(False))
+                path.write_text(original)
+
+    def test_user_commands_cannot_be_hidden_or_lose_argument_hints(self):
+        for name in ("lean-init", "lean-task", "lean-model-update", "lean-compress", "clean-queue"):
+            with self.subTest(name=name):
+                path = self.root / ".claude/skills" / name / "SKILL.md"
+                original = path.read_text()
+                path.write_text(original.replace("user-invocable: true", "user-invocable: false"))
+                self.assertIn("command visibility", self.check(False))
+                path.write_text("\n".join(line for line in original.splitlines() if not line.startswith("argument-hint:")) + "\n")
+                self.assertIn("argument hint", self.check(False))
+                path.write_text(original)
+
+    def test_workflow_skills_must_remain_agent_invocable(self):
+        path = self.root / ".claude/skills/lean-scope/SKILL.md"
+        path.write_text(path.read_text().replace("user-invocable: false", "user-invocable: false\ndisable-model-invocation: true"))
+        self.assertIn("available to the agent", self.check(False))
 
 
 if __name__ == "__main__":

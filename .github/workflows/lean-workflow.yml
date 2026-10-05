@@ -48,5 +48,8 @@ jobs:
       - name: Mode configuration
         run: python3 .lean/scripts/workflow.py check
 
+      - name: Project model catalog
+        run: python3 .lean/scripts/model_catalog.py check
+
       - name: Workflow regression tests
         run: python3 -m unittest discover -s .lean/tests -p 'test_*.py'

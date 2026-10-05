@@ -18,6 +18,10 @@ Direct execution is the portable default; delegated execution uses the Controlle
 
 Queue cleanup uses `/clean-queue old` (DONE older than 30 days) or `/clean-queue all` (all DONE). Preview/apply are available through `clean-queue old|all --dry-run|--apply`; original records move into project-owned queue history, not deletion. Trackers and unfinished items remain. Undated legacy DONE items are skipped by old. See `policy/WORKFLOW.md`.
 
+Model research updates use `/lean-model-update codex|claude|all`. Preview is the default; explicitly approved apply updates an optional project-owned catalog and retains an ignored local catalog lock file. Session/global settings stay under runtime control. See `policy/MODELS.md`.
+
+Use `/lean-compress` for concise, clear workflow prose. It inventories and fully reads all authorized workflow files before compression, preserves rules/protected content, previews by default and edits only approved targets.
+
 ## Layout and ownership
 
 - `PROJECT.md` and `config.json`: project-owned facts, gate, mode and execution.

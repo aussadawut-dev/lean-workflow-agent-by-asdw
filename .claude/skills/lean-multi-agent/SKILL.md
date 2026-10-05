@@ -1,6 +1,7 @@
 ---
 name: lean-multi-agent
 description: Controller and worker delegation with bounded ownership, portable model selection, evidence and optional parallel work.
+user-invocable: false
 ---
 
 # Lean Multi-Agent
@@ -11,7 +12,7 @@ Read `AGENTS.md`, `.lean/PROJECT.md`, and use `python3 .lean/scripts/workflow.py
 
 1. Own the Task Contract, accepted scope, integration, validation, review coordination and final result. Create a workset before non-trivial work in `tracker` or `full`; `standard` and trivial work use session records. Reuse accepted decisions and never ask for approval already given.
 2. Define bounded assignments with acceptance checks, dependencies, allowed files and exclusive ownership. Delegate one ready task by default in delegated execution, including small tasks. Concurrent workers need independent scopes and explicit user intent for parallel work. Keep one Controller slot and respect runtime limits.
-3. Select the least costly capable model and supported effort by `.lean/policy/MODELS.md` using runtime options. Record requested and actually reported settings honestly. Require task-specific evidence that a cheaper option cannot meet the outcome and material constraints before selecting a premium model. A HIGH label or preference is not evidence; never authorize additional paid usage implicitly.
+3. Consult optional project catalog evidence alongside current runtime options; absent/stale entries do not justify an automatic refresh or a model substitution. Use `/lean-model-update` only for requested refreshes. Select the least costly capable model and supported effort by `.lean/policy/MODELS.md` using runtime options. Record requested and actually reported settings honestly. Require task-specific evidence that a cheaper option cannot meet the outcome and material constraints before selecting a premium model. A HIGH label or preference is not evidence; never authorize additional paid usage implicitly.
 4. Record each dispatch before the call. In `full`, create an item for independently claimable non-trivial tasks and assign its exact ID; the worker must claim before editing. Use identical scope labels for shared files; scopes are exact strings, not directory containment.
 5. Send contract, task ID, queue ID if needed, allowed files, checks, dependencies and handoff instructions. If delegation is required but unavailable, report BLOCKED; do not silently switch execution. Independent review remains required regardless of execution routing.
 6. For blockers, preserve partial work and record the prerequisite. In `full`, add a queued dependency while the claim is held or arrange release then set the item BLOCKED; release alone makes the item READY. Do not redispatch blocked work before its prerequisite is resolved.

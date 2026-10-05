@@ -1,6 +1,6 @@
 ---
 name: lean-review
-description: Codex adapter for the shared lean-review workflow procedure.
+description: Internal workflow procedure for the agent; Codex adapter for the shared lean-review workflow procedure.
 ---
 
 Read and follow the canonical procedure at [SKILL.md](../../../.claude/skills/lean-review/SKILL.md).

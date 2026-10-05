@@ -55,3 +55,18 @@ or permissions at their source. For a demonstrated reasoning limit, increase one
 level first if the model remains capable; then consider a stronger model if needed. Change one
 variable per retry, record the reason, and stop at the review round cap in `REVIEW.md`. Do not spend
 more merely because a task is long, and never lower the quality floor to save budget.
+
+## Project catalog refresh
+
+Use `/lean-model-update codex|claude|all` when a refresh is requested. It combines accepted scope,
+source-grounded research and decision grilling, then previews a versioned project catalog.
+An explicit apply updates catalog evidence only; it does not switch a session, rewrite global
+settings, authorize paid usage or change the shared reviewer definition.
+
+Consult the optional `.lean/model-catalog.json` alongside the current runtime's exposed options.
+Missing catalog leaves normal selection unchanged. Stale, retired or unknown-availability entries
+are not proof of eligibility; recheck the runtime and sources before selecting a replacement.
+Preserve explicit model choices and report an unavailable choice rather than silently replacing it.
+Provider IDs belong in project evidence, not this portable policy. Requested settings, observed
+availability and reported backend settings remain distinct. Premium evidence, budget, independent
+review and the quality floor still apply even to a newly documented model.

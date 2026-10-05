@@ -1,7 +1,11 @@
 ---
 name: clean-queue
 description: Archive completed queue items with /clean-queue old (completed over 30 days ago) or /clean-queue all (all DONE items). Preserve history and trackers.
+user-invocable: true
+argument-hint: "<old|all> [--preview]"
 ---
+
+Selection and options: $ARGUMENTS. Treat `--preview` as dry-run only; reject unknown options before running any archive operation.
 
 Read `AGENTS.md` and `.lean/README.md`. Use the project root for the commands below.
 

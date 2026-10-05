@@ -1,6 +1,7 @@
 ---
 name: lean-scope
 description: Draft a clear spec for non-trivial work, get user approval before implementation, and stop for approval when proposed changes leave the agreed scope.
+user-invocable: false
 ---
 
 # Lean Scope

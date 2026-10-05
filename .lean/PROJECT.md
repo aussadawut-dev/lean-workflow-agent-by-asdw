@@ -15,7 +15,7 @@ Bash scripts, Python 3.9+ standard-library tooling, JSON configuration and Markd
 - `AGENTS.md` canonical shared agent contract; `CLAUDE.md` runtime entrypoint importing it. The active agent owns this task; no provider-specific primary is imposed.
 - `.lean/` the workflow: `policy/` rules (replaced on upgrade), `PROJECT.md` (project-owned), `CHANGELOG.md`, and `scripts/` + `tests/` self-checks.
 - `.claude/` Claude runtime: `settings.json`, hooks (`quality-gate.sh` on `Stop`, `session-start.sh` on `SessionStart`, which seeds the gate's state cache), skills (`lean-init`, `lean-task`, `lean-review`, `lean-gate`), `reviewer` subagent.
-- `.agents/skills/` nine Codex adapters to shared procedures. `.lean/config.json` ships unconfigured standard/direct; no task records are included. Mode tooling supports macOS/Linux/WSL through Unix fcntl.
+- `.agents/skills/` eleven Codex adapters to shared procedures. `.lean/config.json` ships unconfigured standard/direct; no task records are included. Mode tooling supports macOS/Linux/WSL through Unix fcntl.
 - `.github/` GitHub platform only: `workflows/lean-workflow.yml` runs the self-checks in CI when workflow files change; `pull_request_template.md`.
 
 ## Commands
@@ -48,6 +48,7 @@ shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh
 .lean/scripts/check-structure.sh
 .lean/tests/test-hooks.sh
 python3 .lean/scripts/workflow.py check
+python3 .lean/scripts/model_catalog.py check
 python3 -m unittest discover -s .lean/tests -p 'test_*.py'
 ```
 <!-- gate:end -->

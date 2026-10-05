@@ -1,7 +1,7 @@
 ---
 name: lean-review
 description: Review the current change at the depth Lean Workflow requires. Uses an independent reviewer for HIGH depth. Use after implementation and deterministic validation, or when the user asks for a review.
-argument-hint: [diff range or scope]
+user-invocable: false
 ---
 
 Scope: $ARGUMENTS (default: uncommitted changes)

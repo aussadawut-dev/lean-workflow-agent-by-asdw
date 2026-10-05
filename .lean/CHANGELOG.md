@@ -6,6 +6,23 @@ was being bypassed -- the rule did not change, its enforcement did. PATCH clarif
 
 ## 3.2.0
 
+### User command entrypoints
+
+- Expose five Claude commands for users: init, task, model update, compression and queue cleanup. Keep six agent procedures available internally with `user-invocable: false`.
+- Document Codex skill invocation and its menu-visibility limitation; no custom-prompt installation. Add public argument hints and explicit preview-only queue arguments.
+
+### Clarity-preserving workflow compression
+
+- Add `/lean-compress` with a shared Claude/Codex procedure, complete-workflow read coverage, default preview and approved-scope prose edits. Preserve operational meaning, protected content, project additions and existing work; do not compress executable code or history.
+- Document usage and add adapter presence/target tests. Creating the skill does not compress the workflow.
+
+### Project model research tooling
+
+- Add `/lean-model-update codex|claude|all`, a shared scope/research/grill procedure and Codex adapter, plus offline catalog check/preview/apply tooling.
+- Preview is the default. Explicit proposal authorization updates only project evidence; runtime model settings, paid usage permissions and reviewer inheritance are unchanged.
+- Add fixture-based tests for evidence freshness, observed availability, proposal/base integrity, atomic failure recovery and adapter parity. Preserve optional project catalogs on import/upgrade; no live model catalog ships with the template.
+
+
 Queue-only cleanup with retained history. `/clean-queue old` archives DONE items completed
 strictly more than 30 days ago; `/clean-queue all` archives every DONE item. READY/BLOCKED
 items and trackers stay in place. The ninth shared procedure has a matching Codex adapter.

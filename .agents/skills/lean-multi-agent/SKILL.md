@@ -1,6 +1,6 @@
 ---
 name: lean-multi-agent
-description: Codex adapter for the shared lean-multi-agent workflow procedure.
+description: Internal workflow procedure for the agent; Codex adapter for the shared lean-multi-agent workflow procedure.
 ---
 
 Read and follow the canonical procedure at [SKILL.md](../../../.claude/skills/lean-multi-agent/SKILL.md).

@@ -1,6 +1,7 @@
 ---
 name: lean-gate
 description: Run the Lean Workflow Quality Gate and report whether the task can be DONE. Use before declaring a task complete, or when the user asks whether work is finished.
+user-invocable: false
 ---
 
 1. Read `.lean/policy/QUALITY.md`.

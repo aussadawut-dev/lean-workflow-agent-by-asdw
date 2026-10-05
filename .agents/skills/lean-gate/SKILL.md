@@ -1,6 +1,6 @@
 ---
 name: lean-gate
-description: Codex adapter for the shared lean-gate workflow procedure.
+description: Internal workflow procedure for the agent; Codex adapter for the shared lean-gate workflow procedure.
 ---
 
 Read and follow the canonical procedure at [SKILL.md](../../../.claude/skills/lean-gate/SKILL.md).

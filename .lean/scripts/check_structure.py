@@ -6,7 +6,8 @@ import sys
 from pathlib import Path
 
 REQUIRED_SKILLS = ("lean-init", "lean-task", "lean-review", "lean-gate", "lean-scope",
-                   "lean-research", "lean-grill", "lean-multi-agent", "clean-queue")
+                   "lean-research", "lean-grill", "lean-multi-agent", "clean-queue", "lean-model-update", "lean-compress")
+USER_COMMANDS = {"lean-init", "lean-task", "lean-model-update", "lean-compress", "clean-queue"}
 
 
 def check(root):
@@ -27,7 +28,7 @@ def check(root):
             content = path.read_text()
             for reference in set(re.findall(r"\.(?:lean|claude|agents)/[A-Za-z0-9_./-]+\.(?:md|sh|py|json)", content)):
                 # These paths are created by opting into full mode; examples are not items.
-                if reference.startswith(".agents/queue/"):
+                if reference.startswith(".agents/queue/") or reference == ".lean/model-catalog.json":
                     continue
                 if not (root / reference).exists():
                     bad(f"missing {reference} (from {name})")
@@ -71,7 +72,15 @@ def check(root):
             if not (root / tree / name / "SKILL.md").is_file():
                 bad(f"missing {'adapter' if tree.startswith('.agents') else 'skill'}: {tree}/{name}/SKILL.md")
         for path in sorted((root / tree).glob("*/SKILL.md")):
-            validate_frontmatter(path, path.parent.name, bad)
+            fields = validate_frontmatter(path, path.parent.name, bad)
+            if tree == ".claude/skills" and path.parent.name in REQUIRED_SKILLS:
+                expected_visibility = "true" if path.parent.name in USER_COMMANDS else "false"
+                if fields.get("user-invocable") != expected_visibility:
+                    bad(f"incorrect command visibility: {path.relative_to(root)}")
+                if path.parent.name in USER_COMMANDS and not fields.get("argument-hint"):
+                    bad(f"missing command argument hint: {path.relative_to(root)}")
+                if fields.get("disable-model-invocation") == "true":
+                    bad(f"workflow skill must remain available to the agent: {path.relative_to(root)}")
             if tree == ".agents/skills" and path.parent.name in REQUIRED_SKILLS:
                 expected = (root / ".claude/skills" / path.parent.name / "SKILL.md").resolve()
                 destinations = re.findall(r"\[[^\]]+\]\(([^)]+)\)", path.read_text())
@@ -94,7 +103,7 @@ def validate_frontmatter(path, expected_name, bad):
     match = re.match(r"\A---\n(.*?)\n---(?:\n|$)", content, re.DOTALL)
     if not match:
         bad(f"no closed frontmatter: {path}")
-        return
+        return {}
     fields = {}
     for name, value in re.findall(r"(?m)^([a-z-]+):[ \t]*(.*)$", match.group(1)):
         fields[name] = value.strip().strip("\"'")
@@ -103,6 +112,7 @@ def validate_frontmatter(path, expected_name, bad):
             bad(f"empty or missing {name}: {path}")
     if expected_name and fields.get("name") != expected_name:
         bad(f"skill name does not match directory: {path}")
+    return fields
 
 
 if __name__ == "__main__":

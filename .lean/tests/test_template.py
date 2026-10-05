@@ -14,7 +14,7 @@ def bootstrap(root):
     for name in set(listing.decode().split("\0")):
         source = ROOT / name
         reusable = name.startswith((".lean/", ".claude/", ".agents/skills/")) or name in ("AGENTS.md", "CLAUDE.md", ".gitignore")
-        project_owned = name in (".lean/config.json", ".lean/PROJECT.md")
+        project_owned = name in (".lean/config.json", ".lean/PROJECT.md", ".lean/model-catalog.json")
         if reusable and not project_owned and source.is_file():
             destination = root / name
             destination.parent.mkdir(parents=True, exist_ok=True)

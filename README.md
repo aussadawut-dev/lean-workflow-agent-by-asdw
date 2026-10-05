@@ -379,9 +379,9 @@ cd my-project
 git init
 ```
 
-Open the project in your coding agent and run `/lean-init`. It discovers actual project facts and commands, records the selected mode/execution, and helps fill `.lean/PROJECT.md`.
+Open the project in Claude Code and run `/lean-init`, or invoke `$lean-init` in Codex. It discovers actual project facts and commands, records the selected mode/execution, and helps fill `.lean/PROJECT.md`.
 
-Claude uses shared skills under `.claude/skills/`; Codex uses adapters under `.agents/skills/`. If your runtime does not discover slash commands, ask the agent to read the relevant `SKILL.md` and follow its procedure. Other agents can follow `AGENTS.md` and the shared procedures manually; runtime integrations are provided for Claude and Codex.
+Claude uses shared skills under `.claude/skills/`; Codex uses adapters under `.agents/skills/`. If your runtime does not discover skills, ask the agent to read the relevant `SKILL.md` and follow its procedure. Other agents can follow `AGENTS.md` and the shared procedures manually; runtime integrations are provided for Claude and Codex.
 
 ### Configure without an agent
 
@@ -435,6 +435,41 @@ python3 .lean/scripts/workflow.py queue release --id Q0001 --token 'TOKEN-FROM-R
 ```
 
 A lease lasts 30 minutes; renew it during long work. Use `queue complete --id Q0001 --token 'TOKEN-FROM-RECEIPT' --evidence 'ACTUAL-VALIDATION-EVIDENCE'` only after validation and required review. Completion rechecks dependencies and requires nonblank evidence; it cannot establish that an arbitrary evidence string is true. Synchronize the tracker after queue completion.
+
+### Keep workflow prose lean and clear
+
+Use `/lean-compress` to remove repetition and filler while preserving the same rules and practical meaning. The [shared procedure](.claude/skills/lean-compress/SKILL.md) works for Claude and through the Codex adapter. It uses clear, concise language and has no fixed compression ratio.
+
+```text
+/lean-compress workflow --preview
+/lean-compress README.md --preview
+/lean-compress README.md --apply
+```
+
+Preview is the default. `workflow` targets editable workflow prose; paths restrict which prose files may change. `--apply` requests changes within an approved scope. A matching approval is reused; a new scope or change to workflow behavior needs resolution before dependent edits. Reading a file never authorizes rewriting it.
+
+**Read every corner of the workflow before compressing.** Inventory and fully read the canonical contract, router/policies, project facts, all skills/resources/adapters, reviewer, hooks/settings, scripts/tests/templates, CI, README and history/ownership guidance. Record each file and revision in a coverage ledger. Large files must be read through EOF in chunks; listings, grep snippets, hashes and summaries do not establish coverage. An unread or inaccessible in-scope file blocks dependent compression. Exclude credentials, private settings, caches and runtime internals; report exclusions rather than claiming they were reviewed.
+
+Then map the original rules to the proposed wording: actor, trigger, prerequisites, action, ordering, limits, exceptions, evidence and failure behavior. Keep frontmatter, imports, headings/anchors, code/Mermaid, inline code, commands, links, paths, identifiers, numeric limits, versions, gate markers and license notices unchanged. Code, tests, configuration and project history are read for context and stay outside prose compression. Preserve accepted project additions and unrelated pending edits.
+
+Run preservation checks and the project Quality Gate, then review the actual diff at the required depth. Independent review is required for HIGH-risk areas; tests alone cannot prove preserved meaning. Report measured byte/word changes and any unread/unchanged targets. Do not claim token savings without measurement. This complete-read requirement applies to the compression audit, rather than changing context routing for ordinary tasks. The command does not publish changes or call a paid model API.
+
+### Refresh model research without switching models
+
+Use `/lean-model-update codex`, `/lean-model-update claude` or `/lean-model-update all` to follow scope → research → grill → preview. The shared skill checks official docs and exposed runtime choices. Its default result is a diff and proposal hash. It applies only an explicitly authorized proposal, then follows the task/review/gate workflow. It never changes session models, global configuration, billing permissions or the reviewer’s `inherit` setting.
+
+The optional `.lean/model-catalog.json` stores project-owned model/alias IDs, runtime version, efforts, lifecycle, source URLs/dates and observed availability. Public documentation alone means availability is unknown. Selected evidence older than 30 days blocks preview/apply; retained providers remain visible as stale. Missing catalog leaves normal model selection unchanged. The template ships no live catalog.
+
+The offline CLI consumes researched JSON candidates; it does not fetch models or perform inference. Read the [catalog format](.claude/skills/lean-model-update/references/catalog.md) before preparing a candidate. A provider refresh replaces that provider's complete model list, so review removals and aliases in the diff.
+
+```sh
+python3 .lean/scripts/model_catalog.py check
+python3 .lean/scripts/model_catalog.py preview --provider codex --candidate /path/to/candidate.json
+# Save the preview JSON report, review it, then apply only after authorization:
+python3 .lean/scripts/model_catalog.py apply --proposal /path/to/report.json --sha256 APPROVED_PROPOSAL_DIGEST
+```
+
+Preview/check write nothing. Apply rechecks the base and evidence under a lock, preserves other providers and custom catalog fields, and writes the catalog atomically. It also creates/retains an ignored `.agent-runtime/model-catalog.lock`, including when a locked apply is refused; it never modifies runtime model settings. A changed base requires a new preview; an identical retry leaves the catalog unchanged. The proposal digest checks content consistency, not the authenticity of research. CLI failures exit 2 and do not claim a refresh succeeded. Tests use synthetic fixtures without network or paid model calls.
 
 ### Clean completed queue items
 
@@ -519,7 +554,7 @@ Without an existing lock, preview is an advisory snapshot; apply always locks an
 
 ### One shared contract across agents
 
-[AGENTS.md](AGENTS.md) is canonical. [CLAUDE.md](CLAUDE.md) imports it, and nine Codex adapters reference the same shared skill procedures. No provider is the required primary agent; the active agent owns the task unless the project records a different Controller.
+[AGENTS.md](AGENTS.md) is canonical. [CLAUDE.md](CLAUDE.md) imports it, and eleven Codex adapters reference the same shared skill procedures. No provider is the required primary agent; the active agent owns the task unless the project records a different Controller.
 
 The contract requires acceptance evidence before reporting DONE, preserves an explicitly requested quality floor, and limits extra effort to work with a useful reason. Project-specific additions have dedicated sections so upgrades can preserve them.
 
@@ -557,19 +592,37 @@ Portable policy chooses the least costly available model and supported effort ca
 
 Premium dispatch requires concrete evidence that a cheaper available option cannot satisfy the task; additional paid usage still needs user authorization. Agents record requested and reported settings honestly and cannot claim a runtime change that was not confirmed.
 
-### Nine reusable procedures
+### Five commands for users
 
-| Skill | Purpose |
-|---|---|
-| `/lean-init` | Select mode/execution and discover project facts and commands. |
-| `/lean-scope` | Reuse approved scope or resolve new/expanded scope. |
-| `/lean-research` | Compare alternatives with traceable evidence. |
-| `/lean-grill` | Resolve material decisions and high-risk boundaries. |
-| `/lean-task` | Coordinate contract, implementation, tests, validation and review. |
-| `/lean-review` | Review the shipping delta at the required depth. |
-| `/lean-gate` | Verify completion evidence and report the result. |
-| `/lean-multi-agent` | Coordinate worker ownership, dispatch, claims and handoff. |
-| `/clean-queue old` / `/clean-queue all` | Archive completed queue items while retaining history. |
+Start ordinary work with `lean-task`; the agent handles scope, research, material decisions, implementation, review and completion checks as needed. It asks for unresolved material decisions or new scope approval, and preserves accepted decisions. You do not need to run each internal step yourself.
+
+| Purpose | Claude Code | Codex skill invocation |
+|---|---|---|
+| Set up mode and execution | `/lean-init [standard\|tracker\|full] [--execution direct\|delegated]` | `$lean-init` with the same arguments |
+| Start a task | `/lean-task <task description>` | `$lean-task <task description>` |
+| Research a model catalog refresh | `/lean-model-update [codex\|claude\|all]` | `$lean-model-update` with the same arguments |
+| Audit and shorten workflow prose | `/lean-compress [workflow\|PATH...] [--preview\|--apply]` | `$lean-compress` with the same arguments |
+| Archive completed queue items | `/clean-queue <old\|all> [--preview]` | `$clean-queue` with the same arguments |
+
+For example:
+
+```text
+# Claude Code
+/lean-task Add a regression test and fix the queue lease bug
+/lean-compress workflow --preview
+/clean-queue old --preview
+
+# Codex
+$lean-task Add a regression test and fix the queue lease bug
+$lean-compress workflow --preview
+$clean-queue old --preview
+```
+
+Claude Code exposes these five skills as slash commands. Six internal procedures (`lean-scope`, `lean-research`, `lean-grill`, `lean-review`, `lean-gate`, `lean-multi-agent`) use `user-invocable: false`: hidden from its slash menu, but available for the agent to invoke. They remain shared procedures with Codex adapters.
+
+In Codex CLI/IDE, select skills through `/skills` or mention them with `$`; use the available skill picker in Desktop. Codex has no documented equivalent of Claude's `user-invocable: false` for hiding only manual invocation, so internal adapters remain discoverable and are labeled as internal. Do not disable their implicit invocation: the agent needs them. Examples elsewhere using `/name` describe Claude syntax; use the corresponding Codex skill invocation. No deprecated custom prompts or global installation are required. See [Claude skill invocation](https://code.claude.com/docs/en/skills) and [Codex skill invocation](https://learn.chatgpt.com/docs/build-skills).
+
+Model refresh and compression still preview by default; applying a catalog proposal or compression requires its existing authorization checks. Queue cleanup with `old` or `all` authorizes archiving DONE items; `--preview` only shows the selection. Missing queue selection requires a choice. Command visibility grants no extra permissions, paid usage or Git publishing.
 
 ### Runtime integration and limits
 
@@ -596,7 +649,7 @@ CLAUDE.md                  Claude entrypoint importing the contract
   scripts/                 Mode/lease tooling and structure checks
   tests/                   Workflow behavior and regression tests
 .claude/                   Shared skills, Claude hooks/settings/reviewer
-.agents/skills/            Nine Codex adapters
+.agents/skills/            Eleven Codex adapters
 .github/                   Workflow CI and PR Result Contract template
 ```
 
@@ -619,6 +672,7 @@ shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh
 .lean/scripts/check-structure.sh
 .lean/tests/test-hooks.sh
 python3 .lean/scripts/workflow.py check
+python3 .lean/scripts/model_catalog.py check
 python3 -m unittest discover -s .lean/tests -p 'test_*.py'
 ```
 

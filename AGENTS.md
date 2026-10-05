@@ -35,7 +35,7 @@ Explicit user instructions take precedence. The active agent owns the task unles
 ## Workflow procedures
 
 Shared procedures under `.claude/skills/` have thin Codex adapters under `.agents/skills/`:
-`lean-init`, `lean-scope`, `lean-research`, `lean-grill`, `lean-task`, `lean-review`, `lean-gate`, `lean-multi-agent`, `clean-queue`.
+`lean-init`, `lean-scope`, `lean-research`, `lean-grill`, `lean-task`, `lean-review`, `lean-gate`, `lean-multi-agent`, `clean-queue`, `lean-model-update`, `lean-compress`.
 Use accepted scope and decisions; routine execution within approved scope needs no repeated approval. Scope changes and unresolved material decisions need the user's input before dependent work.
 
 ## Policy router

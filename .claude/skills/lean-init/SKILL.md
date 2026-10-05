@@ -1,6 +1,8 @@
 ---
 name: lean-init
 description: Choose workflow mode and execution routing, then fill PROJECT.md from real repository facts.
+user-invocable: true
+argument-hint: "[standard|tracker|full] [--execution direct|delegated]"
 ---
 
 1. Read `AGENTS.md`, `.lean/PROJECT.md`, and `python3 .lean/scripts/workflow.py show`. Missing `.lean/config.json` means unconfigured `standard`/`direct`; do not fail merely because the file is absent.

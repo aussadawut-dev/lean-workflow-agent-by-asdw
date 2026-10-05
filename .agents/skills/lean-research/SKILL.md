@@ -1,6 +1,6 @@
 ---
 name: lean-research
-description: Codex adapter for the shared lean-research workflow procedure.
+description: Internal workflow procedure for the agent; Codex adapter for the shared lean-research workflow procedure.
 ---
 
 Read and follow the canonical procedure at [SKILL.md](../../../.claude/skills/lean-research/SKILL.md).
