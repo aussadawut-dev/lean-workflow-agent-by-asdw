@@ -23,6 +23,206 @@ Execution is a separate choice:
 
 Delegated execution requires available worker tooling. Parallel workers additionally require explicit user intent, independent tasks and exclusive file ownership. Independent HIGH-depth review is required with either execution setting.
 
+## Sequence diagrams
+
+These diagrams describe the workflow, not an automatic scheduler. The active agent owns the task; it becomes the Controller when delegating. Modes add records independently of execution and review depth. A worker is used when execution is `delegated` or workers are explicitly requested. HIGH-depth review needs a fresh independent reviewer even in `direct` execution.
+
+### Level 0: complete workflow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Agent as Active agent / Controller
+    participant Rules as Project contract and configuration
+    participant Work as Implementation and tests
+    participant Review as Review at required depth
+    participant Gate as Quality Gate and records
+
+    User->>Agent: Request work and acceptance outcome
+    Agent->>Rules: Read AGENTS, policy router, project facts and mode/execution
+    Rules-->>Agent: Scope rules, commands and configured routing
+    Agent-->>User: State Task Contract before changes
+    opt Material scope or decision remains unresolved
+        Agent->>User: Resolve decision before dependent work
+        User-->>Agent: Accepted scope / decision
+    end
+    opt Non-trivial task in tracker or full mode
+        Agent->>Gate: Create workset, full also creates queue items
+    end
+    Agent->>Work: Implement directly or dispatch a bounded worker
+    Note over Agent,Work: Full-mode scope edits require ownership before editing
+    opt Bug fix
+        Work->>Work: Demonstrate regression test fails before fix
+    end
+    Work->>Work: Make changes and run meaningful applicable tests
+    Work-->>Agent: Diff, evidence and integration risks
+    Agent->>Gate: Run deterministic project validation
+    Gate-->>Agent: Check results
+    alt Validation passes
+        Agent->>Review: Review Task Contract and shipping diff
+        Note over Agent,Review: Depth is the deeper of risk and quality floor, HIGH is independent
+        Review-->>Agent: PASS or REWORK with concrete findings
+        opt REWORK within bounded review cycle
+            Agent->>Work: Repair findings, revalidate and resubmit for review
+        end
+        Agent->>Gate: Verify acceptance, tests, final review coverage and records
+        Note over Agent,Gate: Full: complete owned queue items with evidence, then synchronize tracker
+        Gate-->>Agent: Completion conditions satisfied or missing
+        alt Final review PASS and all completion conditions satisfied
+            Agent-->>User: DONE with evidence and any stated limits
+        else Required evidence, tooling or review missing
+            Agent-->>User: BLOCKED or FAILED with cause and next step
+        end
+    else Validation fails or cannot run
+        Agent->>Agent: Repair task-caused failures and rerun, preserve unrelated failures
+        Agent-->>User: BLOCKED / FAILED if unresolved, with evidence
+    end
+    opt User explicitly requests queue cleanup
+        Agent->>Gate: Preview, then lock and archive selected DONE items
+        Gate-->>Agent: Preserved history and cleanup result
+        Agent-->>User: Report archived items and any partial progress
+    end
+```
+
+A PASS ends its review cycle. After the second REWORK, only one final repair/review pass is allowed; another REWORK reports BLOCKED. Changes after PASS open a new contract. Commit, push and merge are separate actions performed when requested.
+
+### Codex: Controller, worker and independent reviewer
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Controller as Codex Controller
+    participant Runtime as Codex subagent runtime
+    participant Worker as Worker subagent
+    participant Queue as Local queue / tracker
+    participant Reviewer as Independent reviewer
+    participant Checks as Project checks and Quality Gate
+
+    User->>Controller: Request task
+    Controller->>Controller: Read shared rules, set contract, scope and routing
+    opt Tracker/full and non-trivial work
+        Controller->>Queue: Create workset and full-mode task items
+    end
+    Controller->>Controller: Select capable model/effort and record dispatch
+    Controller->>Runtime: Spawn bounded worker with files, checks and handoff instructions
+    Note over Controller,Runtime: Delegation unavailable when required means BLOCKED
+    Runtime->>Worker: Deliver assignment and runtime identity
+    opt Full mode ownership
+        Worker->>Queue: Claim exact item with stable random request ID
+        Queue-->>Worker: Token, scope ownership and lease expiry
+    end
+    Worker->>Worker: Edit assigned files, bug tests fail before / pass after fix
+    opt Long-running full-mode work
+        Worker->>Queue: Heartbeat owned lease before expiry
+    end
+    alt Worker blocked
+        Worker-->>Controller: Cause, prerequisite, partial diff and task ID
+        Controller->>Queue: Record blocker/dependency when applicable
+        Worker->>Queue: Release owned claim when applicable
+        Controller-->>User: BLOCKED with preserved progress
+    else Worker returns completed implementation
+        Worker-->>Controller: Changed files, concrete test evidence and risks
+        Controller->>Checks: Verify evidence and run integrated deterministic checks
+        Checks-->>Controller: Results
+        opt Checks pass and HIGH review depth is required
+            Controller->>Runtime: Spawn fresh reviewer with contract and shipping diff
+            Note over Runtime,Reviewer: Do not include the author's reasoning
+            Runtime->>Reviewer: Independent review assignment
+            Reviewer-->>Controller: PASS / REWORK, findings and scope
+        end
+        Note over Controller,Checks: Other depths use the required review, REWORK returns to bounded repair and validation
+        opt Validation and required review pass in full mode
+            Controller->>Worker: Finalize owned queue item with verified evidence
+            Worker->>Queue: Complete using token, remove active lease
+            Queue-->>Controller: Queue completion status
+        end
+        Controller->>Queue: Synchronize evidence and current status in enabled records
+        Controller->>Checks: Explicitly run /lean-gate completion procedure
+        Checks-->>Controller: Gate commands and completion evidence results
+        Controller->>Queue: Synchronize enabled records, DONE only if all conditions hold
+        Controller-->>User: DONE, BLOCKED or FAILED with evidence
+    end
+```
+
+Codex uses the adapters in `.agents/skills/` to follow shared procedures. Claude's hook settings do not run Codex checks. Worker completion alone never completes the workset. Concurrent workers require explicit parallel intent, independent tasks and exclusive file ownership; the diagram shows the default single worker.
+
+### Claude: Controller, worker, reviewer and hooks
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Runtime as Claude runtime
+    participant Hooks as SessionStart / Stop hooks
+    participant Controller as Claude Controller
+    participant Worker as Worker subagent
+    participant Queue as Local queue / tracker
+    participant Reviewer as reviewer subagent
+    participant Checks as Project checks and Quality Gate
+
+    Runtime->>Hooks: SessionStart event
+    Hooks->>Hooks: Read onboarding state and seed gate baseline
+    Hooks-->>Runtime: Setup guidance when needed, preserve prior gate refusal
+    User->>Controller: Request task
+    Controller->>Controller: Read CLAUDE import of AGENTS, project facts and routing
+    Controller-->>User: Task Contract before changes
+    opt Tracker/full and non-trivial work
+        Controller->>Queue: Create workset and full-mode task items
+    end
+    Controller->>Controller: Select capable model/effort and record dispatch
+    Controller->>Runtime: Dispatch bounded worker through available subagent tooling
+    Note over Controller,Runtime: Delegation unavailable when required means BLOCKED
+    Runtime->>Worker: Assigned files, acceptance checks and handoff instructions
+    opt Full mode ownership
+        Worker->>Queue: Claim exact item with stable request ID
+        Queue-->>Worker: Token and lease expiry
+    end
+    Worker->>Worker: Implement and test, show fail-before/pass-after for bugs
+    opt Long-running full-mode work
+        Worker->>Queue: Heartbeat owned lease before expiry
+    end
+    alt Worker blocked
+        Worker-->>Controller: Cause, prerequisite, partial diff and task ID
+        Controller->>Queue: Record blocker/dependency when applicable
+        Worker->>Queue: Release owned claim when applicable
+        Controller-->>User: BLOCKED with preserved progress
+    else Worker returns completed implementation
+        Worker-->>Controller: Diff, check evidence and integration risks
+        Controller->>Checks: Run integrated deterministic validation
+        Checks-->>Controller: Results
+        opt Validation passes and HIGH review depth is required
+            Controller->>Runtime: Dispatch reviewer with contract and shipping diff
+            Runtime->>Reviewer: Fresh review context without author's reasoning
+            Note over Runtime,Reviewer: Repository reviewer defaults to inherited model and effort
+            Reviewer-->>Controller: PASS / REWORK, findings and scope
+        end
+        Note over Controller,Checks: Other depths still require review, REWORK follows bounded repair and revalidation
+        opt Validation and required review pass in full mode
+            Controller->>Worker: Finalize owned queue item with verified evidence
+            Worker->>Queue: Complete using token, remove active lease
+        end
+        Controller->>Queue: Synchronize enabled records with evidence and current status
+        Controller->>Checks: Run /lean-gate commands and verify all completion conditions
+        Checks-->>Controller: Gate results and evidence assessment
+        Controller->>Queue: Synchronize final status, DONE only if every condition holds
+        Controller->>Runtime: Attempt to finish turn
+        Runtime->>Hooks: Stop event
+        Hooks->>Checks: Run configured gate commands if repository state needs checks
+        Note over Hooks,Checks: Unchanged cached state can skip checks, an outstanding refusal prevents cache skip
+        Checks-->>Hooks: Pass, fail or missing tool
+        alt Hook checks pass or valid unchanged-state skip
+            Hooks-->>Runtime: Allow turn to finish
+            Controller-->>User: Result with evidence, report BLOCKED / FAILED if conditions are missing
+        else Gate command fails or cannot run
+            Hooks-->>Runtime: Exit 2, block finishing and return evidence
+            Runtime-->>Controller: Continue with gate result
+            Controller->>Controller: Repair task-caused failures and revalidate/review changed diff
+            Controller-->>User: BLOCKED / FAILED if unresolved
+        end
+    end
+```
+
+Claude's Stop hook enforces deterministic gate commands; it does not prove acceptance evidence, review independence or tracker/queue synchronization. The Controller must verify those conditions. The hook avoids recursively blocking a continuation already marked `stop_hook_active`; that guard does not authorize declaring DONE after a failed gate.
+
 ## Getting started
 
 ### Requirements
