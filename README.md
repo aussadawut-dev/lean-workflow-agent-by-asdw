@@ -223,6 +223,137 @@ sequenceDiagram
 
 Claude's Stop hook enforces deterministic gate commands; it does not prove acceptance evidence, review independence or tracker/queue synchronization. The Controller must verify those conditions. The hook avoids recursively blocking a continuation already marked `stop_hook_active`; that guard does not authorize declaring DONE after a failed gate.
 
+### Codex: model and reasoning-effort selection
+
+Model selection follows [.lean/policy/MODELS.md](.lean/policy/MODELS.md), independently of repository mode. The main agent follows the session settings. For dispatches that the runtime can configure, start with an economical model / low effort for mechanical work, the current/default capable model / medium effort for normal implementation or focused review, and a capable model / useful high effort for hard reasoning. Budget guides optional spend and never lowers the quality floor.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Agent as Codex active agent / Controller
+    participant Policy as Task Contract and MODELS policy
+    participant Runtime as Session and subagent runtime
+    participant Record as Session evidence / tracker
+    participant Subagent as Worker or independent reviewer
+
+    User->>Agent: Task, constraints and any explicit model preference
+    Agent->>Policy: Determine capability, effort starting point, quality and budget
+    Policy-->>Agent: Least costly capable option, required review depth and guards
+    Agent->>Runtime: Inspect session settings and supported dispatch options
+    Runtime-->>Agent: Available model/effort controls and observable metadata
+    Agent->>Agent: Use current session settings for main-agent work
+    Note over Agent,Runtime: Do not claim to change the main session without runtime confirmation
+    opt A worker or independent reviewer is needed
+        Agent->>Agent: Choose least costly capable model and supported effort
+        Note over Agent,Subagent: HIGH review requires independence, not a stronger model
+        alt Supported controls and a justified selection are available
+            Agent->>Agent: Prepare supported model/effort settings for dispatch
+        else Selection controls unavailable
+            Agent->>Agent: Use capable available defaults or inherited settings
+        end
+        opt Premium model is considered
+            Agent->>Record: Record outcome, material constraints and cheaper-option evidence
+            alt No concrete evidence that a cheaper option is insufficient
+                Agent->>Agent: Use cheaper capable option, gather evidence or report constraint
+            else Concrete evidence supports premium selection
+                Agent->>Agent: Apply capability and budget requirements
+                opt Additional paid usage would be initiated
+                    Agent->>User: Request authorization for additional paid usage
+                    User-->>Agent: Authorize or decline
+                end
+            end
+        end
+        Note over Agent,Subagent: Dispatch only if capability and any required billing authorization hold, otherwise BLOCKED
+        Agent->>Record: Record assignment, requested settings and task-specific reason before call
+        Agent->>Runtime: Dispatch bounded worker or fresh independent reviewer
+        Runtime->>Subagent: Assignment with supported settings or runtime defaults
+        Runtime-->>Agent: Agent identity and reported settings if exposed
+        Agent->>Record: Record reported settings, use unavailable for unexposed metadata
+        Subagent-->>Agent: Diff/evidence or review verdict and findings
+        opt Work fails or evidence shows quality floor is unmet
+            Agent->>Agent: Classify implementation, context, tools, permissions or reasoning failure
+            alt Cause is implementation, missing context, tools or permissions
+                Agent->>Agent: Repair the cause rather than changing model
+            else Demonstrated reasoning limit
+                Agent->>Agent: Raise one supported effort level first if model remains capable
+                Agent->>Agent: Consider stronger model only if still needed, reapply selection guards
+            end
+            Agent->>Record: Record reason and one changed variable per retry
+            Note over Agent,Subagent: Review retries stay within the bounded review cycle
+        end
+    end
+    Agent-->>User: Result with evidence or BLOCKED if required capability is unavailable
+```
+
+Requested settings are not proof of backend settings. An unsupported desired setting uses a capable available option; if none meets the quality floor, report BLOCKED. Recommend a user-controlled session change only when the current settings threaten that floor or repeated reasoning failure warrants it. Do not hardcode provider model IDs or pricing into the shared policy.
+
+### Claude: session inheritance and model selection
+
+Claude follows the same capability, budget and premium rules. Its session model and effort come from the user's/runtime's settings. The repository's [reviewer definition](.claude/agents/reviewer.md) has `model: inherit` and inherits session effort; runtime-supported per-invocation overrides do not require editing that shared definition.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Runtime as Claude session / subagent runtime
+    participant Agent as Claude active agent / Controller
+    participant Policy as Task Contract and MODELS policy
+    participant Record as Session evidence / tracker
+    participant Subagent as Worker or reviewer subagent
+
+    User->>Runtime: Configure session model and effort
+    User->>Agent: Request task with constraints and quality expectations
+    Agent->>Policy: Determine capability, effort starting point, budget and review depth
+    Policy-->>Agent: Least costly capable option and required quality floor
+    Agent->>Runtime: Inspect session settings and supported invocation controls
+    Runtime-->>Agent: Available controls and observable settings
+    Agent->>Agent: Follow session model and effort for main-agent work
+    opt Worker or independent reviewer is required
+        Agent->>Agent: Select least costly capable option for the assignment
+        alt Use repository reviewer defaults
+            Agent->>Agent: Request inherited model and session effort
+        else Justified override is supported by runtime
+            Agent->>Agent: Prepare supported per-invocation model/effort selection
+        else Desired override is unavailable
+            Agent->>Agent: Use capable inherited/default option or report BLOCKED
+        end
+        Note over Agent,Subagent: Do not edit the shared reviewer definition for one task
+        opt Premium model is considered
+            Agent->>Record: Record outcome, material constraints and cheaper-option evidence
+            alt Cheaper capable option is sufficient or insufficiency is unproven
+                Agent->>Agent: Use cheaper capable option, gather evidence or report constraint
+            else Concrete evidence supports premium selection
+                Agent->>Agent: Apply capability and budget requirements
+                opt Additional paid usage would be initiated
+                    Agent->>User: Request authorization for additional paid usage
+                    User-->>Agent: Authorize or decline
+                end
+            end
+        end
+        Note over Agent,Subagent: Dispatch requires capability and any required billing authorization, HIGH alone does not justify premium
+        Agent->>Record: Record requested settings and task-specific selection reason before call
+        Agent->>Runtime: Invoke available worker or reviewer tooling
+        Runtime->>Subagent: Assignment with inherited or supported overridden settings
+        Note over Runtime,Subagent: Independent reviewer receives contract and diff, not author reasoning
+        Runtime-->>Agent: Agent identity and reported settings if exposed
+        Agent->>Record: Record actual metadata or unavailable, never infer it from request
+        Subagent-->>Agent: Work evidence or PASS / REWORK with findings
+        opt Failure or demonstrated reasoning limit
+            Agent->>Agent: Classify cause before changing settings
+            alt Implementation, context, tool or permission problem
+                Agent->>Agent: Repair that cause
+            else Demonstrated reasoning limit
+                Agent->>Agent: Raise one supported effort level first if model remains capable
+                Agent->>Agent: Consider stronger model only when needed, reapply selection guards
+            end
+            Agent->>Record: Record retry reason and one changed variable
+            Note over Agent,Subagent: Stop at review round cap and preserve requested quality floor
+        end
+    end
+    Agent-->>User: Evidence-backed result or BLOCKED when required capability is unavailable
+```
+
+Session inheritance does not guarantee that a configured model can meet every task's quality floor. If the runtime cannot expose or change a setting, report that limitation honestly and assess the available option against the contract. Never increase spend merely because a task is long.
+
 ## Getting started
 
 ### Requirements
