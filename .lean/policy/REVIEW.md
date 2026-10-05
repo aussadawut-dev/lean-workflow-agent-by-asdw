@@ -18,24 +18,31 @@ Use the deeper of the two. Example: risk `LOW` with quality `VERY_HIGH` gets `HI
 
 ## Rounds
 
-- A review cycle covers one Task Contract. A change stays in the cycle, and counts toward the
-  round cap below, when a finding from this cycle's review motivated it. Anything else arriving
-  mid-cycle is new work: its own contract line, its own cycle, its depth from its own risk. A
-  contract opened because the cap fired says so, so the spend stays visible.
-- After the second `REWORK` on one contract, the cycle gets one last pass, over a delta holding the
-  fix for those findings plus whatever repair validation demands of that fix, and nothing else.
-  `PASS` there ends the cycle. `REWORK` there ends it as `BLOCKED`, naming what is unresolved —
-  never `DONE`: the delta that ships has to have been reviewed, not merely reviewed to the right
+Review costs a full context each round, so the loop needs an end that is not the budget running out.
+
+- A review cycle covers one Task Contract. A change stays in the cycle, and counts toward the round
+  cap below, when its motivation is a finding from this cycle's review. Work that arrives mid-cycle
+  for any other reason is new work: its own contract line, its own cycle, and its depth set by its
+  own risk rather than inherited from this one. A contract opened because the cap fired says so, so
+  the spend already made stays visible.
+- After the second `REWORK` on one contract, the cycle gets one last pass. The delta it reviews must
+  hold the fix for those findings, plus whatever repair validation demands of that fix, and nothing
+  else. `PASS` there ends the cycle. `REWORK` there ends it as `BLOCKED`, naming what is unresolved
+  -- never `DONE`: the delta that ships has to have been reviewed, not merely reviewed to the right
   depth. Going further is the user's call and their budget. This bounds how often a change is
   reviewed, never how deeply.
-- A `PASS` ends the review. Anything applied after it is new work under the one-contract rule
-  above, whatever its size — its own contract line, no review when that contract is trivial, and no
-  carve-out for small fixes. Inside a high-risk area `WORKFLOW.md`'s trivial test cannot be met at
-  all, because every change there is `HIGH` risk, so even a typo costs a full cycle.
+- A `PASS` ends the review. Anything applied afterwards is new work under the one-contract rule
+  above, whatever its size: its own contract line, and no review when that contract is trivial.
+  There is no carve-out for small fixes. Where `WORKFLOW.md`'s trivial test can be met the whole
+  price is one contract line and no review; inside a high-risk area it cannot be met at all, because
+  every change there is `HIGH` risk, so even a typo costs a full cycle -- the price of the area, not
+  of this rule. Every carve-out tried here failed anyway, by licensing too much or forbidding too
+  much: the agent calling a change small is the one who wrote it, and the last independent look is
+  already behind it.
 
 ## Independent reviewer
 
-For `HIGH` depth, use a separate reviewer (for Claude, the `reviewer` subagent; otherwise a subagent or a fresh session) that sees the diff and Task Contract, not the worker's reasoning. If none is available, do a separate review pass against the Review Contract and state in the result that review was not independent.
+For `HIGH` depth, use a separate reviewer (Claude's `reviewer` subagent; for Codex, a subagent or a fresh session) that sees the diff and Task Contract, not the worker's reasoning. Select its model and effort per `MODELS.md`; independence does not require a stronger model. If none is available, do a separate review pass against the Review Contract, state that it was not independent, and report `BLOCKED` until the required review can run.
 
 ## Reviewer rules
 

@@ -11,3 +11,8 @@
 # Merge and patch debris, which --untracked would otherwise scan
 *.orig
 *.rej
+
+# Local workflow coordination and Python test caches
+.agent-runtime/
+__pycache__/
+*.pyc

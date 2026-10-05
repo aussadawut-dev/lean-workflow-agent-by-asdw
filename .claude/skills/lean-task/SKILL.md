@@ -1,21 +1,15 @@
 ---
 name: lean-task
-description: Start a non-trivial task under Lean Workflow. States the Task Contract (risk, quality, acceptance) before any change, then works through test, validation, review, and the Quality Gate. Use when the user starts a feature, bug fix, refactor, or other non-trivial change.
+description: Run a task through contract, accepted scope, configured execution, tests, validation, review and Quality Gate.
 argument-hint: <task description>
 ---
 
 Task: $ARGUMENTS
 
-1. The first line of your reply is the contract line from `CLAUDE.md`, before any tool call that changes files. Infer values; do not ask the user unless the goal itself is ambiguous. If unsure of risk, read `.lean/policy/CONTRACTS.md`.
-2. Check the mode: `.lean/bin/mode.sh get`. `standard` -- nothing extra. `tracker` -- open the record
-   now: `.lean/bin/tracker.sh new "<title>" --contract "<your contract line>"`. `full` -- claim the queue
-   item first (`.lean/bin/queue.sh add <title>` if the task is not in the queue yet, then `claim <id>`),
-   then open the record with `--queue <id>`. Rules: `.lean/policy/MODES.md`. Unset: ask the user for the
-   mode and record it before changing a file.
-3. Read `.lean/PROJECT.md` for commands.
-4. Work, then test:
-   - Behavior change: add tests for it and its edges.
-   - Bug fix: write the regression test first, run it and show the failure, then fix and show it passes.
-5. Run the Quality Gate commands from `.lean/PROJECT.md`.
-6. Review at the deeper of risk and quality. `HIGH` depth: use the `reviewer` subagent, spawned on the strongest model available to this session -- it is `model: inherit`, so otherwise the `HIGH` rule in `.lean/policy/MODELS.md` never fires. If the reviewer did not run on the strongest model available, say so in the result. Read `.lean/policy/REVIEW.md` only for `MEDIUM` or `HIGH`.
-7. Finish with the Result Contract: Status, Changes, Evidence, Not verified, Follow-ups.
+1. Write the contract from `AGENTS.md` before changes. Infer risk/quality; read `.lean/policy/CONTRACTS.md` when needed.
+2. Read `.lean/PROJECT.md` and use `python3 .lean/scripts/workflow.py show`. Follow `.lean/policy/WORKFLOW.md`. Standard uses session records; non-trivial tracker/full work uses one owning tracker. Trivial tasks need no new tracker. Full tasks require appropriate items/claims before scope edits, including trivial edits inside existing claims.
+3. Use `/lean-scope` for non-trivial work: reuse already accepted scope; draft and get approval only when no matching scope exists or a material expansion is proposed. Use `/lean-research` for evidence-backed alternatives and `/lean-grill` for unresolved material decisions/high-risk boundaries. Clear accepted work need not reopen decisions.
+4. Follow configured execution: direct work stays with the active agent; delegated work uses the Controller/worker procedure in `.claude/skills/lean-multi-agent/SKILL.md`. Select models/effort under `.lean/policy/MODELS.md` and record any dispatch. Concurrent workers require explicit user intent and exclusive independent scopes. Preserve the required review depth when delegation is unavailable.
+5. Work, then test. Behavior changes need meaningful tests; bug fixes demonstrate regression fails before the fix and passes after. Validate deterministically with the Quality Gate in PROJECT.
+6. Review at the deeper of risk and quality. HIGH depth requires an independent reviewer: Claude's `reviewer` subagent, or a Codex subagent/fresh session. Give it contract and diff without author reasoning; select model/effort under `.lean/policy/MODELS.md`. Report BLOCKED if independent review cannot run. Follow bounded rounds in `.lean/policy/REVIEW.md`.
+7. Verify claim completion/evidence when applicable and synchronize tracker/session records. Run `/lean-gate` and report the Result Contract, including validation/review evidence and unverified work. Worker completion alone does not mark the task DONE.

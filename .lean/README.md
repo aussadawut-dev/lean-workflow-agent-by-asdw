@@ -1,33 +1,43 @@
 # Agent policy router
 
-Lean Workflow Baseline 2.6.0. See `CHANGELOG.md` for changes and upgrading.
+Lean Workflow Baseline 3.0.0. See `CHANGELOG.md` for changes and migration steps.
 
-This directory holds the operating rules for agents and the self-checks for those rules. It is not application structure and prescribes no language, framework, layout, package manager, database, or deployment model.
+This directory contains operating rules and their self-checks. It is not application structure and prescribes no stack or primary provider. `AGENTS.md` is canonical; `CLAUDE.md` imports it. Shared procedures in `.claude/skills/` have Codex adapters in `.agents/skills/`.
 
-## Layout
+## Setup and modes
 
-- `PROJECT.md` — owned by the project. Agents and people update it.
-- `policy/` — owned by the workflow. Do not edit per project; upgrades replace it.
-- `CHANGELOG.md` — workflow versions and upgrade steps.
-- `bin/` — the workflow's own tools: `mode.sh` (workflow mode), `tracker.sh` (tracking records), `queue.sh` (claimable task queue).
-- `scripts/`, `tests/` — self-checks for the files in here. Not your project's own checks.
+Use `/lean-init` or `python3 .lean/scripts/workflow.py configure standard|tracker|full`. Add `--execution direct|delegated` for execution routing. `show` reads the settings, including a missing-file fallback; `check` validates mode and records. Missing configuration means unconfigured standard/direct, and onboarding prompts for a mode. Do not infer a heavier mode or discard accepted choices.
 
-Do **not** load every file by default. A trivial task (see `policy/WORKFLOW.md`) needs none of them.
+- `standard`: session contract, tests, validation, review and gate.
+- `tracker`: standard plus one workset tracker per non-trivial task.
+- `full`: tracker plus local lease-backed queue ownership.
+
+Direct execution is the portable default; delegated execution uses the Controller/worker procedure. Repository mode, execution strategy, model choice and review depth are separate. Unix tools support macOS/Linux/WSL; native Windows is not supported. Claude hooks are provider-specific; Codex runs the gate explicitly.
+
+## Layout and ownership
+
+- `PROJECT.md` and `config.json`: project-owned facts, gate, mode and execution.
+- `policy/`, shared skills and adapters: workflow-owned; upgrade together.
+- `templates/`: generic record templates, not task history.
+- `scripts/`, `tests/`: mode/lease tooling and workflow checks.
+- `CUSTOMIZING.md`: current ownership and upgrade checklist.
+- `LICENSE`: retain the workflow copyright/permission notice when importing.
+- `CHANGELOG.md`: historical versions and migrations.
+
+Mode setup creates project-owned tracking/queue guides; the distributable template contains no work records or leases. Preserve project additions and local extensions during upgrades.
 
 ## Read when needed
 
-- Running project commands or editing an unfamiliar area -> `PROJECT.md`
-- Which extra steps this project runs (tracking records, task queue) -> `policy/MODES.md`
-- Non-trivial task: planning, states, execution mode -> `policy/WORKFLOW.md`
-- Setting quality/budget/risk or reporting results -> `policy/CONTRACTS.md`
-- Behavior change, bug fix, or tests -> `policy/TESTING.md`
-- Quality floor, completion evidence -> `policy/QUALITY.md`
-- Medium/high-risk review or reviewer role -> `policy/REVIEW.md`
-- Model choice, subagent model, escalation -> `policy/MODELS.md`
-- Unfamiliar area or context expansion -> `policy/CONTEXT.md`
-- Tool selection, subagents, parallelism -> `policy/TOOLS.md`
-- Failure, retry, or rework -> `policy/RECOVERY.md`
+- Unfamiliar area or project commands -> `PROJECT.md`
+- Setup, import or upgrade -> `CUSTOMIZING.md`, `/lean-init`, `config.json`
+- Non-trivial planning, states, modes or claims -> `policy/WORKFLOW.md`
+- Risk/quality/budget or result format -> `policy/CONTRACTS.md`
+- Behavior change or bug fix -> `policy/TESTING.md`
+- Quality floor and completion -> `policy/QUALITY.md`
+- Medium/high review -> `policy/REVIEW.md`
+- Model/effort/dispatch -> `policy/MODELS.md`
+- Context expansion -> `policy/CONTEXT.md`
+- Tool or delegation choice -> `policy/TOOLS.md`
+- Failure or retry -> `policy/RECOVERY.md`
 
-## Routing rule
-
-Start with the shallowest sufficient context. Read deeper only when the task, evidence, or dependency requires it. Routes are preferred, not mandatory detours when the exact target is already known.
+Start with the shallowest sufficient context. Do not load every policy or workflow internal by default. Trivial work still needs its contract/evidence but no formal tracker or scope spec.

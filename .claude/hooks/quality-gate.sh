@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
-# Quality Gate hook (Stop event). Runs the commands between the gate markers in
-# .lean/PROJECT.md. No commands -> no-op. Failure -> exit 2, which blocks Claude
+# Quality Gate hook (Stop event).
+# Runs the commands between the gate markers in .lean/PROJECT.md.
+# No commands defined -> no-op. Failure -> exit 2, which blocks Claude
 # from finishing and returns the output to it. A command the shell cannot find
-# blocks too -- a gate that could not run is not a gate that passed -- but says so
-# in its own words, so the answer is to report the environment, not to repair code.
+# exits 2 as well, because a gate that could not run is not a gate that passed,
+# but it says so in its own words: the answer is to report the environment, not
+# to repair code that nothing has actually found fault with.
 #
-# `--seed` records the current state and runs nothing; the SessionStart hook calls
-# it so a session that changes nothing does not run the gate at its first turn end.
-# Skipping is decided by that recorded state, never by whether the tree is dirty:
-# committing makes a tree clean without making it validated, and the commit is part
-# of the state, so committed work is gated.
+# `--seed` records the current state and runs nothing. The SessionStart hook
+# calls it, so a session that changes nothing does not run the gate at its
+# first turn end. Skipping is decided by that recorded state, never by whether
+# the working tree is dirty: committing makes a tree clean without making it
+# validated, and the commit is part of the state, so committed work is gated.
 
 set -u
 
@@ -79,17 +81,30 @@ while IFS= read -r cmd; do
   status=$?
 
   # Why a command failed decides what to do about it, so the two cases say
-  # different things. Both block. Three things must hold before the gate blames the
-  # environment: status 127, a first word that is a plain command name, and that
-  # name failing to resolve here. 127 alone is not proof -- a wrapper hands back the
-  # 127 of the program it ran -- and a word holding a slash, a quote, a dollar or a
-  # leading dash is a path, a parse fragment or an option, none of them a package to
-  # install. Everything else, 126 included, takes the ordinary message: "not your
-  # change" is the verdict that can wave a real failure through, so it stays narrow.
-  # Leading VAR=VALUE words are the shell's own, so step past them -- the lookup for
-  # `CI=1 npm test` is `npm`. That strip is a regex and cannot see quoting, so it can
-  # leave a fragment behind, which is what the name test is there to catch.
-  # The cases behind each term: .lean/CHANGELOG.md 2.4.0, pinned by .lean/tests/.
+  # different things. Both block: a gate that could not run has not passed, and
+  # neither message may read as "carry on". 127 is the only status that can mean
+  # the shell found nothing to run, but it is not proof of it: a wrapper hands
+  # back the 127 of the program it ran, so `bash lint.sh` whose script calls a
+  # tool the diff never added comes back as 127 with bash plainly installed, and
+  # reading the command's shape alone would blame the environment for that and
+  # name bash as the thing to install. So three things have to hold before the
+  # gate says the environment is at fault: that status, a word the shell would
+  # have looked up that is a plain command name, and that name failing to
+  # resolve here. A word holding a slash names a file this repository points at,
+  # a word holding a quote or a dollar is a fragment the line was parsed into,
+  # and a word opening with a dash is an option, which is nobody's package to
+  # install -- a gate command wrapped over two lines hands its continuation here
+  # as a command of its own. None of the three earns the excuse; all three take
+  # the ordinary message, as do 126 (found, will not execute -- usually an exec
+  # bit missing from the diff) and every other status: "not your change" is the
+  # verdict that can wave a real failure through, so it stays the narrow one.
+  #
+  # Leading VAR=VALUE words are the shell's own business rather than the
+  # program, so step past them -- the lookup for `CI=1 npm test` is `npm`, and
+  # left in they would decide the verdict by whether `CI=1` resolves as a
+  # command, which nothing does. That strip is a regex over the line and cannot
+  # see quoting, so `FOO="a b" cmd` leaves `b"` behind: the fragment the name
+  # test exists to catch rather than trust.
   lookup="$cmd"
   while [[ "$lookup" =~ ^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+(.*)$ ]]; do
     lookup="${BASH_REMATCH[1]}"

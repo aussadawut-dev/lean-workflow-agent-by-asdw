@@ -2,9 +2,9 @@
 
 - Prefer dedicated file/search tools over shell equivalents when available.
 - Run independent tool calls in parallel; sequence dependent ones.
-- Use `DIRECT` execution by default.
-- Use subagents only for genuinely independent parallel work or isolated review/research. Not for simple, tightly coupled, or shared-context work.
+- Follow configured execution: `direct` is the portable default; `delegated` requires Controller/worker routing under `/lean-multi-agent`. Repository mode and review depth are independent.
+- In direct execution, use subagents for independent review/research or explicitly requested parallel work. In delegated execution, assign bounded work including small tasks to one worker. Concurrent workers require explicit user intent and independent, exclusively owned scopes.
 - Use the commands in `.lean/PROJECT.md` for build, test, lint, typecheck.
-- Claude: prefer the workflow skills (`/lean-init`, `/lean-task`, `/lean-review`, `/lean-gate`) and the `reviewer` subagent in `.claude/` over ad-hoc equivalents. They load the policy files on demand.
+- Both agents use shared skills in `.claude/skills/`; Codex adapters in `.agents/skills/` link the same procedures. Claude can use its `reviewer` subagent. Load policies on demand.
 - Do not add dependencies, frameworks, or process files unless the task requires them.
 - Confirm before destructive or outward-facing actions.

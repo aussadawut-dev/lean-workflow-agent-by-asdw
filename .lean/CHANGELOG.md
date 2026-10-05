@@ -4,193 +4,24 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
-## 2.6.0
+## 3.0.0
 
-Workflow modes. A project decides once how much process it runs, and the decision is config from
-then on -- not a judgement call an agent makes per task.
+The reusable Claude/Codex extensions now ship in the template. This is a MAJOR because canonical authority, model/review policy and setup behavior change.
 
-- `standard` is the workflow exactly as it was: nothing added. `tracker` adds one tracking record
-  per non-trivial task, committed under `.lean/tracker/`. `full` adds a task queue whose items are
-  claimed before work starts. The new `policy/MODES.md` holds the rules. Modes only add steps: none
-  of them lowers a floor, and `full` is not licence to skip what `standard` requires.
-- The value lives in a `mode:start`/`mode:end` block in `PROJECT.md`, which upgrades never touch, so
-  the choice survives them and a hand edit is the supported way to switch. `.lean/bin/mode.sh`
-  reads (`get`), validates (`check`), and records (`set`) it. Decoration around a hand-edited value
-  is stripped, since that edit is the documented path.
-- Because that hand edit is expected, a malformed block is expected input, and `PROJECT.md` also
-  carries the Quality Gate commands the `Stop` hook parses. So every read is bounded by the marker
-  line numbers, `set` replaces only the lines between them, and it verifies the result -- the value
-  reads back, the line count is the old one minus the block's contents, and the gate markers are
-  still there -- before overwriting anything. A block with the markers on one line, in the wrong
-  order, or duplicated reads as `unset` and refuses to be written to, naming what to fix. The first
-  version of this change did not: it rewrote such a block by deleting everything after the start
-  marker, gate block included, and reported success. Review caught it before release.
-- `session-start.sh` asks for the mode the first session it finds none recorded, states `tracker` and
-  `full` on every later session, and says nothing for `standard` -- the baseline earns no line of
-  context per session. A value that is not one of the three is reported, never guessed at: guessing
-  silently drops the records or the queue the project asked for. A project that removed
-  `.lean/bin/` is not asked for a mode it has no way to record.
-- `.lean/bin/queue.sh` is the `full` mode queue: `list`, `show`, `add`, `claim`, `release`, `done`.
-  Items live on their own branch (`lean-queue`, or `LEAN_QUEUE_BRANCH`), one file per item under
-  `queue/`. Every write is a commit built with plumbing against the branch as the remote has it and
-  then pushed, so two sessions claiming one item cannot both win: the second push is rejected as
-  non-fast-forward, and the loser re-reads the item and is told who holds it. Exit 3 is that answer.
-  Nothing is checked out and the working tree is never touched -- a queue that dirtied the tree would
-  change the Quality Gate's state and every diff a session reports. Aimed at a branch that *is*
-  checked out it refuses, rather than commit onto that work. Without an `origin` remote it degrades
-  to local-only claims, which coordinate nothing outside the checkout.
-- A rejected push is only a race when it is about this item, so a write is retried against the
-  branch's new state (8 attempts, short randomized backoff) and running out of attempts exits 4:
-  nothing was decided, run it again. Exit 3 stays the item's own answer -- held, not claimed, already
-  done -- so an agent told 3 can trust it and take another item. `add` retries the same way; before
-  review it failed outright, which meant three of four sessions starting at once failed their first
-  step. Item headers are rewritten with `awk` and values passed through the environment, never
-  spliced into a `sed` replacement: an owner holding `&`, `|` or a backslash used to corrupt the item
-  into one nobody could claim, release, or close, while the claim reported success.
-- `.lean/bin/tracker.sh` owns the tracking record's header, so `tracker` mode is a tool rather than
-  prose: `new` writes the record with the date-and-slug name, the contract line and the Result
-  Contract's empty sections; `set` fills in the contract or the queue item a task learns as it goes;
-  `current` finds the record still `IN_PROGRESS`, so the Quality Gate step does not have to carry a
-  path; `state` closes it as one of the four states the workflow defines, and nothing else. The
-  sections stay the session's own writing.
-- What that tool refuses is the substance of it, because a record that lies is worse than no record.
-  A title is written as one line, so a task description whose second line reads `state: DONE` cannot
-  open a record already claiming DONE. A resolved path must be inside the records directory, so a
-  mistyped or generated path cannot have its `state:` line rewritten and `show` is not a way to print
-  any readable file. A slug matching several records resolves to the open one and otherwise refuses,
-  naming the matches, rather than closing whichever sorts last. A glob character in a record name is
-  refused. Records are created with noclobber, so two sessions starting at once take different names.
-  Every one of those is pinned by a mutation recorded in `PROJECT.md`.
-- New directory `.lean/bin/` for the workflow's own tools. It is deliberately not `.lean/scripts/`,
-  which the README tells a project it may delete: those are self-checks for the workflow files,
-  while `bin/` runs during a session -- the `SessionStart` hook reads `mode.sh` every time.
-- Tests: `.lean/tests/test-mode.sh` (43 checks), `.lean/tests/test-tracker.sh` (81 checks) and
-  `.lean/tests/test-queue.sh` (69 checks, against
-  a bare remote and up to four concurrent clones) are new, and `test-hooks.sh` goes from 55 to 67
-  checks for the hook's mode reading. The queue's claim guarantee is tested by really running four
-  claimers at once, not by simulating a stale base: exactly one wins, four claimers of four items
-  all win, and four concurrent `add`s all succeed. Verified by mutation: force-pushing the claim
-  commit fails 12 checks, rewriting a header with `sed` fails 4, removing every guard on the mode
-  write fails 2, and treating an unrecognized mode as `standard` fails the hook's mode cases.
-  `check-structure.sh` now also checks the mode markers and the recorded value, and the exec bits of
-  `.lean/bin/` when that directory is present -- scoped to the mode rule, which must not demand a
-  mode where the hook says nothing and nothing can record one. A project that drops the tools still
-  has the docs naming them to drop.
-- Smaller corrections from the second review round: a value left on a marker line is refused by name
-  rather than by "does not read back"; the queue's owner check looks for control characters, not for
-  non-ASCII, which under `LC_ALL=C` refused an ordinary `user.email`; a `LEAN_QUEUE_ATTEMPTS` that is
-  not a positive number is a usage error rather than a reported race; and the checked-out-branch
-  refusal moved onto the writes, so `list` and `show` still work from a checkout of the queue
-  branch -- with no remote that checkout is the only copy of it.
+- AGENTS is the provider-neutral canonical contract; CLAUDE imports it. The project chooses ownership. Eight shared skills have eight Codex adapters, including init/gate parity. Scope/research/grill and Controller/worker procedures are portable; no product stack, primary provider or volatile model IDs ship.
+- Config separates standard/tracker/full modes from direct/delegated execution. The fresh template is unconfigured standard/direct and contains no trackers, queue items or runtime leases. Unix mode/claim tooling preserves existing records and rejects implicit downgrades. Missing config prompts setup rather than silently skipping onboarding.
+- Portable least-cost-capable model/effort selection replaces the historical strongest-reviewer mandate. Premium dispatch needs task-specific cheaper-option evidence; paid usage still requires authorization. HIGH independent review is mandatory even when a reviewer is unavailable (report BLOCKED).
+- Structural checks cover both entrypoint imports, active canonical HIGH-review/model routing, both skill trees, eight adapters and relative targets. Git-visible Markdown scanning handles whitespace and excludes ignored dependencies. Before repair, seven new structure regression checks failed against the previous guard.
+- Duplicate tracker IDs are rejected in tracker and full checks; FAILED is a valid tracker state. Before repair, duplicate-ID cases passed check and FAILED was rejected by the CLI; new regression tests demonstrate both. Mode/claim tests exercise temporary repositories, including stable request receipts, ownership and completion evidence.
+- Workflow notice is preserved under `.lean/LICENSE`; root project licenses need not be overwritten on import. Current customizing/upgrade guidance replaces project-specific historical extension notes. Merge-debris ignore patterns remain, with lease/Python runtime exclusions added. Support is macOS/Linux/WSL (Bash, Git, Python 3.9+, Unix fcntl); native Windows and hosted/live runtime discovery are not claimed from local tests.
+- CI runs ShellCheck, structure, hook tests, mode checks and Python regression tests. PROJECT gate matches these commands; application gates remain project-owned.
+- Independent review caught two additional regressions before release: the installed smoke test assumed the host still had unconfigured template defaults, and completion allowed an unfinished dependency added after claim. Regression tests first failed on both. Smoke fixtures now isolate reusable assets and preserve configured hosts/licenses/records; completion rechecks current dependencies without losing a refused claim, and DONE dependencies are validated by check.
 
-Upgrade, from 2.5.0. Add `.lean/bin/`, `.lean/policy/MODES.md`, `.lean/tests/test-mode.sh`,
-`.lean/tests/test-tracker.sh`, and `.lean/tests/test-queue.sh`. Replace `.claude/hooks/session-start.sh`,
-`.lean/scripts/check-structure.sh`, `.lean/tests/test-hooks.sh`, `.lean/README.md`, `CLAUDE.md`,
-`AGENTS.md`, the three skills that changed (`lean-task`, `lean-gate`, `lean-init`), and
-`.lean/CHANGELOG.md`. Then, in your own `PROJECT.md`, add the mode block -- copy
-the `## Workflow mode` section from this version, value `unset`, and the next session asks for the
-mode. If you run the workflow's own checks, add `.lean/bin/*.sh` to the shellcheck line and the two
-new test scripts to the Quality Gate block. Nothing moves, and an install that skips the
-`PROJECT.md` step keeps working: an unreadable mode reads as unset, which is a question, not a
-failure.
+### Migrating from 2.x or local extensions
 
-## 2.5.0
+Before replacement, preserve existing CLAUDE/AGENTS additions, PROJECT, config, settings, records and local extensions. Move shared CLAUDE rules to AGENTS; make CLAUDE import it while preserving runtime-specific additions. Compare customized entrypoints rather than overwriting them. Keep configured tracker/full mode and all work records. If config has no execution field, direct is the compatibility default; projects with accepted mandatory delegation explicitly select delegated. Do not import another project's tasks or reset existing config to this template's unconfigured file.
 
-The tier a contract picks now resolves to a model the repository names, per runtime, instead of
-one the agent remembers.
-
-`policy/MODELS.md` routed work to a fast, a default, or a strongest model and stopped there: no
-file in the workflow said which model any of those is. The names were supplied at the spawn site,
-from the agent's own knowledge of what shipped by its training cutoff. Seen in a run that
-dispatched two bounded workers on a version id recalled rather than read -- the routing was right,
-the model was a guess, and nothing in the repository could tell the two apart. Every other link in
-the chain is written down: `policy/CONTRACTS.md` infers risk, `policy/QUALITY.md` and
-`policy/REVIEW.md` set depth, `policy/MODELS.md` maps depth to a tier. Only the last hop was
-unwritten, and it is the one that goes out of date on its own.
-
-- `policy/MODELS.md` gains `Resolving a tier to a model`. The tiers stay abstract, which is what
-  keeps that file from going stale on an upgrade cycle it does not control, and it names no model
-  of its own. The names live in a `Model registry` in `PROJECT.md`, which is project-owned and
-  untouched by upgrades.
-- The registry is keyed by runtime. An agent reaching this repository through `AGENTS.md` spawns
-  models this one cannot, so a single column of names would be wrong for everyone but its author.
-  Each row is `| runtime | tier | model | verified |` and carries its own date, so one runtime's
-  update does not vouch for another's. An agent adds the rows for the runtime it is on once it has
-  checked them against what that runtime offers, and fills in no other runtime's.
-- An alias is preferred over a pinned version id where the runtime has one: an alias tracks the
-  current generation, a pinned id goes out of date without saying so. No registry, no rows for the
-  runtime in hand, or an entry the runtime rejects falls back to the tier descriptions and names
-  the model that actually ran; an id from memory is the drift the registry exists to catch, so it
-  is never the fallback.
-- `CLAUDE.md`'s reviewer rule says where `strongest model available` is defined. The rule has been
-  in the file since 2.3.0 with nothing to read it off.
-- `scripts/check-structure.sh` checks what can be checked from in here. The names cannot be: no
-  list of current models is in this repository. Its rows can, and the dates can. It fails when a
-  runtime named does not cover every tier -- a half-filled registry is dated and trusted for the
-  tier it does not name -- when a tier is spelled as one `MODELS.md` does not define, and when the
-  oldest row is more than 90 days old, naming the runtime to go and recheck. A row dated in the
-  future is rejected: it verifies nothing, and it is the cheapest way to silence the check. Dates
-  are read from each row's last cell, never scanned out of the block, or a pinned id carrying a
-  date of its own would date the registry by the model it is meant to be checking.
-- The block is read strictly, because the failure mode of reading it loosely is silence. Markdown
-  does not require a table row's outer pipes, and a row written without them is one the check
-  cannot see: review found three rows dated 2019, sitting in a six-row registry, passing as a
-  current one that way, complete tier coverage and all, while an agent following `MODELS.md` reads
-  exactly those rows. Any line with content inside the markers that is not a row the check read is
-  now a failure naming that line, which covers prose left in the block as well. Blank lines are
-  not content, on either line ending. The separator row is recognised in both shapes GFM
-  allows, so a table formatted with alignment colons is not read as data.
-- A project carrying no registry is not failed, since the fallback covers it; half a registry is,
-  because a lost marker would otherwise read as no registry and skip the check in silence.
-- `tests/test-structure.sh` is new: 33 checks, ~10s. `scripts/check-structure.sh` had no test
-  before this. Every case that tests a registry writes it into a throwaway copy of the repository
-  rather than editing whatever the host `PROJECT.md` carries, so the suite holds in an install
-  that never adopted a registry -- verified at 33 passed with the `Model registry` section
-  deleted. One case runs the check against this repository instead, so the suite goes red on the
-  day the shipped rows go stale rather than only the gate. Fifteen mutations of the check each
-  fail a case: dropping the age limit, moving it to 89 days, dropping the future-date,
-  half-a-registry, row-shape, empty-registry, tier-completeness, unknown-tier or stray-line guard,
-  reverting the separator filter to the un-aligned shape, letting the block scan run past a closed
-  marker, dropping the runtime from the stale message, reading dates from the whole row instead of
-  its runtime and date cells, counting a bare CR as content, and keeping the CR in the stray line
-  it reports. Added to the gate block and to CI.
-
-The cost is deliberate and worth stating: a dated check is a check that fires on a date nobody
-picked, and a stale registry blocks the gate on whatever task happens to be in flight. That is the
-trade for a registry that cannot rot quietly. The fix is a minute's work and the failure names the
-runtime to recheck.
-
-Replace `.lean/policy/MODELS.md`, `.lean/scripts/check-structure.sh`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `README.md`, `.github/workflows/lean-workflow.yml`, `.lean/README.md`, and
-`.lean/CHANGELOG.md`. Add `.lean/tests/test-structure.sh`, and add it to the gate block in your own
-`.lean/PROJECT.md`. Adopting a registry is optional and separate: an install that adds neither is
-not failed by the structure check, the test suite, or CI. To adopt one, add a `Model registry`
-section to `.lean/PROJECT.md` with `<!-- models:start -->` / `<!-- models:end -->` markers, a
-`| runtime | tier | model | verified |` header, and a row for each of `fast`, `default` and
-`strongest` for the runtime you are on. Rows need their outer pipes, and nothing else may sit
-between the markers.
-
-## 2.4.1
-
-Rationale moved out of the files agents read on every task. No rule changed.
-
-`policy/REVIEW.md`'s `Rounds` section argued for its own shape inside a file every `MEDIUM` and
-`HIGH` task loads. It now states only the rules. The argument, kept here: every carve-out tried for
-small fixes applied after a `PASS` failed, by licensing too much or forbidding too much -- the agent
-calling a change small is the one who wrote it, and the last independent look is already behind it.
-Inside a high-risk area even a typo costs a full cycle, and that is the price of the area, not of
-this rule. Every rule the section stated it still states; only the argument for them moved here.
-
-`.claude/hooks/quality-gate.sh` and `.lean/scripts/check-structure.sh` carried design notes at
-roughly two comment lines per three lines of code. The notes that explain a term still stand; the
-ones re-deriving the cases behind it are gone. Those cases stay in the entry that introduced each:
-2.4.0 below for the gate's missing-tool split, 2.3.0 for the structure check's spawn-site guard. The
-gate's are pinned besides by the 55 checks in `.lean/tests/test-hooks.sh`, which covers the hooks and
-not the structure check. Trimmed 15 comment lines from the gate and 22 from the structure check,
-and 7 from `REVIEW.md`.
-
-Replace `.lean/policy/REVIEW.md`, `.lean/scripts/check-structure.sh`,
-`.claude/hooks/quality-gate.sh`, `.lean/README.md`, and `.lean/CHANGELOG.md`. Nothing moves.
+Update shared skills and adapters, policy, hooks, tooling/templates/tests and workflow CI together; merge gitignore/settings and retain the workflow notice. Read CUSTOMIZING.md, fill actual project commands, run its Quality Gate and required independent review. Legacy CLAUDE authority is tolerated by the structure guard during migration; two competing contracts are not.
 
 ## 2.4.0
 
@@ -235,12 +66,10 @@ about the change.
   unclear
   takes the ordinary message, which sends the agent to look, because "not your change" is the verdict
   that can wave a real failure through.
-- `test-hooks.sh` is now 55 checks. Four fail against the 2.2.0 hook, which is the revision before
-  this change because 2.3.0 left `quality-gate.sh` untouched. Three are the regression proper: a
-  missing program must say the gate could not run, must name the environment, and must not carry the
-  "If your change caused this" line. The fourth is the check that the message names the program
-  rather than an assignment, which fails there for the same reason -- 2.2.0 has no second message for
-  anything to be named in. The rest pin what must not move, one case per shape that got
+- `test-hooks.sh` is now 55 checks. Three are the regression proper and fail against the 2.2.0 hook
+  (2.3.0 left `quality-gate.sh` untouched, so that is the revision before this one):
+  a missing program must say the gate could not run, must name the environment, and must not carry
+  the "If your change caused this" line. The rest pin what must not move, one case per shape that got
   a condition wrong -- the wrapper, the quoted assignment, the compound line, the wrapped gate
   command's continuation, the script named by path, and a command that exists and fails -- and every
   term of the classification is pinned on its own: remove the status test, either half of the
@@ -507,18 +336,10 @@ Changes from dogfooding (a Go CLI, 5 headless runs). The Task Contract was never
 
 ## Upgrading
 
-Workflow files are separate from project files, so an upgrade replaces them without touching your code.
+Read the target release's migration entry first, especially when crossing a MAJOR. Current import/upgrade authority is documented in `.lean/CUSTOMIZING.md`; historical entries above describe the arrangements at that time.
 
-If you are crossing a MAJOR version, read that entry above and run its migration steps first. A
-MAJOR moves paths, so the files step 1 names may not exist yet under the names it uses.
-
-1. Replace `.lean/policy/`, `.lean/README.md`, `.lean/CHANGELOG.md`, `.lean/scripts/`, and `.lean/tests/`. Never replace `.lean/PROJECT.md`.
-2. Replace `.claude/hooks/`, `.claude/agents/reviewer.md`, and `.claude/skills/lean-*/`. Keep your own agents and skills.
-3. Replace `.github/workflows/lean-workflow.yml`, unless you deleted it. Take
-   `.github/pull_request_template.md` too if you want it; it is new in 2.0.0 and yours to edit
-   afterwards.
-4. In `CLAUDE.md`, replace everything above `## Project additions`. Keep your additions.
-5. Replace `AGENTS.md`, unless you edited it.
-6. Merge `.claude/settings.json` by hand if you changed it.
-7. Run `.lean/scripts/check-structure.sh` and `.lean/tests/test-hooks.sh`.
-8. Re-read the new `CHANGELOG.md` entry and confirm nothing in it is still outstanding.
+1. Preserve project-owned PROJECT/config, records, local extensions and entrypoint additions.
+2. Upgrade policy/router/changelog, all shared skills and Codex adapters, hooks/reviewer, templates, tooling and installed self-tests together.
+3. Merge settings/gitignore/CI rather than replacing project permissions or application checks. Retain `.lean/LICENSE` and existing project licenses.
+4. Reconcile canonical ownership and project overrides explicitly; never silently reset mode, execution or primary agent.
+5. Run the actual project Quality Gate and workflow tests that remain installed. Complete required review over the final delta before reporting DONE.

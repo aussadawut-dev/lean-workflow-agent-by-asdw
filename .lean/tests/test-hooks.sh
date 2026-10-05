@@ -16,25 +16,16 @@ fail=0
 ok()  { pass=$((pass + 1)); echo "ok   $1"; }
 bad() { fail=$((fail + 1)); echo "FAIL $1"; }
 
-# New fixture repo with the real .gitignore, the real mode.sh, and a PROJECT.md
-# whose gate block holds the given lines. The recorded workflow mode is
-# FIXTURE_MODE (default `standard`, which the session hook says nothing about);
-# `none` ships no mode block at all. Prints the repo path.
+# New fixture repo with the real .gitignore and a PROJECT.md whose gate
+# block holds the given lines. Prints the repo path.
 fixture() {
   local dir
   dir="$(mktemp -d "$work/repo.XXXX")"
-  mkdir -p "$dir/.lean/bin" "$dir/.claude"
+  mkdir -p "$dir/.lean" "$dir/.claude"
   cp "$repo/.gitignore" "$dir/.gitignore"
-  cp "$repo/.lean/bin/mode.sh" "$dir/.lean/bin/mode.sh"
   {
     echo "# Project Context"
     echo
-    if [ "${FIXTURE_MODE:-standard}" != "none" ]; then
-      echo "<!-- mode:start -->"
-      echo "${FIXTURE_MODE:-standard}"
-      echo "<!-- mode:end -->"
-      echo
-    fi
     echo "## Purpose"
     echo
     echo "Not defined yet."
@@ -157,8 +148,32 @@ esac
 
 # 14. Session hook is silent once Purpose is filled
 sed -i.bak 's/^Not defined yet\.$/A real project./' "$dir/.lean/PROJECT.md"
+echo '{"mode":"standard","configured":true}' > "$dir/.lean/config.json"
 out="$(CLAUDE_PROJECT_DIR="$dir" bash "$session")"
 if [ -z "$out" ]; then ok "session: silent when filled"; else bad "session: silent when filled (got: $out)"; fi
+
+# 15. Session hook seeds the gate cache.
+dir="$(fixture)"
+echo '{"mode":"standard","configured":false}' > "$dir/.lean/config.json"
+out="$(CLAUDE_PROJECT_DIR="$dir" bash "$session")"
+case "$out" in
+  *"choose standard, tracker, or full"*) ok "session: prompts for mode before initial setup" ;;
+  *) bad "session: prompts for mode before initial setup (got: $out)" ;;
+esac
+echo '{"mode":"tracker","configured":true}' > "$dir/.lean/config.json"
+out="$(CLAUDE_PROJECT_DIR="$dir" bash "$session")"
+case "$out" in
+  *"choose standard, tracker, or full"*) bad "session: no mode prompt after setup (got: $out)" ;;
+  *) ok "session: no mode prompt after setup" ;;
+esac
+
+# Missing config uses the same onboarding as unconfigured standard mode.
+dir="$(fixture)"
+out="$(CLAUDE_PROJECT_DIR="$dir" bash "$session")"
+case "$out" in
+  *"choose standard, tracker, or full"*) ok "session: prompts when config is missing" ;;
+  *) bad "session: prompts when config is missing (got: $out)" ;;
+esac
 
 # 15. Session hook seeds the gate cache.
 dir="$(fixture 'false')"
@@ -464,71 +479,6 @@ case "$err" in
   *"Quality Gate failed:   -x code.txt"*)
     ok "gate: an option is not reported as a missing tool" ;;
   *) bad "gate: an option is not reported as a missing tool (got: $err)" ;;
-esac
-
-# 34. No mode recorded: the hook asks for one, names the three, and says where
-# the answer goes. This is the only moment the choice is made -- a session that
-# starts work without it runs the project in a mode nobody picked.
-dir="$(FIXTURE_MODE="unset" fixture)"
-out="$(CLAUDE_PROJECT_DIR="$dir" bash "$session")"
-case "$out" in
-  *"no workflow mode is recorded"*) ok "session: asks for a mode when none is recorded" ;;
-  *) bad "session: asks for a mode when none is recorded (got: $out)" ;;
-esac
-for word in standard tracker full ".lean/bin/mode.sh set"; do
-  case "$out" in
-    *"$word"*) ok "session: the mode question names $word" ;;
-    *) bad "session: the mode question names $word (got: $out)" ;;
-  esac
-done
-
-# 35. A recorded mode that adds steps is stated every session, and not re-asked:
-# the value is config from then on.
-dir="$(FIXTURE_MODE="tracker" fixture)"
-out="$(CLAUDE_PROJECT_DIR="$dir" bash "$session")"
-case "$out" in
-  *"Lean Workflow mode: tracker"*) ok "session: states a recorded tracker mode" ;;
-  *) bad "session: states a recorded tracker mode (got: $out)" ;;
-esac
-case "$out" in
-  *"no workflow mode is recorded"*) bad "session: a recorded mode is not asked again (got: $out)" ;;
-  *) ok "session: a recorded mode is not asked again" ;;
-esac
-dir="$(FIXTURE_MODE="full" fixture)"
-out="$(CLAUDE_PROJECT_DIR="$dir" bash "$session")"
-case "$out" in
-  *"Lean Workflow mode: full"*"queue.sh"*) ok "session: full names the queue" ;;
-  *) bad "session: full names the queue (got: $out)" ;;
-esac
-
-# 36. `standard` is the workflow as written, so it costs no context: the hook says
-# nothing about it. Case 14 covers the same file with nothing else to report.
-dir="$(FIXTURE_MODE="standard" fixture)"
-sed -i.bak 's/^Not defined yet\.$/A real project./' "$dir/.lean/PROJECT.md"
-out="$(CLAUDE_PROJECT_DIR="$dir" bash "$session")"
-if [ -z "$out" ]; then ok "session: standard says nothing"; else bad "session: standard says nothing (got: $out)"; fi
-
-# 37. A value that is not a mode is reported rather than guessed at. Guessing
-# would silently drop the records or the queue the project asked for.
-dir="$(FIXTURE_MODE="trackerr" fixture)"
-out="$(CLAUDE_PROJECT_DIR="$dir" bash "$session")"
-case "$out" in
-  *"'trackerr'"*"not standard, tracker, or full"*) ok "session: an unknown mode is reported" ;;
-  *) bad "session: an unknown mode is reported (got: $out)" ;;
-esac
-
-# 38. A project that removed .lean/bin/ is not nagged about a mode it has no way
-# to record: the hook says nothing about modes and its other output still runs.
-dir="$(FIXTURE_MODE="unset" fixture)"
-rm -rf "$dir/.lean/bin"
-out="$(CLAUDE_PROJECT_DIR="$dir" bash "$session")"
-case "$out" in
-  *"workflow mode"*) bad "session: no mode.sh means no mode question (got: $out)" ;;
-  *) ok "session: no mode.sh means no mode question" ;;
-esac
-case "$out" in
-  *"/lean-init"*) ok "session: no mode.sh leaves the rest of the hook working" ;;
-  *) bad "session: no mode.sh leaves the rest of the hook working (got: $out)" ;;
 esac
 
 echo
