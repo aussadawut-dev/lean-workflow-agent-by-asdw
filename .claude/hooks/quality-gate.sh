@@ -54,7 +54,11 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     git diff HEAD 2>/dev/null
     git status --porcelain
     git ls-files --others --exclude-standard -z |
-      while IFS= read -r -d '' f; do cat "$f" 2>/dev/null; done
+      while IFS= read -r -d '' f; do
+        # Frame each file independently: A + BC must differ from AB + C.
+        printf '%s\0' "$f"
+        cksum < "$f" 2>/dev/null
+      done
   } | cksum)"
 fi
 

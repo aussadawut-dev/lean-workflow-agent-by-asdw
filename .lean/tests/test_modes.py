@@ -58,6 +58,68 @@ class WorkflowModeTests(unittest.TestCase):
         )
         return path
 
+    def test_indented_and_alternate_checklists_block_done(self):
+        self.run_cli("configure", "tracker")
+        for prefix in ("  -", "\t-", "*", "+", "1.", "2)"):
+            with self.subTest(prefix=prefix):
+                path = self.checklist_tracker()
+                path.write_text(path.read_text().replace("- [ ]", prefix + " [ ]"))
+                before = path.read_bytes()
+                self.run_cli("tracker", "status", "--id", "TCK001", "--status", "DONE",
+                             "--evidence", "review passed", success=False)
+                self.assertEqual(path.read_bytes(), before)
+                path.write_text(path.read_text().replace("Status: PLANNED", "Status: DONE") + "\n- review passed\n")
+                self.run_cli("check", success=False)
+                path.write_text(path.read_text().replace("[ ]", "[x]"))
+                self.run_cli("check")
+
+    def test_symlinked_runtime_and_lock_are_rejected(self):
+        self.run_cli("configure", "standard")
+        with tempfile.TemporaryDirectory() as external:
+            outside = Path(external)
+            runtime = self.root / ".agent-runtime"
+            (runtime / "queue.lock").unlink()
+            runtime.rmdir()
+            runtime.symlink_to(outside, target_is_directory=True)
+            self.run_cli("configure", "standard", success=False)
+            self.assertEqual(list(outside.iterdir()), [])
+            runtime.unlink()
+            runtime.mkdir()
+            target = outside / "lock"
+            target.write_text("preserve")
+            (runtime / "queue.lock").symlink_to(target)
+            self.run_cli("configure", "standard", success=False)
+            self.assertEqual(target.read_text(), "preserve")
+
+    def test_symlinked_claims_cannot_delete_external_files(self):
+        self.run_cli("configure", "full")
+        with tempfile.TemporaryDirectory() as external:
+            outside = Path(external)
+            target = outside / "Q0001.json"
+            target.write_text(json.dumps({"id": "Q0001", "agent": "one", "token": "dummy",
+                                          "request_id": "expired-request-0001", "expires_at": 0}))
+            before = target.read_bytes()
+            (self.root / ".agent-runtime/claims").symlink_to(outside, target_is_directory=True)
+            self.run_cli("queue", "list", success=False)
+            self.assertEqual(target.read_bytes(), before)
+
+    def test_symlinked_tracking_parent_and_item_are_rejected(self):
+        with tempfile.TemporaryDirectory() as external:
+            outside = Path(external)
+            (self.root / "docs").symlink_to(outside, target_is_directory=True)
+            self.run_cli("configure", "tracker", success=False)
+            self.assertEqual(list(outside.iterdir()), [])
+            (self.root / "docs").unlink()
+            self.run_cli("configure", "full")
+            self.tracker_doc()
+            item = self.item("Q0001", ["area:api"])
+            target = outside / "Q0001.json"
+            target.write_bytes(item.read_bytes())
+            item.unlink()
+            item.symlink_to(target)
+            self.run_cli("queue", "claim", "--id", "Q0001", "--agent", "one", success=False)
+            self.assertFalse((self.root / ".agent-runtime/claims/Q0001.json").exists())
+
     def test_duplicate_tracker_ids_are_rejected_in_all_tracking_modes(self):
         for mode in ("tracker", "full"):
             with self.subTest(mode=mode):

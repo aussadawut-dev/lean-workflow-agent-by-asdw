@@ -1,6 +1,6 @@
 # Agent policy router
 
-Lean Workflow Baseline 3.2.0. See `CHANGELOG.md` for changes and migration steps.
+Lean Workflow Baseline 3.3.0. See `CHANGELOG.md` for changes and migration steps.
 
 This directory contains operating rules and their self-checks. It is not application structure and prescribes no stack or primary provider. `AGENTS.md` is canonical; `CLAUDE.md` imports it. Shared procedures in `.claude/skills/` have Codex adapters in `.agents/skills/`.
 

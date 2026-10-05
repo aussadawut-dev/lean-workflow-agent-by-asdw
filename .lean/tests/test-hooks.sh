@@ -482,5 +482,16 @@ case "$err" in
 esac
 
 echo
+# Distinct untracked file boundaries must invalidate a passing cache.
+dir="$(fixture "test \"\$(cat a)\" = A")"
+printf A > "$dir/a"
+printf BC > "$dir/b"
+run_gate "$dir" '{}'
+expect_code "gate: initial untracked boundary fixture passes" 0
+printf AB > "$dir/a"
+printf C > "$dir/b"
+run_gate "$dir" '{}'
+expect_code "gate: redistributed untracked bytes rerun and fail" 2
+
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

@@ -2,7 +2,7 @@
 
 A reusable GitHub template for working with coding agents through clear task contracts, meaningful tests, risk-based review and evidence before completion. Claude and Codex share one workflow, with optional tracking and task ownership. Bring your own application stack and choose how much process your project needs.
 
-Current baseline: **3.2.0**. The template starts with unconfigured `standard` mode and `direct` execution; it contains no project tasks, queue items or leases.
+Current baseline: **3.3.0**. The template starts with unconfigured `standard` mode and `direct` execution; it contains no project tasks, queue items or leases.
 
 ## Workflow modes
 

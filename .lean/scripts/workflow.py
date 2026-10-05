@@ -23,10 +23,30 @@ LEASE_SECONDS = 30 * 60
 ID = re.compile(r"Q[0-9]{4,}")
 TRACKER = re.compile(r"TCK[0-9]{3,}")
 REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{7,127}")
+CHECKLIST_HEADING = re.compile(r"(?:acceptance criteri(?:a|on)|tasks?)\b", re.IGNORECASE)
+CHECKBOX = re.compile(r"[ \t]*(?:[-+*]|[0-9]+[.)])[ \t]+\[([ xX])\][ \t]*(.*)")
 
 
 def fail(message):
     raise ValueError(message)
+
+
+def validate_project_paths(root):
+    """Keep workflow data and its parents in this checkout before any mutation.
+
+    Local CLI locking coordinates cooperating processes; it does not protect
+    against another process replacing filesystem paths during an operation.
+    """
+    for relative in (".lean/config.json", ".gitignore", ".agent-runtime", "docs/tracking", ".agents/queue"):
+        path = root
+        for part in Path(relative).parts:
+            path = path / part
+            if path.is_symlink():
+                fail(f"workflow path must not be a symlink: {path}")
+        if path.is_dir():
+            for child in path.rglob("*"):
+                if child.is_symlink():
+                    fail(f"workflow path must not be a symlink: {child}")
 
 
 def write_json(path, value):
@@ -146,40 +166,65 @@ def tracker_file(root, tracker_id):
 
 
 def unchecked_tracker_items(content):
-    """Return unchecked AC/TASK items; legacy trackers without these lists remain valid."""
-    sections = re.split(r"(?m)^## (.+)$", content)
-    unchecked = []
-    for index in range(1, len(sections), 2):
-        heading, body = sections[index], sections[index + 1]
-        if heading.strip().lower() in ("acceptance criteria", "tasks"):
-            entries = re.findall(r"(?m)^- \[([ xX])\] ((?:AC|TASK)-[^:]+): (.+)$", body)
-            unchecked.extend(entry[1] for entry in entries if entry[0] == " ")
+    """Return unchecked items under Acceptance criteria/Tasks headings and their subheadings.
+
+    Every list checkbox counts, whatever its label or the heading level, so an
+    unconventional format cannot hide open work. Legacy trackers without these
+    sections remain valid.
+    """
+    unchecked, level, fenced = [], None, False
+    for line in content.splitlines():
+        if re.match(r"[ \t]*(```|~~~)", line):
+            fenced = not fenced
+            continue
+        if fenced:
+            continue
+        heading = re.fullmatch(r"(#{1,6})[ \t]+(.*?)[ \t#]*", line)
+        if heading:
+            depth = len(heading.group(1))
+            if level is not None and depth <= level:
+                level = None
+            if level is None and CHECKLIST_HEADING.match(heading.group(2)):
+                level = depth
+            continue
+        entry = CHECKBOX.fullmatch(line)
+        if level is not None and entry and entry.group(1) == " ":
+            unchecked.append(entry.group(2).split(":", 1)[0].strip())
     return unchecked
+
+
+def single_line(value, name):
+    """Reject line breaks that would forge Status or Evidence lines in a tracker."""
+    if "".join(value.splitlines()) != value:
+        fail(f"{name} must be a single line")
+    return value.strip()
 
 
 def tracker_command(root, args):
     with locked(root):
         mode_at_least(root, "tracker")
         if args.action == "new":
-            if not TRACKER.fullmatch(args.id) or not args.title.strip():
+            title = single_line(args.title, "tracker title")
+            if not TRACKER.fullmatch(args.id) or not title:
                 fail("valid tracker id and title are required")
             directory = root / "docs/tracking"
             matches = list(directory.glob(f"{args.id}*.md"))
             if any(p.stem == args.id or p.stem.startswith(args.id + "-") for p in matches):
                 fail(f"tracker already exists: {args.id}")
             content = (root / ".lean/templates/tracker.md").read_text()
-            content = content.replace("TCKNNN — Title", f"{args.id} — {args.title.strip()}", 1)
+            content = content.replace("TCKNNN — Title", f"{args.id} — {title}", 1)
             path = directory / f"{args.id}.md"
             with path.open("x") as out:
                 out.write(content)
             print(f"created: {path.relative_to(root)}")
         elif args.action == "status":
             path = tracker_file(root, args.id)
+            evidence = single_line(args.evidence, "evidence")
             content = path.read_text()
             matches = list(re.finditer(r"(?m)^Status: [A-Z_]+$", content))
             if len(matches) != 1:
                 fail(f"expected one Status line: {args.id}")
-            if args.status == "DONE" and not args.evidence.strip():
+            if args.status == "DONE" and not evidence:
                 fail("DONE requires evidence")
             if args.status == "DONE" and unchecked_tracker_items(content):
                 fail(f"DONE requires all acceptance criteria and tasks checked: {args.id}")
@@ -188,11 +233,11 @@ def tracker_command(root, args):
                 if not linked or any(item["status"] != "DONE" for item in linked):
                     fail("all linked queue items must be DONE before the tracker")
             content = content[:matches[0].start()] + f"Status: {args.status}" + content[matches[0].end():]
-            if args.evidence.strip():
+            if evidence:
                 marker = "## Evidence\n"
                 if marker not in content:
                     fail(f"missing Evidence section: {args.id}")
-                content = content.replace(marker, marker + f"\n- {args.evidence.strip()}\n", 1)
+                content = content.replace(marker, marker + f"\n- {evidence}\n", 1)
             write_text(path, content)
             print(f"tracker {args.id}: {args.status}")
 
@@ -422,6 +467,7 @@ def downgrade(root, target, apply=False, keep_pending=False):
 
 @contextlib.contextmanager
 def locked(root, read_only=False):
+    validate_project_paths(root)
     runtime = root / ".agent-runtime"
     path = runtime / "queue.lock"
     if read_only and not path.exists():
@@ -473,9 +519,10 @@ def validate_claims(all_items, claims):
         item = all_items.get(item_id)
         if item is None or item["status"] != "READY":
             fail(f"claim has no READY item: {item_id}")
-        if claim["agent"] in agents:
-            fail(f"agent owns multiple claims: {claim['agent']}")
-        agents.add(claim["agent"])
+        # Surrounding whitespace must not make one agent look like two.
+        if claim["agent"].strip() in agents:
+            fail(f"agent owns multiple claims: {claim['agent'].strip()}")
+        agents.add(claim["agent"].strip())
         overlap = scopes.intersection(item["scopes"])
         if overlap:
             fail(f"overlapping active claim scope: {sorted(overlap)[0]}")
@@ -563,8 +610,8 @@ def queue_command(root, args):
                 print(f"{item_id} {item['status']} {owner} {item['tracker']} {item['title']}")
             return
         if args.action in ("claim-next", "claim"):
-            if not args.agent.strip():
-                fail("agent id is required")
+            if not args.agent.strip() or args.agent != args.agent.strip():
+                fail("agent id is required and must not have surrounding whitespace")
             if not REQUEST_ID.fullmatch(args.request_id):
                 fail("request id must be a stable random identifier of at least eight characters")
             occupied = validate_claims(all_items, claims)

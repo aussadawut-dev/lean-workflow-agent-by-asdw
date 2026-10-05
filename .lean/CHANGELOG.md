@@ -4,6 +4,27 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
+## 3.3.0
+
+### Guard enforcement
+
+Existing rules now hold where tracker layout, CLI input or filesystem paths could bypass them.
+The rules are unchanged; their enforcement is stricter.
+
+- DONE counts every unchecked checkbox under Acceptance criteria/Tasks headings at any level,
+  including subheadings, suffixed headings, other bullet styles and items without an
+  `AC-`/`TASK-` id. Checkboxes in other sections and inside code fences still do not count.
+  Before upgrading, check or remove open boxes in DONE trackers: `check` now reports them.
+- `tracker new --title` and `tracker status --evidence` must be single lines, so CLI text
+  cannot add a second `Status:` line or a forged Evidence section.
+- Agent ids with surrounding whitespace are rejected at claim time, and claim validation
+  compares trimmed ids, so one agent cannot hold two claims as `A` and `A `.
+- Workflow paths (config, `.gitignore`, runtime leases, tracking and queue) must not be
+  symlinks; the CLI refuses to lock or mutate through them.
+- The Quality Gate frames each untracked file by name and checksum, so redistributing bytes
+  between untracked files invalidates a passing cache.
+- Add regression tests for each guard and one end-to-end mode lifecycle test.
+
 ## 3.2.0
 
 ### User command entrypoints

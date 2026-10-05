@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Lean Workflow Baseline 3.2.0. This file is the canonical contract for all coding agents.
+Lean Workflow Baseline 3.3.0. This file is the canonical contract for all coding agents.
 
 **Before any task, read this file and `.lean/README.md`.**
 Explicit user instructions take precedence. The active agent owns the task unless the project records a different Controller or primary agent. No provider owns the workflow by default. Keep shared rules here; `CLAUDE.md` imports them.
