@@ -58,6 +58,18 @@ class WorkflowModeTests(unittest.TestCase):
         )
         return path
 
+    def test_cancelled_ids_cannot_be_reused_or_claimed(self):
+        self.run_cli("configure", "full")
+        self.tracker_doc()
+        retired = self.root / ".agents/queue/retired"
+        retired.mkdir()
+        (retired / "Q0001.txt").write_text(json.dumps({"id": "Q0001", "status": "CANCELLED"}))
+        self.run_cli("check")
+        self.run_cli("queue", "claim", "--id", "Q0001", "--agent", "worker", success=False)
+        self.item("Q0001", ["area:old"])
+        result = self.run_cli("check", success=False)
+        self.assertIn("cancelled queue id reused", result.stderr)
+
     def test_indented_and_alternate_checklists_block_done(self):
         self.run_cli("configure", "tracker")
         for prefix in ("  -", "\t-", "*", "+", "1.", "2)"):

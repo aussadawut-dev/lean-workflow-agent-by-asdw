@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Static imports, review routing and skill parity checks; no third-party dependencies."""
 import re
+import json
 import subprocess
 import sys
 from pathlib import Path
 
 REQUIRED_SKILLS = ("lean-init", "lean-task", "lean-review", "lean-gate", "lean-scope",
-                   "lean-research", "lean-grill", "lean-multi-agent", "clean-queue", "lean-model-update", "lean-compress")
-USER_COMMANDS = {"lean-init", "lean-task", "lean-model-update", "lean-compress", "clean-queue"}
+                   "lean-research", "lean-grill", "lean-multi-agent", "clean-queue", "lean-model-update", "lean-compress",
+                   "lean-takeover-workflow")
+USER_COMMANDS = {"lean-init", "lean-task", "lean-model-update", "lean-compress", "clean-queue", "lean-takeover-workflow"}
 
 
 def check(root):
@@ -15,6 +17,24 @@ def check(root):
 
     def bad(message):
         failures.append(message)
+
+    try:
+        registry = json.loads((root / ".lean/assets.json").read_text())
+        assets = registry["files"]
+        if (registry.get("schema") != 1 or not isinstance(assets, list) or not assets
+                or not all(isinstance(name, str) for name in assets) or len(assets) != len(set(assets))
+                or ".lean/assets.json" not in assets):
+            raise ValueError("invalid portable registry")
+        for name in assets:
+            path = Path(name)
+            if path.is_absolute() or ".." in path.parts or not (root / path).is_file():
+                bad(f"invalid/missing portable asset: {name}")
+        for name in REQUIRED_SKILLS:
+            for tree in (".claude/skills", ".agents/skills"):
+                if f"{tree}/{name}/SKILL.md" not in assets:
+                    bad(f"portable registry missing skill: {tree}/{name}/SKILL.md")
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        bad("invalid or missing portable asset registry")
 
     listing = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
                              cwd=root, capture_output=True)

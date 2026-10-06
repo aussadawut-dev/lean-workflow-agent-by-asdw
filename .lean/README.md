@@ -1,6 +1,6 @@
 # Agent policy router
 
-Lean Workflow Baseline 3.3.0. See `CHANGELOG.md` for changes and migration steps.
+Lean Workflow Baseline 3.4.0. See `CHANGELOG.md` for changes and migration steps.
 
 This directory contains operating rules and their self-checks. It is not application structure and prescribes no stack or primary provider. `AGENTS.md` is canonical; `CLAUDE.md` imports it. Shared procedures in `.claude/skills/` have Codex adapters in `.agents/skills/`.
 
@@ -21,6 +21,8 @@ Queue cleanup uses `/clean-queue old` (DONE older than 30 days) or `/clean-queue
 Model research updates use `/lean-model-update codex|claude|all`. Preview is the default; explicitly approved apply updates an optional project-owned catalog and retains an ignored local catalog lock file. Session/global settings stay under runtime control. See `policy/MODELS.md`.
 
 Use `/lean-compress` for concise, clear workflow prose. It inventories and fully reads all authorized workflow files before compression, preserves rules/protected content, previews by default and edits only approved targets.
+
+Use `/lean-takeover-workflow "<target path>"` to audit an existing repository, resolve migration decisions through Grill, propose a concrete plan and install Lean after matching approval. Preview does not write to the target. External staging verifies the proposed public workflow before writes; snapshots/journals support resume and guarded rollback; APPLIED still requires the actual target gate and HIGH independent review. See the shared procedure and `CUSTOMIZING.md`.
 
 ## Layout and ownership
 

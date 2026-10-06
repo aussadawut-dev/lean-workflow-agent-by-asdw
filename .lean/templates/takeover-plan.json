@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "id": "REPLACE_WITH_SESSION_ID",
+  "target": "/absolute/target/path",
+  "baseline": null,
+  "decisions": [],
+  "unresolved": ["Populate from the generated draft and resolve material user decisions"],
+  "acceptance": [],
+  "dispositions": [],
+  "rule_map": [],
+  "record_migrations": [],
+  "operations": []
+}

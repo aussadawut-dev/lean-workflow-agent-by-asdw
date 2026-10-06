@@ -2,7 +2,7 @@
 
 ## Current authority
 
-Baseline 3.3.0 uses `AGENTS.md` as the shared canonical contract. `CLAUDE.md` is a runtime entrypoint. The active agent leads unless project additions record a different Controller or primary agent. No provider-specific ownership, product stack or model shortlist is imposed.
+Baseline 3.4.0 uses `AGENTS.md` as the shared canonical contract. `CLAUDE.md` is a runtime entrypoint. The active agent leads unless project additions record a different Controller or primary agent. No provider-specific ownership, product stack or model shortlist is imposed.
 
 Keep project facts, commands and gates in PROJECT; keep mode/execution in config; keep accepted scope and work records in the project's chosen tracking system. Project overrides go below the contract's Project additions marker. Record local workflow extensions in project-owned documentation (an existing LOCAL-EXTENSIONS file may serve this purpose). Do not edit portable policy per project without tracking that delta.
 
@@ -16,10 +16,18 @@ Never copy another project's actual trackers, queue items, leases, gate caches/r
 
 1. Read the new release's migration entry before replacing files. Save the project's canonical contract additions, runtime additions and local extension deltas.
 2. Preserve the optional project model catalog and its accepted research evidence. Preserve PROJECT, config (including configured mode/execution), all accepted decisions and project record directories. Do not reset a configured repository or change the primary agent.
-3. Update policy/router/changelog, all eleven shared procedures and their adapters, hooks/reviewer, mode tooling/templates and self-tests as a coherent set. Preserve project-specific extra skills and agents. Reconcile any existing local extensions, including scope/research/grill/delegation and model evidence gates.
+3. Update policy/router/changelog, all twelve shared procedures and their adapters, hooks/reviewer, mode tooling/templates and self-tests as a coherent set. Preserve project-specific extra skills and agents. Reconcile any existing local extensions, including scope/research/grill/delegation and model evidence gates.
 4. Reapply shared overrides below AGENTS Project additions and Claude-specific overrides below CLAUDE Project additions. A project with another established canonical arrangement must reconcile it deliberately rather than silently lose its contract.
 5. Merge settings and gitignore; never replace existing permissions with template defaults merely for convenience. Preserve application CI/gate and merge workflow checks. Keep `.agent-runtime/`, Claude gate files, Python caches and merge debris ignored.
 6. Run the actual PROJECT Quality Gate and workflow checks that remain installed. Any behavior change needs meaningful tests; fixes demonstrate regression failure before repair and success after. Finish required independent review over the shipping delta.
+
+## Taking over another workflow
+
+Use `/lean-takeover-workflow "<target path>"` (Codex: `$lean-takeover-workflow`) for deliberate replacement of an existing agent workflow. Read the shared skill before proceeding. It fully reads authorized workflow dependencies, grills material choices with evidence and consequences, maps old rules/documents into Lean ownership and presents an exact plan before apply. Existing accepted choices are reused; clear mechanics do not need extra questionnaires.
+
+The Python helper imports only the portable assets declared in the fingerprinted `.lean/assets.json` release registry. Adjacent local scripts/templates are not release assets. Regenerate and review the registry when changing the distribution; a pre-registry baseline needs that upgrade first. It does not synthesize project rules or merge permissions automatically. Reconcile target PROJECT/config, runtime settings, application gate/CI, custom capabilities, documentation routes and records in the reviewed plan. Preserve valid existing Lean trackers/queues; state transitions and downgrades retain their original tools and guards. Supported `casetodian-v1` foreign queue/tracker conversions use explicit decision-bound `record_migrations`, exact inert originals and validated staged records in the same recoverable journal. Cancelled records become reserved cancellation history; they never become DONE. Existing Lean records remain protected. Unsupported foreign-record mappings or unresolved authority conflicts block the affected migration.
+
+Keep private session artifacts outside both repositories. Snapshots archive original public workflow content without leaving active instruction filenames in the target. Do not add a blanket history exemption to active structure checks; version-controlled history requires inert content and deliberate runtime/reference routing. Preview/check/stage/seal leave the target intact. Validate the staged public workflow before sealing; it excludes private/generated/application dependencies and does not replace the actual target gate. Apply may create the local queue lock; resume uses the same sealed plan, and rollback refuses subsequent edits. File-write success is APPLIED until the target's checks and HIGH independent review pass. No commit, push, global configuration or paid usage is implied.
 
 ## Existing 2.x projects
 

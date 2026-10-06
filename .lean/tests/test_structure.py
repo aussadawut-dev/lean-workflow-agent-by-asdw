@@ -90,6 +90,14 @@ class StructureTests(unittest.TestCase):
         path.write_text(path.read_text().replace("../../../.claude/skills/lean-compress/SKILL.md", "../../../.claude/skills/lean-task/SKILL.md"))
         self.assertIn("adapter", self.check(False))
 
+    def test_takeover_adapter_is_required_and_must_link_canonical_procedure(self):
+        path = self.root / ".agents/skills/lean-takeover-workflow/SKILL.md"
+        original = path.read_text()
+        path.write_text(original.replace("../../../.claude/skills/lean-takeover-workflow/SKILL.md", "../../../.claude/skills/lean-task/SKILL.md"))
+        self.assertIn("adapter", self.check(False))
+        shutil.rmtree(path.parent)
+        self.assertIn("adapter", self.check(False))
+
     def test_empty_description_is_rejected(self):
         path = self.root / ".agents/skills/lean-task/SKILL.md"
         lines = ["description: " if line.startswith("description:") else line for line in path.read_text().splitlines()]
@@ -106,7 +114,7 @@ class StructureTests(unittest.TestCase):
                 path.write_text(original)
 
     def test_user_commands_cannot_be_hidden_or_lose_argument_hints(self):
-        for name in ("lean-init", "lean-task", "lean-model-update", "lean-compress", "clean-queue"):
+        for name in ("lean-init", "lean-task", "lean-model-update", "lean-compress", "clean-queue", "lean-takeover-workflow"):
             with self.subTest(name=name):
                 path = self.root / ".claude/skills" / name / "SKILL.md"
                 original = path.read_text()

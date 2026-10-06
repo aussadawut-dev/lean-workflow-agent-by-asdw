@@ -4,6 +4,20 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
+## 3.4.0
+
+### Workflow takeover
+
+- Add `/lean-takeover-workflow "<target path>"` with a shared procedure and Codex adapter. Audit the complete authorized workflow, ask adaptive Grill questions for material user decisions, and map old requirements/documents into Lean ownership before presenting an exact migration plan.
+- Add external-session tooling for inventory/full-read attestations, release-registry baseline drafts, checked external staging, exact-plan approval, journaled apply/resume and guarded rollback. Preserve dirty/untracked originals and permission bits; reject private paths, nested repositories, source project capabilities, live Lean claims and stale revisions. APPLIED still needs target validation and HIGH independent review.
+- Expand adapter parity and command visibility checks to twelve shared skills and six user commands. Add takeover behavior/recovery tests and usage/ownership guidance. The global Grill procedure is unchanged; additional decision depth applies to takeover.
+
+- Support explicit lossless `casetodian-v1` queue/tracker conversion with accepted mapping decisions, inert originals, trusted staged record validation, and journaled recovery. Preserve existing Lean record guards and reserve cancelled queue IDs without inventing DONE evidence.
+
+### Upgrade from 3.3.x
+
+Update portable assets, the new `.lean/assets.json` release registry, tooling/tests and all matching adapters together. Preserve project additions, facts/gate, configuration, records, custom skills/agents and runtime permissions. No migration sessions or task records are shipped. Takeover is an explicit target operation; upgrading Lean does not run it or alter global skill discovery.
+
 ## 3.3.0
 
 ### Guard enforcement

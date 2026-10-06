@@ -265,10 +265,21 @@ def queue_history(root):
 def items(root):
     directory = root / ".agents/queue/items"
     history = queue_history(root)
+    retired = set()
+    for path in sorted((root / ".agents/queue/retired").glob("*.txt")):
+        original = read_json(path)
+        if (not ID.fullmatch(path.stem) or not isinstance(original, dict)
+                or original.get("id") != path.stem or original.get("status") != "CANCELLED"):
+            fail(f"invalid cancellation history: {path}")
+        retired.add(path.stem)
+    if retired & set(history):
+        fail("cancelled queue id reused in DONE history")
     sources = [(root / ".agents/queue/history" / (key + ".json"), json.loads(record["content"]))
                for key, record in history.items()]
     for path in sorted(directory.glob("*.json")):
         value = read_json(path)
+        if path.stem in retired:
+            fail(f"cancelled queue id reused: {path.stem}")
         if path.stem in history:
             # A published archive is authoritative after an interrupted unlink.
             # A different source with the same id is reuse/corruption, not recovery.
