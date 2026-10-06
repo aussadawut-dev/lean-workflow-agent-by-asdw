@@ -8,8 +8,8 @@ from pathlib import Path
 
 REQUIRED_SKILLS = ("lean-init", "lean-task", "lean-review", "lean-gate", "lean-scope",
                    "lean-research", "lean-grill", "lean-multi-agent", "clean-queue", "lean-model-update", "lean-compress",
-                   "lean-takeover-workflow")
-USER_COMMANDS = {"lean-init", "lean-task", "lean-model-update", "lean-compress", "clean-queue", "lean-takeover-workflow"}
+                   "lean-takeover-workflow", "lean-use-submodule")
+USER_COMMANDS = {"lean-init", "lean-task", "lean-model-update", "lean-compress", "clean-queue", "lean-takeover-workflow", "lean-use-submodule"}
 
 
 def check(root):
@@ -48,7 +48,7 @@ def check(root):
             content = path.read_text()
             for reference in set(re.findall(r"\.(?:lean|claude|agents)/[A-Za-z0-9_./-]+\.(?:md|sh|py|json)", content)):
                 # These paths are created by opting into full mode; examples are not items.
-                if reference.startswith(".agents/queue/") or reference == ".lean/model-catalog.json":
+                if reference.startswith((".agents/queue/", ".lean/targets/")) or reference == ".lean/model-catalog.json":
                     continue
                 if not (root / reference).exists():
                     bad(f"missing {reference} (from {name})")

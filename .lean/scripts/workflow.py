@@ -23,12 +23,18 @@ LEASE_SECONDS = 30 * 60
 ID = re.compile(r"Q[0-9]{4,}")
 TRACKER = re.compile(r"TCK[0-9]{3,}")
 REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{7,127}")
+TEMPLATE_ROOT = None  # CLI-selected workflow assets; record roots never contain scripts.
 CHECKLIST_HEADING = re.compile(r"(?:acceptance criteri(?:a|on)|tasks?)\b", re.IGNORECASE)
 CHECKBOX = re.compile(r"[ \t]*(?:[-+*]|[0-9]+[.)])[ \t]+\[([ xX])\][ \t]*(.*)")
 
 
 def fail(message):
     raise ValueError(message)
+
+
+def tracker_template(root):
+    source = TEMPLATE_ROOT if TEMPLATE_ROOT is not None else root / ".lean/templates"
+    return (source / "tracker.md").read_text()
 
 
 def validate_project_paths(root):
@@ -119,7 +125,7 @@ def configure_locked(root, mode, execution=None):
         tracking.mkdir(parents=True, exist_ok=True)
         template = tracking / "TEMPLATE.md"
         if not template.exists():
-            template.write_text((root / ".lean/templates/tracker.md").read_text())
+            template.write_text(tracker_template(root))
         readme = tracking / "README.md"
         if not readme.exists():
             readme.write_text(
@@ -211,7 +217,7 @@ def tracker_command(root, args):
             matches = list(directory.glob(f"{args.id}*.md"))
             if any(p.stem == args.id or p.stem.startswith(args.id + "-") for p in matches):
                 fail(f"tracker already exists: {args.id}")
-            content = (root / ".lean/templates/tracker.md").read_text()
+            content = tracker_template(root)
             content = content.replace("TCKNNN — Title", f"{args.id} — {title}", 1)
             path = directory / f"{args.id}.md"
             with path.open("x") as out:
@@ -654,8 +660,11 @@ def queue_command(root, args):
 
 
 def main():
+    global TEMPLATE_ROOT
+    sys.dont_write_bytecode = True  # Read-only commands must not leave imported tool caches.
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
+    parser.add_argument("--root", type=Path, help="explicit record root; bypass active target selection")
+    parser.add_argument("--workflow-root", type=Path, help="template source when using an explicit record root")
     commands = parser.add_subparsers(dest="command", required=True)
     setup = commands.add_parser("configure")
     setup.add_argument("mode", choices=MODES)
@@ -701,8 +710,17 @@ def main():
         if action == "complete":
             command.add_argument("--evidence", required=True)
     args = parser.parse_args()
-    root = args.root.resolve()
     try:
+        if args.root is None:
+            from submodule import context
+            workspace_root = Path(__file__).resolve().parents[2]
+            root = Path(context(workspace_root)["record_root"])
+            TEMPLATE_ROOT = workspace_root / ".lean/templates"
+        else:
+            root = args.root.resolve()
+            TEMPLATE_ROOT = root / ".lean/templates"
+        if args.workflow_root is not None:
+            TEMPLATE_ROOT = args.workflow_root.resolve() / ".lean/templates"
         if args.command == "configure":
             configure(root, args.mode, args.execution)
         elif args.command == "downgrade":

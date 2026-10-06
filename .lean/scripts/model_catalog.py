@@ -221,8 +221,9 @@ def apply(root, report_path, approved_digest):
 
 
 def main():
+    sys.dont_write_bytecode = True
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[2])
+    parser.add_argument('--root', type=Path, help='explicit record root; bypass active target selection')
     commands = parser.add_subparsers(dest='command', required=True)
     commands.add_parser('check')
     plan = commands.add_parser('preview')
@@ -233,7 +234,11 @@ def main():
     commit.add_argument('--sha256', required=True)
     args = parser.parse_args()
     try:
-        root = args.root.resolve()
+        if args.root is None:
+            from submodule import context
+            root = Path(context(Path(__file__).resolve().parents[2])['record_root'])
+        else:
+            root = args.root.resolve()
         if args.command == 'check':
             catalog, checksum = current(root)
             result = {'present': checksum is not None, 'models': len(catalog['models']),

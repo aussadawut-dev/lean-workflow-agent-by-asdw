@@ -1,6 +1,6 @@
 # Agent policy router
 
-Lean Workflow Baseline 3.4.0. See `CHANGELOG.md` for changes and migration steps.
+Lean Workflow Baseline 3.5.0. See `CHANGELOG.md` for changes and migration steps.
 
 This directory contains operating rules and their self-checks. It is not application structure and prescribes no stack or primary provider. `AGENTS.md` is canonical; `CLAUDE.md` imports it. Shared procedures in `.claude/skills/` have Codex adapters in `.agents/skills/`.
 
@@ -23,6 +23,8 @@ Model research updates use `/lean-model-update codex|claude|all`. Preview is the
 Use `/lean-compress` for concise, clear workflow prose. It inventories and fully reads all authorized workflow files before compression, preserves rules/protected content, previews by default and edits only approved targets.
 
 Use `/lean-takeover-workflow "<target path>"` to audit an existing repository, resolve migration decisions through Grill, propose a concrete plan and install Lean after matching approval. Preview does not write to the target. External staging verifies the proposed public workflow before writes; snapshots/journals support resume and guarded rollback; APPLIED still requires the actual target gate and HIGH independent review. See the shared procedure and `CUSTOMIZING.md`.
+
+Use `/lean-use-submodule <remote url>` to keep Lean as the superproject and application code in `targets/<repository-name>`. No workflow files are added to the application. Project facts/config and records live in `.lean/targets/<name>/`, using the existing record layout inside each directory. `submodule.py context` returns all three roots and the project file; default workflow/catalog commands select the active records, while `--root` is explicit. Selection is ignored checkout-local state; cloned workspaces initialize/select a registered target by rerunning the command. Application gates run in the target and block on missing checks; Claude runs them before its Lean cache, Codex runs them explicitly. See the shared procedure and `CUSTOMIZING.md`.
 
 ## Layout and ownership
 

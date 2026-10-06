@@ -4,6 +4,18 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
+## 3.5.0
+
+### Application submodules
+
+- Add `/lean-use-submodule <remote url>` and a Codex adapter: Lean is the superproject, application code lives in `targets/<name>`, and workflow/project records stay outside the application repository.
+- Add read-only preview, guarded add/reuse, pinned-commit branch recovery for clean detached checkouts, per-target context/records, explicit deselection and application gates. Preserve staged work and custom target instructions; stage only the submodule registration through Git, never commit or push automatically.
+- Route workflow/catalog defaults to active target records, retaining explicit `--root` behavior and Lean template sourcing. Claude checks the application before its Lean cache can skip; Codex runs both gates explicitly. Add actual Git installation/reuse/clone, record isolation and gate tests. Upgrade all thirteen procedures/adapters, tooling, hooks and the assets registry together; preserve target registrations and records.
+
+### Upgrade from 3.4.x
+
+Update the contract/router, all shared procedures and matching adapters, tooling/hooks, tests and assets registry together. In Lean's own PROJECT gate, give workflow/catalog checks an explicit `--root .`; default commands now select active target records. Preserve target registrations, project data, runtime permissions and existing configured choices. The command keeps workflow outside the application Git history; it does not remove files already tracked there.
+
 ## 3.4.0
 
 ### Workflow takeover

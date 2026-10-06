@@ -32,6 +32,12 @@ if [ "$seed" -eq 0 ]; then
   fi
 fi
 
+# Application checks must run before the Lean cache can skip its own checks.
+# Target state (including untracked files) is separate from the superproject.
+if [ "$seed" -eq 0 ] && { [ -e "$root/.agent-runtime/active-target.json" ] || [ -L "$root/.agent-runtime/active-target.json" ]; }; then
+  python3 "$root/.lean/scripts/submodule.py" --root "$root" gate --optional || exit 2
+fi
+
 [ -f "$project" ] || exit 0
 
 commands="$(awk '

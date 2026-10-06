@@ -2,7 +2,7 @@
 
 A reusable GitHub template for working with coding agents through clear task contracts, meaningful tests, risk-based review and evidence before completion. Claude and Codex share one workflow, with optional tracking and task ownership. Bring your own application stack and choose how much process your project needs.
 
-Current baseline: **3.4.0**. The template starts with unconfigured `standard` mode and `direct` execution; it contains no project tasks, queue items or leases.
+Current baseline: **3.5.0**. The template starts with unconfigured `standard` mode and `direct` execution; it contains no project tasks, queue items or leases.
 
 ## Workflow modes
 
@@ -105,7 +105,7 @@ Run preservation checks and the project Quality Gate, then review the actual dif
 
 ### One shared contract across agents
 
-[AGENTS.md](AGENTS.md) is canonical. [CLAUDE.md](CLAUDE.md) imports it, and twelve Codex adapters reference the same shared skill procedures. No provider is the required primary agent; the active agent owns the task unless the project records a different Controller.
+[AGENTS.md](AGENTS.md) is canonical. [CLAUDE.md](CLAUDE.md) imports it, and thirteen Codex adapters reference the same shared skill procedures. No provider is the required primary agent; the active agent owns the task unless the project records a different Controller.
 
 The contract requires acceptance evidence before reporting DONE, preserves an explicitly requested quality floor, and limits extra effort to work with a useful reason. Project-specific additions have dedicated sections so upgrades can preserve them.
 
@@ -139,6 +139,7 @@ Start ordinary work with `lean-task`; the agent handles scope, research, materia
 | Start a task | `/lean-task <task description>` | `$lean-task <task description>` |
 | Research a model catalog refresh | `/lean-model-update [codex\|claude\|all]` | `$lean-model-update` with the same arguments |
 | Audit and shorten workflow prose | `/lean-compress [workflow\|PATH...] [--preview\|--apply]` | `$lean-compress` with the same arguments |
+| Use an application submodule | `/lean-use-submodule <remote url>` | `$lean-use-submodule <remote url>` |
 | Take over an existing workflow | `/lean-takeover-workflow "<target path>" [--preview\|--apply <plan-id>]` | `$lean-takeover-workflow` with the same arguments |
 | Archive completed queue items | `/clean-queue <old\|all> [--preview]` | `$clean-queue` with the same arguments |
 
@@ -226,9 +227,24 @@ Run from a Git working tree:
 shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh
 .lean/scripts/check-structure.sh
 .lean/tests/test-hooks.sh
-python3 .lean/scripts/workflow.py check
-python3 .lean/scripts/model_catalog.py check
+python3 .lean/scripts/workflow.py --root . check
+python3 .lean/scripts/model_catalog.py --root . check
 python3 -m unittest discover -s .lean/tests -p 'test_*.py'
 ```
 
 For contribution expectations, see [CONTRIBUTING.md](CONTRIBUTING.md). The project is distributed under the [MIT License](LICENSE); preserve its notice when redistributing the workflow.
+
+### Keep workflow out of an application repository
+
+Run `/lean-use-submodule <remote url>` from Lean to add or reuse the application under `targets/<repository-name>`. Lean stores `.gitmodules`, the gitlink and all workflow/project records; the application receives no agent workflow files. The new command is a shared Claude skill with a Codex adapter.
+
+```sh
+# Read-only preview; the skill applies a direct installation request.
+python3 .lean/scripts/submodule.py use --dry-run -- https://github.com/team/my-project.git
+python3 .lean/scripts/submodule.py use --apply -- https://github.com/team/my-project.git
+python3 .lean/scripts/submodule.py context
+```
+
+Start sessions from Lean. The context reports `project_root` for application commands and Git, `record_root` for project facts/config and tracking, and `workflow_root` for tools/rules. Default workflow and model-catalog commands select the active records; `--root` overrides that selection. Explicit workflow record operations can add `--workflow-root` to source templates from Lean. Fill the returned project file with verified application checks, then run `python3 .lean/scripts/submodule.py gate`; Lean self-checks remain separate. Claude runs target checks before using its Lean cache, while Codex runs both gates explicitly.
+
+Adding a submodule stages its registration; it does not commit or push. Initializing a registered submodule preserves its pinned commit: if the default branch differs, the command creates `codex/lean-<name>` at that commit rather than advancing the pointer. Commit application work inside the target and review the resulting pointer change in Lean separately. Checkout-local selection is ignored: after cloning Lean, rerun the command to initialize/select the registered target. `python3 .lean/scripts/submodule.py clear` deselects without removing its checkout or records. Live claims/active trackers block switching; use one active target per session. Existing checkout adoption, workflow removal from target history, and automatic pointer publishing are not part of this command.

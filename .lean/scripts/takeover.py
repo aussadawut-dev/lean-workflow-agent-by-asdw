@@ -390,6 +390,18 @@ def record_migration_sources(manifest, plan):
                 if (not isinstance(new, dict) or set(new) - set(expected)
                         or any(new.get(key) != value for key, value in expected.items())):
                     fail("foreign queue mapping changes status, scope, dependencies or evidence")
+        elif mapping.get("kind") == "evidence-history":
+            parent = mapping_sources.get(mapping.get("parent"), {})
+            evidence_id = re.match(r"TCK[0-9]{3,}(?=[_.-])", Path(source).name)
+            parent_id = re.match(r"TCK[0-9]{3,}(?=[_.-])", Path(parent.get("source", "")).name)
+            named_owner = evidence_id and parent_id and evidence_id[0] == parent_id[0]
+            declared_owner = re.search(r"(?m)^Referenced by:.*`" + re.escape(parent.get("source", "")) + r"`", text)
+            if (not source.startswith("docs/tracking/evidence/") or not source.endswith(".md")
+                    or not parent_id or not (named_owner or (not evidence_id and declared_owner))
+                    or parent.get("kind") != "tracker" or parent.get("format") != "casetodian-v1"
+                    or not archive.startswith("docs/history/agent-workflow/") or not archive.endswith(".txt")
+                    or change.get("content") is not None):
+                fail("evidence history requires its mapped foreign tracker and exact inert archival, never proof rewriting")
         elif mapping.get("kind") == "tracker":
             # This foreign contract used a Tasks/queue-mapping section. A
             # canonical Lean record cannot opt out simply by adding a mapping.

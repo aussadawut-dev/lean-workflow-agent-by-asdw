@@ -1,0 +1,19 @@
+---
+name: lean-use-submodule
+description: Add or reuse a remote application repository as a submodule inside Lean, keeping agent workflow and work records out of the application repository.
+user-invocable: true
+argument-hint: "<remote url>"
+---
+
+# Lean Use Submodule
+
+Use `/lean-use-submodule <remote url>` from the Lean repository root. Lean is the superproject; the application is `targets/<repository-name>`. This is not installing Lean into the application.
+
+1. Read the Lean contract and run `python3 .lean/scripts/submodule.py use --dry-run -- "<remote url>"`. Use the supplied URL as one argument with proper shell quoting (or an argument array); never interpolate it into shell code. The preview reports paths and Git staging. A direct request to use this remote authorizes adding/reusing it and selecting it; do not ask again for routine setup. Stop on a name/path collision, conflicting registration, symlink boundary or pending `.gitmodules` changes. Do not move existing checkouts or discard work. Do not put tokens/passwords in URLs.
+2. Run the same command with `--apply`. Only the selected submodule may be initialized. Existing attached branches and pending application changes are preserved. Attach a clean detached checkout at its pinned commit: use the default branch when it points there, otherwise create `codex/lean-<name>` at that commit. Do not advance to the remote's latest commit or reset an existing branch. If branch selection fails, preserve the partial checkout, explain the failure, choose a branch with the user when material, and rerun. Do not remove Git metadata to force a retry.
+3. Read the returned context: `workflow_root` supplies contract, policies, tools and templates; `project_root` supplies application code, Git operations and working directory for application commands; `record_root` holds project facts, mode/config, trackers, queues and local coordination. Read existing target instructions and preserve their project requirements. Add no workflow files to the target. Begin agent sessions from Lean, not the target alone.
+4. Fill `project_file` from actual target facts and safe verified checks. Leave unknown facts undefined. The generated application gate is empty: installation is successful setup, not evidence that application checks passed. Use `/lean-init` for initial mode/execution choices, reusing accepted settings. Default workflow/model-catalog CLI commands select the active record root; use `--root <record_root> --workflow-root <workflow_root>` for explicit workflow record operations, or `--root <workflow_root>` for Lean's own configuration. Queue scope labels refer to target files; record paths stay under record_root.
+5. Run `python3 .lean/scripts/submodule.py context` to verify selection. Once application checks are defined, run `python3 .lean/scripts/submodule.py gate` as well as Lean's own gate. Lean's workflow/catalog checks must use an explicit `--root <workflow_root>` so active selection cannot redirect them. Claude's Stop hook runs application checks before Lean's cache can skip; Codex runs both explicitly. An undefined/failed target gate blocks DONE for application work. Application commands execute repository code: inspect and select them according to the task's authorization.
+6. Report target path, branch, project-file location and both repositories' status. Submodule addition stages `.gitmodules` and the gitlink; it does not commit or push. Application commits belong to the target; pointer changes belong to Lean and are separate reviewed changes. Never update other pointers automatically. `python3 .lean/scripts/submodule.py clear` deselects the target without deleting its checkout or records. Selection is checkout-local and ignored; after cloning Lean, rerun this command with the registered URL to initialize/select the target. Do not switch active targets during another task or active workset; one target per session is supported.
+
+$ARGUMENTS

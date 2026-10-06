@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Lean Workflow Baseline 3.4.0. This file is the canonical contract for all coding agents.
+Lean Workflow Baseline 3.5.0. This file is the canonical contract for all coding agents.
 
 **Before any task, read this file and `.lean/README.md`.**
 Explicit user instructions take precedence. The active agent owns the task unless the project records a different Controller or primary agent. No provider owns the workflow by default. Keep shared rules here; `CLAUDE.md` imports them.
@@ -24,6 +24,7 @@ Explicit user instructions take precedence. The active agent owns the task unles
 ## Runtime and execution
 
 - Read `.lean/PROJECT.md` before unfamiliar work. Use `python3 .lean/scripts/workflow.py show` to read mode and execution settings. Missing configuration uses unconfigured `standard`/`direct`; do not silently select a heavier mode.
+- For a submodule target, start from Lean and run `python3 .lean/scripts/submodule.py context`. Read its `project_file` and target instructions. Workflow rules/tools stay in `workflow_root`; project-owned PROJECT/config/catalog, trackers, queue and runtime state stay in `record_root`. Application code, commands and Git operations use `project_root`. Default workflow/catalog CLI commands select target records; `--root` overrides selection. Run the target gate explicitly in Codex and retain Lean's own gate for workflow changes. Never install workflow files into the target or silently fall back when its context is invalid.
 - `standard` uses session evidence; `tracker` adds workset documents; `full` adds queue claims. These modes do not select a model, execution strategy, quality floor or review depth.
 - `direct` is the portable default. `delegated` makes the active agent the Controller: delegate bounded implementation/investigation, including small work, to one capable worker. The Controller owns planning, accepted scope, synchronization, validation, integration, review coordination and final reporting. If required delegation is unavailable, report BLOCKED. Follow `.claude/skills/lean-multi-agent/SKILL.md`.
 - Concurrent workers require independent tasks, exclusive file ownership and explicit parallel/multi-agent user intent. Independent HIGH review is required regardless of implementation routing.
@@ -35,7 +36,7 @@ Explicit user instructions take precedence. The active agent owns the task unles
 ## Workflow procedures
 
 Shared procedures under `.claude/skills/` have thin Codex adapters under `.agents/skills/`:
-`lean-init`, `lean-scope`, `lean-research`, `lean-grill`, `lean-task`, `lean-review`, `lean-gate`, `lean-multi-agent`, `clean-queue`, `lean-model-update`, `lean-compress`, `lean-takeover-workflow`.
+`lean-init`, `lean-scope`, `lean-research`, `lean-grill`, `lean-task`, `lean-review`, `lean-gate`, `lean-multi-agent`, `clean-queue`, `lean-model-update`, `lean-compress`, `lean-takeover-workflow`, `lean-use-submodule`.
 Use accepted scope and decisions; routine execution within approved scope needs no repeated approval. Scope changes and unresolved material decisions need the user's input before dependent work.
 
 ## Policy router

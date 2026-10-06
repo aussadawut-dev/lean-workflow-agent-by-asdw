@@ -114,7 +114,7 @@ class StructureTests(unittest.TestCase):
                 path.write_text(original)
 
     def test_user_commands_cannot_be_hidden_or_lose_argument_hints(self):
-        for name in ("lean-init", "lean-task", "lean-model-update", "lean-compress", "clean-queue", "lean-takeover-workflow"):
+        for name in ("lean-init", "lean-task", "lean-model-update", "lean-compress", "clean-queue", "lean-takeover-workflow", "lean-use-submodule"):
             with self.subTest(name=name):
                 path = self.root / ".claude/skills" / name / "SKILL.md"
                 original = path.read_text()

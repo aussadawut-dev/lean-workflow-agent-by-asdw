@@ -667,6 +667,66 @@ class TakeoverTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             TOOL.stage_check(self.session, manifest, self.root, "cannot archive a linked tracker")
 
+    def evidence_history_plan(self, named=True):
+        manifest, plan, parent, _, _ = self.history_tracker_plan()
+        filename = "TCK002-review.md" if named else "model-benchmark.md"
+        source = "docs/tracking/evidence/" + filename
+        archive = "docs/history/agent-workflow/evidence/" + filename + ".txt"
+        original = "# TCK002 old review\nReviewer: .claude/agents/lead-reviewer.md\nPASS with live browser NOT_RUN.\n"
+        if not named:
+            original += "Referenced by: `" + parent + "`.\n"
+        (self.root / source).parent.mkdir(parents=True, exist_ok=True)
+        (self.root / source).write_text(original)
+        TOOL.coverage(self.session, manifest, self.root, source, "include", "")
+        TOOL.coverage(self.session, manifest, self.root, source, "cover", manifest["files"][source]["before"]["sha256"])
+        plan["dispositions"].append({"path": source, "action": "retire", "reason": "exact foreign workset evidence history"})
+        plan["operations"] += [
+            {"path": archive, "before": None, "content": original, "mode": 0o644, "reason": "exact inert evidence original"},
+            {"path": source, "before": manifest["files"][source]["before"], "content": None, "mode": 0o644,
+             "reason": "retain foreign review as history"}]
+        plan["record_migrations"].append({"source": source, "archive": archive, "format": "casetodian-v1",
+            "kind": "evidence-history", "decision": "D1", "parent": parent})
+        return manifest, plan, source, archive, original
+
+    def test_foreign_workset_evidence_history_is_exact_and_recoverable(self):
+        manifest, plan, source, archive, original = self.evidence_history_plan()
+        TOOL.save(self.session / "plan.json", plan)
+        receipt = self.seal_ready(manifest, "fixture accepts foreign tracker and related evidence history")
+        self.apply(manifest, receipt)
+        self.assertFalse((self.root / source).exists())
+        self.assertEqual((self.root / archive).read_text(), original)
+        TOOL.rollback(self.session, manifest, self.root)
+        self.assertEqual((self.root / source).read_text(), original)
+        self.assertFalse((self.root / archive).exists())
+
+    def test_evidence_history_cannot_opt_out_native_or_unrelated_records(self):
+        manifest, plan, source, archive, original = self.evidence_history_plan()
+        TOOL.validate_plan(manifest, plan)
+        for mutation in ("missing-parent", "wrong-workset", "rewrite-proof", "native-parent"):
+            bad, inventory = copy.deepcopy(plan), copy.deepcopy(manifest)
+            if mutation == "missing-parent":
+                bad["record_migrations"][-1]["parent"] = "docs/tracking/TCK999.md"
+            elif mutation == "wrong-workset":
+                bad["record_migrations"][-1]["parent"] = "docs/tracking/TCK001.md"
+            elif mutation == "rewrite-proof":
+                bad["operations"][-1]["content"] = "PASS all live checks\n"
+            else:
+                parent = bad["record_migrations"][-2]
+                content = "Status: DONE\n## Tasks\n## Evidence\n- PASS\n"
+                next(op for op in bad["operations"] if op["path"] == parent["archive"])["content"] = content
+                inventory["files"][parent["source"]]["before"]["sha256"] = TOOL.digest(content.encode())
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                TOOL.validate_plan(inventory, bad)
+
+    def test_unnamed_evidence_needs_explicit_original_parent_reference(self):
+        manifest, plan, source, archive, original = self.evidence_history_plan(named=False)
+        TOOL.validate_plan(manifest, plan)
+        content = original.split("Referenced by:", 1)[0]
+        plan["operations"][-2]["content"] = content
+        manifest["files"][source]["before"]["sha256"] = TOOL.digest(content.encode())
+        with self.assertRaisesRegex(ValueError, "mapped foreign tracker"):
+            TOOL.validate_plan(manifest, plan)
+
     def test_record_guides_can_be_reconciled_without_record_override(self):
         name = "docs/tracking/README.md"
         path = self.root / name
