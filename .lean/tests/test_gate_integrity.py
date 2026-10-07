@@ -46,6 +46,45 @@ class GateIntegrityTests(unittest.TestCase):
         return subprocess.run(["python3", str(self.root / ".lean/scripts/gate_evidence.py"),
                                "--root", str(self.root), *args], text=True, capture_output=True)
 
+    def configured_stop(self, payload=None):
+        settings = json.loads((ROOT / ".claude/settings.json").read_text())
+        command = settings["hooks"]["Stop"][0]["hooks"][0]["command"]
+        return subprocess.run(["bash", "-c", command], input=json.dumps(payload or {}),
+                              env={**os.environ, "CLAUDE_PROJECT_DIR": str(self.root)},
+                              text=True, capture_output=True)
+
+    def test_configured_stop_reuses_pass_but_rechecks_changes_and_failures(self):
+        command = "printf 'run\\n' >> .agent-runtime/check-runs; test ! -f code.txt"
+        self.project.write_text(self.project.read_text().replace("true", command))
+        for _ in range(2):
+            result = self.configured_stop()
+            self.assertEqual(result.returncode, 0, result.stderr)
+        counter = self.root / ".agent-runtime/check-runs"
+        self.assertEqual(counter.read_text().splitlines(), ["run"])
+        (self.root / "code.txt").write_text("changed input\n")
+        result = self.configured_stop()
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertFalse((self.root / ".claude/.gate-cache").exists())
+        (self.root / "code.txt").unlink()
+        result = self.configured_stop()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(counter.read_text().splitlines(), ["run"] * 3)
+
+    def test_configured_stop_cache_still_checks_current_contract_and_review(self):
+        self.assertEqual(self.configured_stop().returncode, 0)
+        path = self.transcript([self.user("high task"), self.assistant(CONTRACT)])
+        result = self.configured_stop({"transcript_path": path})
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("review", result.stderr.lower())
+        self.assertEqual(self.evidence("record-review", "--contract", CONTRACT,
+                                      "--reviewer", "independent-test", "--evidence", "fixture",
+                                      "--verdict", "PASS").returncode, 0)
+        self.assertEqual(self.configured_stop({"transcript_path": path}).returncode, 0)
+        path = self.transcript([self.user("different high task"), self.assistant(CONTRACT + " again")])
+        result = self.configured_stop({"transcript_path": path})
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("review", result.stderr.lower())
+
     def transcript(self, entries):
         path = self.root / ".agent-runtime/transcript.jsonl"
         path.parent.mkdir(exist_ok=True)

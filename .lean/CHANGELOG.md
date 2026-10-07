@@ -6,6 +6,8 @@ was being bypassed -- the rule did not change, its enforcement did. PATCH clarif
 
 ## Unreleased
 
+- Opt this repository's Claude Stop command into tree caching; keep contract/review checks and fresh validation after changes or refusals. Document forced checks for environment/dependency changes and downstream opt-out; test the configured Stop command end to end.
+
 - Add optional standard/high/ultra levels to scope, research and grill: preserve the default, deepen scope precision and question rounds, and broaden evidence-backed vendor/approach comparisons without changing workflow modes or authority.
 
 - Keep eight core procedures in default discovery; expose seven bundled maintenance procedures through explicit `skill_pack.py enable|disable|status`. Retain canonical tools/tests/resources and accept legacy full discovery registries. Preserve existing project pack choices and custom slots during upgrades.
