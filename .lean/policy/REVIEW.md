@@ -18,31 +18,17 @@ Use the deeper of the two. Example: risk `LOW` with quality `VERY_HIGH` gets `HI
 
 ## Rounds
 
-Review costs a full context each round, so the loop needs an end that is not the budget running out.
-
-- A review cycle covers one Task Contract. A change stays in the cycle, and counts toward the round
-  cap below, when its motivation is a finding from this cycle's review. Work that arrives mid-cycle
-  for any other reason is new work: its own contract line, its own cycle, and its depth set by its
-  own risk rather than inherited from this one. A contract opened because the cap fired says so, so
-  the spend already made stays visible.
-- After the second `REWORK` on one contract, the cycle gets one last pass. The delta it reviews must
-  hold the fix for those findings, plus whatever repair validation demands of that fix, and nothing
-  else. `PASS` there ends the cycle. `REWORK` there ends it as `BLOCKED`, naming what is unresolved
-  -- never `DONE`: the delta that ships has to have been reviewed, not merely reviewed to the right
-  depth. Going further is the user's call and their budget. This bounds how often a change is
-  reviewed, never how deeply.
-- A `PASS` ends the review. Anything applied afterwards is new work under the one-contract rule
-  above, whatever its size: its own contract line, and no review when that contract is trivial.
-  There is no carve-out for small fixes. Where `WORKFLOW.md`'s trivial test can be met the whole
-  price is one contract line and no review; inside a high-risk area it cannot be met at all, because
-  every change there is `HIGH` risk, so even a typo costs a full cycle -- the price of the area, not
-  of this rule. Every carve-out tried here failed anyway, by licensing too much or forbidding too
-  much: the agent calling a change small is the one who wrote it, and the last independent look is
-  already behind it.
+- One cycle covers one Task Contract. Fixes motivated by its findings stay in that cycle; unrelated work needs a new contract and its own review depth.
+- After the second `REWORK`, allow one final pass containing only those fixes and repairs required by their validation. `PASS` ends the cycle; another `REWORK` means `BLOCKED`, with unresolved findings. Further rounds require the user's decision and budget; a new contract must disclose the exhausted cycle.
+- A `PASS` ends review. Any later applied change needs a new contract, including small fixes. Only work meeting `WORKFLOW.md`'s trivial criteria skips review; changes in a HIGH-risk area never qualify.
 
 ## Independent reviewer
 
 For `HIGH` depth, use a separate reviewer (Claude's `reviewer` subagent; for Codex, a subagent or a fresh session) that sees the diff and Task Contract, not the worker's reasoning. Select its model and effort per `MODELS.md`; independence does not require a stronger model. If none is available, do a separate review pass against the Review Contract, state that it was not independent, and report `BLOCKED` until the required review can run.
+
+Before reviewing, capture `python3 .lean/scripts/gate_evidence.py state`. The reviewer records its verdict with `python3 .lean/scripts/gate_evidence.py record-review --contract '<exact contract line>' --reviewer '<reviewer identity>' --state '<captured state>' --verdict PASS --evidence '<scope, round and findings>'`. Use `REWORK` for a failed review. The receipt binds the contract to HEAD, index, Git-visible file contents/modes, links, gate controls and submodule state. Check it with `check-review --contract '<exact contract line>'` before DONE. Untracked shipping files must be included in review. Ignored application inputs still require the project's own checks.
+
+This receipt detects stale coverage. Its identity and findings are attestations; it cannot prove reviewer independence against a writer with access to the same checkout.
 
 ## Reviewer rules
 

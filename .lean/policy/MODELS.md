@@ -13,22 +13,11 @@ this portable policy.
 | Normal implementation or focused review | Current/default capable model | Medium |
 | Hard reasoning, conflicting evidence, or a complex security/data boundary | Capable model for that task | High when the added reasoning is useful |
 
-These are starting points for settings the agent can select. Use the current session settings when
-the runtime does not let the agent change them; do not interrupt routine work just to match the
-table. Use a supported effort level at or above the starting point when useful; if none is
-available, assess the result against the quality floor. Check the actual options exposed by Claude
-or Codex before selecting a subagent. `CHEAP` favors the least
-costly capable option, `BALANCED` uses the normal starting point, and `EXPENSIVE` permits more spend
-when justified; none removes tests, validation, or required review. If the quality floor cannot be
-met within the budget, report the constraint.
+Use current settings when the runtime cannot change them; do not interrupt routine work to match the table. Check actual model/effort options before dispatch. Use supported effort at or above the starting point when useful, or assess the available setting against the quality floor. `CHEAP` favors economical capable options, `BALANCED` uses the normal starting point, and `EXPENSIVE` allows justified optional spend. None removes tests, validation or required review; report an unmet floor rather than lowering it.
 
 ## Independent review
 
-`HIGH` review depth requires an independent reviewer and the checks in `REVIEW.md`. Select the least
-costly reviewer capable of examining the boundary at that depth. A fresh context that receives the
-Task Contract and diff, without the author's reasoning, provides independence; the reviewer does
-not have to use a stronger model than the author. Raise its effort or model when the boundary is
-complex or review evidence shows a reasoning limit. Report when the review was not independent.
+`HIGH` review uses an independent context with the Task Contract and diff, without author reasoning, under `REVIEW.md`. Choose the least costly capable reviewer; a stronger model is not required. Escalate only for useful boundary analysis or demonstrated reasoning limits. Report missing independence.
 
 ## Runtime control
 
@@ -50,23 +39,10 @@ Before selecting a premium model or initiating additional usage billing, record 
 
 ## Escalation
 
-Classify a failure before changing model or effort. Repair implementation, missing context, tools,
-or permissions at their source. For a demonstrated reasoning limit, increase one supported effort
-level first if the model remains capable; then consider a stronger model if needed. Change one
-variable per retry, record the reason, and stop at the review round cap in `REVIEW.md`. Do not spend
-more merely because a task is long, and never lower the quality floor to save budget.
+Classify failure first: fix implementation, context, tools or permissions at their source. For a demonstrated reasoning limit, raise one supported effort level before changing to a stronger model. Change one variable per retry, record why and obey `REVIEW.md`'s round cap. Task length alone does not justify escalation; budget never lowers quality.
 
 ## Project catalog refresh
 
-Use `/lean-model-update codex|claude|all` when a refresh is requested. It combines accepted scope,
-source-grounded research and decision grilling, then previews a versioned project catalog.
-An explicit apply updates catalog evidence only; it does not switch a session, rewrite global
-settings, authorize paid usage or change the shared reviewer definition.
+Use `/lean-model-update codex|claude|all` only when requested; enable its optional maintenance discovery if needed. Research and preview a versioned project-owned catalog, then apply only accepted changes. This never changes session/global settings, reviewer definitions or billing authorization.
 
-Consult the optional `.lean/model-catalog.json` alongside the current runtime's exposed options.
-Missing catalog leaves normal selection unchanged. Stale, retired or unknown-availability entries
-are not proof of eligibility; recheck the runtime and sources before selecting a replacement.
-Preserve explicit model choices and report an unavailable choice rather than silently replacing it.
-Provider IDs belong in project evidence, not this portable policy. Requested settings, observed
-availability and reported backend settings remain distinct. Premium evidence, budget, independent
-review and the quality floor still apply even to a newly documented model.
+Consult optional `.lean/model-catalog.json` alongside current runtime options. A missing catalog changes nothing. Stale, retired or unknown-availability entries require rechecking; preserve explicit model choices and report unavailable ones. Provider IDs/prices belong to evidence, not portable rules. Distinguish requested settings, observed availability and reported backend settings. Premium evidence, budget, independence and quality requirements still apply.

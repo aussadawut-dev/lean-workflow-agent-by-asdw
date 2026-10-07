@@ -4,6 +4,46 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
+## Unreleased
+
+- Add optional standard/high/ultra levels to scope, research and grill: preserve the default, deepen scope precision and question rounds, and broaden evidence-backed vendor/approach comparisons without changing workflow modes or authority.
+
+- Keep eight core procedures in default discovery; expose seven bundled maintenance procedures through explicit `skill_pack.py enable|disable|status`. Retain canonical tools/tests/resources and accept legacy full discovery registries. Preserve existing project pack choices and custom slots during upgrades.
+- Gate failures, including continued Stops, never become success after a retry cap. Missing/empty/malformed gates report undefined validation instead of passing silently. SessionStart records a change baseline rather than blessing a passing cache.
+- Rerun checks by default; tree caching is explicit for Git-visible inputs only. Bind state to SHA-256 file contents, modes, symlinks, HEAD, index, controls and submodule work. Contracts come from parsed assistant text in the current human turn, before known write tools; unreadable supplied transcripts block.
+- Release a Stop after three continued gate refusals with a user-visible UNVERIFIED message, so BLOCKED can be reported; a release keeps the refusal and never records a pass or cache. Do not treat runtime-injected skill, hook-feedback, task-notification or compaction entries as human turns. Require a HIGH review receipt when changes touch backticked paths/globs under PROJECT.md High-risk areas, including commits made since SessionStart.
+- Bind HIGH-review receipts to exact contracts and shipping state. Track local gate-control drift and require recorded matching user approval for intentional changes. Document first-use trust, writable evidence, missing transcript metadata, Codex's explicit checks and external CI/merge authority limits.
+- Shorten review/model/router prose. Keep the broad regression suite required before shipping behavior changes and in CI, with hook/discovery integrity checks in the turn gate.
+- Add `lean-update-workflow` with pinned stable-tag acquisition, release/version checks, local customization reconciliation and existing takeover staging/approval/recovery. Preserve project-owned provenance and all project records; no automatic update or publishing. Treat source text as untrusted evidence; pinning does not authenticate publishers.
+
+### Upgrade notes
+
+Merge the runner, evidence helper, hooks, skills, registry and tests together; preserve PROJECT/config/records/permissions. Configure real project checks if the old gate was empty. Existing cache files are advisory only; seeding no longer makes validation pass. Optional discovery is a separate choice from mode/execution. Review and accept any intentional control changes using `gate_evidence.py accept-controls --reason '<matching user approval>'`; never use acceptance to bypass a failing check. No release tag or publication is implied by this working-tree entry.
+
+## 4.1.0
+
+### Evidence-backed repository cleanup
+
+- Add `/lean-clean-repo` for whole-repository or path-limited audits of generated clutter, obsolete source/tests/dependencies/docs/assets/configuration and workflow files. Preview exact operations, reference edits, evidence, impact and validation before matching approval; retain uncertain/protected candidates.
+- Add a Python helper with read-only inventory, exact-plan-ID apply, private external snapshots, per-operation journaling and guarded restore/resume. Preserve dirty/staged/untracked work by default, Git index, credentials, records/history and active instructions; reject symlink/hardlink/nested-repository boundaries, source drift and new descendants. Explicit regenerated selections require evidence in the approved plan. Stop repository writers during apply/restore. APPLIED still requires target checks and required review.
+- Register the fourteenth canonical skill and both runtime discovery links; add isolated cleanup/recovery tests. No cleanup is run automatically during installation/upgrade.
+
+### Upgrade from 4.0.x
+
+Update the registry, shared-assets identities, canonical skill/tooling reference, helper/tests and both discovery links together. Preserve project facts/configuration, local skills and work records. Plans/snapshots belong in external private sessions and are not distributed. Existing queue cleanup and workflow ownership stay compatible.
+
+## 4.0.0
+
+### One shared source for Claude and Codex
+
+- Move all thirteen skills and resources into `.lean/skills/`; replace runtime skill copies/adapters with individual relative discovery symlinks. Rename `/clean-queue` to `/lean-clean-queue` so all skill names use the `lean-` prefix; keep the underlying `workflow.py clean-queue` subcommand, input meaning and Claude command visibility. Provider-specific local extensions remain separate.
+- Move reviewer instructions into `.lean/roles/reviewer.md`; Claude's reviewer entrypoint and Codex review routing use that source. Extract the Quality Gate into `.lean/scripts/quality-gate.sh`: direct calls always run; the Claude Stop adapter retains loop, seed, refusal and cache behavior.
+- Add schema-2 release registry links, strict link/target integrity checks and recoverable takeover support for declared skill slots only. Preserve exact legacy directory snapshots and guard staging, interrupted apply/resume, rollback and post-approval drift. Schema-1 sources without legacy provider skill assets remain readable; upgrade a legacy skill baseline to schema 2 before drafting.
+
+### Upgrade from 3.x
+
+Update canonical skills/resources, both sets of discovery links, roles, runtime entrypoints, runner/tooling, tests, registry and documentation together. Preserve project additions, facts/config/catalog, records, target registrations and permissions. Before replacing a legacy Lean skill directory, fully read and reconcile local customizations into the canonical skill; preserve unrelated runtime skills. Use the reviewed takeover plan for lossless snapshots and guarded recovery. Copy links without dereferencing; a copied duplicate or incorrect target fails the structure check. Existing Claude cache paths and settings stay compatible. Restart/reload skills in existing sessions when necessary.
+
 ## 3.5.0
 
 ### Application submodules

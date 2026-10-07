@@ -29,7 +29,7 @@ The plan merges settings, gitignore, application gates/CI and project extensions
 
 ## Apply and recovery
 
-The [shared procedure](../.claude/skills/lean-takeover-workflow/SKILL.md) owns interpretation and approval. Its [tool interface](../.claude/skills/lean-takeover-workflow/references/tooling.md) records inventory, decisions, rule mappings, exact writes and source/target fingerprints in a private session outside both repositories. Portable source files come from the release’s `.lean/assets.json` registry, so adjacent source project extensions are not copied. Keep the session path; it contains recovery data and must not be published.
+The [shared procedure](../.lean/skills/lean-takeover-workflow/SKILL.md) owns interpretation and approval. Its [tool interface](../.lean/skills/lean-takeover-workflow/references/tooling.md) records inventory, decisions, rule mappings, exact writes and source/target fingerprints in a private session outside both repositories. Portable source files come from the release’s `.lean/assets.json` registry, so adjacent source project extensions are not copied. Keep the session path; it contains recovery data and must not be published.
 
 Apply takes the local Lean queue lock and refuses live claims. Stop affected foreign workers separately; the lock cannot protect against unrelated editors. Each write has an original snapshot and intent/completion journal. Resume uses the same approved plan after interruption; rollback restores only the journal's files and refuses subsequent edits. Git reset, commit and push are not used. The coordination lock may remain after rollback.
 

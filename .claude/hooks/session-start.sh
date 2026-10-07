@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # SessionStart hook: stdout is added to Claude's context.
 # Nudges toward /lean-init while PROJECT.md is still the empty template, and
-# seeds the Quality Gate cache so a session that changes nothing does not run
-# the gate at its first turn end.
+# records a change baseline; seeding never means validation passed.
 
 root="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 project="$root/.lean/PROJECT.md"
@@ -22,6 +21,14 @@ if [ ! -f "$config" ] || grep -q '"configured"[[:space:]]*:[[:space:]]*false' "$
   echo "Lean Workflow: choose standard, tracker, or full with /lean-init; direct execution is the default, delegated is optional."
 fi
 
+if [ ! -f "$project" ] || ! awk '
+  /<!-- gate:start -->/ { on=1; next }
+  /<!-- gate:end -->/ { on=0 }
+  on && !/^```/ && !/^[[:space:]]*(#|$)/ { found=1 }
+  END { exit !found }
+' "$project"; then
+  echo "Lean Quality Gate undefined: configure checks in .lean/PROJECT.md with /lean-init; no validation is enforced yet."
+fi
 [ -f "$project" ] || exit 0
 
 if grep -A2 '^## Purpose' "$project" | grep -q 'Not defined yet'; then

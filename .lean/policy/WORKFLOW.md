@@ -32,7 +32,7 @@ Task Contract -> Context -> Decide when needed -> Work -> Test -> Validate -> Re
 
 ## Queue cleanup
 
-Use `/clean-queue old` for DONE items completed strictly over 30 days ago, or `/clean-queue all`
+Use `/lean-clean-queue old` for DONE items completed strictly over 30 days ago, or `/lean-clean-queue all`
 for every DONE item. Only explicit cleanup requests authorize apply; cleanup never runs merely
 because a task finishes or a mode changes. The CLI is `clean-queue old|all --dry-run|--apply`.
 Preview is read-only; apply locks and rechecks data. READY/BLOCKED records and trackers remain.

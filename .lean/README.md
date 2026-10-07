@@ -1,8 +1,8 @@
 # Agent policy router
 
-Lean Workflow Baseline 3.5.0. See `CHANGELOG.md` for changes and migration steps.
+Lean Workflow Baseline 4.1.0. See `CHANGELOG.md` for changes and migration steps.
 
-This directory contains operating rules and their self-checks. It is not application structure and prescribes no stack or primary provider. `AGENTS.md` is canonical; `CLAUDE.md` imports it. Shared procedures in `.claude/skills/` have Codex adapters in `.agents/skills/`.
+This directory contains operating rules and their self-checks. It is not application structure and prescribes no stack or primary provider. `AGENTS.md` is canonical; `CLAUDE.md` imports it. Shared procedures live in `.lean/skills/`; `.claude/skills/` and `.agents/skills/` contain core discovery symlinks and any explicitly enabled extras.
 
 ## Setup and modes
 
@@ -16,20 +16,14 @@ Explicit mode lowering uses `downgrade <lower-mode> --dry-run` and `--apply`; ad
 
 Direct execution is the portable default; delegated execution uses the Controller/worker procedure. Repository mode, execution strategy, model choice and review depth are separate. Unix tools support macOS/Linux/WSL; native Windows is not supported. Claude hooks are provider-specific; Codex runs the gate explicitly.
 
-Queue cleanup uses `/clean-queue old` (DONE older than 30 days) or `/clean-queue all` (all DONE). Preview/apply are available through `clean-queue old|all --dry-run|--apply`; original records move into project-owned queue history, not deletion. Trackers and unfinished items remain. Undated legacy DONE items are skipped by old. See `policy/WORKFLOW.md`.
+## Optional maintenance
 
-Model research updates use `/lean-model-update codex|claude|all`. Preview is the default; explicitly approved apply updates an optional project-owned catalog and retains an ignored local catalog lock file. Session/global settings stay under runtime control. See `policy/MODELS.md`.
-
-Use `/lean-compress` for concise, clear workflow prose. It inventories and fully reads all authorized workflow files before compression, preserves rules/protected content, previews by default and edits only approved targets.
-
-Use `/lean-takeover-workflow "<target path>"` to audit an existing repository, resolve migration decisions through Grill, propose a concrete plan and install Lean after matching approval. Preview does not write to the target. External staging verifies the proposed public workflow before writes; snapshots/journals support resume and guarded rollback; APPLIED still requires the actual target gate and HIGH independent review. See the shared procedure and `CUSTOMIZING.md`.
-
-Use `/lean-use-submodule <remote url>` to keep Lean as the superproject and application code in `targets/<repository-name>`. No workflow files are added to the application. Project facts/config and records live in `.lean/targets/<name>/`, using the existing record layout inside each directory. `submodule.py context` returns all three roots and the project file; default workflow/catalog commands select the active records, while `--root` is explicit. Selection is ignored checkout-local state; cloned workspaces initialize/select a registered target by rerunning the command. Application gates run in the target and block on missing checks; Claude runs them before its Lean cache, Codex runs them explicitly. See the shared procedure and `CUSTOMIZING.md`.
+Eight core skills are discovered by default. Enable the seven maintenance skills with `python3 .lean/scripts/skill_pack.py enable` (`status` / `disable` inspect or reverse discovery). Read `OPTIONAL.md` for queue cleanup, model refresh, compression, repository cleanup, takeover, submodules and upgrades. Canonical tools/resources stay bundled; discovery changes never discard records or recovery capabilities. Reload runtime skills after toggling.
 
 ## Layout and ownership
 
 - `PROJECT.md` and `config.json`: project-owned facts, gate, mode and execution.
-- `policy/`, shared skills and adapters: workflow-owned; upgrade together.
+- `policy/`, shared skills and discovery links: workflow-owned; upgrade together.
 - `templates/`: generic record templates, not task history.
 - `scripts/`, `tests/`: mode/lease tooling and workflow checks.
 - `CUSTOMIZING.md`: current ownership and upgrade checklist.

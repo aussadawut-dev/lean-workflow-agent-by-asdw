@@ -6,10 +6,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-REQUIRED_SKILLS = ("lean-init", "lean-task", "lean-review", "lean-gate", "lean-scope",
-                   "lean-research", "lean-grill", "lean-multi-agent", "clean-queue", "lean-model-update", "lean-compress",
-                   "lean-takeover-workflow", "lean-use-submodule")
-USER_COMMANDS = {"lean-init", "lean-task", "lean-model-update", "lean-compress", "clean-queue", "lean-takeover-workflow", "lean-use-submodule"}
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.dont_write_bytecode = True
+from shared_assets import REQUIRED_SKILLS, EXTRA_SKILLS, USER_COMMANDS, declared_links, verify_link
 
 
 def check(root):
@@ -21,18 +20,35 @@ def check(root):
     try:
         registry = json.loads((root / ".lean/assets.json").read_text())
         assets = registry["files"]
-        if (registry.get("schema") != 1 or not isinstance(assets, list) or not assets
+        if (registry.get("schema") not in (1, 2) or not isinstance(assets, list) or not assets
                 or not all(isinstance(name, str) for name in assets) or len(assets) != len(set(assets))
                 or ".lean/assets.json" not in assets):
             raise ValueError("invalid portable registry")
         for name in assets:
             path = Path(name)
-            if path.is_absolute() or ".." in path.parts or not (root / path).is_file():
+            location = root / path
+            symbolic = any(parent.is_symlink() for parent in (location, *location.parents) if parent != root and root in parent.parents)
+            if path.is_absolute() or ".." in path.parts or symbolic or not location.is_file():
                 bad(f"invalid/missing portable asset: {name}")
+        links = declared_links(registry)
         for name in REQUIRED_SKILLS:
-            for tree in (".claude/skills", ".agents/skills"):
-                if f"{tree}/{name}/SKILL.md" not in assets:
-                    bad(f"portable registry missing skill: {tree}/{name}/SKILL.md")
+            if f".lean/skills/{name}/SKILL.md" not in assets:
+                bad(f"portable registry missing canonical skill: {name}")
+        for name in links:
+            try:
+                verify_link(root, name)
+            except ValueError as error:
+                bad(str(error))
+        # Extra discovery is optional, but an enabled slot must use the canonical source.
+        for tree in (".agents/skills", ".claude/skills"):
+            for name in EXTRA_SKILLS:
+                relative = f"{tree}/{name}"
+                path = root / relative
+                if relative not in links and (path.exists() or path.is_symlink()):
+                    try:
+                        verify_link(root, relative)
+                    except ValueError as error:
+                        bad(str(error))
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         bad("invalid or missing portable asset registry")
 
@@ -48,7 +64,7 @@ def check(root):
             content = path.read_text()
             for reference in set(re.findall(r"\.(?:lean|claude|agents)/[A-Za-z0-9_./-]+\.(?:md|sh|py|json)", content)):
                 # These paths are created by opting into full mode; examples are not items.
-                if reference.startswith((".agents/queue/", ".lean/targets/")) or reference == ".lean/model-catalog.json":
+                if reference.startswith((".agents/queue/", ".lean/targets/")) or reference in {".lean/model-catalog.json", ".lean/upstream.json"}:
                     continue
                 if not (root / reference).exists():
                     bad(f"missing {reference} (from {name})")
@@ -76,7 +92,7 @@ def check(root):
     # Support the legacy CLAUDE-first arrangement during migration, as well as AGENTS.
     agents = root / "AGENTS.md"
     canonical = "CLAUDE.md" if agents.is_file() and re.search(r"(?m)^@CLAUDE\.md$", agents.read_text()) else "AGENTS.md"
-    for name in (canonical, ".claude/skills/lean-task/SKILL.md", ".claude/skills/lean-review/SKILL.md"):
+    for name in (canonical, ".lean/skills/lean-task/SKILL.md", ".lean/skills/lean-review/SKILL.md"):
         path = root / name
         if not path.is_file():
             bad(f"missing reviewer routing: {name}")
@@ -87,30 +103,27 @@ def check(root):
         if not any("independent" in paragraph.lower() and "MODELS.md" in paragraph for paragraph in routing):
             bad(f"HIGH reviewer routing requires independent review and model/effort policy: {name}")
 
+    for name in REQUIRED_SKILLS:
+        path = root / ".lean/skills" / name / "SKILL.md"
+        if not path.is_file():
+            bad(f"missing canonical skill: {name}")
+            continue
+        fields = validate_frontmatter(path, name, bad)
+        expected_visibility = "true" if name in USER_COMMANDS else "false"
+        if fields.get("user-invocable") != expected_visibility:
+            bad(f"incorrect command visibility: {path.relative_to(root)}")
+        if name in USER_COMMANDS and not fields.get("argument-hint"):
+            bad(f"missing command argument hint: {path.relative_to(root)}")
+        if fields.get("disable-model-invocation") == "true":
+            bad(f"workflow skill must remain available to the agent: {path.relative_to(root)}")
+    # Local extensions may remain ordinary provider-specific skills.
     for tree in (".claude/skills", ".agents/skills"):
-        for name in REQUIRED_SKILLS:
-            if not (root / tree / name / "SKILL.md").is_file():
-                bad(f"missing {'adapter' if tree.startswith('.agents') else 'skill'}: {tree}/{name}/SKILL.md")
         for path in sorted((root / tree).glob("*/SKILL.md")):
-            fields = validate_frontmatter(path, path.parent.name, bad)
-            if tree == ".claude/skills" and path.parent.name in REQUIRED_SKILLS:
-                expected_visibility = "true" if path.parent.name in USER_COMMANDS else "false"
-                if fields.get("user-invocable") != expected_visibility:
-                    bad(f"incorrect command visibility: {path.relative_to(root)}")
-                if path.parent.name in USER_COMMANDS and not fields.get("argument-hint"):
-                    bad(f"missing command argument hint: {path.relative_to(root)}")
-                if fields.get("disable-model-invocation") == "true":
-                    bad(f"workflow skill must remain available to the agent: {path.relative_to(root)}")
-            if tree == ".agents/skills" and path.parent.name in REQUIRED_SKILLS:
-                expected = (root / ".claude/skills" / path.parent.name / "SKILL.md").resolve()
-                destinations = re.findall(r"\[[^\]]+\]\(([^)]+)\)", path.read_text())
-                targets = [(path.parent / value.split("#", 1)[0]).resolve() for value in destinations
-                           if "://" not in value]
-                if expected not in targets or not expected.is_file():
-                    bad(f"adapter must link its canonical procedure: {path.relative_to(root)}")
-                for target in targets:
-                    if not target.is_file():
-                        bad(f"missing adapter target: {path.relative_to(root)} -> {target}")
+            if path.parent.name not in REQUIRED_SKILLS:
+                validate_frontmatter(path, path.parent.name, bad)
+    reviewer = root / ".claude/agents/reviewer.md"
+    if reviewer.is_file() and "../../.lean/roles/reviewer.md" not in reviewer.read_text():
+        bad("reviewer must route to the shared role")
     for path in sorted((root / ".claude/agents").glob("*.md")):
         validate_frontmatter(path, None, bad)
     for message in failures:

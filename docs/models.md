@@ -256,7 +256,7 @@ Use `/lean-model-update codex`, `/lean-model-update claude` or `/lean-model-upda
 
 The optional `.lean/model-catalog.json` stores project-owned model/alias IDs, runtime version, efforts, lifecycle, source URLs/dates and observed availability. Public documentation alone means availability is unknown. Selected evidence older than 30 days blocks preview/apply; retained providers remain visible as stale. Missing catalog leaves normal model selection unchanged. The template ships no live catalog.
 
-The offline CLI consumes researched JSON candidates; it does not fetch models or perform inference. Read the [catalog format](../.claude/skills/lean-model-update/references/catalog.md) before preparing a candidate. A provider refresh replaces that provider's complete model list, so review removals and aliases in the diff.
+The offline CLI consumes researched JSON candidates; it does not fetch models or perform inference. Read the [catalog format](../.lean/skills/lean-model-update/references/catalog.md) before preparing a candidate. A provider refresh replaces that provider's complete model list, so review removals and aliases in the diff.
 
 ```sh
 python3 .lean/scripts/model_catalog.py check

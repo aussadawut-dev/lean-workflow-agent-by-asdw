@@ -2,7 +2,7 @@
 
 A reusable GitHub template for working with coding agents through clear task contracts, meaningful tests, risk-based review and evidence before completion. Claude and Codex share one workflow, with optional tracking and task ownership. Bring your own application stack and choose how much process your project needs.
 
-Current baseline: **3.5.0**. The template starts with unconfigured `standard` mode and `direct` execution; it contains no project tasks, queue items or leases.
+Current baseline: **4.1.0**. The template starts with unconfigured `standard` mode and `direct` execution; it contains no project tasks, queue items or leases.
 
 ## Workflow modes
 
@@ -61,7 +61,7 @@ git init
 
 Open the project in Claude Code and run `/lean-init`, or invoke `$lean-init` in Codex. It discovers actual project facts and commands, records the selected mode/execution, and helps fill `.lean/PROJECT.md`.
 
-Claude uses shared skills under `.claude/skills/`; Codex uses adapters under `.agents/skills/`. If your runtime does not discover skills, ask the agent to read the relevant `SKILL.md` and follow its procedure. Other agents can follow `AGENTS.md` and the shared procedures manually; runtime integrations are provided for Claude and Codex.
+Both runtimes read canonical skills in `.lean/skills/`, through per-skill discovery links. Eight core procedures are enabled by default; `python3 .lean/scripts/skill_pack.py enable` adds the seven maintenance procedures, and `disable` removes only their discovery links. Reload runtime skills after toggling. See [.lean/OPTIONAL.md](.lean/OPTIONAL.md). Edit the canonical files only; adding a Lean skill requires registering its canonical files and assigning it to core or optional discovery. If your runtime does not discover skills, ask the agent to read the relevant `SKILL.md` and follow its procedure. Other agents can follow `AGENTS.md` and the shared procedures manually; runtime integrations are provided for Claude and Codex.
 
 ### Configure without an agent
 
@@ -81,11 +81,11 @@ python3 .lean/scripts/workflow.py configure tracker --execution delegated
 
 Omitting `--execution` preserves the current setting. Configuration belongs to the project in `.lean/config.json`; agents follow the recorded choice rather than selecting a mode for each task.
 
-Fill `.lean/PROJECT.md` with your application's real test, lint, build and typecheck commands. Add gate commands between its existing markers, one command per line. Each must exit non-zero on failure. The shipped commands test the workflow itself; they do not validate application code you add later.
+Fill `.lean/PROJECT.md` with your application's real test, lint, build and typecheck commands. Add gate commands between its existing markers, one command per line. Each must exit non-zero on failure. The shipped turn gate tests workflow integrity; the full regression suite runs before shipping behavior changes and in CI. Neither validates application code you add later. Missing/empty project gates block until configured.
 
 ### Keep workflow prose lean and clear
 
-Use `/lean-compress` to remove repetition and filler while preserving the same rules and practical meaning. The [shared procedure](.claude/skills/lean-compress/SKILL.md) works for Claude and through the Codex adapter. It uses clear, concise language and has no fixed compression ratio.
+Enable the optional maintenance pack before invoking `/lean-compress` to remove repetition and filler while preserving the same rules and practical meaning. The [shared procedure](.lean/skills/lean-compress/SKILL.md) works for Claude and Codex from the same source. It uses clear, concise language and has no fixed compression ratio.
 
 ```text
 /lean-compress workflow --preview
@@ -95,7 +95,7 @@ Use `/lean-compress` to remove repetition and filler while preserving the same r
 
 Preview is the default. `workflow` targets editable workflow prose; paths restrict which prose files may change. `--apply` requests changes within an approved scope. A matching approval is reused; a new scope or change to workflow behavior needs resolution before dependent edits. Reading a file never authorizes rewriting it.
 
-**Read every corner of the workflow before compressing.** Inventory and fully read the canonical contract, router/policies, project facts, all skills/resources/adapters, reviewer, hooks/settings, scripts/tests/templates, CI, README and history/ownership guidance. Record each file and revision in a coverage ledger. Large files must be read through EOF in chunks; listings, grep snippets, hashes and summaries do not establish coverage. An unread or inaccessible in-scope file blocks dependent compression. Exclude credentials, private settings, caches and runtime internals; report exclusions rather than claiming they were reviewed.
+**Read every corner of the workflow before compressing.** Inventory and fully read the canonical contract, router/policies, project facts, all skills/resources/discovery links, reviewer, hooks/settings, scripts/tests/templates, CI, README and history/ownership guidance. Record each file and revision in a coverage ledger. Large files must be read through EOF in chunks; listings, grep snippets, hashes and summaries do not establish coverage. An unread or inaccessible in-scope file blocks dependent compression. Exclude credentials, private settings, caches and runtime internals; report exclusions rather than claiming they were reviewed.
 
 Then map the original rules to the proposed wording: actor, trigger, prerequisites, action, ordering, limits, exceptions, evidence and failure behavior. Keep frontmatter, imports, headings/anchors, code/Mermaid, inline code, commands, links, paths, identifiers, numeric limits, versions, gate markers and license notices unchanged. Code, tests, configuration and project history are read for context and stay outside prose compression. Preserve accepted project additions and unrelated pending edits.
 
@@ -105,7 +105,7 @@ Run preservation checks and the project Quality Gate, then review the actual dif
 
 ### One shared contract across agents
 
-[AGENTS.md](AGENTS.md) is canonical. [CLAUDE.md](CLAUDE.md) imports it, and thirteen Codex adapters reference the same shared skill procedures. No provider is the required primary agent; the active agent owns the task unless the project records a different Controller.
+[AGENTS.md](AGENTS.md) is canonical. [CLAUDE.md](CLAUDE.md) imports it, and both runtimes discover eight core procedures through symlinks. Seven maintenance procedures are available as an optional discovery pack. No provider is the required primary agent; the active agent owns the task unless the project records a different Controller.
 
 The contract requires acceptance evidence before reporting DONE, preserves an explicitly requested quality floor, and limits extra effort to work with a useful reason. Project-specific additions have dedicated sections so upgrades can preserve them.
 
@@ -125,13 +125,25 @@ Review depth follows the deeper of task risk and quality floor. HIGH-depth revie
 
 Project-owned gate commands live in [.lean/PROJECT.md](.lean/PROJECT.md). Claude's Stop hook runs them; Codex follows the shared procedures and runs them explicitly.
 
-The Claude gate tracks repository state to avoid repeating checks on unchanged work. Committed changes are still gated, and a prior failure is not cleared by merely seeding the cache. A missing tool and a real command failure both block completion, with different messages so an environment problem is not mistaken for an application defect.
+Checks rerun by default, including on continued Stops after failure. Missing or empty gates block with an onboarding message. SessionStart records only a change baseline. `--cache-tree` is an explicit choice for checks whose inputs are entirely Git-visible; it does not cover environment or ignored dependencies.
 
-Pre-existing or out-of-scope failures are reported with evidence rather than repaired merely to satisfy hook pressure. An unavailable required reviewer or worker also results in BLOCKED.
+The Claude adapter checks assistant contract provenance when transcript metadata is available. HIGH review receipts bind the reported review to the current contract and shipping state. Local hashes also catch changes to hooks/settings/gate commands until an already user-approved change is recorded. These mechanisms detect mistakes and stale evidence; an agent with write access can still alter them. Contract truth, regression timing, reviewer identity and task-record evidence remain procedural. Codex runs the checks explicitly; no native hook is claimed. See [.lean/policy/QUALITY.md](.lean/policy/QUALITY.md) for exact limits and commands.
 
-### Six commands for users
+Projects requiring enforcement outside the agent must use trusted CI and protected merge permissions. Local self-tests do not prove application correctness. Pre-existing/out-of-scope failures or unavailable required reviewers/workers remain BLOCKED with evidence.
 
-Start ordinary work with `lean-task`; the agent handles scope, research, material decisions, implementation, review and completion checks as needed. It asks for unresolved material decisions or new scope approval, and preserves accepted decisions. You do not need to run each internal step yourself.
+### Repository cleanup
+
+With the optional maintenance pack enabled, use `/lean-update-workflow [--ref <tag|branch|commit>]` to preview an upgrade from the Lean upstream stable tag. The [shared skill](.lean/skills/lean-update-workflow/SKILL.md) pins the commit, preserves project data/customizations, reconciles exact changes and uses external staging/snapshots for approved apply and recovery. Older or incompatible releases block writes. Project-owned `.lean/upstream.json` retains provenance; no commit, push or global configuration change is implied.
+
+Use `/lean-clean-repo` to audit clutter and obsolete source, tests, dependencies, docs, assets, configuration, scripts and workflow files. Preview is the default. The [shared skill](.lean/skills/lean-clean-repo/SKILL.md) presents exact removals/reference edits, evidence, impact and checks before matching approval. Missing references alone do not prove a file is unused. Protected and uncertain candidates remain.
+
+The [helper](.lean/scripts/clean_repo.py) inventories without writes and applies only a fingerprinted plan, retaining original bytes/modes in a private external recovery session. It preserves Git's index, blocks dirty/staged work, symlinks, nested repositories and protected state, and rejects drift/new descendants. Untracked work is preserved unless explicitly proposed with verified regeneration evidence (ordinary Python cache/OS debris is recognized). Apply/restore require repository writers stopped; a partial batch is journaled and recoverable. Restore refuses later edits. No automatic backup purge, commit or push occurs.
+
+`apply <plan-id>` uses the previously presented session; `restore <session-path>` performs guarded recovery. See [tooling and proposal format](.lean/skills/lean-clean-repo/references/tooling.md). APPLIED still requires the project's checks and required review. Creating/installing this skill does not authorize cleaning any repository.
+
+### Core and optional commands
+
+The core user commands are `lean-init` and `lean-task`; the other commands below require the optional maintenance pack. Start ordinary work with `lean-task`; the agent handles scope, research, material decisions, implementation, review and completion checks as needed. It asks for unresolved material decisions or new scope approval, and preserves accepted decisions. You do not need to run each internal step yourself.
 
 | Purpose | Claude Code | Codex skill invocation |
 |---|---|---|
@@ -141,7 +153,9 @@ Start ordinary work with `lean-task`; the agent handles scope, research, materia
 | Audit and shorten workflow prose | `/lean-compress [workflow\|PATH...] [--preview\|--apply]` | `$lean-compress` with the same arguments |
 | Use an application submodule | `/lean-use-submodule <remote url>` | `$lean-use-submodule <remote url>` |
 | Take over an existing workflow | `/lean-takeover-workflow "<target path>" [--preview\|--apply <plan-id>]` | `$lean-takeover-workflow` with the same arguments |
-| Archive completed queue items | `/clean-queue <old\|all> [--preview]` | `$clean-queue` with the same arguments |
+| Archive completed queue items | `/lean-clean-queue <old\|all> [--preview]` | `$lean-clean-queue` with the same arguments |
+| Update installed Lean workflow | `/lean-update-workflow [--ref <ref>]` | `$lean-update-workflow` with the same arguments |
+| Audit and clean repository files | `/lean-clean-repo [--path <path>]` | `$lean-clean-repo` with the same arguments |
 
 For example:
 
@@ -149,19 +163,31 @@ For example:
 # Claude Code
 /lean-task Add a regression test and fix the queue lease bug
 /lean-compress workflow --preview
-/clean-queue old --preview
+/lean-clean-queue old --preview
 
 # Codex
 $lean-task Add a regression test and fix the queue lease bug
 $lean-compress workflow --preview
-$clean-queue old --preview
+$lean-clean-queue old --preview
 ```
 
-Claude Code exposes these six skills as slash commands. Six internal procedures (`lean-scope`, `lean-research`, `lean-grill`, `lean-review`, `lean-gate`, `lean-multi-agent`) use `user-invocable: false`: hidden from its slash menu, but available for the agent to invoke. They remain shared procedures with Codex adapters.
+Claude Code exposes these eight skills as slash commands. Six internal procedures (`lean-scope`, `lean-research`, `lean-grill`, `lean-review`, `lean-gate`, `lean-multi-agent`) use `user-invocable: false`: hidden from its slash menu, but available for the agent to invoke. They remain shared procedures used by both runtimes.
 
-In Codex CLI/IDE, select skills through `/skills` or mention them with `$`; use the available skill picker in Desktop. Codex has no documented equivalent of Claude's `user-invocable: false` for hiding only manual invocation, so internal adapters remain discoverable and are labeled as internal. Do not disable their implicit invocation: the agent needs them. Examples elsewhere using `/name` describe Claude syntax; use the corresponding Codex skill invocation. No deprecated custom prompts or global installation are required. See [Claude skill invocation](https://code.claude.com/docs/en/skills) and [Codex skill invocation](https://learn.chatgpt.com/docs/build-skills).
+In Codex CLI/IDE, select skills through `/skills` or mention them with `$`; use the available skill picker in Desktop. Codex has no documented equivalent of Claude's `user-invocable: false` for hiding only manual invocation, so internal skills remain discoverable there. Do not disable their implicit invocation: the agent needs them. Examples elsewhere using `/name` describe Claude syntax; use the corresponding Codex skill invocation. No deprecated custom prompts or global installation are required. See [Claude skill invocation](https://code.claude.com/docs/en/skills) and [Codex skill invocation](https://learn.chatgpt.com/docs/build-skills).
 
 Model refresh and compression still preview by default; applying a catalog proposal or compression requires its existing authorization checks. Queue cleanup with `old` or `all` authorizes archiving DONE items; `--preview` only shows the selection. Missing queue selection requires a choice. Command visibility grants no extra permissions, paid usage or Git publishing.
+
+### Optional skill levels
+
+Scope, research and grill support `standard` (the existing default), `high` and `ultra` as optional capabilities. Ask in natural language, for example: "use scope high, grill ultra and research high for this task" or "use ultra for all three skills". Internal command visibility remains unchanged; these requests do not require new slash commands. Levels apply to this work, can differ per skill, and do not change workflow mode, quality, budget, model, execution or review requirements.
+
+| Skill | high adds to standard | ultra adds to high |
+|---|---|---|
+| Scope | Detailed flows, rules, boundaries and acceptance per behavior | Material states, exceptions, failures and cross-flow consistency, with traceable validation |
+| Grill | More questions by scope topic to find omissions and narrow requirements | Follow-up rounds, scenario details and confirmation of each important boundary |
+| Research | More relevant vendors/approaches and corroborated decisive claims | Broader discovery, deeper comparison of leading candidates and conditional conclusions |
+
+Higher levels reuse confirmed decisions and focus on relevant details. Grill asks in manageable batches; research distinguishes vendor breadth from source depth and reports evidence gaps. Findings can feed back into the scope, while approval and authority boundaries stay in force. These instructions guide agent behavior; repository checks validate the instruction contracts, not the accuracy of every future agent response.
 
 ### Runtime integration and limits
 
@@ -169,7 +195,7 @@ Claude's `.claude/settings.json` supplies SessionStart and Stop hooks, read-only
 
 For headless Claude, follow your runtime's workspace trust and tool permission requirements. Other agents can follow the shared contract, but this repository does not provide native adapters for every runtime.
 
-Workflow self-tests run locally and in GitHub Actions on Ubuntu with Python 3.9. They cover onboarding, modes, lease ownership, evidence/dependencies, downgrade guards, dry-run preservation, worker races, upgrade-back validation, canonical routing and adapter parity. Smoke tests isolate reusable assets and preserve a configured host's project license and records. CI validates the workflow; add your application's own checks separately.
+Workflow self-tests run locally and in GitHub Actions on Ubuntu with Python 3.9. They cover onboarding, modes, lease ownership, evidence/dependencies, downgrade guards, dry-run preservation, worker races, upgrade-back validation, canonical routing and discovery-link integrity. Smoke tests isolate reusable assets and preserve a configured host's project license and records. CI validates the workflow; add your application's own checks separately.
 
 ## Repository layout
 
@@ -192,17 +218,19 @@ lean-workflow-agent-by-asdw/
 │   ├── LICENSE                    Workflow notice for downstream imports
 │   ├── CHANGELOG.md               Versions and migrations
 │   ├── policy/                    Portable workflow rules
+│   ├── skills/                    Canonical skills and resources
+│   ├── roles/                     Shared reviewer instructions
 │   ├── templates/                 Generic tracker and queue templates
-│   ├── scripts/                   Mode/lease tooling and structure checks
+│   ├── scripts/                   Shared gate, mode/lease tooling and checks
 │   └── tests/                     Workflow behavior and regression tests
-├── .claude/                       Claude runtime and shared procedures
+├── .claude/                       Claude runtime integration
 │   ├── settings.json              Claude hook and permission settings
 │   ├── hooks/                     SessionStart and Quality Gate hooks
 │   ├── agents/
-│   │   └── reviewer.md            Independent reviewer definition
-│   └── skills/                    Shared workflow procedures
+│   │   └── reviewer.md            Claude reviewer entrypoint
+│   └── skills/                    Per-skill links to .lean/skills/
 ├── .agents/                       Codex integration
-│   └── skills/                    Twelve Codex adapters
+│   └── skills/                    Per-skill links to .lean/skills/
 └── .github/                       GitHub integration
     ├── workflows/
     │   └── lean-workflow.yml       Workflow self-checks in CI
@@ -236,7 +264,7 @@ For contribution expectations, see [CONTRIBUTING.md](CONTRIBUTING.md). The proje
 
 ### Keep workflow out of an application repository
 
-Run `/lean-use-submodule <remote url>` from Lean to add or reuse the application under `targets/<repository-name>`. Lean stores `.gitmodules`, the gitlink and all workflow/project records; the application receives no agent workflow files. The new command is a shared Claude skill with a Codex adapter.
+Run `/lean-use-submodule <remote url>` from Lean to add or reuse the application under `targets/<repository-name>`. Lean stores `.gitmodules`, the gitlink and all workflow/project records; the application receives no agent workflow files. The command uses one shared skill discovered by both runtimes.
 
 ```sh
 # Read-only preview; the skill applies a direct installation request.

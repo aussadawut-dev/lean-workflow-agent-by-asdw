@@ -42,10 +42,13 @@ fixture() {
   echo "$dir"
 }
 
-# run_gate <dir> <stdin json>; sets $code and $err
+# run_gate <dir> <stdin json>; sets $code, $err and $out
 run_gate() {
-  err="$(printf '%s' "$2" | CLAUDE_PROJECT_DIR="$1" bash "$gate" 2>&1 >/dev/null)"
+  # These legacy cases intentionally edit gate commands; acceptance is fixture setup.
+  python3 "$repo/.lean/scripts/gate_evidence.py" --root "$1" accept-controls --reason 'Fixture intentionally selected these controls' >/dev/null || return
+  err="$(printf '%s' "$2" | CLAUDE_PROJECT_DIR="$1" bash "$gate" --cache-tree 2>&1 >"$work/stdout")"
   code=$?
+  out="$(cat "$work/stdout")"
 }
 
 expect_code() {
@@ -55,13 +58,13 @@ expect_code() {
 # 1. No PROJECT.md
 dir="$(mktemp -d "$work/empty.XXXX")"
 run_gate "$dir" '{}'
-expect_code "gate: no PROJECT.md is a no-op" 0
+expect_code "gate: no PROJECT.md is undefined" 2
 
 # 2. Empty gate block
 dir="$(fixture)"
 echo change > "$dir/file.txt"
 run_gate "$dir" '{}'
-expect_code "gate: empty block is a no-op" 0
+expect_code "gate: empty block is undefined" 2
 
 # 3. Failing command blocks with a message
 dir="$(fixture 'false')"
@@ -73,9 +76,26 @@ case "$err" in
   *) bad "gate: failure names the command (got: $err)" ;;
 esac
 
-# 4. stop_hook_active prevents a loop
+# 4. stop_hook_active no longer waves a failing gate through, but the loop is bounded:
+# after three refusals the Stop is released UNVERIFIED, never recorded as a pass.
 run_gate "$dir" '{"stop_hook_active":true}'
-expect_code "gate: stop_hook_active skips" 0
+expect_code "gate: stop_hook_active still refuses a failing gate (2nd refusal)" 2
+run_gate "$dir" '{"stop_hook_active":true}'
+expect_code "gate: stop_hook_active still refuses a failing gate (3rd refusal)" 2
+run_gate "$dir" '{"stop_hook_active":true}'
+expect_code "gate: continued failure is released after three refusals" 0
+case "$out" in
+  *'"systemMessage"'*UNVERIFIED*) ok "gate: the release tells the user the work is unverified" ;;
+  *) bad "gate: the release tells the user the work is unverified (got: $out)" ;;
+esac
+if [ -f "$dir/.claude/.gate-failed" ] && [ ! -f "$dir/.claude/.gate-cache" ]; then
+  ok "gate: a release keeps the refusal and caches nothing"
+else
+  bad "gate: a release keeps the refusal and caches nothing"
+fi
+run_gate "$dir" '{"stop_hook_active":false}'
+expect_code "gate: a fresh Stop is gated again after the cap" 2
+if [ "$(cat "$dir/.claude/.gate-failed")" = "1" ]; then ok "gate: a fresh refusal restarts the count"; else bad "gate: a fresh refusal restarts the count"; fi
 
 # 5. A clean tree is not a validated tree: committed work is still gated.
 dir="$(fixture 'false')"
@@ -89,7 +109,7 @@ expect_code "gate: committed work is still gated" 2
 dir="$(fixture 'false')"
 CLAUDE_PROJECT_DIR="$dir" bash "$gate" --seed
 run_gate "$dir" '{}'
-expect_code "gate: seeded and unchanged skips" 0
+expect_code "gate: seed is not proof a failing gate passed" 2
 
 # 7. Seeded, then something changed: the gate runs.
 echo change > "$dir/code.txt"
@@ -101,10 +121,10 @@ counter="$work/seeded"
 : > "$counter"
 dir="$(fixture "echo run >> '$counter'")"
 CLAUDE_PROJECT_DIR="$dir" bash "$gate" --seed
-if [ -s "$dir/.claude/.gate-cache" ] && [ ! -s "$counter" ]; then
-  ok "gate: --seed caches without running commands"
+if [ -s "$dir/.agent-runtime/gate-baseline" ] && [ ! -s "$counter" ] && [ ! -f "$dir/.claude/.gate-cache" ]; then
+  ok "gate: --seed records baseline without validating"
 else
-  bad "gate: --seed caches without running commands"
+  bad "gate: --seed records baseline without validating"
 fi
 
 # 9. Comments, blank lines, and fences are not commands
@@ -146,7 +166,8 @@ case "$out" in
   *) bad "session: suggests /lean-init when empty" ;;
 esac
 
-# 14. Session hook is silent once Purpose is filled
+# 14. Session hook is silent once Purpose and the gate are filled
+dir="$(fixture true)"
 sed -i.bak 's/^Not defined yet\.$/A real project./' "$dir/.lean/PROJECT.md"
 echo '{"mode":"standard","configured":true}' > "$dir/.lean/config.json"
 out="$(CLAUDE_PROJECT_DIR="$dir" bash "$session")"
@@ -179,10 +200,10 @@ esac
 dir="$(fixture 'false')"
 rm -f "$dir/.claude/.gate-cache"
 CLAUDE_PROJECT_DIR="$dir" bash "$session" >/dev/null 2>&1
-if [ -s "$dir/.claude/.gate-cache" ]; then
-  ok "session: seeds the gate cache"
+if [ -s "$dir/.agent-runtime/gate-baseline" ]; then
+  ok "session: records the change baseline"
 else
-  bad "session: seeds the gate cache"
+  bad "session: records the change baseline"
 fi
 
 # 16. The commit is part of the state: the second commit is gated too, not just
@@ -492,6 +513,194 @@ printf AB > "$dir/a"
 printf C > "$dir/b"
 run_gate "$dir" '{}'
 expect_code "gate: redistributed untracked bytes rerun and fail" 2
+
+
+# Contract line enforcement. The transcript is JSONL; only assistant entries count.
+contract_case() { # <name> <want> <transcript body>
+  local d t
+  d="$(fixture 'true')"
+  echo change > "$d/file.txt"
+  t="$work/transcript.$RANDOM.jsonl"
+  printf '%s\n' "$3" > "$t"
+  run_gate "$d" "{\"stop_hook_active\":false,\"transcript_path\":\"$t\"}"
+  expect_code "$1" "$2"
+}
+contract_case "contract: real assistant Contract line passes" 0 \
+  '{"type":"assistant","message":{"content":[{"type":"text","text":"Contract: risk=LOW quality=STANDARD acceptance=tests pass\nDone"}]}}'
+contract_case "contract: trivial form passes" 0 \
+  '{"type":"assistant","message":{"content":[{"type":"text","text":"Contract: trivial (typo)"}]}}'
+contract_case "contract: missing line blocks" 2 \
+  '{"type":"assistant","message":{"content":[{"type":"text","text":"Done."}]}}'
+contract_case "contract: template placeholders do not count" 2 \
+  '{"type":"assistant","message":{"content":[{"type":"text","text":"Contract: risk=<LOW|MEDIUM|HIGH> quality=<STANDARD|HIGH|VERY_HIGH> acceptance=<observable check> / Contract: trivial (<reason>)"}]}}'
+contract_case "contract: a line in a user entry does not count" 2 \
+  '{"type":"user","message":{"content":"Contract: risk=LOW quality=STANDARD acceptance=tests pass"}}'
+dir="$(fixture 'true')"
+echo change > "$dir/file.txt"
+run_gate "$dir" '{"stop_hook_active":false,"transcript_path":"/nonexistent/t.jsonl"}'
+expect_code "contract: unreadable transcript blocks with a diagnostic" 2
+contract_case "contract: block message tells how to fix" 2 '{"type":"assistant","message":{"content":"x"}}'
+case "$err" in
+  *"No Task Contract first line"*) ok "contract: block message is specific" ;;
+  *) bad "contract: block message is specific (got: $err)" ;;
+esac
+
+
+# Tool input holding a real-valued Contract line is not a reply line.
+contract_case "contract: a line inside tool_use input does not count" 2 \
+  '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","input":{"new_string":"Contract: risk=LOW quality=STANDARD acceptance=tests pass"}}]}}'
+contract_case "contract: a contract after prose is not a first line" 2 \
+  '{"type":"assistant","message":{"content":[{"type":"text","text":"say \"hi\"\nContract: risk=LOW quality=STANDARD acceptance=x ok"}]}}'
+
+# A contract refusal says nothing about the code: a later chat-only session must not inherit it.
+dir="$(fixture 'true')"
+t="$work/t-none.jsonl"; printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"text","text":"hi"}]}}' > "$t"
+echo change > "$dir/file.txt"
+run_gate "$dir" "{\"stop_hook_active\":false,\"transcript_path\":\"$t\"}"
+expect_code "contract: first refusal" 2
+if [ "$(cat "$dir/.claude/.gate-failed")" = "c1" ]; then ok "contract: marker is a contract marker"; else bad "contract: marker is a contract marker"; fi
+run_gate "$dir" "{\"stop_hook_active\":true,\"transcript_path\":\"$t\"}"
+expect_code "contract: continued refusal (2nd)" 2
+run_gate "$dir" "{\"stop_hook_active\":true,\"transcript_path\":\"$t\"}"
+expect_code "contract: continued refusal (3rd)" 2
+run_gate "$dir" "{\"stop_hook_active\":true,\"transcript_path\":\"$t\"}"
+expect_code "contract: continued refusal is released after three refusals" 0
+case "$(cat "$dir/.claude/.gate-failed")" in
+  c*) ok "contract: a released refusal stays a contract refusal" ;;
+  *) bad "contract: a released refusal stays a contract refusal" ;;
+esac
+# New session: seed clears the contract marker, so a session that changes nothing is not gated.
+git -C "$dir" -c user.name=t -c user.email=t@t add -A
+git -C "$dir" -c user.name=t -c user.email=t@t commit -qm change
+CLAUDE_PROJECT_DIR="$dir" bash "$gate" --seed </dev/null
+if [ ! -f "$dir/.claude/.gate-failed" ]; then ok "contract: seed clears a contract marker"; else bad "contract: seed clears a contract marker"; fi
+run_gate "$dir" "{\"stop_hook_active\":false,\"transcript_path\":\"$t\"}"
+expect_code "contract: chat-only follow-up session is not blocked" 0
+
+# No transcript_path in the input: not checked.
+dir="$(fixture 'true')"
+echo change > "$dir/file.txt"
+run_gate "$dir" '{"stop_hook_active":false}'
+expect_code "contract: missing transcript_path is not checked" 0
+
+# Runtime-injected user entries are not human turns: skill bodies, Stop hook
+# feedback, background task notifications and compaction summaries.
+human='{"type":"user","message":{"content":"please change file"}}'
+said='{"type":"assistant","message":{"content":[{"type":"text","text":"Contract: risk=LOW quality=STANDARD acceptance=tests pass"}]}}'
+edit='{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","input":{}}]}}'
+contract_case "contract: a loaded skill body does not end the turn" 0 "$human
+$said
+{\"type\":\"user\",\"isMeta\":true,\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Base directory for this skill: x\"}]}}
+$edit"
+contract_case "contract: Stop hook feedback cannot excuse an earlier write" 2 "$human
+$edit
+{\"type\":\"user\",\"isMeta\":true,\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Stop hook feedback: no contract\"}]}}
+$said"
+contract_case "contract: a task notification does not end the turn" 0 "$human
+$said
+{\"type\":\"user\",\"message\":{\"content\":\"<task-notification> <task-id>a1</task-id> </task-notification>\"}}
+$edit"
+contract_case "contract: a compaction summary does not end the turn" 0 "$human
+$said
+{\"type\":\"user\",\"isCompactSummary\":true,\"message\":{\"content\":\"This session is being continued\"}}
+$edit"
+contract_case "contract: a new human prompt still needs a new contract" 2 "$human
+$said
+{\"type\":\"user\",\"message\":{\"content\":\"now change it again\"}}
+$edit"
+
+# High-risk areas in PROJECT.md set a review floor that a low contract cannot lower.
+risky_fixture() {
+  local d
+  d="$(fixture 'true')"
+  # shellcheck disable=SC2016 # literal Markdown backticks
+  printf '\n## High-risk areas\n\n- `secure/`: auth boundary.\n- `deploy/*.yml`: production config.\n\n## Other\n\n- `not/listed/`\n' >> "$d/.lean/PROJECT.md"
+  git -C "$d" -c user.name=t -c user.email=t@t commit -qam areas
+  echo "$d"
+}
+low="Contract: risk=LOW quality=STANDARD acceptance=tests pass"
+t="$work/t-low.jsonl"; printf '%s\n' "$said" > "$t"
+dir="$(risky_fixture)"
+mkdir -p "$dir/secure"; echo x > "$dir/secure/auth.py"
+run_gate "$dir" "{\"stop_hook_active\":false,\"transcript_path\":\"$t\"}"
+expect_code "risk: a LOW contract in a high-risk area needs a review receipt" 2
+case "$err" in
+  *"High-risk areas changed"*"secure/auth.py"*) ok "risk: refusal names the high-risk path" ;;
+  *) bad "risk: refusal names the high-risk path (got: $err)" ;;
+esac
+evidence() { python3 "$repo/.lean/scripts/gate_evidence.py" --root "$dir" "$@"; }
+evidence record-review --contract "$low" --reviewer independent --evidence 'round 1, no findings' \
+  --verdict PASS --state "$(evidence state)" >/dev/null
+run_gate "$dir" "{\"stop_hook_active\":false,\"transcript_path\":\"$t\"}"
+expect_code "risk: a matching review receipt satisfies the floor" 0
+dir="$(risky_fixture)"
+echo x > "$dir/elsewhere.txt"; mkdir -p "$dir/not/listed"; echo x > "$dir/not/listed/f"
+run_gate "$dir" "{\"stop_hook_active\":false,\"transcript_path\":\"$t\"}"
+expect_code "risk: paths outside High-risk areas keep the contract depth" 0
+dir="$(risky_fixture)"
+mkdir -p "$dir/deploy"; echo x > "$dir/deploy/prod.yml"
+run_gate "$dir" "{\"stop_hook_active\":false,\"transcript_path\":\"$t\"}"
+expect_code "risk: glob areas match" 2
+dir="$(risky_fixture)"
+CLAUDE_PROJECT_DIR="$dir" bash "$gate" --seed </dev/null
+mkdir -p "$dir/secure"; echo x > "$dir/secure/auth.py"
+git -C "$dir" -c user.name=t -c user.email=t@t add -A
+git -C "$dir" -c user.name=t -c user.email=t@t commit -qm risky
+run_gate "$dir" "{\"stop_hook_active\":false,\"transcript_path\":\"$t\"}"
+expect_code "risk: work committed during the session still counts" 2
+dir="$(risky_fixture)"
+mkdir -p "$dir/secure"; echo x > "$dir/secure/auth.py"
+run_gate "$dir" '{"stop_hook_active":false}'
+expect_code "risk: a high-risk change without any contract is refused" 2
+
+dir="$(risky_fixture)"
+mkdir -p "$dir/secure"; echo x > "$dir/secure/auth.py"
+CLAUDE_PROJECT_DIR="$dir" bash "$gate" --seed </dev/null
+t="$work/t-chat.jsonl"; printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"text","text":"hi"}]}}' > "$t"
+run_gate "$dir" "{\"stop_hook_active\":false,\"transcript_path\":\"$t\"}"
+expect_code "risk: a chat-only turn over an inherited high-risk change is not refused" 0
+# A Lean root below the Git toplevel matches areas against root-relative paths.
+outer="$(mktemp -d "$work/outer.XXXX")"
+git -C "$outer" init -q
+dir="$outer/app"; mkdir -p "$dir/.lean" "$dir/secure"
+cp "$(risky_fixture)/.lean/PROJECT.md" "$dir/.lean/PROJECT.md"
+echo old > "$dir/secure/auth.py"
+git -C "$outer" -c user.name=t -c user.email=t@t add -A
+git -C "$outer" -c user.name=t -c user.email=t@t commit -qm init
+echo new > "$dir/secure/auth.py"
+t="$work/t-low.jsonl"
+run_gate "$dir" "{\"stop_hook_active\":false,\"transcript_path\":\"$t\"}"
+expect_code "risk: a nested Lean root still sees tracked high-risk edits" 2
+
+# Every hook refusal after input parsing counts toward the cap, including
+# protected-control drift and an undefined gate.
+run_raw() { # <dir> <stdin json>; no fixture control acceptance
+  err="$(printf '%s' "$2" | CLAUDE_PROJECT_DIR="$1" bash "$gate" 2>&1 >"$work/stdout")"
+  code=$?
+  out="$(cat "$work/stdout")"
+}
+dir="$(fixture 'true')"
+run_raw "$dir" '{"stop_hook_active":false}'
+expect_code "cap: first use records gate controls" 0
+sed -i.bak 's/^true$/test -d ./' "$dir/.lean/PROJECT.md" && rm -f "$dir/.lean/PROJECT.md.bak"
+run_raw "$dir" '{"stop_hook_active":false}'
+expect_code "cap: changed controls refuse" 2
+run_raw "$dir" '{"stop_hook_active":true}'
+run_raw "$dir" '{"stop_hook_active":true}'
+expect_code "cap: changed controls still refuse (3rd)" 2
+run_raw "$dir" '{"stop_hook_active":true}'
+expect_code "cap: changed-control refusals are released after three" 0
+case "$out" in *UNVERIFIED*) ok "cap: control release is marked unverified" ;; *) bad "cap: control release is marked unverified (got: $out)" ;; esac
+dir="$(fixture 'true')"
+rm "$dir/.lean/PROJECT.md"
+for active in false true true; do run_raw "$dir" "{\"stop_hook_active\":$active}"; done
+expect_code "cap: an undefined gate still refuses (3rd)" 2
+run_raw "$dir" '{"stop_hook_active":true}'
+expect_code "cap: undefined-gate refusals are released after three" 0
+dir="$(fixture 'true')"
+rm "$dir/.lean/PROJECT.md"
+CLAUDE_PROJECT_DIR="$dir" bash "$gate" --seed </dev/null
+if [ ! -f "$dir/.claude/.gate-failed" ]; then ok "cap: seed never records a refusal"; else bad "cap: seed never records a refusal"; fi
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

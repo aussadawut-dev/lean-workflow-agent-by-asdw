@@ -24,7 +24,7 @@ Record decisions that affect implementation or scope.
 
 ## Evidence guidance
 
-Record commands, results, and review findings before marking DONE. For each delegated assignment, reassignment, or model/effort change, add the compact dispatch records defined in `.claude/skills/lean-multi-agent/SKILL.md`.
+Record commands, results, and review findings before marking DONE. For each delegated assignment, reassignment, or model/effort change, add the compact dispatch records defined in `.lean/skills/lean-multi-agent/SKILL.md`.
 
 ## Next step
 

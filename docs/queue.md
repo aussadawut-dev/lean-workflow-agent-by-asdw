@@ -32,20 +32,20 @@ A lease lasts 30 minutes; renew it during long work. Use `queue complete --id Q0
 Use either command in your coding agent:
 
 ```text
-/clean-queue old
-/clean-queue all
+/lean-clean-queue old
+/lean-clean-queue all
 ```
 
 | Command | DONE items selected | Items retained |
 |---|---|---|
-| `/clean-queue old` | Completed strictly more than 30 days ago, using `completed_at`. | DONE from the last 30 days, undated DONE, and all READY/BLOCKED items. |
-| `/clean-queue all` | Every DONE item, including undated legacy items. | All READY/BLOCKED items. |
+| `/lean-clean-queue old` | Completed strictly more than 30 days ago, using `completed_at`. | DONE from the last 30 days, undated DONE, and all READY/BLOCKED items. |
+| `/lean-clean-queue all` | Every DONE item, including undated legacy items. | All READY/BLOCKED items. |
 
 Both commands archive queue items only; trackers stay in place. “All” means all DONE items,
 not all work. Cleanup moves records out of the active queue and keeps their full history.
 The skill previews the selection, then applies the explicitly requested cleanup without asking
 for the same permission again. If slash-command discovery is unavailable, follow the shared
-[clean-queue procedure](../.claude/skills/clean-queue/SKILL.md) or use the CLI below.
+[lean-clean-queue procedure](../.lean/skills/lean-clean-queue/SKILL.md) or use the CLI below.
 
 Equivalent CLI commands (choose old or all):
 

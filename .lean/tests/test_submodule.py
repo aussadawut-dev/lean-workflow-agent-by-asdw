@@ -23,7 +23,7 @@ class SubmoduleTests(unittest.TestCase):
                     "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "test@example.invalid"}
         for name in (".lean/scripts/submodule.py", ".lean/scripts/workflow.py", ".lean/scripts/model_catalog.py",
                      ".lean/templates/tracker.md", ".lean/templates/queue-item.json",
-                     ".claude/hooks/quality-gate.sh", ".claude/hooks/session-start.sh", ".gitignore", "AGENTS.md"):
+                     ".lean/scripts/gate_evidence.py", ".lean/scripts/quality-gate.sh", ".claude/hooks/quality-gate.sh", ".claude/hooks/session-start.sh", ".gitignore", "AGENTS.md"):
             dst = self.root / name
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / name, dst)
@@ -155,6 +155,18 @@ class SubmoduleTests(unittest.TestCase):
         self.cli("gate")
         self.gate_file(context, "false")
         self.assertIn("Target Quality Gate failed", self.cli("gate", success=False).stderr)
+
+    def test_direct_shared_gate_checks_target_even_when_claude_cache_would_skip(self):
+        context = self.install()
+        self.gate_file(context, "test ! -f blocked.txt")
+        self.assertEqual(self.hook(seed=True).returncode, 0)
+        gate = self.root / ".lean/scripts/quality-gate.sh"
+        result = self.command("bash", gate, "--root", self.root)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        (Path(context["project_root"]) / "blocked.txt").write_text("must gate")
+        result = self.command("bash", gate, "--root", self.root)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("Target Quality Gate failed", result.stderr)
 
     def test_hook_gates_untracked_target_work_even_after_lean_cache_is_seeded(self):
         context = self.install()

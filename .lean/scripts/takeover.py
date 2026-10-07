@@ -22,6 +22,10 @@ import tempfile
 import time
 import uuid
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.dont_write_bytecode = True
+from shared_assets import SKILL_LINKS, declared_links, link_leaf, verify_link
+
 
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build",
              ".next", ".cache", ".agent-runtime"}
@@ -116,6 +120,13 @@ def relative_path(relative):
 
 def target_path(root, relative):
     relative_path(relative)
+    if relative in SKILL_LINKS:
+        path = link_leaf(root, relative)
+        if path.is_symlink():
+            verify_link(root, relative, require_target=False)
+        elif path.exists() and not path.is_dir():
+            fail(f"discovery slot is not a directory: {relative}")
+        return path
     path = plain_path(root / relative)
     for parent in path.parents:
         if parent == root:
@@ -127,12 +138,130 @@ def target_path(root, relative):
     return path
 
 
+def skill_slot(path):
+    return "/".join(path.parts[-3:]) in SKILL_LINKS
+
+
+def tree_content(path):
+    """An inert exact snapshot, restricted to an audited Lean discovery slot."""
+    members = {}
+    def inaccessible(error):
+        raise error
+    for directory, directories, files in os.walk(path, followlinks=False, onerror=inaccessible):
+        for name in sorted(directories + files):
+            child = Path(directory) / name
+            relative_path(child.relative_to(path).as_posix())
+            if child.is_symlink() or (child.is_dir() and (child / ".git").exists()):
+                fail(f"symlink/nested repository boundary: {child}")
+            info = child.lstat()
+            mode = stat.S_IMODE(info.st_mode)
+            relative = child.relative_to(path).as_posix()
+            if stat.S_ISDIR(info.st_mode):
+                members[relative] = {"directory": True, "mode": mode}
+            elif stat.S_ISREG(info.st_mode) and info.st_nlink == 1:
+                data = child.read_bytes()
+                data.decode("utf-8")
+                members[relative] = {"data": base64.b64encode(data).decode(), "mode": mode}
+            else:
+                fail(f"not an exclusive regular file: {child}")
+    return json.dumps(members, sort_keys=True).encode()
+
+
+def tree_fingerprint(data, mode):
+    members = json.loads(data)
+    hashes = {}
+    for name, member in members.items():
+        relative_path(name)
+        if member.get("directory") is True:
+            hashes[name] = {"directory": True, "mode": member["mode"]}
+        else:
+            hashes[name] = {"sha256": digest(base64.b64decode(member["data"], validate=True)), "mode": member["mode"]}
+    return {"sha256": digest(data), "mode": mode, "directory": hashes}
+
+
 def fingerprint(path):
+    if path.is_symlink():
+        if not skill_slot(path) or os.readlink(path) != SKILL_LINKS["/".join(path.parts[-3:])]:
+            fail(f"symlink boundary: {path}")
+        return {"sha256": digest(os.readlink(path).encode()), "mode": 0o777, "link": os.readlink(path)}
     if not path.exists():
         return None
-    if not stat.S_ISREG(path.stat().st_mode) or path.stat().st_nlink != 1:
+    info = path.stat()
+    if path.is_dir() and skill_slot(path):
+        return tree_fingerprint(tree_content(path), stat.S_IMODE(info.st_mode))
+    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
         fail(f"not an exclusive regular file: {path}")
-    return {"sha256": digest(path.read_bytes()), "mode": stat.S_IMODE(path.stat().st_mode)}
+    return {"sha256": digest(path.read_bytes()), "mode": stat.S_IMODE(info.st_mode)}
+
+
+def snapshot_data(path):
+    if path.is_symlink():
+        return os.readlink(path).encode()
+    if path.is_dir() and skill_slot(path):
+        return tree_content(path)
+    return path.read_bytes()
+
+
+def partial_directory(state, before):
+    # Directory replacement can stop after removing some original members.
+    # Accept only untouched originals, never additions or edits, on resume.
+    if not before or "directory" not in before:
+        return False
+    if state is None:
+        return True
+    return ("directory" in state and state["mode"] == before["mode"]
+            and all(before["directory"].get(name) == item for name, item in state["directory"].items()))
+
+
+def write_operation(path, operation):
+    if "link" in operation:
+        if path.is_dir() and not path.is_symlink():
+            # Preflight already checked exact members and boundaries; repeat
+            # the no-follow check before removing only this audited skill slot.
+            tree_content(path)
+            shutil.rmtree(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # Directory removal leaves an absent leaf; symlink creation publishes
+        # that leaf atomically. No unjournaled temporary link survives a crash.
+        path.symlink_to(operation["link"], target_is_directory=True)
+        sync_directory(path.parent)
+    elif operation["content"] is None:
+        remove_file(path)
+    else:
+        atomic(path, operation["content"].encode(), operation["mode"])
+
+
+def restore_snapshot(path, snapshot):
+    before = snapshot["before"]
+    data = restore_data(snapshot)
+    if path.is_symlink():
+        remove_file(path)
+    if before is None:
+        if path.exists():
+            remove_file(path)
+    elif "link" in before:
+        write_operation(path, {"link": before["link"]})
+    elif "directory" in before:
+        path.mkdir(parents=True, exist_ok=True)
+        path.chmod(before["mode"])
+        members = json.loads(data)
+        for name, member in sorted(members.items(), key=lambda item: (len(PurePosixPath(item[0]).parts), item[0])):
+            child = path / name
+            if member.get("directory") is True:
+                child.mkdir(parents=True, exist_ok=True)
+                child.chmod(member["mode"])
+            else:
+                atomic(child, base64.b64decode(member["data"], validate=True), member["mode"])
+    else:
+        atomic(path, data, before["mode"])
+
+
+def sync_directory(path):
+    directory = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
 
 
 def candidate(relative):
@@ -155,6 +284,15 @@ def inventory(root):
             path = base / name
             relative = path.relative_to(root).as_posix()
             reason = None
+            if relative in SKILL_LINKS:
+                directories.remove(name)
+                try:
+                    location = target_path(root, relative)
+                    data = snapshot_data(location)
+                    entries[relative] = {"status": "unread", "before": fingerprint(location), "size": len(data)}
+                except (OSError, UnicodeError, ValueError) as error:
+                    entries[relative] = {"status": "blocked", "reason": str(error)}
+                continue
             if path.is_symlink():
                 reason = "symlink boundary; not followed"
             elif name in SKIP_DIRS or secret(relative):
@@ -167,7 +305,13 @@ def inventory(root):
         for name in files:
             path = base / name
             relative = path.relative_to(root).as_posix()
-            if path.is_symlink() or not stat.S_ISREG(path.lstat().st_mode):
+            if relative in SKILL_LINKS and path.is_symlink():
+                try:
+                    location = target_path(root, relative)
+                    entries[relative] = {"status": "unread", "before": fingerprint(location), "size": len(snapshot_data(location))}
+                except (OSError, ValueError) as error:
+                    entries[relative] = {"status": "blocked", "reason": str(error)}
+            elif path.is_symlink() or not stat.S_ISREG(path.lstat().st_mode):
                 entries[relative] = {"status": "excluded", "reason": "symlink/special file; not read"}
             elif secret(relative) or name == ".git":
                 entries[relative] = {"status": "excluded", "reason": "private/runtime file; not read"}
@@ -190,7 +334,11 @@ def session_path(value, root=None):
     if path.exists():
         for child in path.rglob("*"):
             if child.is_symlink():
-                fail("session contains a symlink")
+                relative = child.relative_to(path).as_posix()
+                if relative.startswith("staging/") and relative[8:] in SKILL_LINKS:
+                    verify_link(path / "staging", relative[8:], require_target=False)
+                else:
+                    fail("session contains a symlink")
     return path
 
 
@@ -258,9 +406,9 @@ def coverage(session, manifest, root, path, action, evidence):
     entry = manifest["files"].get(path)
     if action == "include":
         location = target_path(root, path)
-        if not location.is_file():
+        if not location.exists() and not location.is_symlink():
             fail("included file is missing")
-        data = location.read_bytes()
+        data = snapshot_data(location)
         data.decode("utf-8")
         manifest["files"][path] = {"status": "unread", "before": fingerprint(location), "size": len(data)}
     elif action == "exclude":
@@ -282,19 +430,25 @@ def portable_files(source):
     # silently import source-project scripts/templates placed beside them.
     registry = load(target_path(source, ".lean/assets.json"))
     names = registry.get("files") if isinstance(registry, dict) else None
-    if (not isinstance(registry, dict) or registry.get("schema") != 1 or not isinstance(names, list) or not names
+    if (not isinstance(registry, dict) or registry.get("schema") not in (1, 2) or not isinstance(names, list) or not names
             or not all(isinstance(name, str) for name in names) or len(set(names)) != len(names)
             or ".lean/assets.json" not in names):
         fail("invalid portable asset registry")
+    links = declared_links(registry)
+    if registry["schema"] == 1 and any(
+            any(name.startswith(slot + "/") for slot in SKILL_LINKS) for name in names):
+        fail("legacy provider skill baseline must be upgraded to schema 2 before drafting")
+    for name in links:
+        verify_link(source, name)
     for name in names:
         relative_path(name)
-        if (name in {".lean/PROJECT.md", ".lean/config.json", ".lean/model-catalog.json"}
+        if (name in {".lean/PROJECT.md", ".lean/config.json", ".lean/model-catalog.json", ".lean/upstream.json"}
                 or name.startswith(RECORD_DIRS)
                 or not (name in {"AGENTS.md", "CLAUDE.md"} or name.startswith((".lean/", ".claude/", ".agents/skills/")))):
             fail(f"project-owned file cannot be a portable asset: {name}")
         if not target_path(source, name).is_file():
             fail(f"missing portable asset: {name}")
-    return sorted(names)
+    return sorted(names) + sorted(links)
 
 
 def draft(session, manifest, root, baseline):
@@ -311,6 +465,12 @@ def draft(session, manifest, root, baseline):
     for name in portable_files(source):
         path = target_path(source, name)
         sources[name] = fingerprint(path)
+        if name in SKILL_LINKS:
+            before = fingerprint(target_path(root, name))
+            if before != sources[name]:
+                plan["operations"].append({"path": name, "before": before, "link": SKILL_LINKS[name],
+                                           "reason": "install shared Lean skill discovery link"})
+            continue
         content = path.read_text()
         if name in {"AGENTS.md", "CLAUDE.md"}:
             content = content.split("## Project additions", 1)[0] + "## Project additions\n\n"
@@ -326,6 +486,8 @@ def draft(session, manifest, root, baseline):
 
 
 def after_state(operation):
+    if "link" in operation:
+        return {"sha256": digest(operation["link"].encode()), "mode": 0o777, "link": operation["link"]}
     if operation.get("content") is None:
         return None
     return {"sha256": digest(operation["content"].encode()), "mode": operation["mode"]}
@@ -523,11 +685,21 @@ def validate_plan(manifest, plan):
                 fail(f"operation contradicts keep disposition: {name}")
         elif entry and entry["status"] != "excluded":
             fail(f"operation incorrectly claims a new path: {name}")
+        if "link" in op:
+            if (name not in SKILL_LINKS or op["link"] != SKILL_LINKS[name] or "content" in op
+                    or name not in (plan.get("baseline") or {}).get("files", {})):
+                fail("operation must use a release-declared Lean discovery link")
+            source_state = plan["baseline"]["files"][name]
+            if source_state != after_state(op):
+                fail("link operation must match the fingerprinted release")
+            continue
+        if name in SKILL_LINKS:
+            fail("discovery slot operations must install the declared link")
         if "content" not in op or (op["content"] is not None and not isinstance(op["content"], str)):
             fail("operation content must be UTF-8 text or null for deletion")
         if op["content"] is not None and (type(op.get("mode")) is not int or not 0 <= op["mode"] <= 0o777):
             fail("operation mode must be ordinary permission bits")
-        if op["content"] is None and before is None:
+        if after_state(op) is None and before is None:
             fail("cannot delete an absent file")
     permitted = record_migration_sources(manifest, plan)
     for op in plan["operations"]:
@@ -553,6 +725,7 @@ def check_target(manifest, plan, root, journal=None):
     current = inventory(root)
     ops = {op["path"]: op for op in plan["operations"]}
     touched = set(journal.get("started", [])) if journal else set()
+    interrupted = touched - set(journal.get("completed", [])) if journal else set()
     # Excluded symlink/nested-repo boundaries can introduce active instructions
     # without becoming ordinary readable candidates. Keep discovery coverage
     # stable as well as the hashes of fully read files.
@@ -564,25 +737,25 @@ def check_target(manifest, plan, root, journal=None):
                      or "separate scope" in item.get("reason", ""))}
     footprint = discovered(manifest["files"])
     for name in touched:
-        if ops[name]["content"] is None:
+        if after_state(ops[name]) is None:
             footprint.discard(name)
         elif candidate(name):
             footprint.add(name)
     discovered_now = discovered(current)
-    deletions = {name for name in touched if ops[name]["content"] is None}
+    deletions = {name for name in touched if after_state(ops[name]) is None}
     if (discovered_now - footprint) - deletions or (footprint - discovered_now) - touched:
         fail("workflow file set changed; refresh audit before applying")
     expected = {name for name, item in manifest["files"].items() if item["status"] != "excluded" and candidate(name)}
     for name, op in ops.items():
         if name in touched:
-            if op["content"] is None:
+            if after_state(op) is None:
                 expected.discard(name)
             elif candidate(name):
                 expected.add(name)
     actual = {name for name, item in current.items() if item["status"] != "excluded"
               and manifest["files"].get(name, {}).get("status") != "excluded"}
     # A started deletion can still be at its pre-write state after a crash.
-    allowed_missing = {name for name in touched if ops[name]["content"] is None}
+    allowed_missing = {name for name in touched if after_state(ops[name]) is None}
     if (actual - expected) - allowed_missing or (expected - actual) - touched:
         fail("workflow file set changed; refresh audit before applying")
     for name, entry in manifest["files"].items():
@@ -595,14 +768,14 @@ def check_target(manifest, plan, root, journal=None):
         allowed = [entry["before"]]
         if name in touched:
             allowed.append(after_state(ops[name]))
-        if state not in allowed:
+        if state not in allowed and not (name in interrupted and partial_directory(state, entry["before"])):
             fail(f"audited revision changed: {name}")
     for name, op in ops.items():
         state = fingerprint(target_path(root, name))
         allowed = [op["before"]]
         if name in touched:
             allowed.append(after_state(op))
-        if state not in allowed:
+        if state not in allowed and not (name in interrupted and partial_directory(state, op["before"])):
             fail(f"operation precondition changed: {name}")
 
 
@@ -619,17 +792,16 @@ def stage(session, manifest, root):
         for name, item in manifest["files"].items():
             if item["status"] == "read":
                 original = target_path(root, name)
-                atomic(target_path(temporary, name), original.read_bytes(), item["before"]["mode"])
+                restore_snapshot(target_path(temporary, name), {"before": item["before"],
+                                 "data": base64.b64encode(snapshot_data(original)).decode()})
         for op in plan["operations"]:
             path = target_path(temporary, op["path"])
-            if op["content"] is None:
-                if path.exists():
-                    remove_file(path)
-            else:
-                atomic(path, op["content"].encode(), op["mode"])
+            if after_state(op) is None and not path.exists():
+                continue
+            write_operation(path, op)
         names = {name for name, item in manifest["files"].items() if item["status"] == "read"}
         for op in plan["operations"]:
-            if op["content"] is None:
+            if after_state(op) is None:
                 names.discard(op["path"])
             else:
                 names.add(op["path"])
@@ -659,6 +831,9 @@ def check_stage(session, manifest, plan):
     for name, expected in staged["files"].items():
         if fingerprint(target_path(directory, name)) != expected:
             fail(f"staged result changed: {name}")
+    for name, state in staged["files"].items():
+        if "link" in state:
+            verify_link(directory, name)
     current = inventory(directory)
     # A controlled staging tree has no pre-existing excluded app/private files.
     # Reject added private settings by name without reading their contents.
@@ -729,8 +904,13 @@ def restore_data(snapshot):
             fail("invalid absent-file snapshot")
         return None
     data = base64.b64decode(snapshot["data"], validate=True)
-    if digest(data) != snapshot["before"]["sha256"]:
+    before = snapshot["before"]
+    if digest(data) != before["sha256"]:
         fail("snapshot checksum mismatch")
+    if "directory" in before and tree_fingerprint(data, before["mode"]) != before:
+        fail("snapshot directory checksum mismatch")
+    if "link" in before and data.decode() != before["link"]:
+        fail("snapshot link mismatch")
     return data
 
 
@@ -761,7 +941,7 @@ def apply_plan(session, manifest, root, receipt_hash):
         for snapshot in snapshots:
             path = target_path(root, snapshot["path"])
             if snapshot["before"] is not None:
-                snapshot["data"] = base64.b64encode(path.read_bytes()).decode()
+                snapshot["data"] = base64.b64encode(snapshot_data(path)).decode()
             for parent in path.parents:
                 if parent == root:
                     break
@@ -788,12 +968,9 @@ def apply_plan(session, manifest, root, receipt_hash):
             journal["started"].append(name)
             save(journal_path, journal)
         if state != after_state(op):
-            if state != op["before"]:
+            if state != op["before"] and not partial_directory(state, op["before"]):
                 fail(f"interrupted operation changed: {name}")
-            if op["content"] is None:
-                remove_file(path)
-            else:
-                atomic(path, op["content"].encode(), op["mode"])
+            write_operation(path, op)
         journal["completed"].append(name)
         save(journal_path, journal)
     journal["state"] = "APPLIED"
@@ -816,7 +993,9 @@ def rollback(session, manifest, root):
         restore_data(snapshot)
         state = fingerprint(target_path(root, name))
         allowed = [snapshot["before"]] if name in journal["restored"] else [snapshot["before"], after_state(ops[name])]
-        if state not in allowed:
+        interrupted = (name not in journal["restored"] and
+                       (journal["state"] == "ROLLING_BACK" or name not in journal["completed"]))
+        if state not in allowed and not (interrupted and partial_directory(state, snapshot["before"])):
             fail(f"rollback would overwrite subsequent edits: {name}")
     journal["state"] = "ROLLING_BACK"
     save(journal_path, journal)
@@ -826,10 +1005,7 @@ def rollback(session, manifest, root):
         snapshot = snapshots[name]
         path = target_path(root, name)
         if fingerprint(path) != snapshot["before"]:
-            if snapshot["before"] is None:
-                remove_file(path)
-            else:
-                atomic(path, restore_data(snapshot), snapshot["before"]["mode"])
+            restore_snapshot(path, snapshot)
         journal["restored"].append(name)
         save(journal_path, journal)
     for name in sorted(journal["directories"], key=lambda value: len(PurePosixPath(value).parts), reverse=True):

@@ -812,6 +812,173 @@ class TakeoverTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "excluded file changed"):
             self.apply(manifest, receipt)
 
+    def shared_baseline(self):
+        registry = TOOL.load(self.source / ".lean/assets.json")
+        registry["schema"] = 2
+        registry["links"] = TOOL.SKILL_LINKS
+        for name, target in TOOL.SKILL_LINKS.items():
+            skill = self.source / ".lean/skills" / Path(name).name
+            skill.mkdir(parents=True, exist_ok=True)
+            (skill / "SKILL.md").write_text("Shared instructions\n")
+            canonical = str((skill / "SKILL.md").relative_to(self.source))
+            if canonical not in registry["files"]:
+                registry["files"].append(canonical)
+            (self.source / name).symlink_to(target, target_is_directory=True)
+        TOOL.save(self.source / ".lean/assets.json", registry)
+
+    def test_legacy_provider_skill_source_requires_upgrade_before_draft(self):
+        old = self.source / ".claude/skills/lean-task"
+        old.mkdir()
+        (old / "SKILL.md").write_text("Old source procedure\n")
+        registry = TOOL.load(self.source / ".lean/assets.json")
+        registry["files"].append(".claude/skills/lean-task/SKILL.md")
+        TOOL.save(self.source / ".lean/assets.json", registry)
+        manifest = self.init()
+        with self.assertRaisesRegex(ValueError, "upgraded to schema 2"):
+            TOOL.draft(self.session, manifest, self.root, self.source)
+        self.assertFalse((self.root / ".claude").exists())
+
+    def test_shared_links_install_and_legacy_directory_rollback_is_lossless(self):
+        self.shared_baseline()
+        old = self.root / ".claude/skills/lean-task"
+        (old / "references").mkdir(parents=True)
+        (old / "SKILL.md").write_text("Old customized procedure\n")
+        (old / "references/local.md").write_text("Preserve extension in snapshot\n")
+        (old / "references/local.md").chmod(0o640)
+        before = TOOL.fingerprint(old)
+        manifest, plan, receipt = self.prepare()
+        self.assertEqual(self.apply(manifest, receipt)["status"], "APPLIED")
+        self.assertTrue(old.is_symlink())
+        self.assertEqual((old / "SKILL.md").read_text(), "Shared instructions\n")
+        self.assertEqual(self.apply(manifest, receipt)["status"], "APPLIED")
+        self.cli("status", "--session", str(self.session))
+        self.assertEqual(TOOL.rollback(self.session, manifest, self.root)["status"], "ROLLED_BACK")
+        self.assertFalse(old.is_symlink())
+        self.assertEqual(TOOL.fingerprint(old), before)
+        self.assertFalse((self.root / ".agents/skills/lean-task").exists())
+
+    def test_declared_link_tampering_and_external_targets_block_without_following(self):
+        self.shared_baseline()
+        manifest, _, receipt = self.prepare()
+        link = self.session / "staging/.agents/skills/lean-task"
+        link.unlink()
+        link.symlink_to(self.root / ".env")
+        with self.assertRaisesRegex(ValueError, "symlink|discovery"):
+            self.apply(manifest, receipt)
+        self.assertFalse((self.session / "journal.json").exists())
+        link.unlink()
+        link.symlink_to(TOOL.SKILL_LINKS[".agents/skills/lean-task"])
+        source_link = self.source / ".agents/skills/lean-task"
+        source_link.unlink()
+        source_link.symlink_to("../../.lean/skills/lean-init")
+        with self.assertRaisesRegex(ValueError, "discovery link"):
+            self.apply(manifest, receipt)
+
+    def test_link_operations_cannot_escape_release_allowlist(self):
+        self.shared_baseline()
+        manifest, plan, _ = self.prepare()
+        link = next(op for op in plan["operations"] if "link" in op)
+        link["link"] = "../../../outside"
+        with self.assertRaisesRegex(ValueError, "release-declared"):
+            TOOL.validate_plan(manifest, plan)
+        link["link"] = TOOL.SKILL_LINKS[link["path"]]
+        link["path"] = "service/AGENTS.md"
+        with self.assertRaisesRegex(ValueError, "release-declared"):
+            TOOL.validate_plan(manifest, plan)
+
+    def test_interrupted_directory_replacement_resumes_and_rejects_new_content(self):
+        self.shared_baseline()
+        old = self.root / ".agents/skills/lean-task"
+        old.mkdir(parents=True)
+        (old / "SKILL.md").write_text("Old adapter\n")
+        (old / "local.md").write_text("Original extension\n")
+        before = TOOL.fingerprint(old)
+        manifest, _, receipt = self.prepare()
+        real_write = TOOL.write_operation
+        def crash(path, operation):
+            if path == old:
+                (old / "SKILL.md").unlink()
+                raise OSError("fixture interrupted directory removal")
+            return real_write(path, operation)
+        with mock.patch.object(TOOL, "write_operation", crash):
+            with self.assertRaisesRegex(OSError, "interrupted"):
+                self.apply(manifest, receipt)
+        (old / "new.md").write_text("Unreviewed content\n")
+        with self.assertRaisesRegex(ValueError, "changed"):
+            self.apply(manifest, receipt)
+        (old / "new.md").unlink()
+        self.assertEqual(self.apply(manifest, receipt)["status"], "APPLIED")
+        TOOL.rollback(self.session, manifest, self.root)
+        self.assertEqual(TOOL.fingerprint(old), before)
+
+    def test_interrupted_link_creation_and_directory_restore_recover(self):
+        self.shared_baseline()
+        old = self.root / ".claude/skills/lean-task"
+        old.mkdir(parents=True)
+        (old / "SKILL.md").write_text("Old procedure\n")
+        (old / "local.md").write_text("Original extension\n")
+        before = TOOL.fingerprint(old)
+        manifest, _, receipt = self.prepare()
+        real_write = TOOL.write_operation
+        def crash(path, operation):
+            if path == old:
+                import shutil
+                shutil.rmtree(old)
+                raise OSError("fixture before link creation")
+            return real_write(path, operation)
+        with mock.patch.object(TOOL, "write_operation", crash):
+            with self.assertRaises(OSError):
+                self.apply(manifest, receipt)
+        self.assertEqual(self.apply(manifest, receipt)["status"], "APPLIED")
+        real_atomic = TOOL.atomic
+        def crash_restore(path, data, mode=0o600):
+            if path == old / "local.md":
+                raise OSError("fixture partial directory restore")
+            return real_atomic(path, data, mode)
+        with mock.patch.object(TOOL, "atomic", crash_restore):
+            with self.assertRaisesRegex(OSError, "partial directory"):
+                TOOL.rollback(self.session, manifest, self.root)
+        self.assertEqual(TOOL.rollback(self.session, manifest, self.root)["status"], "ROLLED_BACK")
+        self.assertEqual(TOOL.fingerprint(old), before)
+
+    def test_unreadable_legacy_directory_blocks_instead_of_snapshotting_empty_tree(self):
+        old = self.root / ".claude/skills/lean-task"
+        old.mkdir(parents=True)
+        def inaccessible(path, **options):
+            options["onerror"](PermissionError("fixture directory cannot be enumerated"))
+            return iter(())
+        with mock.patch.object(TOOL.os, "walk", inaccessible):
+            with self.assertRaises(PermissionError):
+                TOOL.tree_content(old)
+
+    def test_completed_link_replacement_drift_blocks_apply_and_rollback(self):
+        self.shared_baseline()
+        old = self.root / ".claude/skills/lean-task"
+        old.mkdir(parents=True)
+        (old / "SKILL.md").write_text("Old instructions\n")
+        manifest, _, receipt = self.prepare()
+        self.apply(manifest, receipt)
+        old.unlink()
+        with self.assertRaisesRegex(ValueError, "changed"):
+            self.apply(manifest, receipt)
+        with self.assertRaisesRegex(ValueError, "subsequent edits"):
+            TOOL.rollback(self.session, manifest, self.root)
+
+    def test_skill_directory_secrets_symlinks_and_hardlinks_are_never_imported(self):
+        for kind in ("secret", "symlink", "hardlink"):
+            with self.subTest(kind=kind):
+                old = self.root / ".claude/skills/lean-task"
+                old.mkdir(parents=True, exist_ok=True)
+                child = old / (".env" if kind == "secret" else "unsafe.md")
+                if kind == "secret":
+                    child.write_text("do not read")
+                elif kind == "symlink":
+                    child.symlink_to(self.root / ".env")
+                else:
+                    os.link(self.root / "AGENTS.md", child)
+                self.assertEqual(TOOL.inventory(self.root)[".claude/skills/lean-task"]["status"], "blocked")
+                child.unlink()
+
     def test_portable_registry_contains_complete_structural_skillset(self):
         path = SCRIPT.parent / "check_structure.py"
         spec = importlib.util.spec_from_file_location("takeover_structure", path)
@@ -819,8 +986,13 @@ class TakeoverTests(unittest.TestCase):
         spec.loader.exec_module(module)
         files = set(TOOL.portable_files(SCRIPT.parents[2]))
         for name in module.REQUIRED_SKILLS:
-            self.assertIn(f".claude/skills/{name}/SKILL.md", files)
-            self.assertIn(f".agents/skills/{name}/SKILL.md", files)
+            self.assertIn(f".lean/skills/{name}/SKILL.md", files)
+        for name in set(module.REQUIRED_SKILLS) - set(module.EXTRA_SKILLS):
+            self.assertIn(f".claude/skills/{name}", files)
+            self.assertIn(f".agents/skills/{name}", files)
+        for name in module.EXTRA_SKILLS:
+            self.assertNotIn(f".claude/skills/{name}", files)
+            self.assertNotIn(f".agents/skills/{name}", files)
 
     def test_staging_matches_result_keeps_target_intact_and_excludes_secrets(self):
         original = (self.root / "AGENTS.md").read_bytes()

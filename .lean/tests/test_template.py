@@ -13,9 +13,17 @@ def bootstrap(root):
     listing = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"], cwd=ROOT)
     for name in set(listing.decode().split("\0")):
         source = ROOT / name
+        # A working-tree move can leave retired index entries beneath a link.
+        # Never materialize their dereferenced content as provider-owned copies.
+        if any((ROOT / parent).is_symlink() for parent in Path(name).parents):
+            continue
         reusable = name.startswith((".lean/", ".claude/", ".agents/skills/")) or name in ("AGENTS.md", "CLAUDE.md", ".gitignore")
         project_owned = name in (".lean/config.json", ".lean/PROJECT.md", ".lean/model-catalog.json")
-        if reusable and not project_owned and source.is_file():
+        if reusable and not project_owned and source.is_symlink():
+            destination = root / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.symlink_to(source.readlink(), target_is_directory=True)
+        elif reusable and not project_owned and source.is_file():
             destination = root / name
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
