@@ -30,7 +30,8 @@ class UpdateWorkflowTests(unittest.TestCase):
         (self.target / "AGENTS.md").write_text("Lean Workflow Baseline 1.0.0\n## Project additions\nBusiness rules\n")
         (self.target / ".lean").mkdir()
         for name, content in ((".lean/PROJECT.md", "application gate"), (".lean/config.json", '{"mode":"full"}'),
-                              ("pending.txt", "uncommitted work"), (".lean/model-catalog.json", "research")):
+                              ("pending.txt", "uncommitted work"), (".lean/model-catalog.json", "research"),
+                              (".lean/skill-effort.json", '{"default":"high","skills":{}}')):
             (self.target / name).write_text(content)
         self.before = self.snapshot()
 
@@ -153,6 +154,15 @@ class UpdateWorkflowTests(unittest.TestCase):
             "files": ["AGENTS.md", ".lean/assets.json", ".lean/upstream.json"]}))
         self.release("1.1.0")
         with self.assertRaisesRegex(ValueError, "project-owned"):
+            self.prepare()
+        self.assertEqual(self.snapshot(), self.before)
+
+    def test_source_skill_settings_cannot_overwrite_project_preferences(self):
+        (self.remote / '.lean/skill-effort.json').write_text('{"default":"ultra","skills":{}}')
+        (self.remote / '.lean/assets.json').write_text(json.dumps({'schema': 1,
+            'files': ['AGENTS.md', '.lean/assets.json', '.lean/skill-effort.json']}))
+        self.release('1.1.0')
+        with self.assertRaisesRegex(ValueError, 'project-owned'):
             self.prepare()
         self.assertEqual(self.snapshot(), self.before)
 

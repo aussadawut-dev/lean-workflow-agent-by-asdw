@@ -16,7 +16,7 @@ class GateIntegrityTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="lean integrity ")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        for name in (".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py",
+        for name in (".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py",
                      ".claude/hooks/quality-gate.sh", ".claude/hooks/session-start.sh", ".gitignore"):
             source = ROOT / name
             if source.exists():

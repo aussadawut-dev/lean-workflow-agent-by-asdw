@@ -7,6 +7,8 @@ argument-hint: "<remote url>"
 
 Input: `$ARGUMENTS` means the explicit invocation arguments, or the current user task when the runtime does not substitute it.
 
+Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity; keep model reasoning effort separate.
+
 # Lean Use Submodule
 
 Use `/lean-use-submodule <remote url>` from the Lean repository root. Lean is the superproject; the application is `targets/<repository-name>`. This is not installing Lean into the application.

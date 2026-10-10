@@ -1,5 +1,7 @@
 # Models and effort
 
+Model reasoning effort is separate from procedure intensity under `SKILL-EFFORT.md`; never translate standard/high/ultra procedure levels into runtime settings.
+
 Choose the least costly available model and effort likely to satisfy the Task Contract. Risk and
 quality set the required work and review depth; budget guides optional spend. Repository mode
 (`standard`, `tracker`, or `full`) does not change model selection. Do not pin provider model IDs in

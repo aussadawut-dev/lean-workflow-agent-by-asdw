@@ -35,7 +35,7 @@ Explicit user instructions take precedence. The active agent owns the task unles
 
 ## Workflow procedures
 
-Core procedures live under `.lean/skills/`, exposed by per-skill links in `.claude/skills/` and `.agents/skills/`: `lean-init`, `lean-scope`, `lean-research`, `lean-grill`, `lean-task`, `lean-review`, `lean-gate`, `lean-multi-agent`. Optional maintenance procedures and discovery controls are documented in `.lean/OPTIONAL.md`. Canonical resources remain available for explicit use.
+Core procedures live under `.lean/skills/`, exposed by per-skill links in `.claude/skills/` and `.agents/skills/`: `lean-init`, `lean-scope`, `lean-research`, `lean-grill`, `lean-task`, `lean-review`, `lean-gate`, `lean-multi-agent`, `lean-skill-effort`. All discovered Lean skills are user-invocable and remain available to the agent. Resolve procedure intensity using `.lean/policy/SKILL-EFFORT.md`; project settings default to standard when absent and never change model reasoning effort. Optional maintenance procedures and discovery controls are documented in `.lean/OPTIONAL.md`. Canonical resources remain available for explicit use.
 Use accepted scope and decisions; routine execution within approved scope needs no repeated approval. Scope changes and unresolved material decisions need the user's input before dependent work.
 
 ## Policy router

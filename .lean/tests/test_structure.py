@@ -109,12 +109,12 @@ class StructureTests(unittest.TestCase):
         path.write_text("\n".join(lines) + "\n")
         self.check(False)
 
-    def test_internal_commands_cannot_be_exposed(self):
+    def test_core_procedures_cannot_be_hidden(self):
         for name in ("lean-scope", "lean-research", "lean-grill", "lean-review", "lean-gate", "lean-multi-agent"):
             with self.subTest(name=name):
                 path = self.root / ".lean/skills" / name / "SKILL.md"
                 original = path.read_text()
-                path.write_text(original.replace("user-invocable: false", "user-invocable: true"))
+                path.write_text(original.replace("user-invocable: true", "user-invocable: false"))
                 self.assertIn("command visibility", self.check(False))
                 path.write_text(original)
 
@@ -131,7 +131,7 @@ class StructureTests(unittest.TestCase):
 
     def test_workflow_skills_must_remain_agent_invocable(self):
         path = self.root / ".lean/skills/lean-scope/SKILL.md"
-        path.write_text(path.read_text().replace("user-invocable: false", "user-invocable: false\ndisable-model-invocation: true"))
+        path.write_text(path.read_text().replace("user-invocable: true", "user-invocable: true\ndisable-model-invocation: true"))
         self.assertIn("available to the agent", self.check(False))
 
 
@@ -145,15 +145,15 @@ class SkillLevelContractTests(unittest.TestCase):
         for skill in ("lean-scope", "lean-research", "lean-grill"):
             with self.subTest(skill=skill):
                 text = self.text(skill)
-                self.assertIn("If no level is requested, use `standard`", text)
+                self.assertIn("saved skill override, saved default, then `standard`", text)
                 self.assertIn("A request for one skill does not raise the others", text)
                 self.assertIn("a later skill-specific request overrides an earlier group request", text)
                 self.assertIn("ambiguous or names an unsupported level, clarify", text)
                 self.assertIn("Do not silently lower a requested level", text)
                 self.assertIn("Do not change those settings or spawn agents", text)
                 self.assertIn("do not expand the user's intended scope", text)
-                self.assertIn("otherwise it starts at `standard`", text)
-                self.assertIn("user-invocable: false", text)
+                self.assertIn("otherwise resolve its saved override/default under SKILL-EFFORT", text)
+                self.assertIn("user-invocable: true", text)
                 for level in ("standard", "high", "ultra"):
                     self.assertIn("- **" + level + "**", text)
                 self.assertIn("**high** — Add to standard", text)

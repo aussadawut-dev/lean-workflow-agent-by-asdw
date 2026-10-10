@@ -7,6 +7,8 @@ argument-hint: "[standard|tracker|full] [--execution direct|delegated]"
 
 Input: `$ARGUMENTS` means the explicit invocation arguments, or the current user task when the runtime does not substitute it.
 
+Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity; keep model reasoning effort separate.
+
 For an active submodule target, run `python3 .lean/scripts/submodule.py context` first. In the steps below, PROJECT/config and generated records belong to `record_root`; inspect application facts and verify application commands in `project_root`. Read target instructions as well as Lean's contract. Default workflow CLI commands already route to target records. Keep tools/templates in Lean and do not create workflow files in the target. Write verified application commands to the returned `project_file`.
 
 1. Read `AGENTS.md`, `.lean/PROJECT.md`, and `python3 .lean/scripts/workflow.py show`. Missing `.lean/config.json` means unconfigured `standard`/`direct`; do not fail merely because the file is absent.

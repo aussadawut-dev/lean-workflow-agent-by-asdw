@@ -7,6 +7,8 @@ argument-hint: "[codex|claude|all]"
 
 Input: `$ARGUMENTS` means the explicit invocation arguments, or the current user task when the runtime does not substitute it.
 
+Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity; keep model reasoning effort separate.
+
 # Lean Model Update
 
 Read AGENTS, PROJECT and `workflow.py show`. Use the accepted scope; `/lean-scope` drafts new scope only if none matches. Default provider is the active agent's provider; ask if that cannot be determined. `/lean-model-update all` covers both providers. A request to refresh produces a proposal, not permission to apply it or switch a model.

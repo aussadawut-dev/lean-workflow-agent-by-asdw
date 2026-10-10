@@ -1,6 +1,6 @@
 # Optional maintenance pack
 
-Ordinary tasks use eight core procedures: init, task, scope, research, grill, multi-agent, review and gate. Maintenance skills are bundled as canonical resources, but are absent from runtime discovery by default. Their tools/tests remain installed so existing records, recovery and upgrades stay compatible.
+Ordinary tasks use nine core procedures: init, task, scope, research, grill, multi-agent, review, gate and skill-effort. Maintenance skills are bundled as canonical resources, but are absent from runtime discovery by default. Their tools/tests remain installed so existing records, recovery and upgrades stay compatible.
 
 Enable both runtimes' seven extra discovery links with `python3 .lean/scripts/skill_pack.py enable`; inspect with `status`, or remove only the links with `disable`. Conflicting custom slots block the batch. Canonical resources are retained. Reload runtime skills after changing discovery. This setting is independent of standard/tracker/full mode and direct/delegated execution.
 

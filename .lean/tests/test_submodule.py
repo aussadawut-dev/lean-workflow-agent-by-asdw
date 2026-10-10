@@ -23,7 +23,7 @@ class SubmoduleTests(unittest.TestCase):
                     "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "test@example.invalid"}
         for name in (".lean/scripts/submodule.py", ".lean/scripts/workflow.py", ".lean/scripts/model_catalog.py",
                      ".lean/templates/tracker.md", ".lean/templates/queue-item.json",
-                     ".lean/scripts/gate_evidence.py", ".lean/scripts/quality-gate.sh", ".claude/hooks/quality-gate.sh", ".claude/hooks/session-start.sh", ".gitignore", "AGENTS.md"):
+                     ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py", ".lean/scripts/skill_effort.py", ".lean/scripts/quality-gate.sh", ".claude/hooks/quality-gate.sh", ".claude/hooks/session-start.sh", ".gitignore", "AGENTS.md"):
             dst = self.root / name
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / name, dst)
@@ -83,6 +83,28 @@ class SubmoduleTests(unittest.TestCase):
         self.assertFalse((self.root / "targets").exists())
         self.assertFalse((self.root / ".agent-runtime").exists())
         self.assertEqual(before, self.git(self.root, "status", "--porcelain"))
+
+    def test_skill_intensity_uses_selected_records_and_invalid_context_blocks(self):
+        context = self.install()
+        skills = self.root / '.lean/skills/lean-scope'
+        skills.mkdir(parents=True)
+        (skills / 'SKILL.md').write_text('scope procedure')
+        script = self.root / '.lean/scripts/skill_effort.py'
+        result = self.command('python3', script, 'ultra', 'lean-scope')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        target_settings = Path(context['record_root']) / '.lean/skill-effort.json'
+        self.assertEqual(json.loads(target_settings.read_text())['skills'], {'lean-scope': 'ultra'})
+        self.assertFalse((Path(context['project_root']) / '.lean').exists())
+        self.assertFalse((self.root / '.lean/skill-effort.json').exists())
+        result = self.command('python3', script, '--root', self.root, 'high')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        lean_settings = self.root / '.lean/skill-effort.json'
+        before = lean_settings.read_bytes()
+        (self.root / '.agent-runtime/active-target.json').write_text('{"schema":1,"name":"missing"}')
+        result = self.command('python3', script, 'standard')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(lean_settings.read_bytes(), before)
+        self.assertEqual(json.loads(target_settings.read_text())['skills'], {'lean-scope': 'ultra'})
 
     def test_unignored_selection_and_active_lean_work_block_initial_install(self):
         ignore = self.root / ".gitignore"

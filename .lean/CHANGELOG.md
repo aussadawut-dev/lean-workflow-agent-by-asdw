@@ -6,11 +6,20 @@ was being bypassed -- the rule did not change, its enforcement did. PATCH clarif
 
 ## Unreleased
 
+- Port reusable Casetodian extensions: shared standard/high/ultra procedure settings and a core `lean-skill-effort` command, with global/named choices, read-only inspection, reset and submodule record routing. Missing settings remain standard; project preferences never ship as release assets.
+- Expose all discovered Lean skills to users while retaining the optional maintenance pack. Nine core and seven optional skills are available; previous eight-core/full registries remain readable during migration.
+- Serialize shared gate runs with a per-checkout lock, report busy/unavailable as NOT_RUN and guard the lock helper as a gate control. Keep existing automatic/explicit gate behavior and opt-in whole-tree caching.
+- Refuse new tracker IDs reserved by archived agent-workflow records, including nested history and Markdown/text records.
+
+### Upgrade notes for these extensions
+
+Merge canonical skills, policy, CLI, registry, discovery links, gate runner/lock helper and tests together. Preserve project `.lean/skill-effort.json` and per-target preferences; do not import downstream defaults, records or runtime hooks. Keep existing mode, execution and optional-pack choices. No auto/manual toggle, records-only cache, release tag or publishing is introduced.
+
 - Opt this repository's Claude Stop command into tree caching; keep contract/review checks and fresh validation after changes or refusals. Document forced checks for environment/dependency changes and downstream opt-out; test the configured Stop command end to end.
 
 - Add optional standard/high/ultra levels to scope, research and grill: preserve the default, deepen scope precision and question rounds, and broaden evidence-backed vendor/approach comparisons without changing workflow modes or authority.
 
-- Keep eight core procedures in default discovery; expose seven bundled maintenance procedures through explicit `skill_pack.py enable|disable|status`. Retain canonical tools/tests/resources and accept legacy full discovery registries. Preserve existing project pack choices and custom slots during upgrades.
+- Keep nine core procedures in default discovery; expose seven bundled maintenance procedures through explicit `skill_pack.py enable|disable|status`. Retain canonical tools/tests/resources and accept legacy full discovery registries. Preserve existing project pack choices and custom slots during upgrades.
 - Gate failures, including continued Stops, never become success after a retry cap. Missing/empty/malformed gates report undefined validation instead of passing silently. SessionStart records a change baseline rather than blessing a passing cache.
 - Rerun checks by default; tree caching is explicit for Git-visible inputs only. Bind state to SHA-256 file contents, modes, symlinks, HEAD, index, controls and submodule work. Contracts come from parsed assistant text in the current human turn, before known write tools; unreadable supplied transcripts block.
 - Release a Stop after three continued gate refusals with a user-visible UNVERIFIED message, so BLOCKED can be reported; a release keeps the refusal and never records a pass or cache. Do not treat runtime-injected skill, hook-feedback, task-notification or compaction entries as human turns. Require a HIGH review receipt when changes touch backticked paths/globs under PROJECT.md High-risk areas, including commits made since SessionStart.

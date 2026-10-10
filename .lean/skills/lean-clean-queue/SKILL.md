@@ -7,6 +7,8 @@ argument-hint: "<old|all> [--preview]"
 
 Input: `$ARGUMENTS` means the explicit invocation arguments, or the current user task when the runtime does not substitute it.
 
+Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity; keep model reasoning effort separate.
+
 Selection and options: $ARGUMENTS. Treat `--preview` as dry-run only; reject unknown options before running any archive operation.
 
 Read `AGENTS.md` and `.lean/README.md`. Use the project root for the commands below.

@@ -61,7 +61,7 @@ git init
 
 Open the project in Claude Code and run `/lean-init`, or invoke `$lean-init` in Codex. It discovers actual project facts and commands, records the selected mode/execution, and helps fill `.lean/PROJECT.md`.
 
-Both runtimes read canonical skills in `.lean/skills/`, through per-skill discovery links. Eight core procedures are enabled by default; `python3 .lean/scripts/skill_pack.py enable` adds the seven maintenance procedures, and `disable` removes only their discovery links. Reload runtime skills after toggling. See [.lean/OPTIONAL.md](.lean/OPTIONAL.md). Edit the canonical files only; adding a Lean skill requires registering its canonical files and assigning it to core or optional discovery. If your runtime does not discover skills, ask the agent to read the relevant `SKILL.md` and follow its procedure. Other agents can follow `AGENTS.md` and the shared procedures manually; runtime integrations are provided for Claude and Codex.
+Both runtimes read canonical skills in `.lean/skills/`, through per-skill discovery links. Nine core procedures are enabled by default; `python3 .lean/scripts/skill_pack.py enable` adds the seven maintenance procedures, and `disable` removes only their discovery links. Reload runtime skills after toggling. See [.lean/OPTIONAL.md](.lean/OPTIONAL.md). Edit the canonical files only; adding a Lean skill requires registering its canonical files and assigning it to core or optional discovery. If your runtime does not discover skills, ask the agent to read the relevant `SKILL.md` and follow its procedure. Other agents can follow `AGENTS.md` and the shared procedures manually; runtime integrations are provided for Claude and Codex.
 
 ### Configure without an agent
 
@@ -105,7 +105,7 @@ Run preservation checks and the project Quality Gate, then review the actual dif
 
 ### One shared contract across agents
 
-[AGENTS.md](AGENTS.md) is canonical. [CLAUDE.md](CLAUDE.md) imports it, and both runtimes discover eight core procedures through symlinks. Seven maintenance procedures are available as an optional discovery pack. No provider is the required primary agent; the active agent owns the task unless the project records a different Controller.
+[AGENTS.md](AGENTS.md) is canonical. [CLAUDE.md](CLAUDE.md) imports it, and both runtimes discover nine core procedures through symlinks. Seven maintenance procedures are available as an optional discovery pack. No provider is the required primary agent; the active agent owns the task unless the project records a different Controller.
 
 The contract requires acceptance evidence before reporting DONE, preserves an explicitly requested quality floor, and limits extra effort to work with a useful reason. Project-specific additions have dedicated sections so upgrades can preserve them.
 
@@ -131,6 +131,8 @@ This repository opts its Claude Stop hook into `--cache-tree`: an unchanged stat
 
 The Claude adapter checks assistant contract provenance when transcript metadata is available. HIGH review receipts bind the reported review to the current contract and shipping state. Local hashes also catch changes to hooks/settings/gate commands until an already user-approved change is recorded. These mechanisms detect mistakes and stale evidence; an agent with write access can still alter them. Contract truth, regression timing, reviewer identity and task-record evidence remain procedural. Codex runs the checks explicitly; no native hook is claimed. See [.lean/policy/QUALITY.md](.lean/policy/QUALITY.md) for exact limits and commands.
 
+All shared gate entry points hold a per-checkout lock for the lifetime of their checks. A busy or unavailable lock reports NOT_RUN; retry after the owning processes exit and never delete a live lock file. Direct validation commands outside the shared runner are not serialized. The lock does not freeze source edits or establish passing evidence.
+
 Projects requiring enforcement outside the agent must use trusted CI and protected merge permissions. Local self-tests do not prove application correctness. Pre-existing/out-of-scope failures or unavailable required reviewers/workers remain BLOCKED with evidence.
 
 ### Repository cleanup
@@ -145,12 +147,13 @@ The [helper](.lean/scripts/clean_repo.py) inventories without writes and applies
 
 ### Core and optional commands
 
-The core user commands are `lean-init` and `lean-task`; the other commands below require the optional maintenance pack. Start ordinary work with `lean-task`; the agent handles scope, research, material decisions, implementation, review and completion checks as needed. It asks for unresolved material decisions or new scope approval, and preserves accepted decisions. You do not need to run each internal step yourself.
+All nine core procedures are user-invocable, including `lean-skill-effort`; the seven maintenance commands require the optional maintenance pack. Start ordinary work with `lean-task`; the agent handles scope, research, material decisions, implementation, review and completion checks as needed. It asks for unresolved material decisions or new scope approval, and preserves accepted decisions. You do not need to run each internal step yourself.
 
 | Purpose | Claude Code | Codex skill invocation |
 |---|---|---|
 | Set up mode and execution | `/lean-init [standard\|tracker\|full] [--execution direct\|delegated]` | `$lean-init` with the same arguments |
 | Start a task | `/lean-task <task description>` | `$lean-task <task description>` |
+| Set procedure intensity | `/lean-skill-effort [standard\|high\|ultra\|reset] [lean-skill-name]` | `$lean-skill-effort` with the same arguments |
 | Research a model catalog refresh | `/lean-model-update [codex\|claude\|all]` | `$lean-model-update` with the same arguments |
 | Audit and shorten workflow prose | `/lean-compress [workflow\|PATH...] [--preview\|--apply]` | `$lean-compress` with the same arguments |
 | Use an application submodule | `/lean-use-submodule <remote url>` | `$lean-use-submodule <remote url>` |
@@ -173,21 +176,23 @@ $lean-compress workflow --preview
 $lean-clean-queue old --preview
 ```
 
-Claude Code exposes these eight skills as slash commands. Six internal procedures (`lean-scope`, `lean-research`, `lean-grill`, `lean-review`, `lean-gate`, `lean-multi-agent`) use `user-invocable: false`: hidden from its slash menu, but available for the agent to invoke. They remain shared procedures used by both runtimes.
+All discovered Lean skills are user-invocable and remain available to the agent, including scope, research, grill, review, gate and multi-agent. Nine core skills are discovered by default; enabling the maintenance pack exposes seven more. Command visibility does not change scope approval or execution routing.
 
-In Codex CLI/IDE, select skills through `/skills` or mention them with `$`; use the available skill picker in Desktop. Codex has no documented equivalent of Claude's `user-invocable: false` for hiding only manual invocation, so internal skills remain discoverable there. Do not disable their implicit invocation: the agent needs them. Examples elsewhere using `/name` describe Claude syntax; use the corresponding Codex skill invocation. No deprecated custom prompts or global installation are required. See [Claude skill invocation](https://code.claude.com/docs/en/skills) and [Codex skill invocation](https://learn.chatgpt.com/docs/build-skills).
+In Codex CLI/IDE, select skills through `/skills` or mention them with `$`; use the available skill picker in Desktop. Keep implicit invocation enabled so the agent can follow the shared procedures. Examples elsewhere using `/name` describe Claude syntax; use the corresponding Codex skill invocation. No deprecated custom prompts or global installation are required. See [Claude skill invocation](https://code.claude.com/docs/en/skills) and [Codex skill invocation](https://learn.chatgpt.com/docs/build-skills).
 
 Model refresh and compression still preview by default; applying a catalog proposal or compression requires its existing authorization checks. Queue cleanup with `old` or `all` authorizes archiving DONE items; `--preview` only shows the selection. Missing queue selection requires a choice. Command visibility grants no extra permissions, paid usage or Git publishing.
 
 ### Optional skill levels
 
-Scope, research and grill support `standard` (the existing default), `high` and `ultra` as optional capabilities. Ask in natural language, for example: "use scope high, grill ultra and research high for this task" or "use ultra for all three skills". Internal command visibility remains unchanged; these requests do not require new slash commands. Levels apply to this work, can differ per skill, and do not change workflow mode, quality, budget, model, execution or review requirements.
+All Lean procedures support `standard` (the existing default), `high` and `ultra` intensity under [.lean/policy/SKILL-EFFORT.md](.lean/policy/SKILL-EFFORT.md). Ask in natural language, for example: "use scope high, grill ultra and research high for this task" or "use ultra for all three skills". Task-specific requests remain in the task. Use `/lean-skill-effort high` to save a default, `/lean-skill-effort ultra lean-research` for an override, and `reset` to remove saved choices. No arguments inspects without writes. Settings are optional project-owned data, preserved on upgrades and kept in the selected target record root. Levels can differ per skill, and do not change workflow mode, quality, budget, model, execution or review requirements.
 
 | Skill | high adds to standard | ultra adds to high |
 |---|---|---|
 | Scope | Detailed flows, rules, boundaries and acceptance per behavior | Material states, exceptions, failures and cross-flow consistency, with traceable validation |
 | Grill | More questions by scope topic to find omissions and narrow requirements | Follow-up rounds, scenario details and confirmation of each important boundary |
 | Research | More relevant vendors/approaches and corroborated decisive claims | Broader discovery, deeper comparison of leading candidates and conditional conclusions |
+| Review | Trace callers, interfaces and relevant failure paths | Challenge consequential assumptions and cross-component invariants |
+| Gate | Map acceptance criteria to current evidence and expose stale coverage | Cross-check scope, tests, review, tracker and queue consistency |
 
 Higher levels reuse confirmed decisions and focus on relevant details. Grill asks in manageable batches; research distinguishes vendor breadth from source depth and reports evidence gaps. Findings can feed back into the scope, while approval and authority boundaries stay in force. These instructions guide agent behavior; repository checks validate the instruction contracts, not the accuracy of every future agent response.
 

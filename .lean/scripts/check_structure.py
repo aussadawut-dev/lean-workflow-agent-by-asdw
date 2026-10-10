@@ -64,7 +64,7 @@ def check(root):
             content = path.read_text()
             for reference in set(re.findall(r"\.(?:lean|claude|agents)/[A-Za-z0-9_./-]+\.(?:md|sh|py|json)", content)):
                 # These paths are created by opting into full mode; examples are not items.
-                if reference.startswith((".agents/queue/", ".lean/targets/")) or reference in {".lean/model-catalog.json", ".lean/upstream.json"}:
+                if reference.startswith((".agents/queue/", ".lean/targets/")) or reference in {".lean/model-catalog.json", ".lean/upstream.json", ".lean/skill-effort.json"}:
                     continue
                 if not (root / reference).exists():
                     bad(f"missing {reference} (from {name})")

@@ -7,6 +7,8 @@ argument-hint: "<task description>"
 
 Input: `$ARGUMENTS` means the explicit invocation arguments, or the current user task when the runtime does not substitute it.
 
+Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity; keep model reasoning effort separate.
+
 Task: $ARGUMENTS
 
 1. Write the contract from `AGENTS.md` before changes. Infer risk/quality; read `.lean/policy/CONTRACTS.md` when needed.

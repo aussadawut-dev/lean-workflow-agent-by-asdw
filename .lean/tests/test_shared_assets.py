@@ -5,14 +5,40 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import sys
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / '.lean/scripts'))
+from shared_assets import declared_links
 
 
 class SharedAssetsTests(unittest.TestCase):
+    def test_previous_core_and_full_registries_remain_readable(self):
+        registry = json.loads((ROOT / '.lean/assets.json').read_text())
+        old_files = [name for name in registry['files'] if 'skill-effort' not in name and 'skill_effort' not in name]
+        old_core = {path: target for path, target in registry['links'].items() if not path.endswith('/lean-skill-effort')}
+        self.assertEqual(declared_links({'schema': 2, 'files': old_files, 'links': old_core}), old_core)
+        extras = ('lean-clean-queue', 'lean-clean-repo', 'lean-compress', 'lean-model-update',
+                  'lean-takeover-workflow', 'lean-use-submodule', 'lean-update-workflow')
+        old_full = dict(old_core)
+        for tree in ('.agents/skills', '.claude/skills'):
+            old_full.update({f'{tree}/{name}': f'../../.lean/skills/{name}' for name in extras})
+        self.assertEqual(declared_links({'schema': 2, 'files': old_files, 'links': old_full}), old_full)
+        with self.assertRaises(ValueError):
+            declared_links({'schema': 2, 'files': old_files, 'links': registry['links']})
+
+    def test_intensity_is_shared_but_project_settings_never_ship(self):
+        registry = json.loads((ROOT / '.lean/assets.json').read_text())
+        self.assertNotIn('.lean/skill-effort.json', registry['files'])
+        for path in (ROOT / '.lean/skills').glob('*/SKILL.md'):
+            content = path.read_text()
+            self.assertIn('.lean/policy/SKILL-EFFORT.md', content, path)
+            self.assertIn('user-invocable: true', content, path)
+            self.assertIn('argument-hint:', content, path)
+
     def test_discovery_uses_one_source_and_resources(self):
         names = sorted(p.name for p in (ROOT / ".lean/skills").iterdir())
-        self.assertEqual(len(names), 15)
+        self.assertEqual(len(names), 16)
         self.assertTrue(all(name.startswith("lean-") for name in names), names)
         self.assertIn("lean-clean-queue", names)
         for tree in (".claude/skills", ".agents/skills"):

@@ -1,10 +1,13 @@
 ---
 name: lean-multi-agent
 description: Controller and worker delegation with bounded ownership, portable model selection, evidence and optional parallel work.
-user-invocable: false
+user-invocable: true
+argument-hint: "<bounded delegation task>"
 ---
 
 Input: `$ARGUMENTS` means the explicit invocation arguments, or the current user task when the runtime does not substitute it.
+
+Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity; keep model reasoning effort separate.
 
 # Lean Multi-Agent
 

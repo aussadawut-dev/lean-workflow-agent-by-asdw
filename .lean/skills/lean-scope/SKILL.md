@@ -1,10 +1,13 @@
 ---
 name: lean-scope
 description: Draft a clear spec for non-trivial work, get user approval before implementation, and stop for approval when proposed changes leave the agreed scope.
-user-invocable: false
+user-invocable: true
+argument-hint: "<requirement or scope amendment>"
 ---
 
 Input: `$ARGUMENTS` means the explicit invocation arguments, or the current user task when the runtime does not substitute it.
+
+Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity; keep model reasoning effort separate.
 
 # Lean Scope
 
@@ -12,11 +15,11 @@ Use for non-trivial implementation work or when explicitly invoked. Skip a forma
 
 ## Skill level
 
-Resolve this skill's level from the user's request: `standard`, `high`, or `ultra`. If no level is requested, use `standard`; the existing workflow below remains the baseline. Natural-language requests such as "scope high" or "use ultra for all three skills" are sufficient; no new runtime command is required. A request for one skill does not raise the others. Keep the selection for this work until the user changes it; a later skill-specific request overrides an earlier group request. State the effective level briefly when starting the skill. If the request is ambiguous or names an unsupported level, clarify rather than silently substituting one.
+Resolve `standard`, `high`, or `ultra` under `.lean/policy/SKILL-EFFORT.md`: the user's latest task selection, saved skill override, saved default, then `standard`; the existing workflow below remains the baseline. Natural-language requests such as "scope high" or "use ultra for all three skills" are sufficient; no new runtime command is required. A request for one skill does not raise the others. Keep the selection for this work until the user changes it; a later skill-specific request overrides an earlier group request. State the effective level briefly when starting the skill. If the request is ambiguous or names an unsupported level, clarify rather than silently substituting one.
 
 Levels are optional skill capabilities, separate from workflow mode, Task Contract quality, budget, model, execution routing and review depth. Do not change those settings or spawn agents because of a skill level. Existing risk, approval, evidence and review requirements apply at every level. Do not silently lower a requested level; report unavailable evidence or constraints explicitly.
 
-Higher levels add relevant detail, questions and evidence; they do not expand the user's intended scope or grant implementation or external-write authority. Reuse confirmed decisions. When handing off to scope, research or grill, preserve any user-selected level for the destination skill; otherwise it starts at `standard`. Feed findings back into the scope and decision summary, reopening only decisions affected by new evidence or a material conflict. In tracker/full mode, keep levels and findings in the existing owning tracker; in standard mode, keep them in the conversation.
+Higher levels add relevant detail, questions and evidence; they do not expand the user's intended scope or grant implementation or external-write authority. Reuse confirmed decisions. When handing off to scope, research or grill, preserve any user-selected level for the destination skill; otherwise resolve its saved override/default under SKILL-EFFORT. Feed findings back into the scope and decision summary, reopening only decisions affected by new evidence or a material conflict. In tracker/full mode, keep levels and findings in the existing owning tracker; in standard mode, keep them in the conversation.
 
 ### Scope depth
 

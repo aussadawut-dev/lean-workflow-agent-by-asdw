@@ -1,10 +1,13 @@
 ---
 name: lean-gate
 description: Run the Lean Workflow Quality Gate and report whether the task can be DONE. Use before declaring a task complete, or when the user asks whether work is finished.
-user-invocable: false
+user-invocable: true
+argument-hint: "[task or workset]"
 ---
 
 Input: `$ARGUMENTS` means the explicit invocation arguments, or the current user task when the runtime does not substitute it.
+
+Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity; keep model reasoning effort separate.
 
 For an active submodule target, resolve `python3 .lean/scripts/submodule.py context`; read the returned `project_file` and run `python3 .lean/scripts/submodule.py gate`. This executes application checks in `project_root` and blocks on undefined/failed checks. Also run Lean's own PROJECT gate for workflow changes, with explicit `--root <workflow_root>` on its workflow/catalog checks. Do not substitute a passing Lean self-check for target validation; workset records belong to `record_root`.
 

@@ -7,6 +7,8 @@ argument-hint: "[workflow|PATH...] [--preview|--apply]"
 
 Input: `$ARGUMENTS` means the explicit invocation arguments, or the current user task when the runtime does not substitute it.
 
+Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity; keep model reasoning effort separate.
+
 # Lean Compress
 
 Make prose concise and easy to follow. Remove filler, repetition and needless indirection; keep complete, precise instructions. Do not use cryptic fragments, invented abbreviations or a target compression ratio. Shorter text is useful only when readers retain the same understanding and actions.

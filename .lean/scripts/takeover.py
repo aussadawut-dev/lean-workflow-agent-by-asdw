@@ -442,7 +442,7 @@ def portable_files(source):
         verify_link(source, name)
     for name in names:
         relative_path(name)
-        if (name in {".lean/PROJECT.md", ".lean/config.json", ".lean/model-catalog.json", ".lean/upstream.json"}
+        if (name in {".lean/PROJECT.md", ".lean/config.json", ".lean/model-catalog.json", ".lean/upstream.json", ".lean/skill-effort.json"}
                 or name.startswith(RECORD_DIRS)
                 or not (name in {"AGENTS.md", "CLAUDE.md"} or name.startswith((".lean/", ".claude/", ".agents/skills/")))):
             fail(f"project-owned file cannot be a portable asset: {name}")

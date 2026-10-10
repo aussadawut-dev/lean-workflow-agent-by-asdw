@@ -217,6 +217,9 @@ def tracker_command(root, args):
             matches = list(directory.glob(f"{args.id}*.md"))
             if any(p.stem == args.id or p.stem.startswith(args.id + "-") for p in matches):
                 fail(f"tracker already exists: {args.id}")
+            archived = (root / 'docs/history/agent-workflow').rglob(f'{args.id}*')
+            if any(p.is_file() and (p.stem == args.id or p.stem.startswith(args.id + '-')) for p in archived):
+                fail(f'tracker id reserved by history: {args.id}')
             content = tracker_template(root)
             content = content.replace("TCKNNN — Title", f"{args.id} — {title}", 1)
             path = directory / f"{args.id}.md"

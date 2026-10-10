@@ -5,6 +5,8 @@ user-invocable: true
 argument-hint: "[--path <relative-path>] | apply <plan-id> | restore <session-path>"
 ---
 
+Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity; keep model reasoning effort separate.
+
 Input: `$ARGUMENTS` means explicit invocation arguments, or the current user task when substitution is unavailable.
 
 # Lean Clean Repo

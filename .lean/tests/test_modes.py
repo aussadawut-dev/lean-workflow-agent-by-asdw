@@ -142,6 +142,21 @@ class WorkflowModeTests(unittest.TestCase):
                 self.assertIn("duplicate tracker", result.stderr)
                 (self.root / "docs/tracking/TCK001-other.md").unlink()
 
+    def test_archived_tracker_ids_cannot_be_reused(self):
+        self.run_cli('configure', 'tracker')
+        history = self.root / 'docs/history/agent-workflow/nested'
+        history.mkdir(parents=True)
+        for name in ('TCK001.txt', 'TCK001-old.md', 'TCK001-closed.txt'):
+            path = history / name
+            path.write_text('historical evidence')
+            result = self.run_cli('tracker', 'new', '--id', 'TCK001', '--title', 'replacement', success=False)
+            self.assertIn('reserved by history', result.stderr)
+            self.assertFalse((self.root / 'docs/tracking/TCK001.md').exists())
+            self.assertEqual(path.read_text(), 'historical evidence')
+            path.unlink()
+        (history / 'TCK0010-other.txt').write_text('different id')
+        self.run_cli('tracker', 'new', '--id', 'TCK001', '--title', 'replacement')
+
     def test_failed_tracker_status_is_supported(self):
         self.run_cli("configure", "tracker")
         self.tracker_doc()

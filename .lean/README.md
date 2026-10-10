@@ -18,11 +18,11 @@ Direct execution is the portable default; delegated execution uses the Controlle
 
 ## Optional maintenance
 
-Eight core skills are discovered by default. Enable the seven maintenance skills with `python3 .lean/scripts/skill_pack.py enable` (`status` / `disable` inspect or reverse discovery). Read `OPTIONAL.md` for queue cleanup, model refresh, compression, repository cleanup, takeover, submodules and upgrades. Canonical tools/resources stay bundled; discovery changes never discard records or recovery capabilities. Reload runtime skills after toggling.
+Nine core skills are discovered by default. Enable the seven maintenance skills with `python3 .lean/scripts/skill_pack.py enable` (`status` / `disable` inspect or reverse discovery). Read `OPTIONAL.md` for queue cleanup, model refresh, compression, repository cleanup, takeover, submodules and upgrades. Canonical tools/resources stay bundled; discovery changes never discard records or recovery capabilities. Reload runtime skills after toggling.
 
 ## Layout and ownership
 
-- `PROJECT.md` and `config.json`: project-owned facts, gate, mode and execution.
+- `PROJECT.md`, `config.json` and optional `skill-effort.json`: project-owned facts, gate, mode, execution and procedure preferences.
 - `policy/`, shared skills and discovery links: workflow-owned; upgrade together.
 - `templates/`: generic record templates, not task history.
 - `scripts/`, `tests/`: mode/lease tooling and workflow checks.
@@ -47,3 +47,7 @@ Mode setup creates project-owned tracking/queue guides; the distributable templa
 - Failure or retry -> `policy/RECOVERY.md`
 
 Start with the shallowest sufficient context. Do not load every policy or workflow internal by default. Trivial work still needs its contract/evidence but no formal tracker or scope spec.
+
+## Procedure intensity
+
+Use `/lean-skill-effort [standard|high|ultra|reset] [lean-skill-name]` to inspect or explicitly save shared procedure intensity. No arguments is read-only. Missing settings mean standard. `.lean/policy/SKILL-EFFORT.md` defines precedence and boundaries. Settings follow the active target record root; `--root` overrides it. All discovered Lean procedures are user-invocable; optional discovery remains opt-in.

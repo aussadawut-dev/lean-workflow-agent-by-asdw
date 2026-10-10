@@ -7,6 +7,8 @@ argument-hint: '"<target path>" [--preview | --apply <plan-id>]'
 
 Input: `$ARGUMENTS` means the explicit invocation arguments, or the current user task when the runtime does not substitute it.
 
+Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity; keep model reasoning effort separate.
+
 # Lean Takeover Workflow
 
 Replace the target's active workflow with a coherent Lean baseline while preserving project requirements, accepted decisions, unfinished work and history. `$ARGUMENTS` selects the target; it does not authorize changing another repository, publishing, running arbitrary discovered hooks, or modifying global runtime settings. Follow the active agent's accepted scope and Lean contract. Applying a takeover is HIGH risk and needs independent review.

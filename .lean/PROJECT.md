@@ -14,10 +14,12 @@ Bash scripts, Python 3.9+ standard-library tooling, JSON configuration and Markd
 
 - `AGENTS.md` canonical shared agent contract; `CLAUDE.md` runtime entrypoint importing it. The active agent owns this task; no provider-specific primary is imposed.
 - `.lean/scripts/gate_evidence.py` binds review receipts to shipping state and records local control acceptance; neither proves independent authority.
+- `.lean/scripts/gate_lock.py` holds a per-checkout gate lock across the shared runner; busy gates report NOT_RUN.
+- `.lean/scripts/skill_effort.py` manages optional project-owned procedure preferences and routes active submodules to their record roots; no settings ship in the template.
 - `.lean/scripts/quality-gate.sh` runs the PROJECT checks directly for Codex and through the Claude Stop adapter; direct calls always run without stdin or Claude cache state.
 - `.lean/` the workflow: `policy/` rules (replaced on upgrade), `PROJECT.md` (project-owned), `CHANGELOG.md`, and `scripts/` + `tests/` self-checks.
 - `.claude/` Claude runtime: `settings.json`, hooks (`quality-gate.sh` on `Stop`, `session-start.sh` on `SessionStart`, which records a change baseline without validating), skill discovery links, and a `reviewer` entrypoint for `.lean/roles/reviewer.md`.
-- `.lean/skills/` contains eight core and seven optional maintenance procedures; discovery links expose only core by default (`skill_pack.py enable` adds extras). `.lean/config.json` ships unconfigured standard/direct; no task records are included. Mode tooling supports macOS/Linux/WSL through Unix fcntl.
+- `.lean/skills/` contains nine core and seven optional maintenance procedures; discovery links expose only core by default (`skill_pack.py enable` adds extras). `.lean/config.json` ships unconfigured standard/direct; no task records are included. Mode tooling supports macOS/Linux/WSL through Unix fcntl.
 - `.lean/scripts/submodule.py` installs/reuses remote application submodules under `targets/` and separates application roots from Lean-owned per-target record roots. Active selection is local/ignored; application gates run inside the target while mode tooling and model catalogs use target records.
 - `.lean/scripts/clean_repo.py` provides read-only inventory, evidence-bearing plans and exact-ID cleanup with external snapshots/journaled recovery; no semantic unused-file inference or Git index writes. Tests use disposable repositories.
 - `.lean/scripts/takeover.py` inventories a separate target, binds approved text operations to read coverage/source fingerprints, and journals apply/resume/rollback in a private external session. The shared takeover skill owns semantic migration and user decisions.
@@ -73,6 +75,7 @@ python3 -m unittest discover -s .lean/tests -p 'test_skill_pack.py'
 ## High-risk areas
 
 - `.claude/hooks/` and `.claude/settings.json`: run on every turn and control permissions; a bug can block all work or widen access.
+- `.lean/scripts/gate_lock.py`: controls gate serialization and must be reviewed with the runner.
 - `.lean/policy/`: changes alter behavior for every downstream project on upgrade.
 
 ## Documentation routes

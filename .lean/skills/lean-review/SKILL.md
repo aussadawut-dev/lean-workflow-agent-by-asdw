@@ -1,10 +1,13 @@
 ---
 name: lean-review
 description: Review the current change at the depth Lean Workflow requires. Uses an independent reviewer for HIGH depth. Use after implementation and deterministic validation, or when the user asks for a review.
-user-invocable: false
+user-invocable: true
+argument-hint: "[diff or scope]"
 ---
 
 Input: `$ARGUMENTS` means the explicit invocation arguments, or the current user task when the runtime does not substitute it.
+
+Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity; keep model reasoning effort separate.
 
 For an independent reviewer on either runtime, supply `.lean/roles/reviewer.md`, the Task Contract and shipping diff without author reasoning.
 

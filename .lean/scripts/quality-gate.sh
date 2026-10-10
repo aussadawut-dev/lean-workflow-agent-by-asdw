@@ -4,6 +4,7 @@
 # Refusals never become passes. Local receipts catch drift, not hostile writers.
 
 set -u
+gate_args=("$@")
 
 hook=0
 seed=0
@@ -29,6 +30,10 @@ while [ "$#" -gt 0 ]; do
 done
 [ "$seed" -eq 0 ] || [ "$hook" -eq 1 ] || { echo "--seed requires --claude-hook" >&2; exit 2; }
 root="$(cd "$root" && pwd)" || exit 2
+lock_helper="$(dirname "$helper")/gate_lock.py"
+if ! python3 "$lock_helper" --check "$root"; then
+  exec python3 "$lock_helper" --run "$root" "$0" "${gate_args[@]}"
+fi
 project="$root/.lean/PROJECT.md"
 cache="$root/.claude/.gate-cache"
 failed="$root/.claude/.gate-failed"
