@@ -14,7 +14,7 @@ Model research updates use `/lean-model-update codex|claude|all`. Preview is the
 
 Use `/lean-clean-repo` to preview evidence-backed cleanup of generated clutter and obsolete project files, including exact reference updates. Matching plan approval permits guarded apply with external snapshots; restore refuses subsequent work. Preserve protected state and uncertain candidates, stop repository writers and validate/review before completion. See the shared skill and its tooling reference.
 
-Use `/lean-compress` for concise, clear workflow prose. It inventories and fully reads all authorized workflow files before compression, preserves rules/protected content, previews by default and edits only approved targets.
+Use `/lean-compress` for concise, clear workflow prose. `workflow` inventories and fully reads all authorized workflow files; named paths read their targets and dependencies. It preserves rules/protected content, previews by default and edits only approved targets.
 
 Use `/lean-takeover-workflow "<target path>"` to audit an existing repository, resolve migration decisions through Grill, propose a concrete plan and install Lean after matching approval. Preview does not write to the target. External staging verifies the proposed public workflow before writes; snapshots/journals support resume and guarded rollback; APPLIED still requires the actual target gate and HIGH independent review. See the shared procedure and `CUSTOMIZING.md`.
 

@@ -88,6 +88,21 @@ class SharedAssetsTests(unittest.TestCase):
                     if resource.is_file():
                         self.assertTrue((link / resource.relative_to(canonical)).samefile(resource))
 
+    def test_compress_full_read_applies_only_to_workflow_target(self):
+        content = (ROOT / '.lean/skills/lean-compress/SKILL.md').read_text()
+        self.assertIn('## Read what the target needs', content)
+        section = content.split('## Read what the target needs', 1)[1].split('\n## ', 1)[0]
+        paragraphs = [p for p in section.split('\n\n') if p.strip()]
+        named = next(p for p in paragraphs if p.startswith('`/lean-compress PATH...`'))
+        audit = next(p for p in paragraphs if p.startswith('`/lean-compress workflow`'))
+        # The exhaustive read stays bound to `workflow`; named paths read their dependencies and callers.
+        full_read = [p for p in paragraphs if 'every authorized workflow file' in p.lower()]
+        self.assertEqual(full_read, [audit])
+        for required in ('AGENTS', 'policy router', 'callers', 'scripts, hooks and tests',
+                         'apply the workflow-audit read', 'edits stay limited to the named paths'):
+            self.assertIn(required, named)
+        self.assertIn('The exhaustive read belongs to `/lean-compress workflow`', section)
+
     def test_direct_gate_always_runs_without_claude_state_or_stdin(self):
         with tempfile.TemporaryDirectory(prefix="shared gate ") as directory:
             root = Path(directory)

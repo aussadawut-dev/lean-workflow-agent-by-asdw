@@ -6,6 +6,8 @@ was being bypassed -- the rule did not change, its enforcement did. PATCH clarif
 
 ## Unreleased
 
+- Limit `/lean-compress` exhaustive reads to `workflow` audits. Named paths read their targets, AGENTS, the router and their dependencies, and escalate to a workflow audit when a target summarizes the whole workflow or its dependencies cannot be bounded.
+
 - Complete approved audit remediation: template discovery contains only nine core skills, recommended standards remain nonblocking, and bounded audit behavior trials cover exceptions, missing evidence and unresolved decisions. Add shared auto/manual gate policy, an optional `lean-quality-gate-mode` command and Codex lifecycle adapter; missing preference preserves auto. Protect new controls and preserve project preferences during migration. Ten optional skills are available; manual skips remain NOT_RUN and never waive gate/review evidence. Codex hook trust remains runtime-owned.
 
 - Add optional `lean-pattern` and `lean-audit` procedures with reusable project-standard and audit-finding formats. Reuse research/scope/Grill/task and project record routing; distinguish accepted requirements, exceptions, proposals and verification gaps. Nine core skills remain the default; the optional pack now exposes nine extras. Preserve previous 15/16-skill registries for migration. No new gate, automatic audit or automatic remediation/backlog is introduced.
