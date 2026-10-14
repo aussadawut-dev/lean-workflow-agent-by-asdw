@@ -8,7 +8,7 @@ Run the CLI examples from the repository root.
 
 Choose the least costly available model that can handle the assignment, use an effort level the runtime supports, and check what actually started. The main agent keeps its session settings.
 
-Model choice is separate from workflow mode, execution, risk and quality. A fresh reviewer may use the same model as the worker: HIGH review requires independence, not a stronger model. The shared rules are in [.lean/policy/MODELS.md](../.lean/policy/MODELS.md).
+Model choice is separate from workflow mode, execution, risk and quality. A fresh reviewer may use the same model as the worker: HIGH review requires independence, not a stronger model. A wording-only prose diff may use an economical capable reviewer that checks a before/after rule map; a failed condition, incomplete map or meaning change returns `REWORK` and moves review to a normally chosen reviewer. The shared rules are in [.lean/policy/MODELS.md](../.lean/policy/MODELS.md).
 
 ## Documented model options
 

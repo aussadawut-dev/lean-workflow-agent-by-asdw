@@ -21,6 +21,8 @@ Use current settings when the runtime cannot change them; do not interrupt routi
 
 `HIGH` review uses an independent context with the Task Contract and diff, without author reasoning, under `REVIEW.md`. Choose the least costly capable reviewer; a stronger model is not required. Escalate only for useful boundary analysis or demonstrated reasoning limits. Report missing independence.
 
+A wording-only diff may use an economical capable available reviewer model at its default or lower effort. A diff is wording-only when it changes only instruction or documentation prose, adds or removes no rule, and leaves unchanged every normative keyword (such as must, may, never, only, required and their negations), number, limit, YAML frontmatter, import, heading/anchor, code span or block, command, path, link, identifier, table layout, list hierarchy and order, gate marker and license notice. Any change to executable code, tests, hooks or configuration disqualifies the diff. Give the reviewer a before/after rule map covering every changed sentence. The reviewer checks each condition and verifies the map against the before/after text itself, not the author's summary. It returns `REWORK` when any condition fails, when the map is missing or incomplete, or when any rule's actor, trigger, action, ordering, limit, exception or authorization changed. That `REWORK` counts as a review round. After it, review the change, edited or unchanged, with a reviewer chosen by the normal starting point; an intended meaning change also needs its own Task Contract. This lowers reviewer cost only; the HIGH floor, independence, receipt and round limits stay unchanged.
+
 ## Runtime control
 
 - Claude: the session model and effort follow the user's/runtime's settings. The `reviewer`
