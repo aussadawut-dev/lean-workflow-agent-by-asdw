@@ -6,6 +6,8 @@ was being bypassed -- the rule did not change, its enforcement did. PATCH clarif
 
 ## Unreleased
 
+- Allow an economical reviewer model for wording-only diffs in HIGH review. The reviewer checks a before/after rule map and hands meaning changes back to a normally chosen reviewer; the HIGH floor, independence, receipt and round limits are unchanged.
+
 - Limit `/lean-compress` exhaustive reads to `workflow` audits. Named paths read their targets, AGENTS, the router and their dependencies, and escalate to a workflow audit when a target summarizes the whole workflow or its dependencies cannot be bounded.
 
 - Complete approved audit remediation: template discovery contains only nine core skills, recommended standards remain nonblocking, and bounded audit behavior trials cover exceptions, missing evidence and unresolved decisions. Add shared auto/manual gate policy, an optional `lean-quality-gate-mode` command and Codex lifecycle adapter; missing preference preserves auto. Protect new controls and preserve project preferences during migration. Ten optional skills are available; manual skips remain NOT_RUN and never waive gate/review evidence. Codex hook trust remains runtime-owned.

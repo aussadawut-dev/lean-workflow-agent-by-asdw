@@ -103,6 +103,22 @@ class SharedAssetsTests(unittest.TestCase):
             self.assertIn(required, named)
         self.assertIn('The exhaustive read belongs to `/lean-compress workflow`', section)
 
+    def test_wording_only_review_lowers_reviewer_cost_not_the_floor(self):
+        content = (ROOT / '.lean/policy/MODELS.md').read_text()
+        section = content.split('## Independent review', 1)[1].split('\n## ', 1)[0]
+        self.assertIn('wording-only', section)
+        paragraph = next(p for p in section.split('\n\n') if 'wording-only' in p)
+        # Cheaper review needs a defined test, an equivalence check and an exit back to the normal reviewer.
+        for required in ('economical capable', 'only instruction or documentation prose',
+                         'executable code, tests, hooks or configuration disqualifies',
+                         'normative keyword', 'YAML frontmatter', 'table layout', 'list hierarchy',
+                         'against the before/after text itself',
+                         'when any condition fails, when the map is missing or incomplete',
+                         'counts as a review round', 'normal starting point'):
+            self.assertIn(required, paragraph)
+        for kept in ('HIGH floor', 'independence', 'receipt', 'round limits'):
+            self.assertIn(kept, paragraph)
+
     def test_direct_gate_always_runs_without_claude_state_or_stdin(self):
         with tempfile.TemporaryDirectory(prefix="shared gate ") as directory:
             root = Path(directory)
