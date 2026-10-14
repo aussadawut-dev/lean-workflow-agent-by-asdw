@@ -2,68 +2,84 @@
 
 [Back to README](../README.md)
 
-Run CLI examples from the repository root.
+Run the CLI examples from the repository root.
 
 ## Repository layout
+
+Here is where the main pieces live:
 
 ```text
 lean-workflow-agent-by-asdw/
 ├── AGENTS.md                      Shared contract and project additions
-├── CLAUDE.md                      Claude entrypoint importing the contract
-├── docs/                          User guides
-│   ├── getting-started.md         Installation, modes and execution
+├── CLAUDE.md                      Claude entrypoint importing AGENTS
+├── README.md                      Start here
+├── CONTRIBUTING.md                How to contribute and validate changes
+├── docs/                          Public guides
+│   ├── getting-started.md         Setup, modes and execution
+│   ├── workflow-overview.md       Request-to-completion sequence
 │   ├── skills.md                  Commands and procedure intensity
 │   ├── quality-and-runtime.md     Review, gates and runtime limits
-│   ├── maintenance.md             Compression, upgrades and cleanup
-│   ├── repository-guide.md        Layout, customization and verification
-│   ├── submodules.md              Application submodule setup
-│   ├── workflow-overview.md       Complete workflow sequence
 │   ├── tracker.md                 Worksets and mode transitions
-│   ├── queue.md                   Task ownership, leases and cleanup
-│   ├── spawn.md                   Controller, worker and reviewer sequences
+│   ├── queue.md                   Ownership, leases and history
+│   ├── spawn.md                   Controller, worker and reviewer
 │   ├── models.md                  Model selection and reasoning effort
-│   └── takeover-workflow.md       Audit, decisions and workflow migration
+│   ├── maintenance.md             Compression, updates and cleanup
+│   ├── takeover-workflow.md       Workflow migration and recovery
+│   ├── submodules.md              Application submodules
+│   ├── repository-guide.md        This guide
+│   └── workflow-development.md    Internal tools and test coverage
 ├── .lean/                         Portable workflow baseline
-│   ├── PROJECT.md                 Project-owned facts, commands and gate
-│   ├── config.json                Project-owned mode and execution choice
-│   ├── skill-effort.json          Optional project-owned procedure preferences
+│   ├── PROJECT.md                 Project facts, commands and gate
+│   ├── config.json                Project mode and execution
+│   ├── skill-effort.json          Optional saved procedure preferences
 │   ├── README.md                  Policy router
 │   ├── CUSTOMIZING.md             Import, ownership and upgrade guidance
-│   ├── LICENSE                    Workflow notice for downstream imports
-│   ├── CHANGELOG.md               Versions and migrations
-│   ├── policy/                    Portable workflow rules
+│   ├── OPTIONAL.md                Optional skill discovery
+│   ├── LICENSE                    Notice to retain on import
+│   ├── CHANGELOG.md               Versions and migration notes
+│   ├── assets.json                Portable asset registry
+│   ├── policy/                    Shared rules
 │   ├── skills/                    Canonical skills and resources
 │   ├── roles/                     Shared reviewer instructions
-│   ├── templates/                 Generic tracker and queue templates
-│   ├── scripts/                   Shared gate, mode/lease tooling and checks
-│   └── tests/                     Workflow behavior and regression tests
-├── .claude/                       Claude runtime integration
-│   ├── settings.json              Claude hook and permission settings
-│   ├── hooks/                     SessionStart and Quality Gate hooks
-│   ├── agents/
-│   │   └── reviewer.md            Claude reviewer entrypoint
-│   └── skills/                    Per-skill links to .lean/skills/
-├── .agents/                       Codex integration
-│   └── skills/                    Per-skill links to .lean/skills/
-└── .github/                       GitHub integration
-    ├── workflows/
-    │   └── lean-workflow.yml       Workflow self-checks in CI
-    └── pull_request_template.md   PR Result Contract template
+│   ├── templates/                 Generic record templates
+│   ├── scripts/                   Gate, modes, leases and other tools
+│   └── tests/                     Workflow and regression tests
+├── .claude/                       Claude integration
+│   ├── settings.json              Claude hooks and permissions
+│   ├── hooks/                     SessionStart and Stop adapters
+│   ├── agents/reviewer.md         Reviewer entrypoint
+│   └── skills/                    Links to .lean/skills/
+├── .agents/skills/                Codex skill discovery links
+├── .codex/                        Codex lifecycle integration
+│   ├── hooks.json                 Definitions requiring runtime trust
+│   ├── hooks/                     SessionStart and Stop adapters
+│   └── quality-gate.json          Optional local auto/manual preference
+└── .github/
+    ├── workflows/lean-workflow.yml Workflow self-checks in CI
+    └── pull_request_template.md   PR Result Contract
 ```
 
-Tracking and queue record directories are created by their mode setup; `skill-effort.json` is created only when preferences are saved. No example task history, procedure preferences or runtime leases ship with the template.
+Mode setup creates tracker and queue directories. `skill-effort.json` and `quality-gate.json` are optional preferences created when saved. The template contains no actual task history, saved procedure preferences or runtime leases.
 
 ## Importing, customizing and upgrading
 
-For an existing project, follow [.lean/CUSTOMIZING.md](../.lean/CUSTOMIZING.md). Merge entrypoints, settings, gitignore and CI. Preserve your project's owner, facts, accepted scope, configured mode/execution, procedure preferences, gates, records, custom agents and skills. Import the canonical skills, policy, scripts, registry and discovery links together; keep the existing optional-pack selection and each target's settings.
+For an existing project, follow [.lean/CUSTOMIZING.md](../.lean/CUSTOMIZING.md). Merge entrypoints, settings, gitignore and CI. Keep the project's owner, facts, accepted scope, mode/execution, preferences, gates, records, custom agents and skills.
 
-Put shared project overrides below `## Project additions` in `AGENTS.md`; keep Claude-specific additions in `CLAUDE.md`. Retain [.lean/LICENSE](../.lean/LICENSE) for the copied workflow alongside your own project license. Read [.lean/CHANGELOG.md](../.lean/CHANGELOG.md) before crossing versions, especially the 2.x migration to shared AGENTS authority.
+Import canonical skills, policy, scripts, registry and discovery links together. Preserve the optional-pack choice and each target's settings. Put shared project overrides below `## Project additions` in `AGENTS.md`; keep Claude-specific additions in `CLAUDE.md`.
 
-The root README and CONTRIBUTING describe the template and may be replaced downstream. Workflow self-tests/CI can be removed if no longer wanted; remove their gate commands too. Keep mode tooling when tracker/full is used and retain a functioning application gate.
+Keep [.lean/LICENSE](../.lean/LICENSE) alongside your own project license. Read [.lean/CHANGELOG.md](../.lean/CHANGELOG.md) before crossing versions, especially the 2.x move to shared AGENTS authority.
+
+The root README and CONTRIBUTING describe this template; you can replace them for your application. You can remove workflow self-tests/CI if no longer wanted, along with their gate commands. Keep mode tooling if you use tracker/full, and retain a functioning application gate.
 
 ## Verify the workflow
 
-Run from a Git working tree:
+From a Git working tree, the shared gate runs the configured PROJECT checks:
+
+```sh
+bash .lean/scripts/quality-gate.sh --root .
+```
+
+For the individual checks and full Python suite:
 
 ```sh
 shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh
@@ -74,4 +90,4 @@ python3 .lean/scripts/model_catalog.py --root . check
 python3 -m unittest discover -s .lean/tests -p 'test_*.py'
 ```
 
-For contribution expectations, see [CONTRIBUTING.md](../CONTRIBUTING.md). The project is distributed under the [MIT License](../LICENSE); preserve its notice when redistributing the workflow.
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for test and review expectations. The project uses the [MIT License](../LICENSE); retain its notice when redistributing the workflow.

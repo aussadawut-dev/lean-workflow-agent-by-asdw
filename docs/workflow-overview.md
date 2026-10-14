@@ -2,65 +2,67 @@
 
 [Back to README](../README.md)
 
-Run CLI examples from the repository root.
+This is the path a task follows. The active agent owns it and becomes Controller when delegating. Modes add records; execution decides who implements; review depth decides how the result is checked.
 
-These diagrams describe the workflow, not an automatic scheduler. The active agent owns the task; it becomes the Controller when delegating. Modes add records independently of execution and review depth. A worker is used when execution is `delegated` or workers are explicitly requested. HIGH-depth review needs a fresh independent reviewer even in `direct` execution.
+The diagram describes the procedure. Workers are used when execution is `delegated` or explicitly requested. HIGH-depth review needs a fresh independent reviewer even in `direct` execution.
 
-## Level 0: complete workflow
+## From request to completion
 
 ```mermaid
 sequenceDiagram
     actor User
     participant Agent as Active agent / Controller
-    participant Rules as Project contract and configuration
+    participant Rules as Project rules and settings
     participant Work as Implementation and tests
     participant Review as Review at required depth
     participant Gate as Quality Gate and records
 
-    User->>Agent: Request work and acceptance outcome
-    Agent->>Rules: Read AGENTS, policy router, project facts and mode/execution
-    Rules-->>Agent: Scope rules, commands and configured routing
+    User->>Agent: Describe the work and acceptance outcome
+    Agent->>Rules: Read AGENTS, router, project facts and mode/execution
+    Rules-->>Agent: Scope rules, commands and routing
     Agent-->>User: State Task Contract before changes
-    opt Material scope or decision remains unresolved
-        Agent->>User: Resolve decision before dependent work
+    opt Important scope or decision is still open
+        Agent->>User: Settle it before dependent work
         User-->>Agent: Accepted scope / decision
     end
-    opt Non-trivial task in tracker or full mode
-        Agent->>Gate: Create workset, full also creates queue items
+    opt Non-trivial task in tracker/full
+        Agent->>Gate: Create workset; full also creates queue items
     end
     Agent->>Work: Implement directly or dispatch a bounded worker
-    Note over Agent,Work: Full-mode scope edits require ownership before editing
+    Note over Agent,Work: Full-mode scope edits need ownership first
     opt Bug fix
-        Work->>Work: Demonstrate regression test fails before fix
+        Work->>Work: Show the regression test failing before the fix
     end
     Work->>Work: Make changes and run meaningful applicable tests
     Work-->>Agent: Diff, evidence and integration risks
     Agent->>Gate: Run deterministic project validation
     Gate-->>Agent: Check results
     alt Validation passes
-        Agent->>Review: Review Task Contract and shipping diff
-        Note over Agent,Review: Depth is the deeper of risk and quality floor, HIGH is independent
+        Agent->>Review: Review contract and final diff
+        Note over Agent,Review: Use the deeper of risk and quality floor; HIGH is independent
         Review-->>Agent: PASS or REWORK with concrete findings
-        opt REWORK within bounded review cycle
-            Agent->>Work: Repair findings, revalidate and resubmit for review
+        opt REWORK within the review limit
+            Agent->>Work: Repair, revalidate and review again
         end
-        Agent->>Gate: Verify acceptance, tests, final review coverage and records
-        Note over Agent,Gate: Full: complete owned queue items with evidence, then synchronize tracker
-        Gate-->>Agent: Completion conditions satisfied or missing
-        alt Final review PASS and all completion conditions satisfied
-            Agent-->>User: DONE with evidence and any stated limits
-        else Required evidence, tooling or review missing
-            Agent-->>User: BLOCKED or FAILED with cause and next step
+        Agent->>Gate: Verify acceptance, tests, review coverage and records
+        Note over Agent,Gate: Full mode completes owned queue items with evidence, then synchronizes tracker
+        Gate-->>Agent: Completion conditions met or missing
+        alt Review passes and all conditions are met
+            Agent-->>User: DONE with evidence and stated limits
+        else Required evidence, tools or review are missing
+            Agent-->>User: BLOCKED / FAILED with cause and next step
         end
     else Validation fails or cannot run
-        Agent->>Agent: Repair task-caused failures and rerun, preserve unrelated failures
+        Agent->>Agent: Repair task-caused failures and preserve unrelated ones
         Agent-->>User: BLOCKED / FAILED if unresolved, with evidence
     end
-    opt User explicitly requests queue cleanup
+    opt User requests queue cleanup
         Agent->>Gate: Preview, then lock and archive selected DONE items
         Gate-->>Agent: Preserved history and cleanup result
-        Agent-->>User: Report archived items and any partial progress
+        Agent-->>User: Report archived items and partial progress
     end
 ```
 
-A PASS ends its review cycle. After the second REWORK, only one final repair/review pass is allowed; another REWORK reports BLOCKED. Changes after PASS open a new contract. Commit, push and merge are separate actions performed when requested.
+PASS ends a review cycle. After a second REWORK, only one final repair/review pass remains; another REWORK reports BLOCKED. Changes after PASS need a new contract.
+
+Commit, push, merge and release are separate actions when requested. For more detail, see [skills](skills.md), [quality and runtime](quality-and-runtime.md), and [delegation](spawn.md).

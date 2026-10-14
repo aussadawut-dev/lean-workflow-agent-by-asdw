@@ -1,21 +1,32 @@
 # Contributing
 
-This repository is the workflow template, not an application. Changes reach downstream projects; keep them portable and backed by evidence.
+Thanks for taking a look. This repository is the workflow template, and changes can reach projects that copy it. Keep changes portable, clear and backed by evidence.
 
-Read `AGENTS.md` and `.lean/README.md` first. Update the canonical contract and shared procedures when instructions change. Keep skill bodies in `.lean/skills/` and preserve all fourteen skills' discovery links. Do not commit actual trackers, queue items, credentials or runtime state as template content.
+Start with `AGENTS.md` and `.lean/README.md`. When instructions change, update the canonical contract and shared procedures together. Skill bodies live in `.lean/skills/`. Preserve the nine core discovery links and the ten optional skills' registration. Keep actual trackers, queue items, credentials and runtime state out of the template.
 
-Run the Quality Gate before review:
+## Check the change
+
+Run deterministic checks before review:
 
 ```sh
-shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh
-.lean/scripts/check-structure.sh
-.lean/tests/test-hooks.sh
-python3 .lean/scripts/workflow.py check
+bash .lean/scripts/quality-gate.sh --root .
 python3 -m unittest discover -s .lean/tests -p 'test_*.py'
 ```
 
-New behavior needs meaningful tests. A bug fix demonstrates its regression test failing before the repair and passing afterward. Use temporary repositories for tests; do not initialize task records in this template to test modes. Run deterministic checks before semantic review and use independent review for HIGH depth.
+The shared gate runs the commands in `.lean/PROJECT.md`, including ShellCheck, structure checks, hook tests, mode/catalog checks and gate/discovery tests. The full Python suite covers workflow behavior. Use temporary repositories for tests so the template stays free of task records.
 
-Keep `.lean/README.md` and `.lean/CHANGELOG.md` versions synchronized. MAJOR changes rules, canonical authority or existing paths; describe migration before replacement. MINOR adds compatible capabilities/enforcement; PATCH clarifies wording. Preserve historical changelog entries. See `.lean/CUSTOMIZING.md` for project-owned files and imports/upgrades. Retain the workflow LICENSE notice when downstream users copy it.
+Behavior changes need meaningful tests. For a bug fix, show its regression test failing before the fix and passing afterward. Review after validation; HIGH-depth work needs an independent reviewer.
 
-Complete the PR Result Contract with checks, regression evidence, review round/coverage and unverified work. Passing checks do not substitute for semantic review or authorize publishing another project's data.
+For public guides, use plain English, explain what the reader can do, and keep examples easy to follow. Preserve commands, paths, links and the meaning of workflow rules when changing the wording.
+
+## Versions and ownership
+
+Keep the baseline in `.lean/README.md` and the first numbered entry in `.lean/CHANGELOG.md` in sync. Also update current baseline references in `AGENTS.md`, `.lean/PROJECT.md`, `.lean/CUSTOMIZING.md` and the root README.
+
+MAJOR changes rules, canonical authority or paths an existing installation relies on. MINOR adds compatible capabilities or enforcement. PATCH clarifies wording. Keep historical changelog entries intact and explain migration before replacement. Unreleased changes stay labelled as Unreleased until released.
+
+See [.lean/CUSTOMIZING.md](.lean/CUSTOMIZING.md) for imports and project-owned files. Keep the workflow license notice when redistributing it.
+
+## Describe the result
+
+Fill in the PR Result Contract with the checks you ran, regression evidence where needed, review round and coverage, and anything still unverified. Passing tests alone does not complete semantic review. Commit, push, merge and release are separate actions when requested.

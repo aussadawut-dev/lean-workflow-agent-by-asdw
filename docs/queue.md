@@ -2,13 +2,13 @@
 
 [Back to README](../README.md)
 
-Run CLI examples from the repository root.
+Run the CLI examples from the repository root.
 
-Queue items add dependencies and exclusive scope ownership to full-mode work. Create the owning [tracker](tracker.md) before adding queue items.
+In full mode, queue items keep dependencies and ownership explicit. Create the owning [tracker](tracker.md) first. A lease is a temporary claim on a task, renewed while the worker is still using it.
 
 ## Claim work in full mode
 
-Configure full mode, create a tracker, and create queue items from `.lean/templates/queue-item.json` under `.agents/queue/items/`. Each item needs a unique `QNNNN` ID, a valid tracker ID, dependencies and exclusive scope labels.
+Configure full mode, create a tracker, then create queue items from `.lean/templates/queue-item.json` under `.agents/queue/items/`. Each needs a unique `QNNNN` ID, a valid tracker ID, dependencies and exclusive scope labels.
 
 ```sh
 python3 .lean/scripts/workflow.py configure full
@@ -16,38 +16,36 @@ python3 .lean/scripts/workflow.py queue list
 python3 .lean/scripts/workflow.py queue claim --id Q0001 --agent worker-a --request-id RANDOM-UNIQUE-ID
 ```
 
-Replace `RANDOM-UNIQUE-ID` with a new random identifier of at least eight characters, such as a UUID. Keep it until you receive the claim receipt. If the response is lost, retry with the same agent, item and request ID to recover the same token. `claim-next` can select an eligible item when a particular ID has not been assigned.
+Replace `RANDOM-UNIQUE-ID` with a fresh random identifier of at least eight characters, such as a UUID. Keep it until you receive the receipt. If the response is lost, retry with the same agent, item and request ID to recover the same token. `claim-next` selects an eligible item when no specific ID was assigned.
 
-The claim returns a token. Use it to renew or release ownership:
+Use the returned token to renew or release the claim:
 
 ```sh
 python3 .lean/scripts/workflow.py queue heartbeat --id Q0001 --token 'TOKEN-FROM-RECEIPT'
 python3 .lean/scripts/workflow.py queue release --id Q0001 --token 'TOKEN-FROM-RECEIPT'
 ```
 
-A lease lasts 30 minutes; renew it during long work. Use `queue complete --id Q0001 --token 'TOKEN-FROM-RECEIPT' --evidence 'ACTUAL-VALIDATION-EVIDENCE'` only after validation and required review. Completion rechecks dependencies and requires nonblank evidence; it cannot establish that an arbitrary evidence string is true. Synchronize the tracker after queue completion.
+A lease lasts 30 minutes. Renew it during long work. After validation and required review, complete the item with `queue complete --id Q0001 --token 'TOKEN-FROM-RECEIPT' --evidence 'ACTUAL-VALIDATION-EVIDENCE'`, then synchronize the tracker.
+
+Completion rechecks dependencies and requires nonblank evidence. The CLI can check that evidence exists; you still need to make sure it is true.
 
 ## Clean completed queue items
 
-Use either command in your coding agent:
+Enable the optional skill pack first. In Claude, use the commands below; in Codex, use `$lean-clean-queue` with the same arguments:
 
 ```text
 /lean-clean-queue old
 /lean-clean-queue all
 ```
 
-| Command | DONE items selected | Items retained |
+| Selection | What gets archived | What stays |
 |---|---|---|
-| `/lean-clean-queue old` | Completed strictly more than 30 days ago, using `completed_at`. | DONE from the last 30 days, undated DONE, and all READY/BLOCKED items. |
-| `/lean-clean-queue all` | Every DONE item, including undated legacy items. | All READY/BLOCKED items. |
+| `old` | DONE items completed strictly more than 30 days ago, using `completed_at`. | Recent DONE, undated DONE, and every READY/BLOCKED item. |
+| `all` | Every DONE item, including undated legacy items. | Every READY/BLOCKED item. |
 
-Both commands archive queue items only; trackers stay in place. “All” means all DONE items,
-not all work. Cleanup moves records out of the active queue and keeps their full history.
-The skill previews the selection, then applies the explicitly requested cleanup without asking
-for the same permission again. If slash-command discovery is unavailable, follow the shared
-[lean-clean-queue procedure](../.lean/skills/lean-clean-queue/SKILL.md) or use the CLI below.
+Cleanup archives queue items and keeps their full history. Trackers stay where they are. The skill previews the selection and applies the requested cleanup using that authorization. Add `--preview` to inspect it without applying.
 
-Equivalent CLI commands (choose old or all):
+If discovery is unavailable, read the [shared procedure](../.lean/skills/lean-clean-queue/SKILL.md), or use the CLI:
 
 ```sh
 python3 .lean/scripts/workflow.py clean-queue old --dry-run
@@ -58,30 +56,20 @@ python3 .lean/scripts/workflow.py queue history
 python3 .lean/scripts/workflow.py queue history --id Q0001
 ```
 
-New completions record a UTC `completed_at`. Old skips/reports legacy DONE items without that field;
-all can archive them. Exactly 30 days old is retained by old; it becomes eligible only after that
-threshold. File modification time is never used to invent a completion date.
+New completions record UTC `completed_at`. `old` reports and skips legacy DONE items without it; `all` can archive them. Exactly 30 days old stays in the queue until it passes that threshold. File modification time is never used as a completion date.
 
-History under `.agents/queue/history/` retains original JSON bytes, custom fields, evidence, IDs,
-checksum, archive time and selection without automatic expiry. Commit this project history when
-saving the cleanup; it is not template material. Dependencies and tracker checks resolve archived
-DONE items, while the active queue list and claims exclude them. History can be read after lowering
-the project mode. `queue history` lists archived IDs/titles; `queue history --id Q0001` returns
-the full snapshot, including original JSON in its `content` field. A checksum detects content
-mismatch; it is not proof of authentic evidence.
+History in `.agents/queue/history/` keeps original JSON bytes, custom fields, evidence, IDs, checksum, archive time and selection, without automatic expiry. Commit this history when saving cleanup in your project; it is project data and does not belong in the distributable template.
 
-Preview writes nothing; apply uses the shared lock and rechecks data. Live claims on DONE records
-and malformed data block cleanup. Valid live claims on retained READY items are preserved and do
-not block it. Each snapshot is written/synced before deleting its source. A process
-interruption can leave an identical source copy; it is already logically archived, and retrying
-cleanup finishes the removal. Batches are recoverable per item, not all-or-nothing; report any
-partial progress after an error. Do not reuse archived IDs, manually delete prerequisites, or run
-cleanup alongside workers using older tooling. Neither the CLI nor skill commits/pushes automatically.
+Dependencies and tracker checks can resolve archived DONE items. Active queue lists and claims exclude them. You can read history after lowering the mode. `queue history` lists IDs/titles; `--id Q0001` returns the full snapshot, with original JSON in `content`. A checksum detects mismatched content but cannot prove the evidence is authentic.
 
-## Durable tracking and local ownership
+Preview writes nothing. Apply takes the shared lock and checks the data again. Malformed data or live claims on DONE records block cleanup. Valid live claims on retained READY items are preserved and do not block it.
 
-Trackers retain acceptance criteria, decisions, status and evidence across sessions. Queue items link work to trackers and declare dependencies and exclusive scopes. The CLI validates IDs, supported states, dependency cycles, completion evidence and tracker–queue consistency where the active mode requires it.
+Each snapshot is written and synced before its source is deleted. An interruption can leave an identical source copy that is already logically archived; retrying finishes the removal. Recovery works per item, so report partial progress if a batch stops. Keep archived IDs reserved, retain prerequisite history and stop workers using older tooling before cleanup. The command does not commit or push for you.
 
-Local lease tooling supports exact-item claims, eligible-item selection, heartbeat, release, completion and retry recovery. It refuses overlapping exact scope labels, multiple live claims for one agent and unfinished dependencies at completion. Configure, downgrade and worker operations use the same lock; workers check the current mode after acquiring it.
+## What local ownership covers
 
-Scope labels are compared exactly: a directory label does not automatically cover all descendant file labels. Ownership is coordinated in **one checkout**, not across machines or Git worktrees. Tokens are coordination receipts, not a security boundary, and expired leases do not forcibly stop a worker process.
+The CLI checks IDs, states, dependency cycles, completion evidence and tracker/queue consistency where the mode requires it. Claim operations cover exact-item selection, eligible-item selection, heartbeat, release, completion and retry recovery.
+
+It refuses overlapping exact scope labels, multiple live claims for one agent and unfinished dependencies at completion. Configure, downgrade and worker operations share a lock; workers check the mode again after acquiring it.
+
+Scope labels match exactly. A directory label does not automatically cover every descendant file label. Coordination applies to **one checkout**, so separate machines and worktrees need their own coordination. Tokens are receipts, not a security boundary. An expired lease also cannot stop a worker process that is still running.

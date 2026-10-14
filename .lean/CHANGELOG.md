@@ -37,6 +37,19 @@ Merge canonical skills, policy, CLI, registry, discovery links, gate runner/lock
 
 Merge the runner, evidence helper, hooks, skills, registry and tests together; preserve PROJECT/config/records/permissions. Configure real project checks if the old gate was empty. Existing cache files are advisory only; seeding no longer makes validation pass. Optional discovery is a separate choice from mode/execution. Review and accept any intentional control changes using `gate_evidence.py accept-controls --reason '<matching user approval>'`; never use acceptance to bypass a failing check. No release tag or publication is implied by this working-tree entry.
 
+## 4.1.1 — 2026-10-14
+
+### Clearer public documentation
+
+- Rewrite the root README, CONTRIBUTING and all public guides in plain English with a more conversational tone. Keep the existing workflow concepts, commands and completion requirements.
+- Make setup, modes, procedure intensity, delegation and runtime limits easier to follow. Correct the contribution guide to match nine core and ten optional skills, and include Codex lifecycle files in the repository map.
+- Replace dated model-name examples and repeated delegation diagrams with capability-based guidance and links to official runtime documentation.
+- Synchronize current baseline references. This patch changes documentation only; the extensions listed under Unreleased remain unreleased. No release tag or GitHub publication is implied.
+
+### Upgrade from 4.1.0
+
+Update the public guides and baseline references together. No configuration, record or runtime migration is required for this documentation patch. Preserve project-owned facts, commands, additions and preferences when merging.
+
 ## 4.1.0
 
 ### Evidence-backed repository cleanup

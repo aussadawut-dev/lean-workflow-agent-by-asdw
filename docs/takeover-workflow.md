@@ -1,6 +1,8 @@
 # Taking over an existing agent workflow
 
-Use a trusted Lean checkout to migrate another repository's workflow and document organization. The target's project rules, accepted decisions, unfinished work, permissions and history must remain accounted for.
+[Back to README](../README.md)
+
+Use a trusted Lean checkout to migrate another repository's workflow and document organization. Keep the target's rules, accepted decisions, unfinished work, permissions and history accounted for. Enable the optional pack first.
 
 ```text
 # Claude Code
@@ -11,26 +13,36 @@ Use a trusted Lean checkout to migrate another repository's workflow and documen
 $lean-takeover-workflow "/path/to/target" --preview
 ```
 
-The default audits and prepares a concrete plan/diff, then applies after matching approval. Preview stops at the proposal and leaves the target intact. An accepted plan can be continued with `--apply <plan-id>` using its recorded external session. Missing approval or changed revisions require a new or refreshed proposal; a plan id alone is not consent.
+The default audits the target and prepares a concrete plan/diff, then applies after matching approval. `--preview` stops at the proposal and leaves the target intact. Continue an accepted plan with `--apply <plan-id>` using its external session. Missing approval or changed revisions need a new or refreshed proposal. A plan ID alone is not approval.
 
-## User decisions
+## Decisions to settle
 
-Grill asks about material intent and tradeoffs, using evidence from the repository. Expect recommendations with alternatives and consequences: which old behavior to keep, how to resolve conflicts, which runtime capabilities still matter, and how ambiguous work records should migrate. Answers are reflected back and tied to the resulting operations and acceptance checks. There is no mandatory number of questions or rounds; accepted choices are reused and routine reversible mechanics proceed directly.
+Grill works through important intent and tradeoffs using repository evidence: which old behavior to keep, how to resolve conflicts, which runtime features still matter, and how to map unclear work records.
 
-## Coverage and document ownership
+Expect recommendations with alternatives and consequences. Answers are tied to operations and acceptance checks. There is no fixed question count. Accepted choices carry forward, and routine reversible steps can proceed.
 
-The agent fully reads authorized workflow files and their local dependencies, including nested rules, skills/resources, public settings, hooks/scripts, workflow CI, tests, manifests and relevant project records. Fingerprints and search results do not count as a full read. Credentials, private settings, generated files and runtime internals are excluded with reasons. External references, symlinks and nested repositories require separate scope; a missing required read blocks its dependent migration.
+## Read coverage and document ownership
 
-Generic process maps to Lean procedures. Facts/commands/gate belong in target `.lean/PROJECT.md`; shared project rules belong in AGENTS Project additions; runtime rules remain with their runtime. Product specifications, architecture, ADRs and runbooks stay in project docs linked through documentation routes. Tracker/full uses `docs/tracking/`, and full uses `.agents/queue/`; existing valid records and configured choices are retained. Foreign records need explicit schema/status/ID mapping, not guessed owners or fabricated completion.
+The agent fully reads authorized workflow files and local dependencies, including nested rules, skills/resources, public settings, hooks/scripts, workflow CI, tests, manifests and relevant records. Fingerprints and search results cannot substitute for a full read.
 
-A private staging tree materializes the reviewed public workflow result before target writes. Run safe deterministic workflow checks there and record their results; staging excludes secrets/generated dependencies and does not substitute for the actual target gate.
+Credentials, private settings, generated files and runtime internals are excluded with reasons. External references, symlinks and nested repositories need separate scope. A missing required read blocks the migration that depends on it.
 
-The plan merges settings, gitignore, application gates/CI and project extensions, fixes active links/imports and removes competing workflow authority. It never imports source project facts, records, model settings, custom application agents/skills, credentials or project licenses. Original public workflow bytes are snapshotted outside the target, where old instruction filenames cannot remain active.
+Generic process belongs in Lean procedures. Facts, commands and gate go in target `.lean/PROJECT.md`; shared project rules go in AGENTS Project additions. Runtime rules stay with their runtime. Product specs, architecture, ADRs and runbooks stay in project docs linked through documentation routes.
+
+Tracker/full uses `docs/tracking/`; full also uses `.agents/queue/`. Keep valid existing records and configured choices. Foreign records need explicit schema/status/ID mapping. Owners and completion evidence must not be invented.
+
+A private staging tree shows the reviewed public workflow result before target writes. Run safe deterministic workflow checks there and record the results. Staging excludes secrets/generated dependencies and still needs the actual target gate afterward.
+
+The plan merges settings, gitignore, application gates/CI and project extensions, fixes active links/imports and removes competing workflow authority. It leaves source project facts, records, model settings, custom application agents/skills, credentials and licenses out of the import. Original public workflow bytes are snapshotted outside the target so old instruction files cannot remain active.
 
 ## Apply and recovery
 
-The [shared procedure](../.lean/skills/lean-takeover-workflow/SKILL.md) owns interpretation and approval. Its [tool interface](../.lean/skills/lean-takeover-workflow/references/tooling.md) records inventory, decisions, rule mappings, exact writes and source/target fingerprints in a private session outside both repositories. Portable source files come from the release’s `.lean/assets.json` registry, so adjacent source project extensions are not copied. Keep the session path; it contains recovery data and must not be published.
+The [shared procedure](../.lean/skills/lean-takeover-workflow/SKILL.md) owns interpretation and approval. Its [tool interface](../.lean/skills/lean-takeover-workflow/references/tooling.md) records inventory, decisions, rule mappings, exact writes and source/target fingerprints in a private session outside both repositories.
 
-Apply takes the local Lean queue lock and refuses live claims. Stop affected foreign workers separately; the lock cannot protect against unrelated editors. Each write has an original snapshot and intent/completion journal. Resume uses the same approved plan after interruption; rollback restores only the journal's files and refuses subsequent edits. Git reset, commit and push are not used. The coordination lock may remain after rollback.
+Portable source files come from `.lean/assets.json`, so nearby source-project extensions are excluded. Keep the private session path for recovery and do not publish it.
 
-APPLIED means the writer finished. DONE requires the target's actual Quality Gate, workflow/reference/permission/record checks and HIGH independent semantic review. Missing tools, unsupported conversions or pre-existing gate failures are reported with evidence. This command does not configure global skill discovery or migrate global runtime settings.
+Apply takes the local Lean queue lock and refuses live claims. Stop affected foreign workers separately; the lock cannot protect against unrelated editors. Every write has an original snapshot and intent/completion journal.
+
+Resume uses the same approved plan after interruption. Rollback restores only journaled files and refuses subsequent edits. No Git reset, commit or push is used. The coordination lock may remain after rollback.
+
+APPLIED means the writer finished. DONE still needs the target's actual Quality Gate, workflow/reference/permission/record checks and HIGH independent semantic review. Report missing tools, unsupported conversions or pre-existing gate failures with evidence. Global skill discovery and runtime settings are outside this migration.

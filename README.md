@@ -1,42 +1,50 @@
 # Lean Workflow Agent by ASDW
 
-A reusable workflow for Claude and Codex: clear task contracts, meaningful tests, risk-based review and evidence before completion. Use it with your own application stack.
+I built this because I want a coding agent to understand the work, check what it changed, and explain why the task is done. This is the workflow I use for that, shared as a template you can bring into your own project.
 
-**Baseline 4.1.0** · [Latest published extension: v4.1.0-skill-effort.1](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/tree/v4.1.0-skill-effort.1)
+It works with **Claude Code and Codex**, with one shared set of rules and skills. Use it with your own stack.
+
+**Baseline 4.1.1** · [MIT License](LICENSE)
+
+The idea is simple: **agree on the work → implement → test → validate → review → finish with evidence**. Use the steps the task needs. You do not have to call every skill or read every file to get started.
 
 ## What you get
 
-- One shared contract and skill library for Claude and Codex.
-- A complete task flow: scope → implementation → tests → validation → review → Quality Gate.
-- Three workflow modes: `standard` for session evidence, `tracker` for persistent worksets, and `full` for queue ownership and leases.
-- Nine core skills, ten optional skills, and shared `standard` / `high` / `ultra` procedure intensity.
-- Gate locking and tracker-history guards to prevent overlapping gate runs and reused task IDs.
+- A shared contract for Claude and Codex, with skills maintained in one place.
+- A short statement of risk, quality and acceptance before the agent changes files.
+- Meaningful tests for behavior changes. For bugs, a regression test that fails before the fix and passes afterward.
+- Review at the depth the work needs, followed by a Quality Gate using your project's checks.
+- Three modes: keep evidence in the chat, keep a workset across sessions, or add a queue with explicit ownership.
+- Nine core skills, ten optional skills, and `standard` / `high` / `ultra` procedure intensity.
+- Gate locking to avoid overlapping runs, and history checks to avoid reusing task IDs.
 
-Mode, execution strategy, model choice and review depth are separate. The template starts with unconfigured `standard` mode and `direct` execution, without task history or leases.
+The template starts with unconfigured `standard` mode and `direct` execution. It contains no task history or leases. Mode, execution, model choice and review depth are separate settings.
 
 ## Quick start
 
-Requires macOS, Linux or WSL, Bash, Git and Python **3.9+**. Install ShellCheck for the workflow's lint gate.
+You need **macOS, Linux or WSL**, Bash, Git, Python **3.9+**, and ShellCheck for the workflow's lint checks. Have your coding agent set up separately.
+
+Use GitHub's **Use this template** action if the repository is enabled as a template, or clone it and change the remote to your own repository:
 
 ```sh
 git clone https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw.git my-project
 cd my-project
 ```
 
-Use GitHub’s **Use this template** action for a new repository, or change the cloned repository’s remote to your own. Open the project in your coding agent:
+Open the project in your agent:
 
-| Runtime | Set up the project | Start work |
+| What you want to do | Claude Code | Codex |
 |---|---|---|
-| Claude Code | `/lean-init` | `/lean-task <task description>` |
-| Codex | `$lean-init` | `$lean-task <task description>` |
+| Set up the project | `/lean-init` | `$lean-init` |
+| Start a task | `/lean-task <task description>` | `$lean-task <task description>` |
 
-Setup records your mode and execution choice. Fill [.lean/PROJECT.md](.lean/PROJECT.md) with your application's real commands and Quality Gate; the shipped checks validate the workflow itself.
+`lean-init` reads the project, records your mode and execution choice, and helps fill [.lean/PROJECT.md](.lean/PROJECT.md) with real facts and commands. Add your application's checks there: the checks shipped in this template validate Lean itself.
 
-For an existing repository, follow the [import guide](.lean/CUSTOMIZING.md). To keep Lean outside the application repository, use [application submodules](docs/submodules.md).
+Already have a project? Follow the [import guide](.lean/CUSTOMIZING.md). Want to keep Lean outside the application repository? See [application submodules](docs/submodules.md).
 
 ## Everyday use
 
-Start with a concrete outcome and acceptance criteria. For example:
+Tell the agent what you want to change and how you will know it works. For example:
 
 ```text
 # Claude Code
@@ -46,30 +54,32 @@ Start with a concrete outcome and acceptance criteria. For example:
 $lean-task Fix expired queue leases; add a regression test and run the project checks
 ```
 
-The agent states a Task Contract, resolves material scope decisions, implements the accepted work, runs tests and validation, reviews the changes and checks completion. It reuses accepted decisions and asks when a material decision or scope change needs your input. You do not need to invoke every step manually.
+The agent states a Task Contract, clears up important open decisions, does the accepted work, runs tests and validation, reviews the changes, and checks whether it can finish. It keeps decisions you have already made. It comes back to you when the scope changes or an important decision needs your input.
 
-Use an individual skill when you want to focus on one stage:
+You can also call a skill for just one part of the work:
 
-| Purpose | Claude Code | Codex |
+| What you want to do | Claude Code | Codex |
 |---|---|---|
-| Define the requirement | `/lean-scope <requirement>` | `$lean-scope <requirement>` |
-| Compare approaches | `/lean-research <question>` | `$lean-research <question>` |
-| Challenge a plan before implementation | `/lean-grill <plan>` | `$lean-grill <plan>` |
-| Review the current change | `/lean-review` | `$lean-review` |
-| Check whether work is complete | `/lean-gate` | `$lean-gate` |
-| Coordinate bounded delegation | `/lean-multi-agent <task>` | `$lean-multi-agent <task>` |
+| Make the requirement clear | `/lean-scope <requirement>` | `$lean-scope <requirement>` |
+| Research and compare options | `/lean-research <question>` | `$lean-research <question>` |
+| Find gaps in a plan before coding | `/lean-grill <plan>` | `$lean-grill <plan>` |
+| Review the current changes | `/lean-review` | `$lean-review` |
+| Check whether the task can finish | `/lean-gate` | `$lean-gate` |
+| Delegate a bounded task | `/lean-multi-agent <task>` | `$lean-multi-agent <task>` |
 
-Both runtimes use the same canonical skills. In Codex, invoke them with `$` or use the skill picker. See the [complete command reference](docs/skills.md).
+Claude uses `/skill-name`. Codex uses `$skill-name` or its skill picker. Both read the same canonical skills. See the [full command guide](docs/skills.md).
 
 ## Choose a workflow mode
 
-| Mode | What it adds | Choose it when |
-|---|---|---|
-| `standard` | Contract, tests, validation, review and gate; evidence stays in the session. | You want minimal record keeping. |
-| `tracker` | A persistent workset for each non-trivial task under `docs/tracking/`. | Work and decisions need to survive between sessions. |
-| `full` | Queue items, scope ownership and lease claims. | Workers need explicit task ownership. |
+Start with the amount of record keeping you need:
 
-Select a mode during `lean-init`, or configure it from the repository root:
+| Mode | What it keeps | When to use it |
+|---|---|---|
+| `standard` | Contract, tests, validation, review and gate; evidence stays in the chat. | You want a simple start with fewer documents. |
+| `tracker` | A workset for each non-trivial task in `docs/tracking/`. | You want to pick up the work in another session. |
+| `full` | Tracker plus queue items, scope ownership and lease claims. | You need explicit ownership for workers in one checkout. |
+
+Choose during `lean-init`, or run this from the repository root:
 
 ```sh
 python3 .lean/scripts/workflow.py configure tracker --execution direct
@@ -77,73 +87,82 @@ python3 .lean/scripts/workflow.py show
 python3 .lean/scripts/workflow.py check
 ```
 
-Execution is independent: `direct` lets the active agent implement; `delegated` makes it a Controller dispatching bounded work to an available worker. Parallel workers require explicit user intent and independent file ownership. Every mode keeps the same test and review obligations; HIGH-depth review always requires an independent reviewer.
+Execution is a separate choice. `direct` means the active agent does the work. `delegated` means it acts as Controller, assigns a bounded task to a worker, then validates and integrates the result. Parallel workers need explicit user intent, independent tasks and separate file ownership.
 
-Mode downgrades use a guarded preview/apply procedure. See [setup and execution](docs/getting-started.md) and [mode transitions](docs/tracker.md).
+Every mode keeps the same test and review requirements. HIGH-depth review needs an independent reviewer with either execution choice. For setup and mode changes, see [getting started](docs/getting-started.md) and [tracker transitions](docs/tracker.md).
 
-## Set skill procedure intensity
+## Set how much detail a skill uses
 
-Use `standard`, `high` or `ultra` to control how thoroughly a skill performs its procedure. This is separate from model reasoning effort, task quality, workflow mode and execution routing.
+Choose `standard`, `high` or `ultra` to adjust how thoroughly a skill follows its procedure. For example, research can compare more relevant options, or scope can cover more failure cases.
 
-| Action | Claude Code | Codex |
+This setting is separate from model reasoning effort, task quality, workflow mode and execution.
+
+| What you want to do | Claude Code | Codex |
 |---|---|---|
-| Inspect saved settings | `/lean-skill-effort` | `$lean-skill-effort` |
-| Save a default for all skills | `/lean-skill-effort high` | `$lean-skill-effort high` |
-| Override one skill | `/lean-skill-effort ultra lean-research` | `$lean-skill-effort ultra lean-research` |
-| Remove one override | `/lean-skill-effort reset lean-research` | `$lean-skill-effort reset lean-research` |
-| Reset all skills to standard | `/lean-skill-effort reset` | `$lean-skill-effort reset` |
+| See saved settings | `/lean-skill-effort` | `$lean-skill-effort` |
+| Set a default for all skills | `/lean-skill-effort high` | `$lean-skill-effort high` |
+| Set research separately | `/lean-skill-effort ultra lean-research` | `$lean-skill-effort ultra lean-research` |
+| Reset research to the default | `/lean-skill-effort reset lean-research` | `$lean-skill-effort reset lean-research` |
+| Reset everything to standard | `/lean-skill-effort reset` | `$lean-skill-effort reset` |
 
-For one task, say “use scope high and research ultra for this task”; task-specific choices are not saved as project defaults. Saved choices live in optional project-owned `.lean/skill-effort.json`. A global setting clears named overrides; a named reset restores inheritance. See [intensity rules and CLI examples](docs/skills.md#optional-skill-levels).
+For just one task, say “use scope high and research ultra for this task.” That choice stays with the task. Saved preferences go in optional `.lean/skill-effort.json`. Setting a global level clears individual overrides; resetting one skill restores inheritance. See [settings and CLI examples](docs/skills.md#optional-skill-levels).
 
 ## Enable optional skills
 
-Nine core skills are available by default. Enable the ten optional skills from the repository root, then reload your runtime’s skills:
+The nine core skills are ready by default. To expose the ten optional skills, run these commands from the repository root, then reload your runtime's skills:
 
 ```sh
 python3 .lean/scripts/skill_pack.py enable
 python3 .lean/scripts/skill_pack.py status
-# Remove optional discovery links again:
+# Hide the optional skills again:
 python3 .lean/scripts/skill_pack.py disable
 ```
 
-After enabling, common starting points are:
+A few useful starting points after enabling them:
 
-| Purpose | Claude Code | Codex |
+| What you want to do | Claude Code | Codex |
 |---|---|---|
 | Preview a workflow update | `/lean-update-workflow` | `$lean-update-workflow` |
 | Preview repository cleanup | `/lean-clean-repo` | `$lean-clean-repo` |
-| Preview prose compression | `/lean-compress workflow --preview` | `$lean-compress workflow --preview` |
-| Keep application code in a submodule | `/lean-use-submodule <remote url>` | `$lean-use-submodule <remote url>` |
+| Preview shorter workflow prose | `/lean-compress workflow --preview` | `$lean-compress workflow --preview` |
+| Add an application submodule | `/lean-use-submodule <remote url>` | `$lean-use-submodule <remote url>` |
 
-The pack also includes model catalog refresh, queue cleanup and workflow takeover. Updates, cleanup and compression start with a preview; applying changes follows their scope and approval rules. See [all optional commands](docs/skills.md#core-and-optional-commands) and the [maintenance guide](docs/maintenance.md).
+The pack also covers project standards, audits, gate mode, model research, queue cleanup and workflow takeover. Updates, repository cleanup and prose compression start with a preview. Applying them follows the accepted scope and each procedure's approval rules.
 
-## Validate before completion
+See [all 19 skills](docs/skills.md#core-and-optional-commands) and the [maintenance guide](docs/maintenance.md).
 
-Put your application’s real test, lint, build and typecheck commands in [.lean/PROJECT.md](.lean/PROJECT.md), with gate commands between its existing markers. Each command must exit non-zero on failure. Behavior changes need meaningful tests; bug fixes need a regression test shown failing before the fix and passing afterward.
+## Before calling a task done
 
-Claude runs the shared gate through its Stop hook. Codex runs it explicitly; you can also run it from the repository root:
+Put your application's real test, lint, build and typecheck commands in [.lean/PROJECT.md](.lean/PROJECT.md), between its existing gate markers. Each command must exit non-zero when it fails.
+
+You can run the shared checks yourself:
 
 ```sh
 bash .lean/scripts/quality-gate.sh --root .
 ```
 
-This runs the configured gate checks. Completion also requires acceptance evidence and the required review; HIGH work needs a matching independent-review receipt. See [quality and runtime details](docs/quality-and-runtime.md) and [workflow verification commands](docs/repository-guide.md#verify-the-workflow).
+Claude uses its Stop hook under the shared auto/manual policy. Codex runs the gate explicitly, or through its lifecycle adapter once the runtime has trusted and activated it.
 
-## Documentation
+Passing commands is one part of completion. The result also needs to meet the acceptance criteria, include the required tests and cover the final changes in review. HIGH-depth work needs a matching independent-review receipt. If a required tool or piece of evidence is missing, report the blocker.
 
-| Guide | Read it for |
+See [quality and runtime details](docs/quality-and-runtime.md) and [workflow verification commands](docs/repository-guide.md#verify-the-workflow).
+
+## Read more when you need it
+
+| Guide | What it covers |
 |---|---|
-| [Getting started and modes](docs/getting-started.md) | Requirements, installation, agent-free setup and execution routing. |
-| [Workflow overview](docs/workflow-overview.md) | The complete task sequence from request to completion. |
-| [Skills and intensity](docs/skills.md) | All 19 commands, optional discovery and skill-effort settings. |
-| [Quality and runtime](docs/quality-and-runtime.md) | Tests, review, gate locking, caching and Claude/Codex integration limits. |
-| [Tracker](docs/tracker.md) | Persistent worksets, statuses and mode transitions. |
-| [Queue](docs/queue.md) | Ownership, claims, leases, dependencies and history. |
-| [Delegation](docs/spawn.md) | Controller, worker and independent reviewer sequences. |
-| [Models and effort](docs/models.md) | Model selection, reasoning effort and catalog refresh. |
-| [Maintenance](docs/maintenance.md) | Prose compression, workflow upgrades and repository cleanup. |
-| [Workflow takeover](docs/takeover-workflow.md) | Audit and migrate an existing workflow with recovery. |
-| [Application submodules](docs/submodules.md) | Separate application code from Lean tools and project records. |
-| [Repository guide](docs/repository-guide.md) | File layout, customization, upgrades and verification commands. |
+| [Getting started](docs/getting-started.md) | Requirements, installation, modes and execution. |
+| [Workflow overview](docs/workflow-overview.md) | The path from a request to completion. |
+| [Skills and intensity](docs/skills.md) | All commands, optional discovery and skill settings. |
+| [Quality and runtime](docs/quality-and-runtime.md) | Tests, review, gates, hooks and their limits. |
+| [Tracker](docs/tracker.md) | Worksets across sessions and mode changes. |
+| [Queue](docs/queue.md) | Ownership, claims, leases and history. |
+| [Delegation](docs/spawn.md) | Controller, worker and reviewer responsibilities. |
+| [Models and effort](docs/models.md) | Choosing a model, reasoning effort and catalog updates. |
+| [Maintenance](docs/maintenance.md) | Prose compression, updates and cleanup. |
+| [Workflow takeover](docs/takeover-workflow.md) | Planning, migration and recovery. |
+| [Application submodules](docs/submodules.md) | Keeping application code separate from Lean. |
+| [Repository guide](docs/repository-guide.md) | File layout, customization and verification. |
+| [Developing Lean](docs/workflow-development.md) | Internal tools and test coverage. |
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) to contribute and [.lean/CHANGELOG.md](.lean/CHANGELOG.md) for baseline history. Distributed under the [MIT License](LICENSE).
+Want to contribute? Read [CONTRIBUTING.md](CONTRIBUTING.md). Version history and migration notes are in [.lean/CHANGELOG.md](.lean/CHANGELOG.md).
