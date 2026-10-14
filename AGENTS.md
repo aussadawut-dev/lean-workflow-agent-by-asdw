@@ -10,7 +10,7 @@ Explicit user instructions take precedence. The active agent owns the task unles
 - Before changing files, write one contract line as the first line of your reply:
   `Contract: risk=<LOW|MEDIUM|HIGH> quality=<STANDARD|HIGH|VERY_HIGH> acceptance=<observable check>`
   For a trivial task: `Contract: trivial (<reason>)`. Infer values; do not ask the user. Risk rules: `.lean/policy/CONTRACTS.md`.
-- Use the smallest sufficient context. Do not read workflow internals (`.claude/hooks/`, `.lean/policy/`) unless the task needs them.
+- Use the smallest sufficient context. Follow impact-based context selection and delta reuse in `.lean/policy/CONTEXT.md` when choosing or expanding task context. Do not read workflow internals (`.claude/hooks/`, `.lean/policy/`) unless the task needs them.
 - Behavior changes require meaningful tests.
 - Bug fixes require a regression test. Run it before the fix and show it fails, then show it passes after.
 - Run deterministic validation before semantic review.
@@ -31,6 +31,7 @@ Explicit user instructions take precedence. The active agent owns the task unles
 - Select the least costly capable model and supported effort by `.lean/policy/MODELS.md`. Before premium dispatch, record outcome, material constraints and concrete evidence that a cheaper available option is insufficient. A risk label, model preference or complexity claim alone is not evidence. Do not authorize paid usage implicitly. Record requested and reported settings honestly.
 - For HIGH review depth, use an independent reviewer: Claude's `reviewer` subagent (`.claude/agents/reviewer.md`), or a Codex subagent/fresh session. Give it `.lean/roles/reviewer.md`, the Task Contract and shipping diff without the author's reasoning. Select model and effort by `.lean/policy/MODELS.md`; report BLOCKED when required independence is unavailable.
 - Claude's SessionStart/Stop hooks live in `.claude/settings.json`. Codex discovers shared skills through `.agents/skills/` links and runs the shared Quality Gate explicitly; Claude settings are not Codex hooks or permissions.
+- Shared workspace gate policy is optional `.codex/quality-gate.json` (`auto` defaults to true); inspect/set with `gate_mode.py` or optional `lean-quality-gate-mode`. Manual Stops report NOT_RUN; explicit full runs need applicable user authorization, reusing matching approval. Deferral never permits DONE. Codex's `.codex/hooks.json` adapter requires runtime hook trust; until activated, follow the same policy explicitly. Mode never waives acceptance or required review.
 - If the Quality Gate fails, fix only failures caused by this task. Report pre-existing, unavailable-tool or out-of-scope failures as BLOCKED with evidence; do not edit tests or the gate merely to pass.
 
 ## Workflow procedures

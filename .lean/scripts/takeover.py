@@ -442,9 +442,10 @@ def portable_files(source):
         verify_link(source, name)
     for name in names:
         relative_path(name)
-        if (name in {".lean/PROJECT.md", ".lean/config.json", ".lean/model-catalog.json", ".lean/upstream.json", ".lean/skill-effort.json"}
+        if (name in {".lean/PROJECT.md", ".lean/config.json", ".lean/model-catalog.json", ".lean/upstream.json", ".lean/skill-effort.json", ".codex/quality-gate.json"}
                 or name.startswith(RECORD_DIRS)
-                or not (name in {"AGENTS.md", "CLAUDE.md"} or name.startswith((".lean/", ".claude/", ".agents/skills/")))):
+                or not (name in {"AGENTS.md", "CLAUDE.md", ".codex/hooks.json", ".codex/hooks/quality_gate.py"}
+                        or name.startswith((".lean/", ".claude/", ".agents/skills/")))):
             fail(f"project-owned file cannot be a portable asset: {name}")
         if not target_path(source, name).is_file():
             fail(f"missing portable asset: {name}")

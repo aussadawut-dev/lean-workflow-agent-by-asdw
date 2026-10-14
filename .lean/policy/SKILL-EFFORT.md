@@ -26,3 +26,5 @@ Use the more specific depth guidance in scope/research/grill alongside this poli
 ## Boundaries
 
 Intensity is separate from model reasoning effort, Task Contract quality, risk, required review depth, budget, workflow mode and execution routing. It does not switch models, edit runtime `effort` frontmatter, authorize paid usage, spawn agents, expand accepted scope, or grant external-write/publication permissions. Model settings still follow MODELS.md. At every intensity, retain required tests, independent review where mandated, review round limits, gate commands and the project's existing gate policy. Standard never lowers those obligations; high/ultra never imply they passed. Reuse valid evidence for an unchanged shipping state rather than rerunning checks just to increase intensity.
+
+A saved global level applies when each skill is used; it does not activate additional skills or require reading their bodies/resources. Select procedures and context by task impact under CONTEXT.md, while retaining explicit user invocations and mandatory workflow steps.

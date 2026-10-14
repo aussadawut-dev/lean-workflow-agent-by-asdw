@@ -50,6 +50,7 @@ def state(root):
 
 def controls(root):
     names = [".claude/settings.json", ".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py"]
+    names += [".lean/scripts/gate_mode.py", ".codex/hooks.json", ".codex/hooks/quality_gate.py", ".codex/quality-gate.json"]
     names += [str(path.relative_to(root)) for path in sorted((root / ".claude/hooks").glob("*.sh"))]
     values = {}
     for name in names:

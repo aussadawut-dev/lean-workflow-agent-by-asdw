@@ -9,15 +9,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def bootstrap(root):
-    listing = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"], cwd=ROOT)
+def bootstrap(root, source_root=ROOT):
+    listing = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"], cwd=source_root)
+    declared = json.loads((source_root / ".lean/assets.json").read_text())["links"]
     for name in set(listing.decode().split("\0")):
-        source = ROOT / name
+        source = source_root / name
         # A working-tree move can leave retired index entries beneath a link.
         # Never materialize their dereferenced content as provider-owned copies.
-        if any((ROOT / parent).is_symlink() for parent in Path(name).parents):
+        if any((source_root / parent).is_symlink() for parent in Path(name).parents):
             continue
-        reusable = name.startswith((".lean/", ".claude/", ".agents/skills/")) or name in ("AGENTS.md", "CLAUDE.md", ".gitignore")
+        if source.is_symlink() and name.startswith((".agents/skills/", ".claude/skills/")) and name not in declared:
+            continue  # Local opt-in is not the distributable template default.
+        reusable = name.startswith((".lean/", ".claude/", ".agents/skills/")) or name in ("AGENTS.md", "CLAUDE.md", ".gitignore", ".codex/hooks.json", ".codex/hooks/quality_gate.py")
         project_owned = name in (".lean/config.json", ".lean/PROJECT.md", ".lean/model-catalog.json")
         if reusable and not project_owned and source.is_symlink():
             destination = root / name
@@ -38,6 +41,22 @@ def bootstrap(root):
 
 
 class TemplateSmokeTests(unittest.TestCase):
+    def test_local_optional_activation_does_not_change_starter_discovery(self):
+        with tempfile.TemporaryDirectory(prefix="lean enabled source ") as directory:
+            source = Path(directory) / "source"
+            source.mkdir()
+            bootstrap(source)
+            subprocess.run(["python3", str(source / ".lean/scripts/skill_pack.py"), "enable"],
+                           check=True, capture_output=True)
+            for tree in (".agents/skills", ".claude/skills"):
+                self.assertEqual(len(list((source / tree).iterdir())), 19)
+            target = Path(directory) / "target"
+            target.mkdir()
+            bootstrap(target, source_root=source)
+            for tree in (".agents/skills", ".claude/skills"):
+                self.assertEqual(len(list((target / tree).iterdir())), 9)
+            self.assertTrue((target / ".lean/skills/lean-audit/SKILL.md").is_file())
+
     def test_fresh_copy_setup_and_full_workset_lifecycle(self):
         with tempfile.TemporaryDirectory(prefix="lean new project ") as directory:
             root = Path(directory)
@@ -54,6 +73,9 @@ class TemplateSmokeTests(unittest.TestCase):
             self.assertFalse((root / "docs/tracking").exists())
             self.assertFalse((root / ".agents/queue").exists())
             self.assertFalse((root / ".agent-runtime").exists())
+            for tree in (".agents/skills", ".claude/skills"):
+                self.assertEqual(len(list((root / tree).iterdir())), 9,
+                                 "A fresh template must discover exactly nine core skills")
             self.assertIn("MIT License", (root / ".lean/LICENSE").read_text())
             self.assertEqual((root / "LICENSE").read_text(), "Separate project license\n")
             run("bash", str(root / ".lean/scripts/check-structure.sh"))

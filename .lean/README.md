@@ -14,11 +14,11 @@ Explicit mode lowering uses `downgrade <lower-mode> --dry-run` and `--apply`; ad
 - `tracker`: standard plus one workset tracker per non-trivial task.
 - `full`: tracker plus local lease-backed queue ownership.
 
-Direct execution is the portable default; delegated execution uses the Controller/worker procedure. Repository mode, execution strategy, model choice and review depth are separate. Unix tools support macOS/Linux/WSL; native Windows is not supported. Claude hooks are provider-specific; Codex runs the gate explicitly.
+Direct execution is the portable default; delegated execution uses the Controller/worker procedure. Repository mode, execution strategy, model choice and review depth are separate. Unix tools support macOS/Linux/WSL; native Windows is not supported. Claude hooks are provider-specific; Codex runs the gate explicitly or through its trusted lifecycle adapter. Both providers follow the shared auto/manual policy in `policy/QUALITY.md`.
 
 ## Optional maintenance
 
-Nine core skills are discovered by default. Enable the seven maintenance skills with `python3 .lean/scripts/skill_pack.py enable` (`status` / `disable` inspect or reverse discovery). Read `OPTIONAL.md` for queue cleanup, model refresh, compression, repository cleanup, takeover, submodules and upgrades. Canonical tools/resources stay bundled; discovery changes never discard records or recovery capabilities. Reload runtime skills after toggling.
+Nine core skills are discovered by default. Enable the ten optional skills with `python3 .lean/scripts/skill_pack.py enable` (`status` / `disable` inspect or reverse discovery). Read `OPTIONAL.md` for project standards/audits, queue cleanup, model refresh, compression, repository cleanup, takeover, submodules and upgrades. Canonical tools/resources stay bundled; discovery changes never discard records or recovery capabilities. Reload runtime skills after toggling.
 
 ## Layout and ownership
 
@@ -47,6 +47,8 @@ Mode setup creates project-owned tracking/queue guides; the distributable templa
 - Failure or retry -> `policy/RECOVERY.md`
 
 Start with the shallowest sufficient context. Do not load every policy or workflow internal by default. Trivial work still needs its contract/evidence but no formal tracker or scope spec.
+
+Use `policy/CONTEXT.md` to select documents and procedures by affected behavior, expand along dependencies and continue from feedback with delta context. Discovery exposes choices; it does not invoke every skill. Context selection leaves required tests, review and gate checks intact.
 
 ## Procedure intensity
 

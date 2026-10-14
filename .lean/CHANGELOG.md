@@ -6,6 +6,12 @@ was being bypassed -- the rule did not change, its enforcement did. PATCH clarif
 
 ## Unreleased
 
+- Complete approved audit remediation: template discovery contains only nine core skills, recommended standards remain nonblocking, and bounded audit behavior trials cover exceptions, missing evidence and unresolved decisions. Add shared auto/manual gate policy, an optional `lean-quality-gate-mode` command and Codex lifecycle adapter; missing preference preserves auto. Protect new controls and preserve project preferences during migration. Ten optional skills are available; manual skips remain NOT_RUN and never waive gate/review evidence. Codex hook trust remains runtime-owned.
+
+- Add optional `lean-pattern` and `lean-audit` procedures with reusable project-standard and audit-finding formats. Reuse research/scope/Grill/task and project record routing; distinguish accepted requirements, exceptions, proposals and verification gaps. Nine core skills remain the default; the optional pack now exposes nine extras. Preserve previous 15/16-skill registries for migration. No new gate, automatic audit or automatic remediation/backlog is introduced.
+
+- Clarify impact-based document and skill selection, cross-area dependency expansion and delta context on feedback. Keep required scope, high-risk Grill, review and gate checks; intensity does not activate extra skills. Add read-trace evaluation scenarios and shorten this repository's PROJECT map without changing its gate.
+
 - Port reusable Casetodian extensions: shared standard/high/ultra procedure settings and a core `lean-skill-effort` command, with global/named choices, read-only inspection, reset and submodule record routing. Missing settings remain standard; project preferences never ship as release assets.
 - Expose all discovered Lean skills to users while retaining the optional maintenance pack. Nine core and seven optional skills are available; previous eight-core/full registries remain readable during migration.
 - Serialize shared gate runs with a per-checkout lock, report busy/unavailable as NOT_RUN and guard the lock helper as a gate control. Keep existing automatic/explicit gate behavior and opt-in whole-tree caching.
@@ -13,7 +19,7 @@ was being bypassed -- the rule did not change, its enforcement did. PATCH clarif
 
 ### Upgrade notes for these extensions
 
-Merge canonical skills, policy, CLI, registry, discovery links, gate runner/lock helper and tests together. Preserve project `.lean/skill-effort.json` and per-target preferences; do not import downstream defaults, records or runtime hooks. Keep existing mode, execution and optional-pack choices. No auto/manual toggle, records-only cache, release tag or publishing is introduced.
+Merge canonical skills, policy, CLI, registry, discovery links, gate runner/lock helper and tests together. Preserve project `.lean/skill-effort.json` and per-target preferences; do not import downstream defaults, records or runtime hooks. Keep existing mode, execution and optional-pack choices. Merge the shared gate-mode helper, both provider adapters, optional command and tests together. Preserve workspace `.codex/quality-gate.json`; missing settings remain auto. No records-only cache or publishing is introduced.
 
 - Opt this repository's Claude Stop command into tree caching; keep contract/review checks and fresh validation after changes or refusals. Document forced checks for environment/dependency changes and downstream opt-out; test the configured Stop command end to end.
 

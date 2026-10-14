@@ -10,6 +10,14 @@ config="$root/.lean/config.json"
 # Kept quiet on purpose: this hook's stdout becomes Claude's context.
 "$(dirname "$0")/quality-gate.sh" --seed >/dev/null 2>&1 || true
 
+policy="$(python3 "$(dirname "$0")/../../.lean/scripts/gate_mode.py" --root "$root" --check-auto)"
+status=$?
+case "$status" in
+  0) ;;
+  3) printf '%s\n' "$policy" ;;
+  *) exit 2 ;;
+esac
+
 if [ -e "$root/.agent-runtime/active-target.json" ] || [ -L "$root/.agent-runtime/active-target.json" ]; then
   echo "Lean target context (start from the Lean root; application commands use project_root):"
   python3 "$root/.lean/scripts/submodule.py" --root "$root" context || exit 2

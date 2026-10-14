@@ -1,8 +1,12 @@
-# Optional maintenance pack
+# Optional skill pack
 
-Ordinary tasks use nine core procedures: init, task, scope, research, grill, multi-agent, review, gate and skill-effort. Maintenance skills are bundled as canonical resources, but are absent from runtime discovery by default. Their tools/tests remain installed so existing records, recovery and upgrades stay compatible.
+Ordinary tasks use nine core procedures: init, task, scope, research, grill, multi-agent, review, gate and skill-effort. Optional skills are bundled as canonical resources, but are absent from runtime discovery by default. Their tools/tests remain installed so existing records, recovery and upgrades stay compatible.
 
-Enable both runtimes' seven extra discovery links with `python3 .lean/scripts/skill_pack.py enable`; inspect with `status`, or remove only the links with `disable`. Conflicting custom slots block the batch. Canonical resources are retained. Reload runtime skills after changing discovery. This setting is independent of standard/tracker/full mode and direct/delegated execution.
+Enable both runtimes' ten extra discovery links with `python3 .lean/scripts/skill_pack.py enable`; inspect with `status`, or remove only the links with `disable`. Conflicting custom slots block the batch. Canonical resources are retained. Reload runtime skills after changing discovery. This setting is independent of standard/tracker/full mode and direct/delegated execution.
+
+Use `/lean-pattern <area>` to propose or maintain project standards with evidence, applicability, verification and accepted exceptions. Reuse research/scope/Grill rather than inventing a second workflow. Use `/lean-audit <area and baseline>` to inspect a bounded existing-system area against accepted scope and standards, report evidenced findings and route uncertain intentional differences through Grill before remediation. Neither procedure runs on every task or adds a gate. Audit reports do not authorize fixes or backlog creation. Project records belong to the selected record root; PROJECT links to their existing locations. Adapt `templates/project-standard.md` and `templates/audit-finding.md` as needed; do not distribute project approvals as template assets.
+
+Use `/lean-quality-gate-mode [auto|manual]` to inspect or explicitly save shared gate automation. Missing workspace `.codex/quality-gate.json` means auto. Manual Stops report NOT_RUN; explicit gate runs and acceptance/review requirements remain. See `policy/QUALITY.md` for authorization, control drift and Codex hook trust.
 
 Queue cleanup uses `/lean-clean-queue old` (DONE older than 30 days) or `/lean-clean-queue all` (all DONE). Preview/apply are available through `clean-queue old|all --dry-run|--apply`; original records move into project-owned queue history, not deletion. Trackers and unfinished items remain. Undated legacy DONE items are skipped by old. See `policy/WORKFLOW.md`.
 

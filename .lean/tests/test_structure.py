@@ -13,7 +13,7 @@ class StructureTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory(prefix="lean structure ")
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
-        for name in (".lean", ".claude", ".agents"):
+        for name in (".lean", ".claude", ".agents", ".codex"):
             shutil.copytree(ROOT / name, self.root / name, symlinks=True,
                             ignore=shutil.ignore_patterns("__pycache__", ".gate-cache", ".gate-failed", "settings.local.json"))
         for name in ("AGENTS.md", "CLAUDE.md", ".gitignore"):
@@ -133,6 +133,43 @@ class StructureTests(unittest.TestCase):
         path = self.root / ".lean/skills/lean-scope/SKILL.md"
         path.write_text(path.read_text().replace("user-invocable: true", "user-invocable: true\ndisable-model-invocation: true"))
         self.assertIn("available to the agent", self.check(False))
+
+
+class ContextSelectionContractTests(unittest.TestCase):
+    """Protect routing instructions; actual agent read traces need scenario evaluation."""
+
+    def read(self, path):
+        return (ROOT / path).read_text()
+
+    def test_entrypoints_route_to_context_selection(self):
+        self.assertIn("policy/CONTEXT.md", self.read(".lean/skills/lean-task/SKILL.md"))
+        self.assertIn("impact-based context selection", self.read("AGENTS.md"))
+
+    def test_style_edit_starts_local_without_a_folder_allowlist(self):
+        context = self.read(".lean/policy/CONTEXT.md")
+        self.assertIn("style-only web change", context)
+        self.assertIn("follow dependencies across area boundaries", context)
+        self.assertIn("Missing or stale routes", context)
+
+    def test_form_change_expands_to_api_and_permissions_when_affected(self):
+        context = self.read(".lean/policy/CONTEXT.md")
+        self.assertIn("payload, validation, error handling or access", context)
+        self.assertIn("API contract/schema", context)
+        self.assertIn("permission rules", context)
+
+    def test_feedback_reuses_only_valid_context_and_decisions(self):
+        context = self.read(".lean/policy/CONTEXT.md")
+        self.assertIn("feedback, current diff and affected dependencies", context)
+        self.assertIn("changed files, stale evidence, conflicting requirements", context)
+        self.assertIn("Material scope changes still need approval", context)
+
+    def test_selection_never_skips_required_procedures_or_validation(self):
+        context = self.read(".lean/policy/CONTEXT.md")
+        self.assertIn("Explicitly requested skills still run", context)
+        self.assertIn("mandatory high-risk Grill", context)
+        self.assertIn("does not select or reduce tests, review depth or Quality Gate commands", context)
+        effort = self.read(".lean/policy/SKILL-EFFORT.md")
+        self.assertIn("does not activate additional skills", effort)
 
 
 class SkillLevelContractTests(unittest.TestCase):

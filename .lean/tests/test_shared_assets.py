@@ -15,7 +15,8 @@ from shared_assets import declared_links
 class SharedAssetsTests(unittest.TestCase):
     def test_previous_core_and_full_registries_remain_readable(self):
         registry = json.loads((ROOT / '.lean/assets.json').read_text())
-        old_files = [name for name in registry['files'] if 'skill-effort' not in name and 'skill_effort' not in name]
+        old_files = [name for name in registry['files'] if 'skill-effort' not in name and 'skill_effort' not in name
+                     and name not in ('.lean/skills/lean-pattern/SKILL.md', '.lean/skills/lean-audit/SKILL.md', '.lean/skills/lean-quality-gate-mode/SKILL.md')]
         old_core = {path: target for path, target in registry['links'].items() if not path.endswith('/lean-skill-effort')}
         self.assertEqual(declared_links({'schema': 2, 'files': old_files, 'links': old_core}), old_core)
         extras = ('lean-clean-queue', 'lean-clean-repo', 'lean-compress', 'lean-model-update',
@@ -27,18 +28,47 @@ class SharedAssetsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             declared_links({'schema': 2, 'files': old_files, 'links': registry['links']})
 
+    def test_previous_nine_core_and_seven_optional_registry_remains_readable(self):
+        registry = json.loads((ROOT / '.lean/assets.json').read_text())
+        previous_files = [name for name in registry['files']
+                          if name not in ('.lean/skills/lean-pattern/SKILL.md', '.lean/skills/lean-audit/SKILL.md', '.lean/skills/lean-quality-gate-mode/SKILL.md')]
+        core = registry['links']
+        full = dict(core)
+        for tree in ('.agents/skills', '.claude/skills'):
+            for name in ('lean-clean-queue', 'lean-clean-repo', 'lean-compress', 'lean-model-update',
+                         'lean-takeover-workflow', 'lean-use-submodule', 'lean-update-workflow'):
+                full[f'{tree}/{name}'] = f'../../.lean/skills/{name}'
+        for links in (core, full):
+            self.assertEqual(declared_links({'schema': 2, 'files': previous_files, 'links': links}), links)
+        # A half-installed new generation must not masquerade as a previous release.
+        with self.assertRaises(ValueError):
+            declared_links({'schema': 2, 'files': previous_files + ['.lean/skills/lean-pattern/SKILL.md'],
+                            'links': core})
+
     def test_intensity_is_shared_but_project_settings_never_ship(self):
         registry = json.loads((ROOT / '.lean/assets.json').read_text())
         self.assertNotIn('.lean/skill-effort.json', registry['files'])
+        self.assertNotIn('.codex/quality-gate.json', registry['files'])
         for path in (ROOT / '.lean/skills').glob('*/SKILL.md'):
             content = path.read_text()
             self.assertIn('.lean/policy/SKILL-EFFORT.md', content, path)
             self.assertIn('user-invocable: true', content, path)
             self.assertIn('argument-hint:', content, path)
 
+    def test_previous_pattern_audit_generation_remains_readable(self):
+        registry = json.loads((ROOT / '.lean/assets.json').read_text())
+        files = [name for name in registry['files'] if name != '.lean/skills/lean-quality-gate-mode/SKILL.md']
+        full = dict(registry['links'])
+        extras = ('lean-clean-queue', 'lean-clean-repo', 'lean-compress', 'lean-model-update',
+                  'lean-takeover-workflow', 'lean-use-submodule', 'lean-update-workflow', 'lean-pattern', 'lean-audit')
+        for tree in ('.agents/skills', '.claude/skills'):
+            full.update({f'{tree}/{name}': f'../../.lean/skills/{name}' for name in extras})
+        for links in (registry['links'], full):
+            self.assertEqual(declared_links({'schema': 2, 'files': files, 'links': links}), links)
+
     def test_discovery_uses_one_source_and_resources(self):
         names = sorted(p.name for p in (ROOT / ".lean/skills").iterdir())
-        self.assertEqual(len(names), 16)
+        self.assertEqual(len(names), 19)
         self.assertTrue(all(name.startswith("lean-") for name in names), names)
         self.assertIn("lean-clean-queue", names)
         for tree in (".claude/skills", ".agents/skills"):

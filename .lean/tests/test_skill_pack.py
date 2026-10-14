@@ -8,7 +8,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 EXTRAS = {"lean-clean-queue", "lean-clean-repo", "lean-compress", "lean-model-update",
-          "lean-takeover-workflow", "lean-use-submodule", "lean-update-workflow"}
+          "lean-takeover-workflow", "lean-use-submodule", "lean-update-workflow",
+          "lean-pattern", "lean-audit", "lean-quality-gate-mode"}
 
 
 class SkillPackTests(unittest.TestCase):
@@ -28,6 +29,61 @@ class SkillPackTests(unittest.TestCase):
     def test_default_release_discovers_core_only(self):
         registry = json.loads((ROOT / ".lean/assets.json").read_text())
         self.assertFalse({Path(name).name for name in registry["links"]} & EXTRAS)
+        self.assertEqual(len(registry["links"]), 18)  # Nine per provider.
+
+    def test_pattern_and_audit_ship_with_resources_without_activating_automation(self):
+        registry = json.loads((ROOT / ".lean/assets.json").read_text())
+        for name in ("lean-pattern", "lean-audit"):
+            self.assertIn(f".lean/skills/{name}/SKILL.md", registry["files"])
+        for name in ("project-standard.md", "audit-finding.md"):
+            self.assertIn(f".lean/templates/{name}", registry["files"])
+        self.assertEqual(self.run_pack("enable").returncode, 0)
+        self.assertFalse((self.root / ".agent-runtime").exists())
+        self.assertFalse((self.root / "docs").exists())
+        self.assertFalse((self.root / ".lean/config.json").exists())
+        self.assertFalse((self.root / ".claude/settings.json").exists())
+
+    def test_pack_preserves_project_gate_and_procedure_settings(self):
+        records = {".lean/PROJECT.md": "<!-- gate:start -->\n```sh\nfalse\n```\n<!-- gate:end -->\n",
+                   ".claude/settings.json": '{"hooks":{"Stop":[]}}',
+                   ".lean/skill-effort.json": '{"default":"high","skills":{}}',
+                   ".lean/config.json": '{"mode":"standard","configured":true,"execution":"direct"}'}
+        for name, value in records.items():
+            (self.root / name).write_text(value)
+        for action in ("enable", "disable"):
+            self.assertEqual(self.run_pack(action).returncode, 0)
+            for name, value in records.items():
+                self.assertEqual((self.root / name).read_text(), value)
+        self.assertFalse((self.root / ".agent-runtime").exists())
+
+    def test_new_optional_skills_accept_named_intensity_without_discovery(self):
+        for name in ("lean-pattern", "lean-audit"):
+            result = subprocess.run(["python3", str(self.root / ".lean/scripts/skill_effort.py"),
+                                     "--root", str(self.root), "high", name], text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        settings = json.loads((self.root / ".lean/skill-effort.json").read_text())
+        self.assertEqual(settings, {"default": "standard", "skills": {"lean-pattern": "high", "lean-audit": "high"}})
+        for tree in (".agents/skills", ".claude/skills"):
+            self.assertEqual(list((self.root / tree).iterdir()), [])
+
+    def test_new_skill_conflict_prevents_partial_enable(self):
+        custom = self.root / ".agents/skills/lean-audit"
+        custom.mkdir()
+        (custom / "SKILL.md").write_text("project audit")
+        self.assertNotEqual(self.run_pack("enable").returncode, 0)
+        self.assertEqual(list((self.root / ".claude/skills").iterdir()), [])
+        self.assertEqual((custom / "SKILL.md").read_text(), "project audit")
+
+    def test_previous_seven_skill_pack_can_be_completed_or_disabled(self):
+        for tree in (".agents/skills", ".claude/skills"):
+            for name in EXTRAS - {"lean-pattern", "lean-audit", "lean-quality-gate-mode"}:
+                (self.root / tree / name).symlink_to(f"../../.lean/skills/{name}")
+        self.assertTrue(json.loads(self.run_pack("status").stdout)["partial"])
+        self.assertEqual(self.run_pack("enable").returncode, 0)
+        self.assertTrue(json.loads(self.run_pack("status").stdout)["enabled"])
+        self.assertEqual(self.run_pack("disable").returncode, 0)
+        for tree in (".agents/skills", ".claude/skills"):
+            self.assertEqual(list((self.root / tree).iterdir()), [])
 
     def test_enable_disable_and_status_preserve_canonical_resources(self):
         result = self.run_pack("enable")
@@ -42,6 +98,9 @@ class SkillPackTests(unittest.TestCase):
         self.assertEqual(self.run_pack("disable").returncode, 0)
         self.assertFalse(json.loads(self.run_pack("status").stdout)["enabled"])
         self.assertTrue((self.root / ".lean/skills/lean-clean-repo/SKILL.md").is_file())
+        for name in ("lean-pattern", "lean-audit"):
+            self.assertEqual((self.root / ".lean/skills" / name / "SKILL.md").read_bytes(),
+                             (ROOT / ".lean/skills" / name / "SKILL.md").read_bytes())
 
     def test_conflicts_block_the_entire_batch_and_never_delete_custom_skills(self):
         custom = self.root / ".claude/skills/lean-compress"

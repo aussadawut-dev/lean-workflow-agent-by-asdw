@@ -812,6 +812,15 @@ class TakeoverTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "excluded file changed"):
             self.apply(manifest, receipt)
 
+    def test_source_gate_preference_cannot_be_declared_portable(self):
+        (self.source / ".codex").mkdir()
+        (self.source / ".codex/quality-gate.json").write_text('{"auto":false}')
+        registry = TOOL.load(self.source / ".lean/assets.json")
+        registry["files"].append(".codex/quality-gate.json")
+        TOOL.save(self.source / ".lean/assets.json", registry)
+        with self.assertRaisesRegex(ValueError, "project-owned"):
+            TOOL.portable_files(self.source)
+
     def shared_baseline(self):
         registry = TOOL.load(self.source / ".lean/assets.json")
         registry["schema"] = 2
@@ -985,6 +994,9 @@ class TakeoverTests(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         files = set(TOOL.portable_files(SCRIPT.parents[2]))
+        self.assertIn(".codex/hooks.json", files)
+        self.assertIn(".codex/hooks/quality_gate.py", files)
+        self.assertNotIn(".codex/quality-gate.json", files)
         for name in module.REQUIRED_SKILLS:
             self.assertIn(f".lean/skills/{name}/SKILL.md", files)
         for name in set(module.REQUIRED_SKILLS) - set(module.EXTRA_SKILLS):

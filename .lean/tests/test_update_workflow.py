@@ -29,6 +29,8 @@ class UpdateWorkflowTests(unittest.TestCase):
         self.old = self.release("1.0.0")
         (self.target / "AGENTS.md").write_text("Lean Workflow Baseline 1.0.0\n## Project additions\nBusiness rules\n")
         (self.target / ".lean").mkdir()
+        (self.target / ".codex").mkdir()
+        (self.target / ".codex/quality-gate.json").write_text('{"auto":false}')
         for name, content in ((".lean/PROJECT.md", "application gate"), (".lean/config.json", '{"mode":"full"}'),
                               ("pending.txt", "uncommitted work"), (".lean/model-catalog.json", "research"),
                               (".lean/skill-effort.json", '{"default":"high","skills":{}}')):
