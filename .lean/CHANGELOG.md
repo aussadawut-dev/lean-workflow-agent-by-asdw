@@ -4,7 +4,7 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
-## Unreleased
+## 4.2.0 — 2026-10-14
 
 - Allow an economical reviewer model for wording-only diffs in HIGH review. The reviewer checks a before/after rule map and hands meaning changes back to a normally chosen reviewer; the HIGH floor, independence, receipt and round limits are unchanged.
 
@@ -39,7 +39,7 @@ Merge canonical skills, policy, CLI, registry, discovery links, gate runner/lock
 
 ### Upgrade notes
 
-Merge the runner, evidence helper, hooks, skills, registry and tests together; preserve PROJECT/config/records/permissions. Configure real project checks if the old gate was empty. Existing cache files are advisory only; seeding no longer makes validation pass. Optional discovery is a separate choice from mode/execution. Review and accept any intentional control changes using `gate_evidence.py accept-controls --reason '<matching user approval>'`; never use acceptance to bypass a failing check. No release tag or publication is implied by this working-tree entry.
+Merge the runner, evidence helper, hooks, skills, registry and tests together; preserve PROJECT/config/records/permissions. Configure real project checks if the old gate was empty. Existing cache files are advisory only; seeding no longer makes validation pass. Optional discovery is a separate choice from mode/execution. Review and accept any intentional control changes using `gate_evidence.py accept-controls --reason '<matching user approval>'`; never use acceptance to bypass a failing check.
 
 ## 4.1.1 — 2026-10-14
 
