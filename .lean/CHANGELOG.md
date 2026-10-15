@@ -4,6 +4,11 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
+## 4.3.0 — 2026-10-15
+
+- Make model sizing hold at dispatch. `MODELS.md` already chose the least costly capable model per task, but no spawn site passed one: the dispatch example recorded `inherited/inherited`, Codex fell back to "available defaults" and the reviewer's `model: inherit` read as the default. Every subagent therefore ran on the session model, usually heavier than the task. Each spawn whose tool accepts them now passes the sized model and effort, reviewers included; inheriting needs a recorded reason. Projects may map the rows to concrete models in Project additions or the catalog. The active session's settings, premium evidence, review depth and the reviewer definition are unchanged. The structure check rejects a policy without the per-spawn rule and an inherited dispatch example.
+- Keep optional work in the active session when a spawn is not cheaper. A spawn costs a brief, cold re-reads and a handoff on top of the subagent's own work, so a session that already holds the context often finishes more cheaply itself. `MODELS.md` now spawns only when required (delegated execution, HIGH independent review, an explicit user request for workers) or cheaper, and favors spawns for large, read-heavy work a cheaper model can do without that context. Required delegation and review are unchanged; the structure check rejects removing the rule.
+
 ## 4.2.0 — 2026-10-14
 
 - Allow an economical reviewer model for wording-only diffs in HIGH review. The reviewer checks a before/after rule map and hands meaning changes back to a normally chosen reviewer; the HIGH floor, independence, receipt and round limits are unchanged.
