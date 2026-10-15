@@ -102,6 +102,15 @@ def check(root):
         routing = [paragraph for paragraph in paragraphs if "HIGH" in paragraph and "review" in paragraph.lower()]
         if not any("independent" in paragraph.lower() and "MODELS.md" in paragraph for paragraph in routing):
             bad(f"HIGH reviewer routing requires independent review and model/effort policy: {name}")
+    # Omitted spawn settings silently inherit the (often heavier) session model.
+    models = root / ".lean/policy/MODELS.md"
+    if models.is_file() and "on every spawn" not in models.read_text():
+        bad("model policy must require sized model/effort on every spawn")
+    if models.is_file() and "Spawn only when required or cheaper." not in models.read_text():
+        bad("model policy must keep work in the active session when a spawn is not cheaper")
+    dispatch = root / ".lean/skills/lean-multi-agent/SKILL.md"
+    if dispatch.is_file() and re.search(r"requested model/effort\s*=\s*inherited\s*/\s*inherited", dispatch.read_text()):
+        bad("dispatch example must not default to inherited model/effort")
 
     for name in REQUIRED_SKILLS:
         path = root / ".lean/skills" / name / "SKILL.md"

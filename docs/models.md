@@ -23,7 +23,9 @@ Runtime availability is the deciding evidence. Public documentation alone cannot
 
 ## Choose settings for the assignment
 
-These are starting points from the repository's policy, rather than promises about a named model's price or capability:
+First decide whether to spawn at all. Delegated execution, HIGH independent review and an explicit user request for workers require a separate agent. Otherwise finish in the active session when that costs less or about the same as a spawn, counting the brief, the new agent's cold re-reads and the handoff. Spawn mainly for large, read-heavy work a cheaper model can do without the session's context.
+
+When you do spawn, these are starting points from the repository's policy, rather than promises about a named model's price or capability:
 
 | Work | Starting point |
 |---|---|
@@ -32,7 +34,7 @@ These are starting points from the repository's policy, rather than promises abo
 | Hard reasoning | A capable available model with useful supported high effort. |
 | Independent HIGH review | A fresh capable reviewer with settings appropriate to the diff. |
 
-Use capable defaults or inheritance if selection controls are unavailable. If no available option meets the quality floor, report BLOCKED. Recommend a user-controlled session change only when current settings threaten that floor or repeated reasoning failures justify it.
+Pass the chosen model and effort on every spawn that accepts them, reviewers included. Use capable defaults or inheritance only if selection controls are unavailable or the session setting already matches the row, and record that reason. If no available option meets the quality floor, report BLOCKED. Recommend a user-controlled session change only when current settings threaten that floor or repeated reasoning failures justify it.
 
 ## Dispatch and check the result
 
@@ -65,7 +67,7 @@ Requested settings do not prove backend settings. Record runtime-reported model/
 
 ## Claude inheritance
 
-Claude uses the session model and effort selected by the user/runtime. This repository's [reviewer definition](../.claude/agents/reviewer.md) uses `model: inherit` and inherits session effort. A supported, justified per-invocation override can be used without editing that shared definition for one task.
+Claude uses the session model and effort selected by the user/runtime. This repository's [reviewer definition](../.claude/agents/reviewer.md) keeps `model: inherit` as a portable fallback. Whenever the Agent tool accepts model and effort, pass the sized settings on each invocation instead of inheriting; this needs no edit to that shared definition.
 
 Inheritance still needs a capability check against the task. If the runtime cannot expose or change a setting, state the limitation and assess the available option honestly. An independent reviewer receives the contract and diff without the author's reasoning.
 
@@ -79,7 +81,7 @@ For a reasoning limit, raise one supported effort level first if the model remai
 
 After enabling optional skills, use `/lean-model-update codex`, `/lean-model-update claude` or `/lean-model-update all`; in Codex, use `$lean-model-update` with the same arguments.
 
-The procedure follows scope → research → grill → preview, checking official docs and exposed runtime choices. It returns a diff and proposal hash by default. Apply needs an explicitly authorized proposal, then the usual task/review/gate checks. It keeps session models, global configuration, billing permissions and reviewer inheritance unchanged.
+The procedure follows scope → research → grill → preview, checking official docs and exposed runtime choices. It returns a diff and proposal hash by default. Apply needs an explicitly authorized proposal, then the usual task/review/gate checks. It keeps session models, global configuration, billing permissions and the reviewer definition unchanged.
 
 Optional project-owned `.lean/model-catalog.json` stores model/alias IDs, runtime version, efforts, lifecycle, source URLs/dates and observed availability. Evidence older than 30 days for the selected provider blocks preview/apply. Other retained providers remain visible as stale. Missing catalog leaves ordinary model selection unchanged; the template ships no live catalog.
 

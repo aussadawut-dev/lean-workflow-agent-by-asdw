@@ -48,6 +48,24 @@ class StructureTests(unittest.TestCase):
         path.write_text(path.read_text().replace("MODELS.md", "MISSING_MODELS"))
         self.assertIn("model", self.check(False).lower())
 
+    def test_model_policy_requires_explicit_spawn_settings(self):
+        path = self.root / ".lean/policy/MODELS.md"
+        path.write_text(path.read_text().replace("on every spawn", "when convenient"))
+        self.assertIn("spawn", self.check(False).lower())
+
+    def test_model_policy_keeps_cheaper_work_in_the_active_session(self):
+        path = self.root / ".lean/policy/MODELS.md"
+        path.write_text(path.read_text().replace("Spawn only when required or cheaper.", "Spawn freely."))
+        self.assertIn("session", self.check(False).lower())
+
+    def test_dispatch_example_cannot_default_to_inherited_settings(self):
+        path = self.root / ".lean/skills/lean-multi-agent/SKILL.md"
+        content = path.read_text()
+        start = content.index("requested model/effort=")
+        end = content.index(" |", start)
+        path.write_text(content[:start] + "requested model/effort=inherited/inherited" + content[end:])
+        self.assertIn("inherited", self.check(False).lower())
+
     def test_canonical_reviewer_routing_cannot_be_deleted(self):
         path = self.root / "AGENTS.md"
         lines = [line for line in path.read_text().splitlines() if "reviewer" not in line.lower() and "independent" not in line.lower()]

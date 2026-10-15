@@ -88,7 +88,7 @@ The Controller verifies the integrated work, required review and completion evid
 
 Claude starts through the `CLAUDE.md` import of AGENTS. SessionStart reads onboarding state and seeds a change baseline, keeping earlier gate refusals. It does not validate the project.
 
-The shared reviewer entrypoint inherits the session model and effort by default. Supported, justified invocation overrides follow the [model policy](../.lean/policy/MODELS.md). See [Claude subagent documentation](https://code.claude.com/docs/en/sub-agents#choose-a-model) for runtime controls.
+The shared reviewer definition keeps `model: inherit` only as a portable fallback. Each invocation passes the model and effort sized by the [model policy](../.lean/policy/MODELS.md) when the Agent tool accepts them. See [Claude subagent documentation](https://code.claude.com/docs/en/sub-agents#choose-a-model) for runtime controls.
 
 After the Controller checks acceptance, validation, review and records, the Stop hook follows the shared auto/manual policy. In auto mode it runs configured checks; an eligible unchanged cached state can reuse a passing run. An outstanding refusal prevents cache skipping.
 

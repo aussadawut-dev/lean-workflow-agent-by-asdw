@@ -21,9 +21,9 @@ Scope: $ARGUMENTS (default: uncommitted changes)
    - `MEDIUM` — focused diff review yourself.
    - `HIGH` — use an independent reviewer: Claude's `reviewer` subagent, or a Codex subagent or
      fresh session. Give it the Task Contract and diff range only, without your reasoning. Select
-     its model and effort by `.lean/policy/MODELS.md`; `model: inherit` is Claude's portable
-     default. If no independent reviewer is available, follow `.lean/policy/REVIEW.md` and report
-     `BLOCKED`.
+     its model and effort by `.lean/policy/MODELS.md` and pass them on the spawn; the definition's
+     `model: inherit` is only Claude's portable fallback. If no independent reviewer is available,
+     follow `.lean/policy/REVIEW.md` and report `BLOCKED`.
 5. Act on the verdict under `Rounds` in `.lean/policy/REVIEW.md`, which bounds both branches:
    - `PASS` — the review is over; anything applied after it is a new contract.
    - `REWORK` — fix the findings, re-run validation, review again with delta context only. It caps
