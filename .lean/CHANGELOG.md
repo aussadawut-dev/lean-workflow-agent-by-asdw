@@ -4,6 +4,10 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
+## 4.3.1 — 2026-10-16
+
+- Let the installed template smoke tests pass in projects that own provider skills. While building its fresh copy, `test_template.py` dropped every undeclared `.agents/skills/*` and `.claude/skills/*` link, including project-owned links that project documents name, so the copy's structure check failed. Its discovery assertions also counted every entry, so project skill directories broke the expected 19 and 9. The copy now drops only undeclared links named after a canonical `.lean/skills/<name>` (local optional opt-ins), and the counts include only entries with a canonical `.lean/skills/<name>`. A downstream-shaped regression test covers both. This test-only patch changes no rule, configuration or record; projects carrying a local patch for it can take the upstream file on upgrade.
+
 ## 4.3.0 — 2026-10-15
 
 - Make model sizing hold at dispatch. `MODELS.md` already chose the least costly capable model per task, but no spawn site passed one: the dispatch example recorded `inherited/inherited`, Codex fell back to "available defaults" and the reviewer's `model: inherit` read as the default. Every subagent therefore ran on the session model, usually heavier than the task. Each spawn whose tool accepts them now passes the sized model and effort, reviewers included; inheriting needs a recorded reason. Projects may map the rows to concrete models in Project additions or the catalog. The active session's settings, premium evidence, review depth and the reviewer definition are unchanged. The structure check rejects a policy without the per-spawn rule and an inherited dispatch example.
