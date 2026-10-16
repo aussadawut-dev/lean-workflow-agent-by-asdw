@@ -160,6 +160,30 @@ class GuardHookTests(HookFixture):
                                            command=f"{DECLARE} --contract 'Contract: trivial (review)'").returncode, 0)
                 self.assertEqual(self.tool(provider, "Bash", fresh, command=record.format(LINE)).returncode, 0)
 
+    def test_receipt_check_parses_the_command_instead_of_matching_text(self):
+        mentions = "Contract: risk=HIGH quality=HIGH acceptance=the author cannot record-review its own work"
+        session = "parse-session"
+        self.assertEqual(self.tool("claude", "Bash", session, command=f"{DECLARE} --contract '{mentions}'").returncode, 0)
+        # Commands that only quote the contract are not receipt recordings.
+        for command in (f"bash .lean/scripts/quality-gate.sh --require-review --contract '{mentions}'",
+                        f"python3 .lean/scripts/gate_evidence.py check-review --contract '{mentions}'",
+                        f"echo '{mentions}'"):
+            result = self.tool("claude", "Bash", session, command=command)
+            self.assertEqual(result.returncode, 0, (command, result.stderr))
+        # Shell quoting that changes the text still names the same contract.
+        apostrophe = "Contract: risk=LOW quality=STANDARD acceptance=the author's tests pass"
+        quoted = apostrophe.replace("'", "'\\''")
+        self.assertEqual(self.tool("codex", "Bash", "quote-session", command=f"{DECLARE} <<'EOF'\n{apostrophe}\nEOF").returncode, 0)
+        for command in (f"python3 .lean/scripts/gate_evidence.py --root . record-review --contract '{quoted}' --state s",
+                        f'python3 .lean/scripts/gate_evidence.py record-review --contract "{apostrophe}" --state s',
+                        f"python3 .lean/scripts/gate_evidence.py record-review --contract='{quoted}'"):
+            result = self.tool("codex", "Bash", "quote-session", command=command)
+            self.assertEqual(result.returncode, 2, command)
+        # A contract hidden behind expansion cannot be compared, so the author's thread may not record at all.
+        hidden = self.tool("codex", "Bash", "quote-session",
+                           command='python3 .lean/scripts/gate_evidence.py record-review --contract "$(cat c.txt)"')
+        self.assertEqual(hidden.returncode, 2)
+
     def test_declaration_records_contract_metadata_and_runtime_model(self):
         result = self.tool("codex", "Bash", "s9", command=f"{DECLARE} <<'EOF'\n{BLOCK}\nEOF")
         self.assertEqual(result.returncode, 0, result.stderr)

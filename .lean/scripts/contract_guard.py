@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import sys
 import time
 
@@ -189,8 +190,7 @@ def pre_tool(root, payload):
     if name in READ_ONLY or name.startswith(READ_ONLY_PREFIXES):
         return None
     declared = current(root, session)
-    if (declared and isinstance(command, str) and "record-review" in command and declared in command
-            and not payload.get("agent_id")):
+    if declared and isinstance(command, str) and not payload.get("agent_id") and records_own_receipt(command, declared):
         # The author's main thread never records the review of its own contract (REVIEW.md);
         # a reviewer subagent carries an agent_id, and a fresh reviewer session declares its own.
         return ("Lean contract guard: only the independent reviewer records the review receipt for this "
@@ -198,6 +198,38 @@ def pre_tool(root, payload):
     if declared:
         return None
     return f"Lean contract guard: no Task Contract is declared for this prompt, so `{name}` is blocked.\n{HELP}"
+
+
+def records_own_receipt(command, declared):
+    """Whether `command` runs `gate_evidence.py record-review` for `declared` (or a contract it cannot see).
+
+    The command is parsed, so a contract that merely mentions the subcommand, or a quoted copy of
+    the contract in another command, does not count; shell quoting of the contract does not hide it.
+    """
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return bool(re.search(r"gate_evidence\.py\b.*\brecord-review\b", command, re.S))
+    for index, token in enumerate(tokens):
+        if not token.endswith("gate_evidence.py"):
+            continue
+        call = []
+        for word in tokens[index + 1:]:
+            if word in ("&&", "||", ";", "|", "&"):
+                break
+            call.append(word)
+        if "record-review" not in call:
+            continue
+        contract = None
+        for position, word in enumerate(call):
+            if word == "--contract" and position + 1 < len(call):
+                contract = call[position + 1]
+            elif word.startswith("--contract="):
+                contract = word.split("=", 1)[1]
+        # An expanded or missing value cannot be compared; treat it as the session's own contract.
+        if contract is None or "$" in contract or "`" in contract or contract == declared:
+            return True
+    return False
 
 
 def prompt(root, payload):
