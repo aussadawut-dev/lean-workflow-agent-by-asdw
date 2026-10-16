@@ -1,11 +1,11 @@
-"""Grader and transcript tests on fake stream-json sessions; no model calls."""
+"""Grader and transcript tests on fake Claude stream-json and Codex exec --json sessions; no model calls."""
 import json
 import tempfile
 import unittest
 from pathlib import Path
 
 import cases
-from harness import Transcript, agent_command, build_fixture, changed_files
+from harness import CodexTranscript, Transcript, agent_command, build_fixture, changed_files, read_transcript
 
 
 def assistant(*blocks, parent=None):
@@ -30,6 +30,42 @@ def final(body, cost=0.12):
 
 
 CONTRACT = "Contract: risk=LOW quality=STANDARD acceptance=unit tests pass"
+
+
+def codex_item(ident, kind, done=True, **fields):
+    return json.dumps({"type": "item.completed" if done else "item.started", "item": {"id": ident, "type": kind,
+                                                                                      **fields}})
+
+
+def codex_text(ident, value):
+    return codex_item(ident, "agent_message", text=value)
+
+
+def codex_shell(ident, command, output="", code=0):
+    return codex_item(ident, "command_execution", command=f"/bin/zsh -lc '{command}'", aggregated_output=output,
+                      exit_code=code, status="completed" if code == 0 else "failed")
+
+
+def codex_patch(ident, *paths, kind="update"):
+    return codex_item(ident, "file_change", changes=[{"path": path, "kind": kind} for path in paths],
+                      status="completed")
+
+
+def rollout_spawn(task_name, fork_turns="none"):
+    arguments = json.dumps({"task_name": task_name, "fork_turns": fork_turns, "message": "gAAAA-encrypted"})
+    return json.dumps({"type": "response_item", "payload": {"type": "function_call", "name": "spawn_agent",
+                                                            "arguments": arguments}})
+
+
+def codex_session(lines, *rollout):
+    session = CodexTranscript(lines)
+    session.attach_rollout(list(rollout))
+    return session
+
+
+def codex_turn(input_tokens, output_tokens):
+    return json.dumps({"type": "turn.completed", "usage": {"input_tokens": input_tokens,
+                                                           "output_tokens": output_tokens}})
 
 
 class TranscriptTests(unittest.TestCase):
@@ -63,6 +99,71 @@ class TranscriptTests(unittest.TestCase):
         self.assertNotIn("--no-session-persistence", command)
         # Agents and the reviewer prefix commands with `cd "<project>" &&`.
         self.assertIn("Bash(cd:*)", command)
+
+    def test_codex_command_ignores_user_config_keeps_sessions_and_takes_prompt_on_stdin(self):
+        command = agent_command("gpt-test", None, "codex")
+        self.assertEqual(command[:3], ["codex", "exec", "--json"])
+        self.assertIn("--ignore-user-config", command)
+        self.assertEqual(command[command.index("--sandbox") + 1], "workspace-write")
+        self.assertEqual(command[command.index("--model") + 1], "gpt-test")
+        # Subagent threads, including the reviewer, cannot spawn from an ephemeral session.
+        self.assertNotIn("--ephemeral", command)
+        self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", command)
+        self.assertEqual(command[-1], "-")
+        self.assertEqual(agent_command("sonnet", 1.5), agent_command("sonnet", 1.5, "claude"))
+
+    def test_codex_transcript_maps_items_onto_claude_events_and_sums_tokens(self):
+        session = CodexTranscript([
+            "not json", json.dumps({"type": "thread.started", "thread_id": "t"}),
+            codex_item("e0", "error", message="hook trust bypassed"),
+            codex_text("m1", CONTRACT), codex_item("c1", "command_execution", done=False, command="ls"),
+            codex_shell("c1", "python3 -m unittest", "FAILED (errors=1)", code=1),
+            codex_patch("p1", "/x/calc.py", "/x/tests/test_calc.py"),
+            codex_item("w1", "collab_tool_call", tool="wait", prompt=None),
+            codex_turn(100, 5), codex_text("m2", "Status: BLOCKED"), codex_turn(40, 2)])
+        self.assertEqual(session.provider, "codex")
+        self.assertEqual([event["kind"] for event in session.events],
+                         ["text", "tool", "tool_result", "tool", "tool", "text"])
+        self.assertEqual(session.result_for("c1"), {"kind": "tool_result", "id": "c1", "text": "FAILED (errors=1)",
+                                                    "is_error": True})
+        self.assertEqual(session.tools("Bash")[0][1]["input"]["command"], "/bin/zsh -lc 'python3 -m unittest'")
+        self.assertEqual(session.first_write("calc.py"), 3)
+        self.assertEqual(session.first_write("test_calc.py"), 4)
+        self.assertEqual(session.final_text, "Status: BLOCKED")
+        self.assertEqual(session.tokens, 147)
+        self.assertIsNone(session.cost)
+
+    def test_codex_spawns_come_from_the_session_rollout(self):
+        thread = "01a145a6-68a4-7d53-b494-67158f10bfef"
+        lines = [json.dumps({"type": "thread.started", "thread_id": thread}), codex_text("m1", CONTRACT)]
+        with tempfile.TemporaryDirectory() as home:
+            self.assertFalse(read_transcript("codex", lines, home).rollout_found)
+            day = Path(home, "sessions/2026/10/16")
+            day.mkdir(parents=True)
+            (day / f"rollout-2026-10-16T23-58-16-{thread}.jsonl").write_text(
+                "\n".join(["not json", json.dumps({"type": "session_meta", "payload": {"id": thread}}),
+                           rollout_spawn("independent_review", "all"),
+                           json.dumps({"type": "response_item", "payload": {"type": "function_call",
+                                                                            "name": "wait_agent",
+                                                                            "arguments": "{}"}})]))
+            session = read_transcript("codex", lines, home)
+        self.assertTrue(session.rollout_found)
+        self.assertEqual(session.spawns, [{"task_name": "independent_review", "fork_turns": "all"}])
+        self.assertIsInstance(read_transcript("claude", [final("x")]), Transcript)
+
+    def test_shell_writes_are_detected_from_the_command_text(self):
+        def first_write(command, suffix=None):
+            return CodexTranscript([codex_shell("c1", command)]).first_write(suffix)
+        for command in ("printf x > calc.py", "echo y >> calc.py", "sed -i.bak s/a/b/ calc.py",
+                        "python3 - <<EOF\nopen(\"calc.py\", \"w\").write(src)\nEOF", "cat new.py | tee calc.py"):
+            self.assertEqual(first_write(command, "calc.py"), 0, command)
+        for command in ("cat calc.py", "python3 -m unittest discover -s tests 2>&1", "ls >/dev/null 2>&1",
+                        "grep -n retrun calc.py"):
+            self.assertIsNone(first_write(command), command)
+        self.assertIsNone(first_write("printf x > tests/test_calc.py", "calc.py"))
+        # Claude shell writes count the same way.
+        claude = Transcript([assistant(tool("b1", "Bash", command="cat > calc.py <<EOF\nx\nEOF"))])
+        self.assertEqual(claude.first_write("calc.py"), 0)
 
     def test_harness_problems_are_detected_in_raw_lines(self):
         from harness import harness_problems
@@ -143,6 +244,35 @@ class GraderTests(unittest.TestCase):
         self.assertEqual(self.check(cases.reviewer_dispatched, hit), [])
         miss = [assistant(tool("a1", "Agent", subagent_type="general-purpose", prompt="review"))]
         self.assertTrue(self.check(cases.reviewer_dispatched, miss))
+        # Claude must use the named type; a prompt mention is not enough.
+        mention = [assistant(tool("a1", "Agent", prompt="act as the reviewer"))]
+        self.assertTrue(self.check(cases.reviewer_dispatched, mention))
+
+    def check_codex(self, grader, lines):
+        return grader(CodexTranscript(lines), self.root)
+
+    def test_codex_reviewer_dispatch_needs_a_fresh_review_spawn(self):
+        grade, text = cases.reviewer_dispatched, [codex_text("m1", CONTRACT)]
+        self.assertEqual(grade(codex_session(text, rollout_spawn("independent_review")), self.root), [])
+        self.assertEqual(grade(codex_session(text, rollout_spawn("review", "all"), rollout_spawn("Reviewer")),
+                               self.root), [])
+        forked = grade(codex_session(text, rollout_spawn("independent_review", "all")), self.root)
+        self.assertEqual(forked, ["reviewer was spawned with fork_turns=all, so it saw the author's reasoning"])
+        self.assertEqual(grade(codex_session(text, rollout_spawn("implement_owner")), self.root),
+                         ["no `reviewer` subagent was dispatched"])
+        self.assertTrue(grade(CodexTranscript(text), self.root)[0].startswith("HARNESS:"))
+
+    def test_codex_contract_and_regression_order(self):
+        good = [codex_text("m1", CONTRACT + "\nPlan."), codex_patch("p1", "calc.py")]
+        self.assertEqual(self.check_codex(cases.contract_first, good), [])
+        late = [codex_shell("c1", "printf x > calc.py"), codex_text("m1", CONTRACT)]
+        self.assertIn("contract line came after the first file write", self.check_codex(cases.contract_first, late))
+        run = "python3 -m unittest discover -s tests -t ."
+        order = [codex_patch("p1", "/p/tests/test_calc.py"), codex_shell("c1", run, "FAILED (errors=1)", code=1),
+                 codex_patch("p2", "/p/calc.py"), codex_shell("c2", run, "OK")]
+        grade = cases.failing_test_before_fix("calc.py")
+        self.assertEqual(self.check_codex(grade, order), [])
+        self.assertTrue(self.check_codex(grade, [order[2], *order[:2], order[3]]))
 
 
 class CaseTableTests(unittest.TestCase):

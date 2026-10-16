@@ -58,8 +58,8 @@ def failing_test_before_fix(source):
         if fix is None:
             return [f"{source} was never edited"]
         test_edit = None
-        for index, event in transcript.tools("Edit", "Write", "MultiEdit"):
-            if index < fix and "tests/" in str(event["input"].get("file_path", "")):
+        for index, paths in transcript.writes():
+            if index < fix and any("tests/" in path for path in paths):
                 test_edit = index
                 break
         if test_edit is None:
@@ -112,6 +112,17 @@ def unchanged(name):
 
 
 def reviewer_dispatched(transcript, root):
+    """Claude names the `reviewer` subagent type. Codex has none: a spawned task named for review counts,
+    and it must start fresh, because a forked reviewer sees the author's reasoning (REVIEW.md)."""
+    if transcript.provider == "codex":
+        if not transcript.rollout_found:
+            return ["HARNESS: Codex session rollout not found; spawned agents are not visible"]
+        reviews = [spawn for spawn in transcript.spawns if re.search(r"review", spawn["task_name"], re.I)]
+        if any(spawn["fork_turns"] != "all" for spawn in reviews):
+            return []
+        if reviews:
+            return ["reviewer was spawned with fork_turns=all, so it saw the author's reasoning"]
+        return ["no `reviewer` subagent was dispatched"]
     for _, event in transcript.tools("Agent", "Task"):
         if event["input"].get("subagent_type") == "reviewer":
             return []
