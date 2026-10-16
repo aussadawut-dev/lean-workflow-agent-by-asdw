@@ -32,6 +32,8 @@ python3 .lean/scripts/workflow.py --root . check
 python3 .lean/scripts/model_catalog.py --root . check
 python3 -m unittest discover -s .lean/tests -p 'test_gate_integrity.py'
 python3 -m unittest discover -s .lean/tests -p 'test_skill_pack.py'
+python3 -m unittest discover -s tools -p 'test_*.py'
+python3 tools/check_commit_attribution.py --root .
 ```
 <!-- gate:end -->
 
