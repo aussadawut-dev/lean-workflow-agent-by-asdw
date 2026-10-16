@@ -12,6 +12,9 @@
 *.orig
 *.rej
 
+# Behavior eval transcripts and reports (evals/run_evals.py)
+evals/results/
+
 # Local workflow coordination and Python test caches
 .agent-runtime/
 __pycache__/

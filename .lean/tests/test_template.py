@@ -1,4 +1,5 @@
 """Smoke the distributable filesystem as a new project without copying runtime state."""
+import contextlib
 import json
 import shutil
 import subprocess
@@ -108,9 +109,12 @@ class TemplateSmokeTests(unittest.TestCase):
 
 
     def test_installed_smoke_survives_onboarding_and_project_license(self):
-        for mode in ("standard", "tracker", "full"):
-            with self.subTest(mode=mode), tempfile.TemporaryDirectory(prefix="lean configured project ") as directory:
-                root = Path(directory)
+        # Prepare every mode first, then run the installed suites concurrently; each mode
+        # keeps its own copy and assertions, only the wall time is shared.
+        with contextlib.ExitStack() as stack:
+            installs = []
+            for mode in ("standard", "tracker", "full"):
+                root = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="lean configured project ")))
                 bootstrap(root)
                 subprocess.run(["python3", str(root / ".lean/scripts/workflow.py"), "configure", mode], check=True, capture_output=True)
                 (root / "LICENSE").write_text("Project-owned license placeholder\n")
@@ -130,17 +134,25 @@ class TemplateSmokeTests(unittest.TestCase):
                     path.write_text(json.dumps(item))
                     records[path] = path.read_text()
                 before = (root / ".lean/config.json").read_text()
-                result = subprocess.run(["python3", str(root / ".lean/tests/test_template.py"),
-                                         "TemplateSmokeTests.test_fresh_copy_setup_and_full_workset_lifecycle"],
-                                        cwd=root, text=True, capture_output=True)
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                structure = subprocess.run(["python3", "-m", "unittest", "discover", "-s", ".lean/tests", "-p", "test_structure.py"],
-                                           cwd=root, text=True, capture_output=True)
-                self.assertEqual(structure.returncode, 0, structure.stdout + structure.stderr)
-                self.assertEqual((root / ".lean/config.json").read_text(), before)
-                self.assertEqual((root / "LICENSE").read_text(), "Project-owned license placeholder\n")
-                for path, content in records.items():
-                    self.assertEqual(path.read_text(), content)
+                # Copies are distinct trees, so their suites cannot share runtime state.
+                smoke = subprocess.Popen(["python3", str(root / ".lean/tests/test_template.py"),
+                                          "TemplateSmokeTests.test_fresh_copy_setup_and_full_workset_lifecycle"],
+                                         cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                stack.callback(smoke.kill)
+                structure = subprocess.Popen(["python3", "-m", "unittest", "discover", "-s", ".lean/tests", "-p", "test_structure.py"],
+                                             cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                stack.callback(structure.kill)
+                installs.append((mode, root, records, before, smoke, structure))
+            for mode, root, records, before, smoke, structure in installs:
+                with self.subTest(mode=mode):
+                    output = smoke.communicate()[0]
+                    self.assertEqual(smoke.returncode, 0, output)
+                    output = structure.communicate()[0]
+                    self.assertEqual(structure.returncode, 0, output)
+                    self.assertEqual((root / ".lean/config.json").read_text(), before)
+                    self.assertEqual((root / "LICENSE").read_text(), "Project-owned license placeholder\n")
+                    for path, content in records.items():
+                        self.assertEqual(path.read_text(), content)
 
     def test_installed_smoke_keeps_project_provider_skills(self):
         with tempfile.TemporaryDirectory(prefix="lean downstream project ") as directory:
