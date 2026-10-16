@@ -179,6 +179,15 @@ class GuardHookTests(HookFixture):
                         f"python3 .lean/scripts/gate_evidence.py record-review --contract='{quoted}'"):
             result = self.tool("codex", "Bash", "quote-session", command=command)
             self.assertEqual(result.returncode, 2, command)
+        # Shell syntax glued to the contract, wrappers and subshells still name it (review round 1).
+        base = f"python3 .lean/scripts/gate_evidence.py record-review --contract '{quoted}'"
+        for command in (base + ";echo done", base + "&&echo done", base + ">/dev/null", f"({base})",
+                        f'bash -c "{base.replace(chr(34), "")}"', f"sh -c {json.dumps(base)}",
+                        "python3 .lean/scripts/gate_evidence.py state&&" + base):
+            self.assertTrue(contract_guard.records_own_receipt(command, apostrophe), command)
+        # Another command on the line is not part of the receipt call.
+        self.assertFalse(contract_guard.records_own_receipt(
+            f"python3 .lean/scripts/gate_evidence.py state; echo '{apostrophe}'", apostrophe))
         # A contract hidden behind expansion cannot be compared, so the author's thread may not record at all.
         hidden = self.tool("codex", "Bash", "quote-session",
                            command='python3 .lean/scripts/gate_evidence.py record-review --contract "$(cat c.txt)"')

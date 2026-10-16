@@ -200,36 +200,45 @@ def pre_tool(root, payload):
     return f"Lean contract guard: no Task Contract is declared for this prompt, so `{name}` is blocked.\n{HELP}"
 
 
-def records_own_receipt(command, declared):
-    """Whether `command` runs `gate_evidence.py record-review` for `declared` (or a contract it cannot see).
+SHELLS = ("sh", "bash", "zsh", "dash", "ksh")
+OPERATORS = set(";&|<>()") | {"&&", "||", ";;", "|&", ">>", "<<"}
 
-    The command is parsed, so a contract that merely mentions the subcommand, or a quoted copy of
-    the contract in another command, does not count; shell quoting of the contract does not hide it.
-    """
+
+def shell_words(command):
+    """Shell words with operators as their own tokens (`'x';echo` gives three), or None if unparseable."""
     try:
-        tokens = shlex.split(command)
+        lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+        lexer.whitespace_split = True
+        return list(lexer)
     except ValueError:
-        return bool(re.search(r"gate_evidence\.py\b.*\brecord-review\b", command, re.S))
-    for index, token in enumerate(tokens):
-        if not token.endswith("gate_evidence.py"):
-            continue
-        call = []
-        for word in tokens[index + 1:]:
-            if word in ("&&", "||", ";", "|", "&"):
-                break
-            call.append(word)
-        if "record-review" not in call:
-            continue
-        contract = None
-        for position, word in enumerate(call):
-            if word == "--contract" and position + 1 < len(call):
-                contract = call[position + 1]
-            elif word.startswith("--contract="):
-                contract = word.split("=", 1)[1]
-        # An expanded or missing value cannot be compared; treat it as the session's own contract.
-        if contract is None or "$" in contract or "`" in contract or contract == declared:
+        return None
+
+
+def records_own_receipt(command, declared, depth=0):
+    """Whether `command` runs `record-review` for `declared`, or for a contract the guard cannot read.
+
+    A receipt call is any `record-review` word (also inside `sh -c`, `bash -c` or `eval`), not text
+    quoted inside a longer argument. It is allowed only with a literal `--contract` value that differs
+    from the declared contract, so quoting, glued operators and expansion cannot hide the contract.
+    """
+    words = shell_words(command)
+    if words is None or depth > 3:
+        return "record-review" in command
+    for index, word in enumerate(words):
+        nested = None
+        if word == "-c" and index and Path(words[index - 1]).name in SHELLS and index + 1 < len(words):
+            nested = words[index + 1]
+        elif word == "eval":
+            nested = " ".join(item for item in words[index + 1:] if item not in OPERATORS)
+        if nested and records_own_receipt(nested, declared, depth + 1):
             return True
-    return False
+    if "record-review" not in words:
+        return False
+    values = [words[index + 1] for index, word in enumerate(words[:-1]) if word == "--contract"]
+    values += [word.split("=", 1)[1] for word in words if word.startswith("--contract=")]
+    if not values or declared in command:
+        return True
+    return any(value == declared or "$" in value or "`" in value or value in OPERATORS for value in values)
 
 
 def prompt(root, payload):
