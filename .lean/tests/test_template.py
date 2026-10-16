@@ -18,8 +18,9 @@ def bootstrap(root, source_root=ROOT):
         # Never materialize their dereferenced content as provider-owned copies.
         if any((source_root / parent).is_symlink() for parent in Path(name).parents):
             continue
-        if source.is_symlink() and name.startswith((".agents/skills/", ".claude/skills/")) and name not in declared:
-            continue  # Local opt-in is not the distributable template default.
+        if (source.is_symlink() and name.startswith((".agents/skills/", ".claude/skills/")) and name not in declared
+                and (source_root / ".lean/skills" / Path(name).name).is_dir()):
+            continue  # Local Lean opt-in is not the distributable template default; project skill links stay.
         reusable = name.startswith((".lean/", ".claude/", ".agents/skills/")) or name in ("AGENTS.md", "CLAUDE.md", ".gitignore", ".codex/hooks.json", ".codex/hooks/quality_gate.py")
         project_owned = name in (".lean/config.json", ".lean/PROJECT.md", ".lean/model-catalog.json")
         if reusable and not project_owned and source.is_symlink():
@@ -40,6 +41,11 @@ def bootstrap(root, source_root=ROOT):
     subprocess.run(["git", "init", "-q", str(root)], check=True)
 
 
+def lean_discovery(root, tree):
+    # Project-owned provider skills in a downstream checkout are outside the Lean discovery count.
+    return [path for path in (root / tree).iterdir() if (root / ".lean/skills" / path.name).is_dir()]
+
+
 class TemplateSmokeTests(unittest.TestCase):
     def test_local_optional_activation_does_not_change_starter_discovery(self):
         with tempfile.TemporaryDirectory(prefix="lean enabled source ") as directory:
@@ -49,12 +55,12 @@ class TemplateSmokeTests(unittest.TestCase):
             subprocess.run(["python3", str(source / ".lean/scripts/skill_pack.py"), "enable"],
                            check=True, capture_output=True)
             for tree in (".agents/skills", ".claude/skills"):
-                self.assertEqual(len(list((source / tree).iterdir())), 19)
+                self.assertEqual(len(lean_discovery(source, tree)), 19)
             target = Path(directory) / "target"
             target.mkdir()
             bootstrap(target, source_root=source)
             for tree in (".agents/skills", ".claude/skills"):
-                self.assertEqual(len(list((target / tree).iterdir())), 9)
+                self.assertEqual(len(lean_discovery(target, tree)), 9)
             self.assertTrue((target / ".lean/skills/lean-audit/SKILL.md").is_file())
 
     def test_fresh_copy_setup_and_full_workset_lifecycle(self):
@@ -74,7 +80,7 @@ class TemplateSmokeTests(unittest.TestCase):
             self.assertFalse((root / ".agents/queue").exists())
             self.assertFalse((root / ".agent-runtime").exists())
             for tree in (".agents/skills", ".claude/skills"):
-                self.assertEqual(len(list((root / tree).iterdir())), 9,
+                self.assertEqual(len(lean_discovery(root, tree)), 9,
                                  "A fresh template must discover exactly nine core skills")
             self.assertIn("MIT License", (root / ".lean/LICENSE").read_text())
             self.assertEqual((root / "LICENSE").read_text(), "Separate project license\n")
@@ -135,6 +141,36 @@ class TemplateSmokeTests(unittest.TestCase):
                 self.assertEqual((root / "LICENSE").read_text(), "Project-owned license placeholder\n")
                 for path, content in records.items():
                     self.assertEqual(path.read_text(), content)
+
+    def test_installed_smoke_keeps_project_provider_skills(self):
+        with tempfile.TemporaryDirectory(prefix="lean downstream project ") as directory:
+            root = Path(directory) / "project"
+            root.mkdir()
+            bootstrap(root)
+            # A downstream project owns provider skills outside Lean: a skill directory,
+            # a cross-provider link to it and a document that names the linked path.
+            skill = root / ".agents/skills/project-deploy/SKILL.md"
+            skill.parent.mkdir(parents=True)
+            skill.write_text("---\nname: project-deploy\ndescription: Deploy this project\n---\n")
+            (root / ".claude/skills/project-deploy").symlink_to("../../.agents/skills/project-deploy",
+                                                                target_is_directory=True)
+            rules = root / ".claude/rules/project-skills.md"
+            rules.parent.mkdir(parents=True)
+            rules.write_text("Claude discovers `.claude/skills/project-deploy/SKILL.md`.\n")
+            subprocess.run(["python3", str(root / ".lean/scripts/skill_pack.py"), "enable"],
+                           check=True, capture_output=True)
+            copy = Path(directory) / "copy"
+            copy.mkdir()
+            bootstrap(copy, source_root=root)
+            self.assertTrue((copy / ".claude/skills/project-deploy/SKILL.md").is_file())
+            self.assertFalse((copy / ".claude/skills/lean-audit").is_symlink())
+            subprocess.run(["python3", str(root / ".lean/scripts/skill_pack.py"), "disable"],
+                           check=True, capture_output=True)
+            result = subprocess.run(["python3", str(root / ".lean/tests/test_template.py"),
+                                     "TemplateSmokeTests.test_local_optional_activation_does_not_change_starter_discovery",
+                                     "TemplateSmokeTests.test_fresh_copy_setup_and_full_workset_lifecycle"],
+                                    cwd=root, text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 if __name__ == "__main__":
     unittest.main()
