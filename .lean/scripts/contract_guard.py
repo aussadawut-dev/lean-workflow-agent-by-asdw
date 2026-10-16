@@ -200,8 +200,7 @@ def pre_tool(root, payload):
     return f"Lean contract guard: no Task Contract is declared for this prompt, so `{name}` is blocked.\n{HELP}"
 
 
-SHELLS = ("sh", "bash", "zsh", "dash", "ksh")
-OPERATORS = set(";&|<>()") | {"&&", "||", ";;", "|&", ">>", "<<"}
+OPERATORS = set(";&|<>()") | {"&&", "||", ";;", "|&", ">>", "<<", "<<<"}
 
 
 def shell_words(command):
@@ -217,25 +216,22 @@ def shell_words(command):
 def records_own_receipt(command, declared, depth=0):
     """Whether `command` runs `record-review` for `declared`, or for a contract the guard cannot read.
 
-    A receipt call is any `record-review` word (also inside `sh -c`, `bash -c` or `eval`), not text
-    quoted inside a longer argument. It is allowed only with a literal `--contract` value that differs
-    from the declared contract, so quoting, glued operators and expansion cannot hide the contract.
+    A receipt call is any standalone `record-review` word. Any other argument that itself holds a
+    command mentioning it (`sh -c`, `bash -lc`, here-strings, `echo ... | sh`, `eval`) is checked the
+    same way; the `--contract` value and the contract text itself are data, not commands. A call
+    passes only with a literal `--contract` value that differs from the declared contract.
     """
     words = shell_words(command)
     if words is None or depth > 3:
         return "record-review" in command
-    for index, word in enumerate(words):
-        nested = None
-        if word == "-c" and index and Path(words[index - 1]).name in SHELLS and index + 1 < len(words):
-            nested = words[index + 1]
-        elif word == "eval":
-            nested = " ".join(item for item in words[index + 1:] if item not in OPERATORS)
-        if nested and records_own_receipt(nested, declared, depth + 1):
+    values = [words[index + 1] for index, word in enumerate(words[:-1]) if word == "--contract"]
+    values += [word.split("=", 1)[1] for word in words if word.startswith("--contract=")]
+    for word in words:
+        if (word not in values and word != declared and "record-review" in word and any(c.isspace() for c in word)
+                and records_own_receipt(word, declared, depth + 1)):
             return True
     if "record-review" not in words:
         return False
-    values = [words[index + 1] for index, word in enumerate(words[:-1]) if word == "--contract"]
-    values += [word.split("=", 1)[1] for word in words if word.startswith("--contract=")]
     if not values or declared in command:
         return True
     return any(value == declared or "$" in value or "`" in value or value in OPERATORS for value in values)

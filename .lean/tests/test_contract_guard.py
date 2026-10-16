@@ -183,7 +183,11 @@ class GuardHookTests(HookFixture):
         base = f"python3 .lean/scripts/gate_evidence.py record-review --contract '{quoted}'"
         for command in (base + ";echo done", base + "&&echo done", base + ">/dev/null", f"({base})",
                         f'bash -c "{base.replace(chr(34), "")}"', f"sh -c {json.dumps(base)}",
-                        "python3 .lean/scripts/gate_evidence.py state&&" + base):
+                        "python3 .lean/scripts/gate_evidence.py state&&" + base,
+                        # Review round 2: option bundles, options before -c, here-strings and pipes.
+                        f"bash -lc {json.dumps(base)}", f"bash -ec {json.dumps(base)}",
+                        f"bash --norc -c {json.dumps(base)}", f"bash <<< {json.dumps(base)}",
+                        f"echo {json.dumps(base)} | sh", f"eval {json.dumps(base)}"):
             self.assertTrue(contract_guard.records_own_receipt(command, apostrophe), command)
         # Another command on the line is not part of the receipt call.
         self.assertFalse(contract_guard.records_own_receipt(
