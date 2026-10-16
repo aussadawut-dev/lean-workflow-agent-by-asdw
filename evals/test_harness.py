@@ -1,5 +1,6 @@
 """Grader and transcript tests on fake Claude stream-json and Codex exec --json sessions; no model calls."""
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -100,10 +101,29 @@ class TranscriptTests(unittest.TestCase):
         # Agents and the reviewer prefix commands with `cd "<project>" &&`.
         self.assertIn("Bash(cd:*)", command)
 
-    def test_codex_command_ignores_user_config_keeps_sessions_and_takes_prompt_on_stdin(self):
+    def test_codex_home_holds_only_a_private_credential_copy_and_fixture_trust(self):
+        from harness import codex_home
+        with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as fixture:
+            Path(source, "auth.json").write_text('{"token": "secret"}')
+            Path(source, "config.toml").write_text('[projects."/"]\ntrust_level = "trusted"\n')
+            with codex_home(fixture, source) as home:
+                self.assertEqual(sorted(path.name for path in home.iterdir()), ["auth.json", "config.toml"])
+                self.assertEqual((home / "auth.json").stat().st_mode & 0o777, 0o600)
+                self.assertEqual((home / "auth.json").read_text(), '{"token": "secret"}')
+                config = (home / "config.toml").read_text()
+                self.assertIn(f'[projects.{json.dumps(os.path.realpath(fixture))}]', config)
+                self.assertNotIn('[projects."/"]', config)
+                self.assertIn("hooks = true", config)
+            self.assertFalse(home.exists())
+            with self.assertRaises(SystemExit):
+                with codex_home(fixture, Path(source, "missing")):
+                    pass
+
+    def test_codex_command_keeps_sessions_and_takes_prompt_on_stdin(self):
         command = agent_command("gpt-test", None, "codex")
         self.assertEqual(command[:3], ["codex", "exec", "--json"])
-        self.assertIn("--ignore-user-config", command)
+        # Ignoring user config also drops project trust, so no project hook would load.
+        self.assertNotIn("--ignore-user-config", command)
         self.assertEqual(command[command.index("--sandbox") + 1], "workspace-write")
         self.assertEqual(command[command.index("--model") + 1], "gpt-test")
         # Subagent threads, including the reviewer, cannot spawn from an ephemeral session.
@@ -171,6 +191,13 @@ class TranscriptTests(unittest.TestCase):
         noisy = [json.dumps({"type": "system", "subtype": "hook_response",
                              "output": "Gate evidence: Contract transcript unreadable"})]
         self.assertTrue(harness_problems(noisy))
+        self.assertTrue(harness_problems(["Contract transcript unreadable: /tmp/x"]))
+        self.assertTrue(harness_problems([codex_item("e1", "error", message="transcript unreadable")]))
+        # The agent printing a script that mentions the fault is not a harness fault.
+        source = 'echo "Contract transcript unreadable: $transcript"'
+        self.assertEqual(harness_problems([result("t1", source), assistant(text(source)),
+                                           codex_shell("c1", "sed -n 1,200p gate.sh", source),
+                                           codex_text("m1", source)]), [])
 
 
 class GraderTests(unittest.TestCase):

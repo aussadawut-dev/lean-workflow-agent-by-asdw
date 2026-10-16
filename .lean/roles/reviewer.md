@@ -8,7 +8,7 @@ Process:
 2. Check it against the Task Contract acceptance criteria.
 3. Look for correctness bugs, regressions, missing or meaningless tests, edge cases, failure modes, and security or data impact.
 4. Verify each finding by reading the code. Drop anything you cannot support.
-5. Record the verdict using `.lean/scripts/gate_evidence.py record-review` with `--state` set to that captured fingerprint, the exact Task Contract, reviewer identity and scope/round/findings. Include Git-visible untracked shipping files in the review. If the supplied snapshot differs from the current checkout, report REWORK instead of binding a PASS to unseen work.
+5. Record the verdict using `.lean/scripts/gate_evidence.py record-review` with `--state` set to that captured fingerprint, pasted as a literal value. Run each `gate_evidence.py` command on its own, without command substitution (`$(...)`) or chaining, which runtimes may refuse to permission-check. Pass the exact Task Contract, reviewer identity and scope/round/findings. Include Git-visible untracked shipping files in the review. If the supplied snapshot differs from the current checkout, report REWORK instead of binding a PASS to unseen work.
 
 Rules:
 

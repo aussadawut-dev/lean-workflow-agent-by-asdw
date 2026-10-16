@@ -5,10 +5,13 @@ application, and drives a real `claude -p` or `codex exec` session there, so the
 project's own CLAUDE.md/AGENTS.md, hooks, skills and reviewer agent load as they
 do for users.
 """
+import contextlib
 import json
 import os
 import re
+import shutil
 import subprocess
+import tempfile
 import sys
 from pathlib import Path
 
@@ -157,9 +160,10 @@ def tests_pass(root):
 def agent_command(model, budget, provider="claude"):
     """The session command; the prompt goes on stdin. Codex has no per-run budget flag."""
     if provider == "codex":
+        # Run under `codex_home`: its config trusts only the fixture, so the project's hooks load
+        # and user hooks, plugins and code mode do not. (--ignore-user-config also drops project
+        # trust, and with it every project hook.)
         return ["codex", "exec", "--json",
-                # User config would change behavior (code mode, user hooks, plugins); auth still loads.
-                "--ignore-user-config",
                 # The fixture is a throwaway copy whose hooks were never trusted interactively.
                 "--dangerously-bypass-hook-trust",
                 # No --ephemeral: subagent threads (the reviewer) fail to spawn without a stored session.
@@ -179,16 +183,56 @@ def agent_command(model, budget, provider="claude"):
 HARNESS_FAULTS = ("transcript unreadable",)
 
 
+# Agent text and tool traffic can quote these words (say, by printing a gate script); only
+# runtime and hook output reports a harness fault.
+AGENT_EVENTS = {"assistant", "user"}
+AGENT_ITEMS = {"agent_message", "reasoning", "command_execution", "file_change", "collab_tool_call",
+               "mcp_tool_call", "web_search", "todo_list"}
+
+
 def harness_problems(lines):
-    joined = "\n".join(lines).lower()
+    kept = []
+    for line in lines:
+        try:
+            item = json.loads(line)
+        except ValueError:
+            item = None
+        if isinstance(item, dict):
+            body = item.get("item")
+            if item.get("type") in AGENT_EVENTS or (isinstance(body, dict) and body.get("type") in AGENT_ITEMS):
+                continue
+        kept.append(line)
+    joined = "\n".join(kept).lower()
     return [f"HARNESS: session output contains {fault!r}" for fault in HARNESS_FAULTS if fault in joined]
 
 
-def run_agent(root, prompt, model, budget, timeout, provider="claude"):
+@contextlib.contextmanager
+def codex_home(root, source=None):
+    """A throwaway CODEX_HOME: the user's auth only (mode 0600) and a config that trusts the fixture.
+
+    The directory, including the copied credential, is removed on exit.
+    """
+    source = Path(source or os.environ.get("CODEX_HOME") or Path.home() / ".codex")
+    if not (source / "auth.json").is_file():
+        raise SystemExit(f"BLOCKED: no Codex credential at {source / 'auth.json'}; run `codex login` first")
+    home = Path(tempfile.mkdtemp(prefix="lean eval codex home "))
+    try:
+        auth = home / "auth.json"
+        auth.touch(mode=0o600)
+        auth.write_bytes((source / "auth.json").read_bytes())
+        trusted = sorted({str(Path(root)), os.path.realpath(root)})
+        (home / "config.toml").write_text("[features]\nhooks = true\n\n" + "".join(
+            f"[projects.{json.dumps(path)}]\ntrust_level = \"trusted\"\n\n" for path in trusted))
+        yield home
+    finally:
+        shutil.rmtree(home, ignore_errors=True)
+
+
+def run_agent(root, prompt, model, budget, timeout, provider="claude", env=None):
     """Run one session; return (JSON event lines, exit code, stderr). The prompt goes on stdin."""
     try:
         result = subprocess.run(agent_command(model, budget, provider), cwd=root, input=prompt, text=True,
-                                capture_output=True, timeout=timeout)
+                                capture_output=True, timeout=timeout, env=env)
         return result.stdout.splitlines(), result.returncode, result.stderr
     except subprocess.TimeoutExpired as error:
         output = error.stdout.decode() if isinstance(error.stdout, bytes) else (error.stdout or "")

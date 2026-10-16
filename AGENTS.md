@@ -7,10 +7,10 @@ Explicit user instructions take precedence. The active agent owns the task unles
 
 ## Core rules
 
-- Before changing files, write the contract at the top of your reply, as one line or a field block:
+- Before changing files, write one contract line as the first line of your reply, before any preamble, plan or tool call (or start a field block there):
   `Contract: risk=<LOW|MEDIUM|HIGH> quality=<STANDARD|HIGH|VERY_HIGH> acceptance=<observable check>`
   For a trivial task: `Contract: trivial (<reason>)`. Infer values; do not ask the user. Risk rules and the block form: `.lean/policy/CONTRACTS.md`.
-  Then declare it, in a command of its own, before any write-capable tool: `python3 .lean/scripts/contract_guard.py declare --contract '<one line>'`, or `declare <<'EOF'` with the block. Hooks deny writes until a declaration exists; each new user prompt clears it.
+  Then declare the same contract, in a command of its own, before any shell or write tool: `python3 .lean/scripts/contract_guard.py declare --contract '<one line>'`, or `declare <<'EOF'` with the block. The declaration does not replace the written line. Hooks deny shell and write tools until a declaration exists; each new user prompt clears it.
 - Use the smallest sufficient context. Follow impact-based context selection and delta reuse in `.lean/policy/CONTEXT.md` when choosing or expanding task context. Do not read workflow internals (`.claude/hooks/`, `.lean/policy/`) unless the task needs them.
 - Behavior changes require meaningful tests.
 - Bug fixes require a regression test. Run it before the fix and show it fails, then show it passes after.

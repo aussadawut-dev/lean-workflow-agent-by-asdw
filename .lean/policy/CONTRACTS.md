@@ -21,7 +21,7 @@ budget: BALANCED
 acceptance: go test ./... passes and printf 'a' | tally prints 1 1 1
 ```
 
-Declare it before the first write-capable tool, as a command of its own:
+Write the contract first in the reply, then declare the same contract before the first shell or write tool, as a command of its own. The declaration does not replace the written contract:
 
 ```sh
 python3 .lean/scripts/contract_guard.py declare <<'EOF'

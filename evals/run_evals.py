@@ -6,7 +6,9 @@ Nothing runs without --model and a total budget (--max-total-usd for Claude,
 --max-total-tokens for Codex); --dry-run builds and checks fixtures only.
 """
 import argparse
+import contextlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -16,8 +18,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from cases import CASES
-from harness import (PROVIDERS, TEST_COMMAND, build_fixture, changed_files, harness_problems, read_transcript,
-                     run_agent, tests_pass)
+from harness import (PROVIDERS, TEST_COMMAND, build_fixture, changed_files, codex_home, harness_problems,
+                     read_transcript, run_agent, tests_pass)
 
 RESULTS = Path(__file__).resolve().parent / "results"
 
@@ -118,12 +120,15 @@ def main(argv=None):
             root = build_fixture(directory, case)
             began = time.monotonic()
             run_budget = None if codex else min(args.max_run_usd, args.max_total_usd - spent)
-            lines, code, stderr = run_agent(root, case["prompt"], args.model, run_budget, args.timeout,
-                                            args.provider)
             label = f"{case['name']}#{run}"
-            # Save the raw session first: a paid transcript must survive a parser or grader error.
-            (out / f"{label}.jsonl").write_text("\n".join(lines) + "\n")
-            transcript = read_transcript(args.provider, lines)
+            with (codex_home(root) if codex else contextlib.nullcontext()) as home:
+                env = dict(os.environ, CODEX_HOME=str(home)) if home else None
+                lines, code, stderr = run_agent(root, case["prompt"], args.model, run_budget, args.timeout,
+                                                args.provider, env)
+                # Save the raw session first: a paid transcript must survive a parser or grader error.
+                (out / f"{label}.jsonl").write_text("\n".join(lines) + "\n")
+                # Codex stores the session rollout (spawned agents) in the temporary home.
+                transcript = read_transcript(args.provider, lines, home)
             cost = transcript.cost
             spent += cost or 0.0
             tokens += transcript.tokens or 0
