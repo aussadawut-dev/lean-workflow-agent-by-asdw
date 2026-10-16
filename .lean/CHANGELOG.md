@@ -4,7 +4,7 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
-## Unreleased
+## 4.3.1 — 2026-10-16
 
 - Let the installed template smoke tests pass in projects that own provider skills. While building its fresh copy, `test_template.py` dropped every undeclared `.agents/skills/*` and `.claude/skills/*` link, including project-owned links that project documents name, so the copy's structure check failed. Its discovery assertions also counted every entry, so project skill directories broke the expected 19 and 9. The copy now drops only undeclared links named after a canonical `.lean/skills/<name>` (local optional opt-ins), and the counts include only entries with a canonical `.lean/skills/<name>`. A downstream-shaped regression test covers both. This test-only patch changes no rule, configuration or record; projects carrying a local patch for it can take the upstream file on upgrade.
 
