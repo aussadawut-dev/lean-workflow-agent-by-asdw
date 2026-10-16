@@ -139,6 +139,27 @@ class GuardHookTests(HookFixture):
                 self.assertEqual(self.prompt(provider, "Next task please", session).returncode, 0)
                 self.assertEqual(self.tool(provider, write[0], session, **write[1]).returncode, 2)
 
+    def test_only_a_subagent_or_another_session_records_the_review_of_a_declared_contract(self):
+        record = ("python3 .lean/scripts/gate_evidence.py record-review --contract '{}' --reviewer r "
+                  "--evidence e --verdict PASS --state abc")
+        for provider in ("claude", "codex"):
+            with self.subTest(provider=provider):
+                session = f"{provider}-author"
+                self.assertEqual(self.tool(provider, "Bash", session,
+                                           command=f"{DECLARE} --contract '{LINE}'").returncode, 0)
+                author = self.tool(provider, "Bash", session, command=record.format(LINE))
+                self.assertEqual(author.returncode, 2, author.stderr)
+                self.assertIn("independent reviewer", author.stderr)
+                reviewer = self.hook(provider, "PreToolUse", {
+                    "session_id": session, "agent_id": "reviewer-1", "tool_name": "Bash",
+                    "tool_input": {"command": record.format(LINE)}})
+                self.assertEqual(reviewer.returncode, 0, reviewer.stderr)
+                # A fresh reviewer session declares its own (review) contract and may record.
+                fresh = f"{provider}-reviewer"
+                self.assertEqual(self.tool(provider, "Bash", fresh,
+                                           command=f"{DECLARE} --contract 'Contract: trivial (review)'").returncode, 0)
+                self.assertEqual(self.tool(provider, "Bash", fresh, command=record.format(LINE)).returncode, 0)
+
     def test_declaration_records_contract_metadata_and_runtime_model(self):
         result = self.tool("codex", "Bash", "s9", command=f"{DECLARE} <<'EOF'\n{BLOCK}\nEOF")
         self.assertEqual(result.returncode, 0, result.stderr)

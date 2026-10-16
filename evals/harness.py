@@ -176,6 +176,8 @@ def agent_command(model, budget, provider="claude"):
             "--permission-mode", "acceptEdits",
             "--allowedTools", "Read", "Edit", "Write", "Glob", "Grep", "Agent", "Skill",
             "Bash(cd:*)", "Bash(python3:*)", "Bash(git:*)", "Bash(bash:*)", "Bash(ls:*)", "Bash(cat:*)",
+            # Read-only helpers reviewers pipe into; a background subagent cannot ask for permission.
+            "Bash(tail:*)", "Bash(head:*)", "Bash(grep:*)", "Bash(wc:*)",
             "Bash(.lean/scripts/*)"]
 
 

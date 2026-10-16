@@ -188,7 +188,14 @@ def pre_tool(root, payload):
             return None
     if name in READ_ONLY or name.startswith(READ_ONLY_PREFIXES):
         return None
-    if current(root, session):
+    declared = current(root, session)
+    if (declared and isinstance(command, str) and "record-review" in command and declared in command
+            and not payload.get("agent_id")):
+        # The author's main thread never records the review of its own contract (REVIEW.md);
+        # a reviewer subagent carries an agent_id, and a fresh reviewer session declares its own.
+        return ("Lean contract guard: only the independent reviewer records the review receipt for this "
+                "session's contract. Ask the reviewer to record it; if it cannot, report BLOCKED.")
+    if declared:
         return None
     return f"Lean contract guard: no Task Contract is declared for this prompt, so `{name}` is blocked.\n{HELP}"
 

@@ -100,6 +100,9 @@ class TranscriptTests(unittest.TestCase):
         self.assertNotIn("--no-session-persistence", command)
         # Agents and the reviewer prefix commands with `cd "<project>" &&`.
         self.assertIn("Bash(cd:*)", command)
+        # A background reviewer cannot ask for permission, so the read-only helpers it pipes into are allowed.
+        for helper in ("tail", "head", "grep", "wc"):
+            self.assertIn(f"Bash({helper}:*)", command)
 
     def test_codex_home_holds_only_a_private_credential_copy_and_fixture_trust(self):
         from harness import codex_home

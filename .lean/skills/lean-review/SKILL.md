@@ -29,4 +29,4 @@ Scope: $ARGUMENTS (default: uncommitted changes)
    - `PASS` — the review is over; anything applied after it is a new contract.
    - `REWORK` — fix the findings, re-run validation, review again with delta context only. It caps
      the rounds on one contract and says when the result is `BLOCKED` rather than `DONE`.
-6. Have the HIGH reviewer record its verdict through `.lean/scripts/gate_evidence.py record-review` as specified in `REVIEW.md`. Check the receipt against the shipping state and exact contract; later edits invalidate it. Report the Review Contract, scope and round. The receipt records coverage and the reported identity, not proof of organizational independence.
+6. Have the HIGH reviewer record its verdict through `.lean/scripts/gate_evidence.py record-review` as specified in `REVIEW.md`. Never record it yourself; if the reviewer cannot, report `BLOCKED`. Check the receipt against the shipping state and exact contract; later edits invalidate it. Report the Review Contract, scope and round. The receipt records coverage and the reported identity, not proof of organizational independence.
