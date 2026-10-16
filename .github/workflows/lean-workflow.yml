@@ -8,6 +8,7 @@ on:
       - '.agents/skills/**'
       - '.codex/**'
       - 'docs/**'
+      - 'evals/**'
       - '.github/workflows/lean-workflow.yml'
       - '.github/pull_request_template.md'
       - 'CLAUDE.md'
@@ -22,6 +23,7 @@ on:
       - '.agents/skills/**'
       - '.codex/**'
       - 'docs/**'
+      - 'evals/**'
       - '.github/workflows/lean-workflow.yml'
       - '.github/pull_request_template.md'
       - 'CLAUDE.md'
@@ -66,3 +68,8 @@ jobs:
 
       - name: Workflow regression tests
         run: python3 .lean/tests/run_tests.py
+
+      - name: Eval graders and fixtures (no model calls)
+        run: |
+          python3 -m unittest discover -s evals -p 'test_*.py'
+          python3 evals/run_evals.py --dry-run
