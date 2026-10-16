@@ -54,6 +54,20 @@ def file_contains(name, pattern):
     return grade
 
 
+def test_run_failed(result):
+    """A unittest or pytest summary decides; the exit code decides only when there is no summary.
+
+    A longer command can run the tests and then something else that fails (say, a missing
+    script), so a nonzero exit alone does not mean the tests failed.
+    """
+    text = result.get("text", "")
+    if re.search(r"^FAILED\b|\b\d+ failed\b", text, re.MULTILINE):
+        return True
+    if re.search(r"^OK\b|\b\d+ passed\b", text, re.MULTILINE):
+        return False
+    return bool(result.get("is_error")) or bool(re.search(r"Error|Traceback", text))
+
+
 def failing_test_before_fix(source):
     """A test run fails after a test edit and before the first edit to `source`, then a run passes."""
     def grade(transcript, root):
@@ -70,10 +84,11 @@ def failing_test_before_fix(source):
         red = green = False
         for index, event in transcript.tools("Bash"):
             command = str(event["input"].get("command", ""))
-            if "unittest" not in command and "pytest" not in command:
+            # The fixture's Quality Gate runs the project's tests, so a gate run is a test run too.
+            if "unittest" not in command and "pytest" not in command and "quality-gate.sh" not in command:
                 continue
             result = transcript.result_for(event["id"]) or {}
-            failed = result.get("is_error") or re.search(r"FAILED|Error|Traceback", result.get("text", ""))
+            failed = test_run_failed(result)
             # A shell command may edit and then run the tests (`python3 - <<PY ... PY; python3 -m
             # unittest`), so the run may share the index of the edit before it.
             if test_edit <= index < fix and failed:
@@ -105,7 +120,8 @@ def final_not_done(transcript, root):
 def requests_input(transcript, root):
     """Asks for the missing decision: a question, or a plain request such as "I need the convention"."""
     pattern = (r"\?|\bI need\b|\bplease (send|provide|share|confirm|tell|specify|choose|decide|clarify)\b"
-               r"|\bonce you\b|\blet me know\b|\b(pending|awaiting|waiting for) your (input|decision|answer|approval)\b")
+               r"|\bonce you\b|\blet me know\b"
+               r"|\b(pending|awaiting|waiting for) your (input|decision|answer|approval|choice|confirmation)\b")
     if re.search(pattern, transcript.final_text, re.IGNORECASE):
         return []
     return ["final reply does not ask for the missing decision"]

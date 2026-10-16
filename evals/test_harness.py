@@ -275,11 +275,23 @@ class GraderTests(unittest.TestCase):
         self.assertEqual(self.check_codex(grade, good), [])
         both = "python3 - <<'PY'\nopen('tests/test_calc.py', 'w'); open('calc.py', 'w')\nPY\npython3 -m unittest"
         self.assertTrue(self.check_codex(grade, [codex_shell("c1", both, "OK")]))
+        # A passing project gate (which runs the tests) after the fix is a passing run.
+        gate = "bash .lean/scripts/quality-gate.sh --root ."
+        self.assertEqual(self.check_codex(grade, [good[0], codex_shell("c2", fix, "", code=2),
+                                                  codex_shell("c3", gate, "")]), [])
+        # The unittest summary decides, not the exit of a longer command that also ran something else.
+        chained = "python3 -m unittest discover -s tests -t . && python3 .lean/scripts/missing.py"
+        passed = "Ran 6 tests in 0.000s\n\nOK\npython3: can't open file 'missing.py': [Errno 2] No such file"
+        self.assertEqual(self.check_codex(grade, [good[0], codex_shell("c2", fix, "Ran 1 test\n\nFAILED (errors=1)",
+                                                                       code=1),
+                                                  codex_shell("c3", chained, passed, code=2)]), [])
 
     def test_requests_input_accepts_a_question_or_a_plain_request(self):
         grade = cases.requests_input
         self.assertEqual(self.check(grade, [final("**BLOCKED pending your input.** Please specify the naming "
                                                   "convention and approve the scope.")]), [])
+        self.assertEqual(self.check(grade, [final("I've left files unchanged pending your choice: camelCase or "
+                                                  "another convention.")]), [])
         self.assertEqual(self.check(grade, [final("Which convention should I use?")]), [])
         self.assertEqual(self.check(grade, [final("I need the naming convention, or an old-to-new mapping.")]), [])
         self.assertEqual(self.check(grade, [final("Once you send the convention, I'll do the rename.")]), [])
