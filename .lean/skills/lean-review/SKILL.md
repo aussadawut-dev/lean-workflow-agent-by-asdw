@@ -20,7 +20,8 @@ Scope: $ARGUMENTS (default: uncommitted changes)
    - `LOW` — self-check against acceptance criteria.
    - `MEDIUM` — focused diff review yourself.
    - `HIGH` — use an independent reviewer: Claude's `reviewer` subagent, or a Codex subagent or
-     fresh session. Give it the Task Contract and diff range only, without your reasoning. Select
+     fresh session. Give it the Task Contract and diff range only, without your reasoning. Start a
+     Codex reviewer fresh (`spawn_agent` with `fork_turns: "none"`), never as a fork of your thread. Select
      its model and effort by `.lean/policy/MODELS.md` and pass them on the spawn; the definition's
      `model: inherit` is only Claude's portable fallback. If no independent reviewer is available,
      follow `.lean/policy/REVIEW.md` and report `BLOCKED`.
