@@ -32,7 +32,8 @@ done
 root="$(cd "$root" && pwd)" || exit 2
 lock_helper="$(dirname "$helper")/gate_lock.py"
 if ! python3 "$lock_helper" --check "$root"; then
-  exec python3 "$lock_helper" --run "$root" "$0" "${gate_args[@]}"
+  # Bash 3.2 (macOS /bin/bash) treats an empty "${gate_args[@]}" as unbound under set -u.
+  exec python3 "$lock_helper" --run "$root" "$0" ${gate_args[@]+"${gate_args[@]}"}
 fi
 project="$root/.lean/PROJECT.md"
 cache="$root/.claude/.gate-cache"

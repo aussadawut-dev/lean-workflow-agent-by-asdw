@@ -36,6 +36,15 @@ class GateLockTests(unittest.TestCase):
                 self.assertFalse((self.root / 'runs').exists())
         self.assertEqual(self.gate().returncode, 0)
 
+    def test_direct_runner_without_arguments_uses_the_working_directory(self):
+        # macOS /bin/bash 3.2 treats an empty "${array[@]}" as unbound under `set -u`.
+        shell = '/bin/bash' if Path('/bin/bash').exists() else 'bash'
+        result = subprocess.run([shell, str(ROOT / '.lean/scripts/quality-gate.sh')], cwd=self.root,
+                                text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn('unbound variable', result.stderr)
+        self.assertEqual((self.root / 'runs').read_text(), 'ran')
+
     def test_running_gate_holds_lock_and_releases_after_failure(self):
         self.root.joinpath('.lean/PROJECT.md').write_text(
             '<!-- gate:start -->\n```sh\nprintf ready > ready; while [ ! -f release ]; do sleep 0.05; done; false\n```\n<!-- gate:end -->\n')
