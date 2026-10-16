@@ -204,6 +204,16 @@ class StopContractTests(HookFixture):
         passed = self.claude_stop("c1")
         self.assertEqual(passed.returncode, 0, passed.stderr)
 
+    def test_codex_session_start_keeps_the_first_baseline_of_a_session(self):
+        # A resumed session (or a subagent) fires SessionStart again with the same id; undeclared
+        # work made before that must not be folded into the baseline.
+        self.assertEqual(self.codex_event("session-start", "r1").returncode, 0)
+        (self.root / "app.py").write_text("x = 2\n")
+        self.assertEqual(self.codex_event("session-start", "r1").returncode, 0)
+        refused = json.loads(self.codex_event("stop", "r1").stdout)
+        self.assertEqual(refused.get("decision"), "block", refused)
+        self.assertIn("no declared Task Contract", refused["reason"])
+
     def test_codex_stop_requires_a_declaration_only_for_changed_work(self):
         self.assertEqual(self.codex_event("session-start", "x1").returncode, 0)
         unchanged = self.codex_event("stop", "x1")
