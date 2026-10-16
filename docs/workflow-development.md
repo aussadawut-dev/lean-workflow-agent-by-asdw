@@ -46,6 +46,8 @@ Run the full Python suite with:
 python3 -m unittest discover -s .lean/tests -p 'test_*.py'
 ```
 
+`python3 .lean/tests/run_tests.py` runs the same files, one process per file and several at once (`-j` sets the count, default one per CPU). Total time is close to the slowest file, and it prints each file's time, so the slowest files are easy to spot. CI uses it.
+
 It covers modes, claims, canonical routing and discovery links. `test_e2e.py` walks standard → tracker → full → standard, including completion, cleanup and downgrade guards. `test_guards.py` checks checklist variants, single-line tracker text and whitespace-padded agent IDs. `python3 .lean/scripts/workflow.py check` validates the current mode.
 
 `test_takeover.py` checks read-only inventory, read attestations, source/target/approval drift, dirty/untracked preservation, claim/path boundaries, interrupted apply/rollback and snapshot integrity. Foreign-record cases cover decision-bound mappings, original/evidence preservation, blocked/cancelled states, trusted staged validation and interrupted conversion recovery.

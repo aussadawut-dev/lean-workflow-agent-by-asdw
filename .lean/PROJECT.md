@@ -14,7 +14,7 @@ Bash, Python 3.9+ standard library, JSON and Markdown. AGENTS.md is canonical; C
 
 - Install: no application dependencies. Require Bash, Git, Python 3.9+ and shellcheck. Native Windows is unsupported; environment notes are in `docs/workflow-development.md`.
 - Build / Typecheck: not defined.
-- Test: `python3 -m unittest discover -s .lean/tests -p 'test_*.py'`. Run the full suite before reviewing workflow behavior changes; CI also runs it.
+- Test: `python3 -m unittest discover -s .lean/tests -p 'test_*.py'`, or `python3 .lean/tests/run_tests.py` to run files in parallel. Run the full suite before reviewing workflow behavior changes; CI also runs it.
 - Hooks: `.lean/tests/test-hooks.sh` uses temporary repositories.
 - Lint: `shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh` and `.lean/scripts/check-structure.sh`.
 - Mode validation: `python3 .lean/scripts/workflow.py show` / `check`.

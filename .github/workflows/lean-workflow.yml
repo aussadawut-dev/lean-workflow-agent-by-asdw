@@ -65,4 +65,4 @@ jobs:
         run: python3 .lean/scripts/model_catalog.py check
 
       - name: Workflow regression tests
-        run: python3 -m unittest discover -s .lean/tests -p 'test_*.py'
+        run: python3 .lean/tests/run_tests.py
