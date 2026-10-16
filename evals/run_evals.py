@@ -22,6 +22,19 @@ from harness import (PROVIDERS, TEST_COMMAND, build_fixture, changed_files, harn
 RESULTS = Path(__file__).resolve().parent / "results"
 
 
+def new_results_dir(base, stamp, provider):
+    """A fresh directory per run; runs started in the same second (say, one per provider) never share one."""
+    base.mkdir(parents=True, exist_ok=True)
+    for attempt in range(1, 1000):
+        path = base / (f"{stamp}-{provider}" if attempt == 1 else f"{stamp}-{provider}-{attempt}")
+        try:
+            path.mkdir()
+            return path
+        except FileExistsError:
+            continue
+    raise SystemExit(f"no free results directory for {stamp}-{provider} under {base}")
+
+
 def select(names):
     if not names:
         return CASES
@@ -94,8 +107,7 @@ def main(argv=None):
         return 2
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out = RESULTS / stamp
-    out.mkdir(parents=True)
+    out = new_results_dir(RESULTS, stamp, args.provider)
     spent, tokens, records, partial = 0.0, 0, [], False
     for case in cases:
         for run in range(1, args.runs + 1):

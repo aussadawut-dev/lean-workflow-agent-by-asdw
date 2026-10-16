@@ -43,7 +43,7 @@ python3 evals/run_evals.py --provider codex --model <codex-model> --max-total-to
 
 Sessions run as you, outside any sandbox, with edits accepted and `python3`, `git`, `bash`, `ls` and `cat` allowed in the temporary project. Those commands can reach beyond it, so run only cases you have read.
 
-`--max-total-usd` stops launching runs once reported spend reaches it, and `--max-run-usd` (default 2) caps each session. A run already in flight can overshoot by up to its own cap. Codex runs use `--max-total-tokens` the same way; Codex sessions run in its `workspace-write` sandbox with hook trust bypassed for the throwaway fixture only. Transcripts and `report.json` go to `evals/results/<timestamp>/` (git-ignored). `--keep` keeps fixture directories for inspection.
+`--max-total-usd` stops launching runs once reported spend reaches it, and `--max-run-usd` (default 2) caps each session. A run already in flight can overshoot by up to its own cap. Codex runs use `--max-total-tokens` the same way; Codex sessions run in its `workspace-write` sandbox with hook trust bypassed for the throwaway fixture only. Transcripts and `report.json` go to `evals/results/<timestamp>-<provider>/` (git-ignored; a numeric suffix keeps runs started in the same second apart, so both providers can run at once). `--keep` keeps fixture directories for inspection.
 
 ## Provider gaps
 

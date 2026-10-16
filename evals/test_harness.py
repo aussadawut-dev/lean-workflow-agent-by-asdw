@@ -279,6 +279,19 @@ class GraderTests(unittest.TestCase):
         self.assertTrue(self.check_codex(grade, [order[2], *order[:2], order[3]]))
 
 
+class ResultsDirectoryTests(unittest.TestCase):
+    def test_runs_started_in_the_same_second_get_separate_directories(self):
+        import run_evals
+        with tempfile.TemporaryDirectory() as base:
+            stamp = "20261017T000000Z"
+            first = run_evals.new_results_dir(Path(base), stamp, "claude")
+            second = run_evals.new_results_dir(Path(base), stamp, "codex")
+            third = run_evals.new_results_dir(Path(base), stamp, "codex")
+            self.assertEqual(len({first, second, third}), 3)
+            self.assertTrue(all(path.is_dir() and path.parent == Path(base) for path in (first, second, third)))
+            self.assertEqual(second.name, f"{stamp}-codex")
+
+
 class CaseTableTests(unittest.TestCase):
     def test_cases_are_named_uniquely_and_graded(self):
         names = [case["name"] for case in cases.CASES]
