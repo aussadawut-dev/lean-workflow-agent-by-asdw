@@ -20,6 +20,17 @@ FILES = (".gitignore", ".lean/scripts/contract_guard.py", ".lean/scripts/gate_ev
          ".claude/settings.json", ".codex/hooks.json", ".codex/hooks/quality_gate.py")
 
 
+def stop_refusal(result):
+    """Claude's Stop adapter refuses with a JSON decision block on exit 0; read it as exit 2 + reason."""
+    try:
+        data = json.loads(result.stdout) if result.returncode == 0 and result.stdout.strip() else None
+    except ValueError:
+        data = None
+    if isinstance(data, dict) and data.get("decision") == "block":
+        return subprocess.CompletedProcess(result.args, 2, "", result.stderr + data["reason"])
+    return result
+
+
 class ParseTests(unittest.TestCase):
     def test_one_line_trivial_and_block_forms(self):
         self.assertEqual(contract_guard.parse(LINE), (LINE, {}))
@@ -187,9 +198,10 @@ class StopContractTests(HookFixture):
                               text=True, capture_output=True, env=env)
         self.assertEqual(seed.returncode, 0, seed.stderr)
         (self.root / "app.py").write_text("x = 2\n")
-        return subprocess.run(["bash", str(self.root / ".claude/hooks/quality-gate.sh")], env=env, text=True,
-                              capture_output=True, input=json.dumps({"session_id": session, "stop_hook_active": False,
-                                                                     "transcript_path": str(self.transcript)}))
+        return stop_refusal(subprocess.run(
+            ["bash", str(self.root / ".claude/hooks/quality-gate.sh")], env=env, text=True, capture_output=True,
+            input=json.dumps({"session_id": session, "stop_hook_active": False,
+                              "transcript_path": str(self.transcript)})))
 
     def codex_event(self, event, session):
         return subprocess.run(["python3", str(self.root / ".codex/hooks/quality_gate.py"), event], text=True,

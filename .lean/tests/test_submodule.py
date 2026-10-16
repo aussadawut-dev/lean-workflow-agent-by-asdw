@@ -10,6 +10,17 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def stop_refusal(result):
+    """Claude's Stop adapter refuses with a JSON decision block on exit 0; read it as exit 2 + reason."""
+    try:
+        data = json.loads(result.stdout) if result.returncode == 0 and result.stdout.strip() else None
+    except ValueError:
+        data = None
+    if isinstance(data, dict) and data.get("decision") == "block":
+        return subprocess.CompletedProcess(result.args, 2, "", result.stderr + data["reason"])
+    return result
+
+
 class SubmoduleTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="lean submodule ")
@@ -74,7 +85,7 @@ class SubmoduleTests(unittest.TestCase):
         result = subprocess.run(["bash", str(self.root / ".claude/hooks/quality-gate.sh"), *(["--seed"] if seed else [])],
                                 input="{}", env={**self.env, "CLAUDE_PROJECT_DIR": str(self.root)},
                                 text=True, capture_output=True)
-        return result
+        return stop_refusal(result)
 
     def test_preview_has_no_filesystem_or_index_effects(self):
         before = self.git(self.root, "status", "--porcelain")

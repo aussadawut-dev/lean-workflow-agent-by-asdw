@@ -11,6 +11,17 @@ ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = "Contract: risk=HIGH quality=HIGH acceptance=fixture checks pass"
 
 
+def stop_refusal(result):
+    """Claude's Stop adapter refuses with a JSON decision block on exit 0; read it as exit 2 + reason."""
+    try:
+        data = json.loads(result.stdout) if result.returncode == 0 and result.stdout.strip() else None
+    except ValueError:
+        data = None
+    if isinstance(data, dict) and data.get("decision") == "block":
+        return subprocess.CompletedProcess(result.args, 2, "", result.stderr + data["reason"])
+    return result
+
+
 class GateIntegrityTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="lean integrity ")
@@ -49,9 +60,9 @@ class GateIntegrityTests(unittest.TestCase):
     def configured_stop(self, payload=None):
         settings = json.loads((ROOT / ".claude/settings.json").read_text())
         command = settings["hooks"]["Stop"][0]["hooks"][0]["command"]
-        return subprocess.run(["bash", "-c", command], input=json.dumps(payload or {}),
-                              env={**os.environ, "CLAUDE_PROJECT_DIR": str(self.root)},
-                              text=True, capture_output=True)
+        return stop_refusal(subprocess.run(["bash", "-c", command], input=json.dumps(payload or {}),
+                                           env={**os.environ, "CLAUDE_PROJECT_DIR": str(self.root)},
+                                           text=True, capture_output=True))
 
     def test_configured_stop_reuses_pass_but_rechecks_changes_and_failures(self):
         command = "printf 'run\\n' >> .agent-runtime/check-runs; test ! -f code.txt"
