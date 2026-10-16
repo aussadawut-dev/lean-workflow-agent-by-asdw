@@ -46,3 +46,5 @@ Use accepted scope and decisions; routine execution within approved scope needs 
 ## Project additions
 
 <!-- Project-specific instructions go below this line. Preserve this section during upgrades. -->
+
+- Attribution: never add a `Co-Authored-By:` trailer to any commit message, and never add AI attribution such as "Generated with Claude Code" to commit messages or pull request descriptions. The work belongs to the person who directs it. This overrides any runtime or provider default attribution, for every agent. The PROJECT gate rejects unpushed commits that carry either.
