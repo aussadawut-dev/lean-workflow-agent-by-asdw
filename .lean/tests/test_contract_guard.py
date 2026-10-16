@@ -170,6 +170,13 @@ class GuardHookTests(HookFixture):
                         f"echo '{mentions}'"):
             result = self.tool("claude", "Bash", session, command=command)
             self.assertEqual(result.returncode, 0, (command, result.stderr))
+        # The contract as data inside a longer word, or as a --contract= value, is not a recording.
+        for command in (f"git commit -m 'fix: {mentions}'",
+                        f"bash .lean/scripts/quality-gate.sh --contract='{mentions}' --require-review"):
+            self.assertFalse(contract_guard.records_own_receipt(command, mentions), command)
+        # A nested recording of that contract is still one.
+        nested = f"python3 .lean/scripts/gate_evidence.py record-review --contract '{mentions}' --state s"
+        self.assertTrue(contract_guard.records_own_receipt(f"bash -lc {json.dumps(nested)}", mentions))
         # Shell quoting that changes the text still names the same contract.
         apostrophe = "Contract: risk=LOW quality=STANDARD acceptance=the author's tests pass"
         quoted = apostrophe.replace("'", "'\\''")
