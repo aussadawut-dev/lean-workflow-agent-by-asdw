@@ -37,7 +37,10 @@ DECLARE = re.compile(r"\s*(?:cd\s+(?:\"[^\"$`\\]*\"|'[^']*'|[\w./~-]+)\s*&&\s*)?
                      r"\s+declare(?P<rest>.*)\Z")
 SINGLE = re.compile(r"\s+--contract\s+'(?P<text>[^'\n]*)'\s*\Z")
 HEREDOC = re.compile(r"\s*<<-?\s*(?P<quote>['\"])(?P<word>\w+)(?P=quote)\s*\Z")
-RUNTIME_PROMPTS = ("<task-notification>", "<agent-message", "<cross-session-message")
+# Runtime-injected turns (task notices, agent hand-backs, hook feedback), sometimes wrapped in a
+# system reminder, continue the current task; only a person's prompt clears the declaration.
+RUNTIME_PROMPTS = ("<task-notification>", "<agent-message", "<cross-session-message", "<system-reminder>",
+                   "[SYSTEM NOTIFICATION", "Stop hook feedback:")
 MAX_SESSIONS = 64
 HELP = ("Declare the Task Contract first, in its own command:\n"
         "python3 .lean/scripts/contract_guard.py declare <<'EOF'\nContract:\nrisk: LOW\nquality: STANDARD\n"
@@ -231,11 +234,25 @@ def records_own_receipt(command, declared, depth=0):
         # contract text is data, such as a commit message quoting it. Anything else that mentions it
         # may run under a wrapper (`eval "--contract=x; ..."`), so it is parsed as a command.
         candidate = word.split("=", 1)[1] if word.startswith("--contract=") else word
-        if candidate == word == "record-review" or "record-review" not in candidate.replace(declared, ""):
+        if "record-review" not in candidate.replace(declared, ""):
+            continue
+        # Re-parsing a single word yields itself: a path or pattern such as record-review.txt is
+        # not a call, and a bare record-review word is left to the standalone check below.
+        if candidate == word and not any(c.isspace() for c in word):
             continue
         if records_own_receipt(candidate, declared, depth + 1):
             return True
-    if "record-review" not in words:
+    # A standalone record-review word is a call only after gate_evidence (or a path the guard
+    # cannot read) in the same simple command; `grep -rn record-review .` only searches for it.
+    called, tool = False, False
+    for word in words:
+        if word in OPERATORS:
+            tool = False
+        elif word == "record-review" and tool:
+            called = True
+        elif "gate_evidence" in word or "$" in word or "`" in word:
+            tool = True
+    if not called:
         return False
     if not values or declared in command:
         return True

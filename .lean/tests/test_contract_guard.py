@@ -135,6 +135,10 @@ class GuardHookTests(HookFixture):
                 self.assertEqual(self.tool(provider, write[0], "other", **write[1]).returncode, 2)
                 self.assertEqual(self.prompt(provider, "<task-notification>done</task-notification>",
                                              session).returncode, 0)
+                # Runtime notices wrapped in a system reminder are not a person's prompt either.
+                self.assertEqual(self.prompt(provider, "<system-reminder>\n[SYSTEM NOTIFICATION - NOT USER INPUT]\n"
+                                             "<task-notification>done</task-notification>", session).returncode, 0)
+                self.assertEqual(self.prompt(provider, "Stop hook feedback:\nGate evidence: refused", session).returncode, 0)
                 self.assertEqual(self.tool(provider, write[0], session, **write[1]).returncode, 0)
                 self.assertEqual(self.prompt(provider, "Next task please", session).returncode, 0)
                 self.assertEqual(self.tool(provider, write[0], session, **write[1]).returncode, 2)
@@ -173,6 +177,9 @@ class GuardHookTests(HookFixture):
         # The contract as data inside a longer word, or as a --contract= value, is not a recording.
         for command in (f"git commit -m 'fix: {mentions}'",
                         f"bash .lean/scripts/quality-gate.sh --contract='{mentions}' --require-review"):
+            self.assertFalse(contract_guard.records_own_receipt(command, mentions), command)
+        # A single word that only contains the subcommand name is a path or pattern, not a call.
+        for command in ("cat record-review.txt", "grep -rn record-review .lean/policy", "ls record-review/x"):
             self.assertFalse(contract_guard.records_own_receipt(command, mentions), command)
         # A nested recording of that contract is still one, including one hidden behind a
         # --contract= or --contract word that a wrapper evaluates (review of 4c609b7).
