@@ -45,6 +45,15 @@ class TranscriptTests(unittest.TestCase):
         self.assertEqual(session.first_write("calc.py"), 1)
         self.assertIsNone(session.first_write("other.py"))
 
+    def test_ignores_events_whose_message_or_blocks_are_not_objects(self):
+        session = Transcript([json.dumps({"type": "system", "message": "hook output"}),
+                              json.dumps({"type": "assistant", "message": "plain"}),
+                              json.dumps({"type": "assistant", "message": {"content": ["raw", text(CONTRACT)]}}),
+                              json.dumps(["not", "an", "object"]),
+                              final("end")])
+        self.assertEqual([event["kind"] for event in session.events], ["text"])
+        self.assertEqual(session.final_text, "end")
+
     def test_command_never_loads_user_settings_and_takes_prompt_on_stdin(self):
         command = agent_command("sonnet", 1.5)
         self.assertEqual(command[command.index("--setting-sources") + 1], "project,local")

@@ -179,19 +179,22 @@ class Transcript:
                 item = json.loads(line)
             except ValueError:
                 continue
+            if not isinstance(item, dict):
+                continue
             if item.get("parent_tool_use_id"):
                 continue  # Subagent traffic; the reviewer's own calls are not the author's.
             kind = item.get("type")
-            content = (item.get("message") or {}).get("content")
+            message = item.get("message")
+            content = message.get("content") if isinstance(message, dict) else None
             if kind == "assistant" and isinstance(content, list):
-                for block in content:
+                for block in filter(lambda block: isinstance(block, dict), content):
                     if block.get("type") == "text" and block.get("text", "").strip():
                         self.events.append({"kind": "text", "text": block["text"]})
                     elif block.get("type") == "tool_use":
                         self.events.append({"kind": "tool", "id": block.get("id"), "name": block.get("name"),
                                             "input": block.get("input") or {}})
             elif kind == "user" and isinstance(content, list):
-                for block in content:
+                for block in filter(lambda block: isinstance(block, dict), content):
                     if block.get("type") == "tool_result":
                         body = block.get("content")
                         if isinstance(body, list):

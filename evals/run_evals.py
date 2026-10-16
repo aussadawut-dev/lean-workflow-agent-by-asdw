@@ -99,12 +99,13 @@ def main(argv=None):
             began = time.monotonic()
             lines, code, stderr = run_agent(root, case["prompt"], args.model,
                                             min(args.max_run_usd, args.max_total_usd - spent), args.timeout)
+            label = f"{case['name']}#{run}"
+            # Save the raw session first: a paid transcript must survive a parser or grader error.
+            (out / f"{label}.jsonl").write_text("\n".join(lines) + "\n")
             transcript = Transcript(lines)
             cost = transcript.cost
             spent += cost or 0.0
             failures = grade(case, transcript, root) if transcript.events else ["no session events: " + stderr[-300:]]
-            label = f"{case['name']}#{run}"
-            (out / f"{label}.jsonl").write_text("\n".join(lines) + "\n")
             records.append({"case": case["name"], "run": run, "passed": not failures, "failures": failures,
                             "exit_code": code, "cost_usd": cost, "seconds": round(time.monotonic() - began, 1),
                             "changed_files": changed_files(root), "fixture": directory if args.keep else None})
