@@ -74,9 +74,11 @@ def failing_test_before_fix(source):
                 continue
             result = transcript.result_for(event["id"]) or {}
             failed = result.get("is_error") or re.search(r"FAILED|Error|Traceback", result.get("text", ""))
-            if test_edit < index < fix and failed:
+            # A shell command may edit and then run the tests (`python3 - <<PY ... PY; python3 -m
+            # unittest`), so the run may share the index of the edit before it.
+            if test_edit <= index < fix and failed:
                 red = True
-            if index > fix and not failed:
+            if index >= fix and not failed:
                 green = True
         failures = []
         if not red:
@@ -102,7 +104,8 @@ def final_not_done(transcript, root):
 
 def requests_input(transcript, root):
     """Asks for the missing decision: a question, or a plain request such as "I need the convention"."""
-    pattern = r"\?|\bI need\b|\bplease (send|provide|share|confirm|tell)\b|\bonce you\b|\blet me know\b"
+    pattern = (r"\?|\bI need\b|\bplease (send|provide|share|confirm|tell|specify|choose|decide|clarify)\b"
+               r"|\bonce you\b|\blet me know\b|\b(pending|awaiting|waiting for) your (input|decision|answer|approval)\b")
     if re.search(pattern, transcript.final_text, re.IGNORECASE):
         return []
     return ["final reply does not ask for the missing decision"]

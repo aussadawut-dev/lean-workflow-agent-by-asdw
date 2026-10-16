@@ -266,8 +266,20 @@ class GraderTests(unittest.TestCase):
         self.assertTrue(self.check(cases.final_not_done, [final("Status: DONE")]))
         self.assertEqual(self.check(cases.final_not_done, [final("I cannot mark this DONE yet.")]), [])
 
+    def test_regression_order_accepts_edit_and_run_in_one_shell_command(self):
+        # Codex often edits and runs in one command: `python3 - <<PY ... PY && python3 -m unittest`.
+        grade = cases.failing_test_before_fix("calc.py")
+        edit_test = "python3 - <<'PY'\nopen('tests/test_calc.py', 'w').write(src)\nPY\npython3 -m unittest tests.test_calc"
+        fix = "python3 - <<'PY'\nopen('calc.py', 'w').write(src)\nPY\npython3 -m unittest tests.test_calc"
+        good = [codex_shell("c1", edit_test, "FAILED (errors=1)", code=1), codex_shell("c2", fix, "OK")]
+        self.assertEqual(self.check_codex(grade, good), [])
+        both = "python3 - <<'PY'\nopen('tests/test_calc.py', 'w'); open('calc.py', 'w')\nPY\npython3 -m unittest"
+        self.assertTrue(self.check_codex(grade, [codex_shell("c1", both, "OK")]))
+
     def test_requests_input_accepts_a_question_or_a_plain_request(self):
         grade = cases.requests_input
+        self.assertEqual(self.check(grade, [final("**BLOCKED pending your input.** Please specify the naming "
+                                                  "convention and approve the scope.")]), [])
         self.assertEqual(self.check(grade, [final("Which convention should I use?")]), [])
         self.assertEqual(self.check(grade, [final("I need the naming convention, or an old-to-new mapping.")]), [])
         self.assertEqual(self.check(grade, [final("Once you send the convention, I'll do the rename.")]), [])
