@@ -227,11 +227,13 @@ def records_own_receipt(command, declared, depth=0):
     values = [words[index + 1] for index, word in enumerate(words[:-1]) if word == "--contract"]
     values += [word.split("=", 1)[1] for word in words if word.startswith("--contract=")]
     for word in words:
-        # Data, not a command: a --contract value (either form) or a word whose only mention of
-        # record-review is inside the declared contract text, such as a commit message quoting it.
-        if word in values or word.startswith("--contract=") or "record-review" not in word.replace(declared, ""):
+        # A word (or a --contract= value) whose only mention of record-review is inside the declared
+        # contract text is data, such as a commit message quoting it. Anything else that mentions it
+        # may run under a wrapper (`eval "--contract=x; ..."`), so it is parsed as a command.
+        candidate = word.split("=", 1)[1] if word.startswith("--contract=") else word
+        if candidate == word == "record-review" or "record-review" not in candidate.replace(declared, ""):
             continue
-        if any(c.isspace() for c in word) and records_own_receipt(word, declared, depth + 1):
+        if records_own_receipt(candidate, declared, depth + 1):
             return True
     if "record-review" not in words:
         return False

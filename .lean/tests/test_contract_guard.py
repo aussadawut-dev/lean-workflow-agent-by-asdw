@@ -174,9 +174,13 @@ class GuardHookTests(HookFixture):
         for command in (f"git commit -m 'fix: {mentions}'",
                         f"bash .lean/scripts/quality-gate.sh --contract='{mentions}' --require-review"):
             self.assertFalse(contract_guard.records_own_receipt(command, mentions), command)
-        # A nested recording of that contract is still one.
+        # A nested recording of that contract is still one, including one hidden behind a
+        # --contract= or --contract word that a wrapper evaluates (review of 4c609b7).
         nested = f"python3 .lean/scripts/gate_evidence.py record-review --contract '{mentions}' --state s"
-        self.assertTrue(contract_guard.records_own_receipt(f"bash -lc {json.dumps(nested)}", mentions))
+        for command in (f"bash -lc {json.dumps(nested)}", f"eval {json.dumps('--contract=x; ' + nested)}",
+                        f"bash -c {json.dumps('--contract=x; ' + nested)}",
+                        f"eval --contract {json.dumps('x; ' + nested)}"):
+            self.assertTrue(contract_guard.records_own_receipt(command, mentions), command)
         # Shell quoting that changes the text still names the same contract.
         apostrophe = "Contract: risk=LOW quality=STANDARD acceptance=the author's tests pass"
         quoted = apostrophe.replace("'", "'\\''")
