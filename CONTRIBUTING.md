@@ -10,7 +10,7 @@ Run deterministic checks before review:
 
 ```sh
 bash .lean/scripts/quality-gate.sh --root .
-python3 -m unittest discover -s .lean/tests -p 'test_*.py'
+python3 .lean/tests/run_tests.py
 ```
 
 The shared gate runs the commands in `.lean/PROJECT.md`, including ShellCheck, structure checks, hook tests, mode/catalog checks and gate/discovery tests. The full Python suite covers workflow behavior. Use temporary repositories for tests so the template stays free of task records.
