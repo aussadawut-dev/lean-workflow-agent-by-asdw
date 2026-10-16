@@ -11,6 +11,7 @@ import math
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 import tempfile
 import time
@@ -166,6 +167,11 @@ def tracker_file(root, tracker_id):
     directory = root / "docs/tracking"
     matches = [p for p in directory.glob(f"{tracker_id}*.md")
                if p.stem == tracker_id or p.stem.startswith(tracker_id + "-")]
+    if not matches:
+        history_dir = root / "docs/history/agent-workflow"
+        if history_dir.is_dir():
+            matches = [p for p in history_dir.rglob(f"{tracker_id}*.md")
+                       if p.stem == tracker_id or p.stem.startswith(tracker_id + "-")]
     if len(matches) != 1:
         fail(f"expected one tracker document for {tracker_id}, found {len(matches)}")
     return matches[0]
@@ -249,6 +255,43 @@ def tracker_command(root, args):
                 content = content.replace(marker, marker + f"\n- {evidence}\n", 1)
             write_text(path, content)
             print(f"tracker {args.id}: {args.status}")
+        elif args.action == "archive":
+            directory = root / "docs/tracking"
+            history_dir = root / "docs/history/agent-workflow"
+            targets = []
+            if args.id:
+                if not TRACKER.fullmatch(args.id):
+                    fail("invalid tracker id")
+                targets = [tracker_file(root, args.id)]
+            else:
+                for path in sorted(directory.glob("TCK*.md")):
+                    if re.fullmatch(r"TCK[0-9]{3,}(?:-[a-zA-Z0-9_-]+)?", path.stem):
+                        targets.append(path)
+            selected = []
+            for path in targets:
+                content = path.read_text()
+                statuses = re.findall(r"(?m)^Status: ([A-Z_]+)$", content)
+                if len(statuses) == 1 and statuses[0] == "DONE":
+                    tracker_id = path.stem.split("-", 1)[0]
+                    if config(root)["mode"] == "full":
+                        linked = [item for item in items(root).values() if item["tracker"] == tracker_id]
+                        if any(item["status"] != "DONE" for item in linked):
+                            continue
+                    selected.append((tracker_id, path))
+            report = {
+                "selected": [tid for tid, _ in selected],
+                "archived": [],
+                "applied": args.apply,
+            }
+            if args.apply:
+                history_dir.mkdir(parents=True, exist_ok=True)
+                for tid, path in selected:
+                    dest = history_dir / path.name
+                    if dest.exists():
+                        fail(f"archived tracker destination already exists: {dest}")
+                    os.replace(path, dest)
+                    report["archived"].append(tid)
+            print(json.dumps(report, indent=2))
 
 
 def queue_history(root):
@@ -662,6 +705,93 @@ def queue_command(root, args):
             fail("no claimable queue item")
 
 
+def context_command(root, args):
+    with locked(root, read_only=True):
+        cfg = config(root)
+        report = {
+            "mode": cfg["mode"],
+            "configured": cfg["configured"],
+            "execution": cfg["execution"],
+            "active_tracker": None,
+            "git": None,
+            "active_claims": [],
+            "gate": None,
+        }
+        tracking_dir = root / "docs/tracking"
+        if tracking_dir.is_dir():
+            trackers_found = []
+            for path in sorted(tracking_dir.glob("TCK*.md")):
+                if not re.fullmatch(r"TCK[0-9]{3,}(?:-[a-zA-Z0-9_-]+)?", path.stem):
+                    continue
+                content = path.read_text()
+                statuses = re.findall(r"(?m)^Status: ([A-Z_]+)$", content)
+                if len(statuses) != 1:
+                    continue
+                status = statuses[0]
+                tracker_id = path.stem.split("-", 1)[0]
+                title_match = re.search(r"^#\s+(?:TCK[0-9]{3,}\s+[—–-]\s+)?(.*)$", content, re.MULTILINE)
+                title = title_match.group(1).strip() if title_match else path.stem
+                next_step_match = re.search(r"## Next step\s*\n+([^\n#]+)", content)
+                next_step = next_step_match.group(1).strip() if next_step_match else None
+                unchecked = unchecked_tracker_items(content)
+                trackers_found.append({
+                    "id": tracker_id,
+                    "filename": path.name,
+                    "title": title,
+                    "status": status,
+                    "next_step": next_step,
+                    "unchecked_tasks": unchecked,
+                })
+            priority = {"IN_PROGRESS": 1, "VALIDATING": 2, "REVIEWING": 3, "PLANNED": 4}
+            active = [t for t in trackers_found if t["status"] in priority]
+            if active:
+                active.sort(key=lambda t: priority.get(t["status"], 99))
+                report["active_tracker"] = active[0]
+            report["tracker_counts"] = {
+                state.lower(): sum(1 for t in trackers_found if t["status"] == state)
+                for state in TRACKER_STATES
+            }
+        claims = active_claims(root, cleanup=False)
+        report["active_claims"] = [
+            {"id": cid, "agent": claim.get("agent"), "expires_in": max(0, int(claim.get("expires_at", 0) - time.time()))}
+            for cid, claim in claims.items()
+        ]
+        try:
+            check_git = subprocess.run(
+                ["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"],
+                capture_output=True, text=True, check=False,
+            )
+            if check_git.returncode == 0:
+                branch = subprocess.run(
+                    ["git", "-C", str(root), "symbolic-ref", "--quiet", "--short", "HEAD"],
+                    capture_output=True, text=True, check=False,
+                ).stdout.strip() or "detached"
+                status_proc = subprocess.run(
+                    ["git", "-C", str(root), "status", "--porcelain"],
+                    capture_output=True, text=True, check=False,
+                )
+                status_out = status_proc.stdout.splitlines()
+                modified = [line[3:].strip() for line in status_out if line[:2].strip() != "??"]
+                untracked = [line[3:].strip() for line in status_out if line.startswith("??")]
+                report["git"] = {
+                    "branch": branch,
+                    "status": "modified" if status_out else "clean",
+                    "modified": modified[:20],
+                    "untracked": untracked[:20],
+                }
+        except Exception:
+            pass
+        gate_failed = root / ".claude/.gate-failed"
+        gate_cache = root / ".claude/.gate-cache"
+        if gate_failed.exists():
+            report["gate"] = {"status": "FAIL"}
+        elif gate_cache.exists():
+            report["gate"] = {"status": "PASS"}
+        else:
+            report["gate"] = {"status": "NOT_RUN"}
+        print(json.dumps(report, indent=2))
+
+
 def main():
     global TEMPLATE_ROOT
     sys.dont_write_bytecode = True  # Read-only commands must not leave imported tool caches.
@@ -685,6 +815,7 @@ def main():
     clean_choice.add_argument("--apply", action="store_true")
     commands.add_parser("show")
     commands.add_parser("check")
+    commands.add_parser("context")
     tracker = commands.add_parser("tracker")
     tracker_actions = tracker.add_subparsers(dest="action", required=True)
     new = tracker_actions.add_parser("new")
@@ -694,6 +825,11 @@ def main():
     status.add_argument("--id", required=True)
     status.add_argument("--status", choices=TRACKER_STATES, required=True)
     status.add_argument("--evidence", default="")
+    archive = tracker_actions.add_parser("archive")
+    archive.add_argument("--id")
+    archive_choice = archive.add_mutually_exclusive_group(required=True)
+    archive_choice.add_argument("--dry-run", action="store_true")
+    archive_choice.add_argument("--apply", action="store_true")
     queue = commands.add_parser("queue")
     actions = queue.add_subparsers(dest="action", required=True)
     actions.add_parser("list")
@@ -734,6 +870,8 @@ def main():
             print(json.dumps(config(root)))
         elif args.command == "check":
             check(root)
+        elif args.command == "context":
+            context_command(root, args)
         elif args.command == "tracker":
             tracker_command(root, args)
         else:

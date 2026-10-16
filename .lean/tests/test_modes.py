@@ -529,6 +529,50 @@ class WorkflowModeTests(unittest.TestCase):
         self.run_cli("queue", "claim", "--id", "Q0001", "--agent", "two",
                      "--request-id", "request-00000001", success=False)
 
+    def test_context_command_in_standard_and_tracker_modes(self):
+        # In unconfigured standard mode
+        res = self.run_cli("context")
+        data = json.loads(res.stdout)
+        self.assertEqual(data["mode"], "standard")
+        self.assertEqual(data["execution"], "direct")
+        self.assertFalse(data["configured"])
+        self.assertIsNone(data["active_tracker"])
+
+        # Switch to tracker mode and create an active tracker
+        self.run_cli("configure", "tracker")
+        self.tracker_doc("TCK001.md")
+        self.run_cli("tracker", "status", "--id", "TCK001", "--status", "IN_PROGRESS")
+        res2 = self.run_cli("context")
+        data2 = json.loads(res2.stdout)
+        self.assertEqual(data2["mode"], "tracker")
+        self.assertIsNotNone(data2["active_tracker"])
+        self.assertEqual(data2["active_tracker"]["id"], "TCK001")
+        self.assertEqual(data2["active_tracker"]["status"], "IN_PROGRESS")
+
+    def test_tracker_archive_dry_run_and_apply(self):
+        self.run_cli("configure", "tracker")
+        doc = self.checklist_tracker()
+        doc.write_text(doc.read_text().replace("- [ ]", "- [x]"))
+        self.run_cli("tracker", "status", "--id", "TCK001", "--status", "DONE", "--evidence", "all done")
+
+        # Dry run does not move the file
+        dry = self.run_cli("tracker", "archive", "--dry-run")
+        dry_data = json.loads(dry.stdout)
+        self.assertIn("TCK001", dry_data["selected"])
+        self.assertFalse(dry_data["applied"])
+        self.assertTrue((self.root / "docs/tracking/TCK001.md").is_file())
+
+        # Apply moves to docs/history/agent-workflow
+        applied = self.run_cli("tracker", "archive", "--apply")
+        app_data = json.loads(applied.stdout)
+        self.assertIn("TCK001", app_data["archived"])
+        self.assertTrue(app_data["applied"])
+        self.assertFalse((self.root / "docs/tracking/TCK001.md").exists())
+        self.assertTrue((self.root / "docs/history/agent-workflow/TCK001.md").is_file())
+
+        # History is checked and integrity holds
+        self.run_cli("check")
+
 
 if __name__ == "__main__":
     unittest.main()
