@@ -6,13 +6,16 @@ files and test results, never a model's opinion.
 """
 import re
 
-from harness import CONTRACT, TEST_COMMAND, changed_files, tests_pass
+from harness import TEST_COMMAND, changed_files, parse_contract, tests_pass
 
 
 def contract_first(transcript, root):
+    """The reply opens with a one-line or block contract (CONTRACTS.md), before any file write."""
     index, text = transcript.first_text()
     first_line = text.strip().splitlines()[0] if text.strip() else ""
-    if not CONTRACT.match(first_line):
+    try:
+        parse_contract(text.strip().split("\n\n", 1)[0])
+    except ValueError:
         return [f"first reply line is not a contract: {first_line[:120]!r}"]
     write = transcript.first_write()
     if write is not None and index > write:

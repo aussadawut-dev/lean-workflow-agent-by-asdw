@@ -14,7 +14,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / ".lean/tests"))
+sys.path.insert(0, str(ROOT / ".lean/scripts"))
 from test_template import bootstrap  # noqa: E402
+from contract_guard import parse as parse_contract  # noqa: E402
 
 PROVIDERS = ("claude", "codex")
 WRITE_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
@@ -22,8 +24,6 @@ WRITE_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
 # Redirections to /dev/null and descriptor duplications such as 2>&1 are not writes.
 SHELL_WRITE = re.compile(r"(?<![\d&>])>{1,2}(?!&)(?!\s*/dev/null)|\btee\b|\bsed\s+-i|\bperl\s+-\S*i"
                          r"|\bapply_patch\b|open\([^)]*['\"][wax]\+?['\"]|\.write_text\(|\b(mv|cp|touch|rm)\s")
-CONTRACT = re.compile(r"^Contract: (risk=(LOW|MEDIUM|HIGH) quality=(STANDARD|HIGH|VERY_HIGH) acceptance=\S"
-                      r"|trivial \()")
 
 CALC = '''"""Small calculator used by Lean behavior evals."""
 

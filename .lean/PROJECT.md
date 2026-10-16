@@ -41,6 +41,7 @@ python3 tools/check_commit_attribution.py --root .
 
 - `.claude/hooks/` and `.claude/settings.json`: run on every turn and control permissions; a bug can block all work or widen access.
 - `.lean/scripts/gate_lock.py`: controls gate serialization and must be reviewed with the runner.
+- `.lean/scripts/contract_guard.py`: PreToolUse contract guard for both providers; a bug can block every write or let writes through undeclared.
 - `.lean/scripts/gate_mode.py`, `.codex/hooks.json` and `.codex/hooks/`: shared gate policy and Codex lifecycle adapter.
 - `.lean/policy/`: changes alter behavior for every downstream project on upgrade.
 

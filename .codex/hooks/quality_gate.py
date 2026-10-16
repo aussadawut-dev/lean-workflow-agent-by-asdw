@@ -8,7 +8,8 @@ import sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / ".lean/scripts"))
 from gate_mode import policy, read_auto
-from gate_evidence import check_review
+from gate_evidence import check_review, state
+import contract_guard
 
 
 def current_review_contract(root):
@@ -45,6 +46,12 @@ def main():
         print(json.dumps({"systemMessage": message}))
         return 0
     if args.event == "session-start":
+        session = payload_session(sys.stdin)
+        if session:
+            try:
+                contract_guard.baseline(root, session, state(root))
+            except (OSError, ValueError, subprocess.CalledProcessError):
+                pass  # No baseline: the Stop treats any uncommitted change as this session's work.
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": policy(auto)}}))
         return 0
     if args.event == "stop" and not auto:
@@ -53,6 +60,17 @@ def main():
     command = ["bash", str(root / ".lean/scripts/quality-gate.sh"), "--root", str(root)]
     contract = args.contract
     reviewed = None
+    session = payload.get("session_id") if isinstance(payload.get("session_id"), str) else ""
+    # Without a session id (no hook metadata) the contract cannot be enforced, as with a
+    # Claude Stop that carries no transcript.
+    if args.event == "stop" and not contract and session:
+        try:
+            contract = contract_guard.current(root, session)
+            if not contract and changed_since_baseline(root, session):
+                return refuse(payload, "Changed work has no declared Task Contract for this session.\n"
+                              + contract_guard.HELP)
+        except (OSError, ValueError, subprocess.CalledProcessError) as error:
+            return refuse(payload, f"Task Contract state unreadable: {error}")
     if args.event == "stop" and not contract:
         reviewed = current_review_contract(root)
         contract = reviewed
@@ -66,11 +84,40 @@ def main():
         sys.stderr.write(result.stderr)
         return result.returncode
     if result.returncode == 0:
+        if session:
+            try:
+                contract_guard.baseline(root, session, state(root))
+            except (OSError, ValueError, subprocess.CalledProcessError):
+                pass
         print(json.dumps({"systemMessage": "Quality Gate checks passed; acceptance and required semantic review remain separate."}))
-    else:
-        message = "Quality Gate UNVERIFIED. Report BLOCKED; do not declare DONE.\n" + (result.stderr + result.stdout)[-12000:]
-        response = {"systemMessage": message} if payload.get("stop_hook_active") else {"decision": "block", "reason": message}
-        print(json.dumps(response))
+        return 0
+    return refuse(payload, (result.stderr + result.stdout)[-12000:])
+
+
+def payload_session(stream):
+    """The session id from a SessionStart payload, or "" when absent or unreadable."""
+    try:
+        payload = json.load(stream)
+    except ValueError:
+        return ""
+    session = payload.get("session_id") if isinstance(payload, dict) else None
+    return session if isinstance(session, str) and session.strip() and "\n" not in session else ""
+
+
+def changed_since_baseline(root, session):
+    """Whether the shipping state moved since this session started or last passed the gate."""
+    recorded = contract_guard.baseline(root, session) if session else None
+    if recorded:
+        return state(root) != recorded
+    dirty = subprocess.run(["git", "-C", str(root), "status", "--porcelain"], capture_output=True, text=True)
+    return dirty.returncode != 0 or bool(dirty.stdout.strip())
+
+
+def refuse(payload, detail):
+    """Block a fresh Stop once; a continued Stop is released UNVERIFIED, never as a pass."""
+    message = "Quality Gate UNVERIFIED. Report BLOCKED; do not declare DONE.\n" + detail
+    response = {"systemMessage": message} if payload.get("stop_hook_active") else {"decision": "block", "reason": message}
+    print(json.dumps(response))
     return 0
 
 

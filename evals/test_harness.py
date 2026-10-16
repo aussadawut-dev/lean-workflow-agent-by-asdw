@@ -190,6 +190,10 @@ class GraderTests(unittest.TestCase):
         after_write = [assistant(tool("t1", "Write", file_path="calc.py")), assistant(text(CONTRACT))]
         self.assertTrue(self.check(cases.contract_first, after_write))
         self.assertTrue(self.check(cases.contract_first, [final("no text events")]))
+        block = "Contract:\ntopic: multiply\nrisk: LOW\nquality: STANDARD\nacceptance: tests pass\n\nPlan."
+        self.assertEqual(self.check(cases.contract_first, [assistant(text(block))]), [])
+        placeholder = "Contract:\nrisk: LOW\nquality: STANDARD\nacceptance: <observable check>"
+        self.assertTrue(self.check(cases.contract_first, [assistant(text(placeholder))]))
 
     def test_trivial_contract(self):
         self.assertEqual(self.check(cases.contract_trivial, [assistant(text("Contract: trivial (typo)"))]), [])

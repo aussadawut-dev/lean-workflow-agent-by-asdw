@@ -17,7 +17,7 @@ class GateModeTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         for name in (".lean/scripts/gate_mode.py", ".codex/hooks/quality_gate.py", ".codex/hooks.json",
-                     ".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py",
+                     ".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py", ".lean/scripts/contract_guard.py",
                      ".claude/hooks/quality-gate.sh", ".claude/hooks/session-start.sh"):
             target = self.root / name
             target.parent.mkdir(parents=True, exist_ok=True)

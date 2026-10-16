@@ -10,6 +10,31 @@ Contract: risk=MEDIUM quality=STANDARD acceptance=go test ./... passes and print
 
 Trivial tasks: `Contract: trivial (<reason>)`.
 
+The same contract may be written as a block: `Contract:` alone, then one `field: value` per line in this order, ending at a blank line. `risk`, `quality` and `acceptance` are required; `topic` (a short slug), `budget` and `skill` (such as `lean-grill:high`) are optional. The block's canonical form is the one-line contract above, which receipts and `--contract` use. Model and effort are not typed: hooks record what the runtime reports.
+
+```
+Contract:
+topic: tally-unicode
+risk: MEDIUM
+quality: STANDARD
+budget: BALANCED
+acceptance: go test ./... passes and printf 'a' | tally prints 1 1 1
+```
+
+Declare it before the first write-capable tool, as a command of its own:
+
+```sh
+python3 .lean/scripts/contract_guard.py declare <<'EOF'
+Contract:
+risk: MEDIUM
+quality: STANDARD
+acceptance: go test ./... passes
+EOF
+python3 .lean/scripts/contract_guard.py declare --contract 'Contract: trivial (typo in README)'
+```
+
+The Claude and Codex PreToolUse hooks bind the declaration to the session (subagents share it) and deny shell, edit and unknown tools until one exists; read-only tools stay available. A new user prompt clears it. Run outside a hook, `declare` only validates. Use a quoted heredoc or single-quoted `--contract`: the guard accepts no shell expansion or chained command in a declaration.
+
 The line is the whole contract at every risk and quality level. The fields below define what it means; write them out only if the user asks:
 
 - **Goal** — what must be true when finished.

@@ -100,7 +100,7 @@ class GateLockTests(unittest.TestCase):
         fixture = self.root / 'fixture'
         scripts = fixture / '.lean/scripts'
         scripts.mkdir(parents=True)
-        for name in ('quality-gate.sh', 'gate_lock.py', 'gate_evidence.py'):
+        for name in ('quality-gate.sh', 'gate_lock.py', 'gate_evidence.py', 'contract_guard.py'):
             shutil.copy2(ROOT / '.lean/scripts' / name, scripts / name)
         shutil.copy2(self.root / '.lean/PROJECT.md', fixture / '.lean/PROJECT.md')
         command = ['bash', str(scripts / 'quality-gate.sh'), '--root', str(fixture)]
