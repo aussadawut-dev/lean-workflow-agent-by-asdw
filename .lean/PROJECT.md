@@ -42,6 +42,10 @@ python3 -m unittest discover -s .lean/tests -p 'test_skill_pack.py'
 - `.lean/scripts/gate_mode.py`, `.codex/hooks.json` and `.codex/hooks/`: shared gate policy and Codex lifecycle adapter.
 - `.lean/policy/`: changes alter behavior for every downstream project on upgrade.
 
+## Development rules
+
+- Provider parity: every workflow feature, hook and enforcement must work for both Claude and Codex with equivalent outcomes. Where a runtime cannot support part of it, record the gap explicitly in the feature's documentation and tests; never ship Claude-only or Codex-only behavior silently. Changes include tests for both providers' adapters.
+
 ## Documentation routes
 
 Select only the route needed, then follow affected dependencies; the list is not a read-all checklist.
