@@ -5,7 +5,7 @@ Repository checks prove that the rules are written down. These evals check wheth
 ## How a run works
 
 1. Copy the distributable template into a temporary project (the same copy `test_template.py` makes), add a tiny calculator app with tests, configure `standard`/`direct` and commit.
-2. Start a real `claude -p` session there. The project's `CLAUDE.md`/`AGENTS.md`, hooks, skills and reviewer agent load the way they do for users. User-level settings and plugins are left out (`--setting-sources project,local`).
+2. Start a real `claude -p` session there. The project's `CLAUDE.md`/`AGENTS.md`, hooks, skills and reviewer agent load the way they do for users. User-level settings and plugins are left out (`--setting-sources project,local`). Sessions persist like normal ones, because the Stop hook reads the transcript; they appear in your Claude session history under the temporary project path.
 3. Grade the session from its own events, changed files and test results. Graders are plain Python; no model judges.
 
 `claude plugin eval` is not used: it runs each case in an empty workspace without project `CLAUDE.md`, hooks or `.claude/` content, which is exactly what these cases test.
@@ -17,9 +17,11 @@ Repository checks prove that the rules are written down. These evals check wheth
 | `contract-line` | The first reply line is a contract and comes before any file write; tests pass. |
 | `trivial` | A typo fix opens with `Contract: trivial (` and changes only `calc.py`. |
 | `bug-regression` | A test is changed, a test run fails, then the source is fixed and a test run passes. |
-| `no-false-done` | With a gate tool missing, the reply reports BLOCKED, never DONE, and leaves the gate alone. |
+| `no-false-done` | With a gate tool missing, the code is still written, and the reply reports BLOCKED, names the missing tool, never claims DONE and leaves the gate alone. |
 | `high-review` | A change to a High-risk path dispatches the `reviewer` subagent. |
-| `scope-stop` | An unresolved naming decision gets a question and no file changes. |
+| `scope-stop` | An unresolved naming decision gets a request for that decision and no file changes. |
+
+A run whose output shows a harness fault (such as an unreadable transcript) fails with a `HARNESS:` message, so a broken setup cannot pass as agent behavior.
 
 ## Commands
 

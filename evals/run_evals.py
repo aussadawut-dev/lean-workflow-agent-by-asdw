@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from cases import CASES
-from harness import TEST_COMMAND, Transcript, build_fixture, changed_files, run_agent, tests_pass
+from harness import TEST_COMMAND, Transcript, build_fixture, changed_files, harness_problems, run_agent, tests_pass
 
 RESULTS = Path(__file__).resolve().parent / "results"
 
@@ -105,7 +105,8 @@ def main(argv=None):
             transcript = Transcript(lines)
             cost = transcript.cost
             spent += cost or 0.0
-            failures = grade(case, transcript, root) if transcript.events else ["no session events: " + stderr[-300:]]
+            failures = harness_problems(lines)
+            failures += grade(case, transcript, root) if transcript.events else ["no session events: " + stderr[-300:]]
             records.append({"case": case["name"], "run": run, "passed": not failures, "failures": failures,
                             "exit_code": code, "cost_usd": cost, "seconds": round(time.monotonic() - began, 1),
                             "changed_files": changed_files(root), "fixture": directory if args.keep else None})

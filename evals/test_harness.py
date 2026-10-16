@@ -59,6 +59,17 @@ class TranscriptTests(unittest.TestCase):
         self.assertEqual(command[command.index("--setting-sources") + 1], "project,local")
         self.assertEqual(command[command.index("--max-budget-usd") + 1], "1.50")
         self.assertNotIn("bypassPermissions", command)
+        # The fixture's Stop hook reads the session transcript; without one every case is BLOCKED.
+        self.assertNotIn("--no-session-persistence", command)
+        # Agents and the reviewer prefix commands with `cd "<project>" &&`.
+        self.assertIn("Bash(cd:*)", command)
+
+    def test_harness_problems_are_detected_in_raw_lines(self):
+        from harness import harness_problems
+        self.assertEqual(harness_problems([final("fine")]), [])
+        noisy = [json.dumps({"type": "system", "subtype": "hook_response",
+                             "output": "Gate evidence: Contract transcript unreadable"})]
+        self.assertTrue(harness_problems(noisy))
 
 
 class GraderTests(unittest.TestCase):
@@ -119,6 +130,13 @@ class GraderTests(unittest.TestCase):
         self.assertTrue(self.check(cases.final_not_done, [final("**DONE** - all good")]))
         self.assertTrue(self.check(cases.final_not_done, [final("Status: DONE")]))
         self.assertEqual(self.check(cases.final_not_done, [final("I cannot mark this DONE yet.")]), [])
+
+    def test_requests_input_accepts_a_question_or_a_plain_request(self):
+        grade = cases.requests_input
+        self.assertEqual(self.check(grade, [final("Which convention should I use?")]), [])
+        self.assertEqual(self.check(grade, [final("I need the naming convention, or an old-to-new mapping.")]), [])
+        self.assertEqual(self.check(grade, [final("Once you send the convention, I'll do the rename.")]), [])
+        self.assertTrue(self.check(grade, [final("Renamed everything to camelCase.")]))
 
     def test_reviewer_dispatch(self):
         hit = [assistant(tool("a1", "Agent", subagent_type="reviewer", prompt="review"))]

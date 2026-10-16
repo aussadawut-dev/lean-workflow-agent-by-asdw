@@ -149,12 +149,23 @@ def tests_pass(root):
 
 def agent_command(model, budget):
     return ["claude", "-p", "--output-format", "stream-json", "--verbose", "--model", model,
-            "--max-budget-usd", f"{budget:.2f}", "--no-session-persistence",
+            # Sessions persist: the fixture's Stop hook reads the transcript to find the contract.
+            "--max-budget-usd", f"{budget:.2f}",
             # Project settings only: user-level plugins, hooks and output styles would change behavior.
             "--setting-sources", "project,local",
             "--permission-mode", "acceptEdits",
             "--allowedTools", "Read", "Edit", "Write", "Glob", "Grep", "Agent", "Skill",
-            "Bash(python3:*)", "Bash(git:*)", "Bash(bash:*)", "Bash(ls:*)", "Bash(cat:*)"]
+            "Bash(cd:*)", "Bash(python3:*)", "Bash(git:*)", "Bash(bash:*)", "Bash(ls:*)", "Bash(cat:*)",
+            "Bash(.lean/scripts/*)"]
+
+
+# Raw-output signs that the harness, not the agent, broke the run.
+HARNESS_FAULTS = ("transcript unreadable",)
+
+
+def harness_problems(lines):
+    joined = "\n".join(lines).lower()
+    return [f"HARNESS: session output contains {fault!r}" for fault in HARNESS_FAULTS if fault in joined]
 
 
 def run_agent(root, prompt, model, budget, timeout):
