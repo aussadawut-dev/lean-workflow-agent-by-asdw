@@ -1,6 +1,6 @@
 ---
 name: lean-audit
-description: Audit a bounded project area against accepted scope, standards and exceptions, reporting evidenced remediation findings. Use for existing-system conformance beyond a shipping diff; ordinary change review remains lean-review.
+description: Audit an existing area against accepted scope and standards with evidenced findings; shipping-diff review is lean-review.
 user-invocable: true
 argument-hint: "<area and accepted scope/standards to audit>"
 ---

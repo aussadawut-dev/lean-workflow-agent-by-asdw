@@ -1,6 +1,6 @@
 ---
 name: lean-research
-description: Find and compare in-repository or external approaches with traceable evidence, explain trade-offs, and recommend options when a decision has meaningful alternatives.
+description: Find and compare approaches with traceable evidence, explain trade-offs, and recommend when a decision has real alternatives.
 user-invocable: true
 argument-hint: "<research question>"
 ---

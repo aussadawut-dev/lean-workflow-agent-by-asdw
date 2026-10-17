@@ -88,7 +88,12 @@ if [ "$seed" -eq 0 ] && { [ -e "$root/.agent-runtime/active-target.json" ] || [ 
   python3 "$root/.lean/scripts/submodule.py" --root "$root" gate --optional || { refuse; exit 2; }
 fi
 
-python3 "$helper" --root "$root" guard-controls || { refuse; exit 2; }
+# Name any High-risk review still ahead in the same refusal, so both steps are asked for at once.
+if ! python3 "$helper" --root "$root" guard-controls; then
+  pending="$(python3 "$helper" --root "$root" high-risk 2>/dev/null)" || pending=""
+  [ -z "$pending" ] || { echo "After that, HIGH independent review is also required for these High-risk changes:"; printf '%s\n' "$pending"; } >&2
+  refuse; exit 2
+fi
 [ -f "$project" ] || { echo "Quality Gate undefined: missing .lean/PROJECT.md; run /lean-init." >&2; refuse; exit 2; }
 
 commands="$(awk '

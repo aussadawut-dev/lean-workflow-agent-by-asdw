@@ -1,6 +1,6 @@
 ---
 name: lean-model-update
-description: Research and propose refreshed Codex/Claude model metadata for the project catalog, applying only an explicitly authorized proposal. Does not switch session models or global runtime configuration.
+description: Propose refreshed Codex/Claude model metadata for the catalog; apply only an explicitly authorized proposal. Never switches session models or global runtime configuration.
 user-invocable: true
 argument-hint: "[codex|claude|all]"
 ---

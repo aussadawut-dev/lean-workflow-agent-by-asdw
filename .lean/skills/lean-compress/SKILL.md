@@ -1,6 +1,6 @@
 ---
 name: lean-compress
-description: Shorten agent-workflow prose while preserving clarity, operational meaning and protected content. Read the complete workflow for a workflow audit, or named targets and their dependencies; preview by default, apply only within approved scope.
+description: Shorten agent-workflow prose while preserving meaning and protected content; preview by default, apply only within approved scope.
 user-invocable: true
 argument-hint: "[workflow|PATH...] [--preview|--apply]"
 ---

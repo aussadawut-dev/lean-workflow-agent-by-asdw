@@ -1,6 +1,6 @@
 ---
 name: lean-gate
-description: Run the Lean Workflow Quality Gate and report whether the task can be DONE. Use before declaring a task complete, or when the user asks whether work is finished.
+description: Run the Quality Gate and report whether the task can be DONE. Use before declaring completion or when asked if work is finished.
 user-invocable: true
 argument-hint: "[task or workset]"
 ---

@@ -21,7 +21,7 @@ budget: BALANCED
 acceptance: go test ./... passes and printf 'a' | tally prints 1 1 1
 ```
 
-Write the contract first in the reply, then declare the same contract before the first shell or write tool, as a command of its own. The declaration does not replace the written contract:
+Write the contract first in the reply. In Claude, the PreToolUse guard binds it from that first text of the reply to the latest person prompt (read from the transcript), so no extra command is needed. A contract written later in the reply, in an earlier turn or by a subagent does not count. When the guard cannot read it (Codex, or no readable transcript) it denies with this hint; then declare the same contract as a command of its own. The declaration does not replace the written contract:
 
 ```sh
 python3 .lean/scripts/contract_guard.py declare <<'EOF'
@@ -33,7 +33,7 @@ EOF
 python3 .lean/scripts/contract_guard.py declare --contract 'Contract: trivial (typo in README)'
 ```
 
-The Claude and Codex PreToolUse hooks bind the declaration to the session (subagents share it) and deny shell, edit and unknown tools until one exists; read-only tools stay available. A new user prompt clears it. Run outside a hook, `declare` only validates. Use a quoted heredoc or single-quoted `--contract`: the guard accepts no shell expansion or chained command in a declaration.
+The Claude and Codex PreToolUse hooks bind the contract to the session (subagents share it) and deny shell, edit and unknown tools until one exists; read-only tools and plain shell reads (`grep`, `cat`, `head`, `tail`, `wc`, `ls` and read-only `git` subcommands, alone or piped, with no redirection, chaining or expansion) stay available. A new user prompt clears it. Run outside a hook, `declare` only validates. Use a quoted heredoc or single-quoted `--contract`: the guard accepts no shell expansion or chained command in a declaration.
 
 The line is the whole contract at every risk and quality level. The fields below define what it means; write them out only if the user asks:
 

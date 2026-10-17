@@ -42,12 +42,11 @@ def policy(auto):
     if auto:
         return ("Lean Quality Gate auto=true: run the shared gate at work completion without asking. "
                 "DONE still requires acceptance, current validation and required semantic review.")
-    return ("Lean Quality Gate auto=false: automatic validation NOT_RUN. Run focused checks; "
-            "before the full gate obtain applicable user authorization for this workset or named batch, "
-            "reusing matching authorization already given. Deferred validation is not a pass. "
-            "Keep work VALIDATING/BLOCKED until the shared gate and required review cover the shipping state. "
-            "Authorized runs use bash .lean/scripts/quality-gate.sh --root . "
-            "with --contract and --require-review when required.")
+    return ("Lean Quality Gate auto=false: automatic validation NOT_RUN. Run focused checks; get user "
+            "authorization (reuse matching approval for this workset or batch) before the full gate: "
+            "bash .lean/scripts/quality-gate.sh --root . with --contract and --require-review when required. "
+            "Deferred validation is not a pass: stay VALIDATING/BLOCKED until the gate and required review "
+            "cover the shipping state.")
 
 
 def write_auto(root, auto):

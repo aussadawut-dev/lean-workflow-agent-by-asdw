@@ -1,6 +1,6 @@
 ---
 name: lean-takeover-workflow
-description: Audit an existing repository's complete agent workflow, resolve user decisions, and migrate its rules and documents into Lean with an approved plan and recoverable local writes.
+description: Audit an existing repository's agent workflow and migrate its rules and documents into Lean with an approved, recoverable plan.
 user-invocable: true
 argument-hint: '"<target path>" [--preview | --apply <plan-id>]'
 ---

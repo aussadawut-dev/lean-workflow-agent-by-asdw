@@ -1,6 +1,6 @@
 ---
 name: lean-scope
-description: Draft a clear spec for non-trivial work, get user approval before implementation, and stop for approval when proposed changes leave the agreed scope.
+description: Draft a spec for non-trivial work, get approval before implementation, and stop for approval when changes leave the agreed scope.
 user-invocable: true
 argument-hint: "<requirement or scope amendment>"
 ---

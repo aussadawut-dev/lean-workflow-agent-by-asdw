@@ -201,6 +201,36 @@ class GateIntegrityTests(unittest.TestCase):
         settings.write_text('{"changed":true}')
         self.assertEqual(self.gate().returncode, 2)
 
+    def test_receipt_mismatch_names_what_differs(self):
+        # A reviewer that paraphrased the contract can re-record in one step when told the exact text.
+        paraphrase = "Contract: risk=HIGH quality=HIGH acceptance=fixture check passes"
+        self.assertEqual(self.evidence("record-review", "--contract", paraphrase, "--reviewer", "independent-test",
+                                       "--evidence", "fixture", "--verdict", "PASS").returncode, 0)
+        result = self.evidence("check-review", "--contract", CONTRACT)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(CONTRACT, result.stderr)
+        self.assertIn(paraphrase, result.stderr)
+        self.assertEqual(self.evidence("record-review", "--contract", CONTRACT, "--reviewer", "independent-test",
+                                       "--evidence", "fixture", "--verdict", "PASS").returncode, 0)
+        (self.root / "later.txt").write_text("change after review")
+        changed = self.evidence("check-review", "--contract", CONTRACT)
+        self.assertNotEqual(changed.returncode, 0)
+        self.assertIn("shipping state changed", changed.stderr)
+
+    def test_control_drift_refusal_also_names_pending_high_risk_review(self):
+        # One refusal names both steps, so the agent can ask once instead of learning them a Stop at a time.
+        self.project.write_text(self.project.read_text() + "\n## High-risk areas\n\n- `secure/`: fixture boundary.\n")
+        self.git("-c", "user.name=test", "-c", "user.email=test@example.invalid", "commit", "-qam", "areas")
+        self.assertEqual(self.gate("--claude-hook", "--seed").returncode, 0)
+        (self.root / "secure").mkdir()
+        (self.root / "secure/rule.txt").write_text("deny\n")
+        self.project.write_text(self.project.read_text().replace("true", "echo changed"))
+        result = self.gate()
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("protected", result.stderr.lower())
+        self.assertIn("HIGH independent review", result.stderr)
+        self.assertIn("secure/rule.txt", result.stderr)
+
     def test_malformed_transcript_fails_with_diagnostic(self):
         path = Path(self.transcript([]))
         path.write_text("not json\n")

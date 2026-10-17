@@ -1,6 +1,6 @@
 ---
 name: lean-quality-gate-mode
-description: Inspect or explicitly set shared Claude/Codex gate automation to auto or manual. Changing the mode does not waive validation or authorize a gate run.
+description: Inspect or set shared Claude/Codex gate automation (auto|manual). Does not waive validation or authorize a gate run.
 user-invocable: true
 argument-hint: "[auto|manual]"
 ---

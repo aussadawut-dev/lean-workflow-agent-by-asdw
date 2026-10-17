@@ -2,35 +2,23 @@
 
 Lean Workflow Baseline 4.4.0. See `CHANGELOG.md` for changes and migration steps.
 
-This directory contains operating rules and their self-checks. It is not application structure and prescribes no stack or primary provider. `AGENTS.md` is canonical; `CLAUDE.md` imports it. Shared procedures live in `.lean/skills/`; `.claude/skills/` and `.agents/skills/` contain core discovery symlinks and any explicitly enabled extras.
+Operating rules and their self-checks; not application structure, and no stack or primary provider is prescribed. `AGENTS.md` is canonical and `CLAUDE.md` imports it. Procedures live in `.lean/skills/`; `.claude/skills/` and `.agents/skills/` hold the core discovery symlinks and any enabled extras.
 
 ## Setup and modes
 
-Use `/lean-init` or `python3 .lean/scripts/workflow.py configure standard|tracker|full`. Add `--execution direct|delegated` for execution routing. `show` reads the settings, including a missing-file fallback; `check` validates mode and records. Missing configuration means unconfigured standard/direct, and onboarding prompts for a mode. Do not infer a heavier mode or discard accepted choices.
-
-Explicit mode lowering uses `downgrade <lower-mode> --dry-run` and `--apply`; add `--keep-pending` only to acknowledge paused work. Active leases block every downgrade; active trackers also block standard. Preview keeps all files intact; apply preserves records/execution and locks/rechecks before updating config. See `policy/WORKFLOW.md`.
+Use `/lean-init` or `python3 .lean/scripts/workflow.py configure standard|tracker|full` (add `--execution direct|delegated`); `show` reads settings, `check` validates mode and records. Missing configuration means unconfigured standard/direct; do not infer a heavier mode or discard accepted choices. Downgrades, leases and records: `policy/WORKFLOW.md`.
 
 - `standard`: session contract, tests, validation, review and gate.
 - `tracker`: standard plus one workset tracker per non-trivial task.
 - `full`: tracker plus local lease-backed queue ownership.
 
-Direct execution is the portable default; delegated execution uses the Controller/worker procedure. Repository mode, execution strategy, model choice and review depth are separate. Unix tools support macOS/Linux/WSL; native Windows is not supported. Claude hooks are provider-specific; Codex runs the gate explicitly or through its trusted lifecycle adapter. Both providers follow the shared auto/manual policy in `policy/QUALITY.md`.
+Direct execution is the portable default; delegated uses the Controller/worker procedure. Mode, execution, model choice, quality floor and review depth are separate. Unix tools support macOS/Linux/WSL, not native Windows. Claude hooks are provider-specific; Codex runs the gate explicitly or through its trusted lifecycle adapter.
 
-## Optional maintenance
+## Optional skills and ownership
 
-Nine core skills are discovered by default. Enable the ten optional skills with `python3 .lean/scripts/skill_pack.py enable` (`status` / `disable` inspect or reverse discovery). Read `OPTIONAL.md` for project standards/audits, queue cleanup, model refresh, compression, repository cleanup, takeover, submodules and upgrades. Canonical tools/resources stay bundled; discovery changes never discard records or recovery capabilities. Reload runtime skills after toggling.
+Nine core skills are discovered by default; `python3 .lean/scripts/skill_pack.py enable` adds the ten optional ones (`status`/`disable` inspect or reverse; reload runtime skills after). Details: `OPTIONAL.md`.
 
-## Layout and ownership
-
-- `PROJECT.md`, `config.json` and optional `skill-effort.json`: project-owned facts, gate, mode, execution and procedure preferences.
-- `policy/`, shared skills and discovery links: workflow-owned; upgrade together.
-- `templates/`: generic record templates, not task history.
-- `scripts/`, `tests/`: mode/lease tooling and workflow checks.
-- `CUSTOMIZING.md`: current ownership and upgrade checklist.
-- `LICENSE`: retain the workflow copyright/permission notice when importing.
-- `CHANGELOG.md`: historical versions and migrations.
-
-Mode setup creates project-owned tracking/queue guides; the distributable template contains no work records or leases. Preserve project additions and local extensions during upgrades.
+Project-owned: `PROJECT.md`, `config.json`, optional `skill-effort.json`. Workflow-owned, upgraded together: `policy/`, shared skills and discovery links, `templates/`, `scripts/`, `tests/`. Preserve project additions and local extensions on upgrade (`CUSTOMIZING.md`); retain `LICENSE`.
 
 ## Read when needed
 
@@ -46,10 +34,8 @@ Mode setup creates project-owned tracking/queue guides; the distributable templa
 - Tool or delegation choice -> `policy/TOOLS.md`
 - Failure or retry -> `policy/RECOVERY.md`
 
-Start with the shallowest sufficient context. Do not load every policy or workflow internal by default. Trivial work still needs its contract/evidence but no formal tracker or scope spec.
-
-Use `policy/CONTEXT.md` to select documents and procedures by affected behavior, expand along dependencies and continue from feedback with delta context. Discovery exposes choices; it does not invoke every skill. Context selection leaves required tests, review and gate checks intact.
+Do not load every policy or workflow internal by default. Trivial work still needs its contract/evidence but no formal tracker or scope spec. `policy/CONTEXT.md` selects context by affected behavior; selection never skips tests, review or gate checks.
 
 ## Procedure intensity
 
-Use `/lean-skill-effort [standard|high|ultra|reset] [lean-skill-name]` to inspect or explicitly save shared procedure intensity. No arguments is read-only. Missing settings mean standard. `.lean/policy/SKILL-EFFORT.md` defines precedence and boundaries. Settings follow the active target record root; `--root` overrides it. All discovered Lean procedures are user-invocable; optional discovery remains opt-in.
+`/lean-skill-effort [standard|high|ultra|reset] [lean-skill-name]` inspects (no arguments, read-only) or explicitly saves shared procedure intensity; missing settings mean standard. `policy/SKILL-EFFORT.md` defines precedence, record-root settings and boundaries. All discovered Lean procedures are user-invocable; optional discovery stays opt-in.

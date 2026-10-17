@@ -1,6 +1,6 @@
 ---
 name: lean-clean-queue
-description: Archive completed queue items with /lean-clean-queue old (completed over 30 days ago) or /lean-clean-queue all (all DONE items). Preserve history and trackers.
+description: Archive DONE queue items: `old` (over 30 days) or `all`. Preserves history and trackers.
 user-invocable: true
 argument-hint: "<old|all> [--preview]"
 ---
