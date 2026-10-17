@@ -20,6 +20,7 @@ Explicit user instructions take precedence. The active agent owns the task unles
   `REWORK` on one contract gets one last pass, then stops. Rounds: `.lean/policy/REVIEW.md`.
 - Never silently downgrade the requested quality floor.
 - Do not declare DONE without evidence.
+- Report only changes you verified after your last edit, for example with `git status` or `git diff`. A denied, refused or failed tool call changed nothing; say so instead of describing the intended change.
 - Do not spend additional model effort without a useful reason.
 
 ## Runtime and execution

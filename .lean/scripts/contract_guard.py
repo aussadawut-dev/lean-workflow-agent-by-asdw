@@ -190,10 +190,16 @@ def pre_tool(root, payload):
                      "model": payload.get("model") if isinstance(payload.get("model"), str) else None})
                 store.save()
             return None
+    if writes_receipt(name, payload.get("tool_input") or {}):
+        # Only gate_evidence.py writes the receipt, so its state and contract checks always apply.
+        return ("Lean contract guard: the review receipt is written only by the reviewer through "
+                "gate_evidence.py, never edited directly. If the reviewer cannot record it, report BLOCKED.")
     if name in READ_ONLY or name.startswith(READ_ONLY_PREFIXES):
         return None
     declared = current(root, session)
-    if declared and isinstance(command, str) and not payload.get("agent_id") and records_own_receipt(command, declared):
+    cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else root
+    if (declared and isinstance(command, str) and not payload.get("agent_id")
+            and records_own_receipt(command, declared, cwd)):
         # The author's main thread never records the review of its own contract (REVIEW.md);
         # a reviewer subagent carries an agent_id, and a fresh reviewer session declares its own.
         return ("Lean contract guard: only the independent reviewer records the review receipt for this "
@@ -216,10 +222,56 @@ def shell_words(command):
         return None
 
 
-def records_own_receipt(command, declared, depth=0):
+# Text unique to gate_evidence.py, so a renamed or copied script is still recognised.
+GATE_MARKER = '("record-review", ' + '"check-review")'  # Split so this file is not mistaken for one.
+RECEIPT = ".agent-runtime/review.json"
+EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit", "apply_patch"}
+SHELL_WRITE = re.compile(r">|\btee\b|\bcp\b|\bmv\b|\bln\b|\binstall\b|\bdd\b|\brsync\b|\bsed\s+-i"
+                         r"|\btouch\b|open\([^)]*['\"][wax]|write_(text|bytes)\(")
+
+
+def writes_receipt(name, tool_input):
+    """Whether a tool call writes the receipt file itself (mentioning its path in text is fine)."""
+    if not isinstance(tool_input, dict):
+        return False
+    if name in EDIT_TOOLS - {"apply_patch"}:
+        return any(str(tool_input.get(key, "")).endswith(RECEIPT) for key in ("file_path", "notebook_path", "path"))
+    command = tool_input.get("command")
+    if not isinstance(command, str) or RECEIPT not in command:
+        return False
+    if name == "apply_patch":
+        return any(line.startswith("*** ") and "File:" in line and line.rstrip().endswith(RECEIPT)
+                   for line in command.splitlines())
+    if name != "Bash":
+        return False
+    words = shell_words(command) or command.split()
+    # A path word naming the receipt in a writing command (`cp x RECEIPT`, `echo > RECEIPT`), or
+    # inline code that opens it for writing; a commit message or a read is not a write.
+    path_target = any(word.endswith(RECEIPT) for word in words) and bool(SHELL_WRITE.search(command))
+    inline = any(RECEIPT in word and re.search(r"open\([^)]*['\"][wax]|write_(text|bytes)\(", word)
+                 for word in words)
+    return path_target or inline
+
+
+def gate_tool(word, cwd):
+    """Whether a word names gate_evidence: by name, through a path the guard cannot read, or a copy."""
+    if "gate_evidence" in word or "$" in word or "`" in word:
+        return True
+    if cwd is None or not word.endswith(".py"):
+        return False
+    path = Path(word) if Path(word).is_absolute() else Path(cwd) / word
+    try:
+        return path.is_file() and path.stat().st_size < 1_000_000 and GATE_MARKER in path.read_text(errors="ignore")
+    except OSError:
+        return False
+
+
+def records_own_receipt(command, declared, cwd=None, depth=0):
     """Whether `command` runs `record-review` for `declared`, or for a contract the guard cannot read.
 
-    A receipt call is any standalone `record-review` word. Any other argument that itself holds a
+    A receipt call is a standalone `record-review` word with gate_evidence (by name, a hidden path,
+    or a renamed copy) earlier in the same simple command, or anywhere in a pipeline that feeds it
+    (`echo record-review | xargs python3 gate_evidence.py`). Any other argument that itself holds a
     command mentioning it (`sh -c`, `bash -lc`, here-strings, `echo ... | sh`, `eval`) is checked the
     same way; the `--contract` value and the contract text itself are data, not commands. A call
     passes only with a literal `--contract` value that differs from the declared contract.
@@ -240,18 +292,22 @@ def records_own_receipt(command, declared, depth=0):
         # not a call, and a bare record-review word is left to the standalone check below.
         if candidate == word and not any(c.isspace() for c in word):
             continue
-        if records_own_receipt(candidate, declared, depth + 1):
+        if records_own_receipt(candidate, declared, cwd, depth + 1):
             return True
-    # A standalone record-review word is a call only after gate_evidence (or a path the guard
-    # cannot read) in the same simple command; `grep -rn record-review .` only searches for it.
-    called, tool = False, False
+    # `grep -rn record-review gate_evidence.py` only searches: the word comes before the tool in the
+    # same simple command. Across a pipe it can be the tool's input (xargs), so order does not matter.
+    called = tool = in_segment = in_pipeline = False
     for word in words:
-        if word in OPERATORS:
-            tool = False
-        elif word == "record-review" and tool:
-            called = True
-        elif "gate_evidence" in word or "$" in word or "`" in word:
+        if word == "|":
+            in_pipeline, in_segment, tool = in_pipeline or in_segment, False, False
+        elif word in OPERATORS:
+            in_pipeline = in_segment = tool = False
+        elif word == "record-review":
+            called = called or tool
+            in_segment = True
+        elif gate_tool(word, cwd):
             tool = True
+            called = called or in_pipeline
     if not called:
         return False
     if not values or declared in command:
@@ -271,6 +327,31 @@ def prompt(root, payload):
             for name in ("contract", "meta", "model"):
                 record.pop(name, None)
             store.save()
+
+
+GUARD = ".lean/scripts/contract_guard.py"
+
+
+def repairs_guard(payload):
+    """While the guard is broken, allow read-only tools and edits that repair or restore the guard file."""
+    name = payload.get("tool_name")
+    tool_input = payload.get("tool_input") if isinstance(payload.get("tool_input"), dict) else {}
+    if not isinstance(name, str):
+        return False
+    if name in READ_ONLY or name.startswith(READ_ONLY_PREFIXES):
+        return True
+    if name in EDIT_TOOLS - {"apply_patch"}:
+        return str(tool_input.get("file_path", "")).endswith(GUARD)
+    command = tool_input.get("command")
+    if not isinstance(command, str):
+        return False
+    if name == "apply_patch":
+        files = [line for line in command.splitlines() if line.startswith("*** ") and "File:" in line]
+        return bool(files) and all(line.rstrip().endswith(GUARD) for line in files)
+    words = shell_words(command) or []
+    restores = name == "Bash" and words[:2] in (["git", "checkout"], ["git", "restore"])
+    return restores and all(word in ("git", "checkout", "restore", "--", "--staged") or word.endswith(GUARD)
+                            for word in words)
 
 
 def main(argv=None):
@@ -303,7 +384,16 @@ def main(argv=None):
         if args.command == "prompt":
             prompt(root, payload)
             return 0
-        reason = pre_tool(root, payload)
+        try:
+            reason = pre_tool(root, payload)
+        except Exception as error:  # A guard bug, not a decision: keep the guard repairable.
+            if repairs_guard(payload):
+                print(f"Lean contract guard crashed ({error!r}); allowing this read or guard repair.",
+                      file=sys.stderr)
+                return 0
+            print(f"Lean contract guard crashed: {error!r}. Repair {GUARD} (edits to it stay allowed), or "
+                  f"restore it with `git checkout -- {GUARD}`.", file=sys.stderr)
+            return 2
     except (OSError, ValueError, TypeError, AttributeError) as error:
         # Fail closed: a guard that cannot decide blocks the tool (and reports why). A failed
         # prompt reset only warns; blocking would discard the person's prompt.

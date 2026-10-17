@@ -152,7 +152,6 @@ risky=""
 if [ "$changed" -eq 1 ]; then
   risky="$(python3 "$helper" --root "$root" high-risk)" || { refuse; exit 2; }
 fi
-[ -z "$risky" ] || require_review=1
 
 # Explain a refused review receipt, naming any High-risk areas that required it.
 review_refused() {
@@ -161,12 +160,20 @@ review_refused() {
   exit 2
 }
 
+# A HIGH contract needs a receipt for itself. The High-risk floor needs only that the state
+# which ships was reviewed: a later contract that changes nothing ships that reviewed state.
+check_receipt() {
+  if [ "$require_review" -eq 1 ]; then
+    python3 "$helper" --root "$root" check-review --contract "$contract" || review_refused
+  elif [ -n "$risky" ]; then
+    python3 "$helper" --root "$root" check-shipped || review_refused
+  fi
+}
+
 # Only a real passing run can be cached; contracts and HIGH review are checked first.
 if [ "$cache_tree" -eq 1 ] && [ "$hook" -eq 1 ] && [ -n "$state" ] && [ ! -f "$failed" ] &&
    [ -f "$cache" ] && [ "$(cat "$cache")" = "$state" ]; then
-  if [ "$require_review" -eq 1 ]; then
-    python3 "$helper" --root "$root" check-review --contract "$contract" || review_refused
-  fi
+  check_receipt
   exit 0
 fi
 
@@ -205,9 +212,7 @@ while IFS= read -r cmd; do
   exit 2
 done <<< "$commands"
 
-if [ "$require_review" -eq 1 ]; then
-  python3 "$helper" --root "$root" check-review --contract "$contract" || review_refused
-fi
+check_receipt
 [ "$hook" -eq 0 ] || rm -f "$failed"
 [ -n "$state" ] && printf '%s' "$state" > "$cache"
 exit 0

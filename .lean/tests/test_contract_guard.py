@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import sys
@@ -214,6 +215,64 @@ class GuardHookTests(HookFixture):
         hidden = self.tool("codex", "Bash", "quote-session",
                            command='python3 .lean/scripts/gate_evidence.py record-review --contract "$(cat c.txt)"')
         self.assertEqual(hidden.returncode, 2)
+
+    def test_receipt_guard_catches_copies_pipelines_and_direct_receipt_writes(self):
+        session = "evasion-session"
+        self.assertEqual(self.tool("codex", "Bash", session, command=f"{DECLARE} --contract '{LINE}'").returncode, 0)
+        copy = self.root / "tools/ge.py"
+        copy.parent.mkdir()
+        shutil.copy2(self.root / ".lean/scripts/gate_evidence.py", copy)
+        for command in (f"python3 tools/ge.py record-review --contract '{LINE}' --state s",
+                        f"python3 {shlex.quote(str(copy))} record-review --contract '{LINE}' --state s",
+                        f"echo record-review | xargs python3 .lean/scripts/gate_evidence.py --contract '{LINE}'"):
+            self.assertTrue(contract_guard.records_own_receipt(command, LINE, self.root), command)
+            self.assertEqual(self.tool("codex", "Bash", session, command=command).returncode, 2, command)
+        # A copy only counts when it is one; searching the real script stays allowed.
+        (self.root / "notes.py").write_text("print('record-review notes')\n")
+        for command in (f"python3 notes.py record-review --contract '{LINE}'",
+                        "grep -rn record-review .lean/scripts/gate_evidence.py"):
+            self.assertFalse(contract_guard.records_own_receipt(command, LINE, self.root), command)
+        # The receipt file is written only by record-review, never by an edit tool or a shell write.
+        receipt = ".agent-runtime/review.json"
+        for provider, name, tool_input in (("claude", "Write", {"file_path": f"{self.root}/{receipt}"}),
+                                           ("claude", "Edit", {"file_path": receipt}),
+                                           ("codex", "apply_patch", {"command": f"*** Update File: {receipt}"}),
+                                           ("codex", "Bash", {"command": f"cp fake.json {receipt}"}),
+                                           ("codex", "Bash", {"command": f"echo '{{}}' > {receipt}"})):
+            with self.subTest(name=name, tool_input=tool_input):
+                result = self.hook(provider, "PreToolUse", {"session_id": session, "tool_name": name,
+                                                            "tool_input": tool_input, "agent_id": "a1"})
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("review receipt", result.stderr)
+        self.assertEqual(self.tool("codex", "Bash", session, command=f"cat {receipt}").returncode, 0)
+        # Text that only mentions the receipt path is not a write to it.
+        for name, tool_input in (("Edit", {"file_path": "CHANGELOG.md", "new_string": f"Never edit `{receipt}`."}),
+                                 ("Bash", {"command": f"git commit -m 'refuse writes to {receipt} > now'"}),
+                                 ("Bash", {"command": f"python3 -c \"import json; print(json.load(open('{receipt}')))\""}),
+                                 ("apply_patch", {"command": f"*** Update File: NOTES.md\n+mentions {receipt}"})):
+            with self.subTest(allowed=name):
+                result = self.hook("codex", "PreToolUse", {"session_id": session, "tool_name": name,
+                                                           "tool_input": tool_input})
+                self.assertEqual(result.returncode, 0, result.stderr)
+        sneaky = f"python3 -c \"open('{receipt}', 'w').write('{{}}')\""
+        self.assertEqual(self.tool("codex", "Bash", session, command=sneaky).returncode, 2)
+
+    def test_a_crashing_guard_still_allows_repairing_itself(self):
+        guard = self.root / ".lean/scripts/contract_guard.py"
+        guard.write_text(guard.read_text().replace("    session = session_of(payload)\n    name =",
+                                                   "    session = session_of(payload)\n    undefined_name\n    name =", 1))
+        for provider in ("claude", "codex"):
+            with self.subTest(provider=provider):
+                blocked = self.tool(provider, "Bash", command="ls")
+                self.assertEqual(blocked.returncode, 2, blocked.stderr)
+                self.assertIn("contract guard crashed", blocked.stderr)
+                for name, tool_input in (("Read", {"file_path": "x.py"}),
+                                         ("Edit", {"file_path": str(guard)}),
+                                         ("Bash", {"command": "git checkout -- .lean/scripts/contract_guard.py"}),
+                                         ("apply_patch", {"command": "*** Update File: .lean/scripts/contract_guard.py"})):
+                    result = self.tool(provider, name, **tool_input)
+                    self.assertEqual(result.returncode, 0, (name, result.stderr))
+                self.assertEqual(self.tool(provider, "Edit", file_path="app.py").returncode, 2)
 
     def test_declaration_records_contract_metadata_and_runtime_model(self):
         result = self.tool("codex", "Bash", "s9", command=f"{DECLARE} <<'EOF'\n{BLOCK}\nEOF")

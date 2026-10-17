@@ -228,6 +228,35 @@ class GateIntegrityTests(unittest.TestCase):
                 result = self.gate("--claude-hook", payload={"transcript_path": path})
                 self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_reviewed_shipping_state_meets_the_high_risk_floor_for_a_later_contract(self):
+        self.project.write_text(self.project.read_text() + "\n## High-risk areas\n\n- `secure/`: fixture boundary.\n")
+        (self.root / "secure").mkdir()
+        (self.root / "secure/rule.txt").write_text("deny\n")
+        status = "Contract: trivial (status report)"
+        refused = self.gate("--contract", status)
+        self.assertEqual(refused.returncode, 2, refused.stderr)
+        self.assertIn("High-risk areas changed", refused.stderr)
+        self.assertEqual(self.evidence("record-review", "--contract", CONTRACT, "--reviewer", "independent-test",
+                                       "--evidence", "fixture", "--verdict", "PASS").returncode, 0)
+        # The reviewed state is what ships, so a later status-only contract needs no new review...
+        for contract in (status, "Contract: risk=LOW quality=STANDARD acceptance=answer only"):
+            result = self.gate("--contract", contract)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        path = self.transcript([self.user("how far along?"), self.assistant(status)])
+        hooked = self.gate("--claude-hook", payload={"transcript_path": path})
+        self.assertEqual(hooked.returncode, 0, hooked.stderr)
+        # ...but a HIGH contract still needs a receipt for itself, and any further change needs review.
+        other_high = "Contract: risk=HIGH quality=HIGH acceptance=another reviewed change"
+        self.assertEqual(self.gate("--contract", other_high).returncode, 2)
+        (self.root / "secure/rule.txt").write_text("allow\n")
+        changed = self.gate("--contract", status)
+        self.assertEqual(changed.returncode, 2, changed.stderr)
+        self.assertIn("High-risk areas changed", changed.stderr)
+        self.assertEqual(self.evidence("record-review", "--contract", CONTRACT, "--reviewer", "independent-test",
+                                       "--evidence", "fixture", "--verdict", "REWORK").returncode, 0)
+        (self.root / "secure/rule.txt").write_text("deny\n")
+        self.assertEqual(self.gate("--contract", status).returncode, 2)  # The latest receipt is not a PASS.
+
     def test_very_high_quality_requires_review_at_low_or_medium_risk(self):
         for risk in ("LOW", "MEDIUM"):
             contract = f"Contract: risk={risk} quality=VERY_HIGH acceptance=fixture checks pass"

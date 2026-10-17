@@ -167,6 +167,19 @@ def check_review(root, contract):
         raise ValueError("Review receipt does not cover the current contract and shipping state")
 
 
+def check_shipped(root):
+    """A PASS receipt for exactly this shipping state, under any contract.
+
+    The High-risk floor asks that the delta which ships was independently reviewed; a later
+    contract that changes nothing (a status reply, say) ships that same reviewed state.
+    """
+    receipt = json.loads((root / ".agent-runtime/review.json").read_text())
+    if (receipt.get("schema") != 1 or receipt.get("verdict") != "PASS" or receipt.get("state") != state(root)
+            or not CONTRACT.fullmatch(str(receipt.get("contract", "")))
+            or not receipt.get("reviewer") or not receipt.get("evidence")):
+        raise ValueError("No PASS review receipt covers the current shipping state")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
@@ -176,6 +189,7 @@ def main():
     accept.add_argument("--reason", required=True)
     commands.add_parser("state")
     commands.add_parser("high-risk")
+    commands.add_parser("check-shipped")
     transcript = commands.add_parser("contract")
     transcript.add_argument("--transcript", required=True)
     field = commands.add_parser("hook-field")
@@ -208,6 +222,8 @@ def main():
                 raise ValueError("Protected gate controls changed. Inspect the diff; use accept-controls --reason only for an already user-approved change")
         elif args.command == "state":
             print(state(root))
+        elif args.command == "check-shipped":
+            check_shipped(root)
         elif args.command == "high-risk":
             for path in high_risk_changes(root):
                 print(path)
