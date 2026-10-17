@@ -1,6 +1,6 @@
 # TCK001 — Lean improvement plan from the Astra review
 
-Status: PLANNED
+Status: IN_PROGRESS
 Owner: unassigned
 
 ## Goal
@@ -24,12 +24,12 @@ This tracker records the recommendations requested by the user after the convers
 - [ ] AC-02: The approved contract/scope lifecycle reuses valid user authorization and context during a continuing task, while material scope changes and unresolved material decisions still stop dependent work. Both providers have equivalent intended outcomes and documented runtime gaps.
 - [ ] AC-03: Behavioral evals cover the approved finalization lifecycle, continuing conversations and independent functional outcomes. Review cases check valid final review evidence, rather than only reviewer dispatch.
 - [ ] AC-04: Cost and outcome comparisons can be reproduced from a committed script and retained sanitized artifacts, reporting task correctness, total usage/cost where available, elapsed time and user interventions with model/runtime/revision/run-count details. Template changes and project-local settings are reported separately.
-- [ ] AC-05: Current documentation agrees with implemented tracker archival and Codex contract enforcement; other documentation edits stay within the affected routes.
+- [x] AC-05: Current documentation agrees with implemented tracker archival and Codex contract enforcement; other documentation edits stay within the affected routes.
 - [ ] AC-06: Each implemented work item has its required deterministic validation and semantic review over the state that ships. Missing or deferred checks remain explicitly unverified.
 
 ## Tasks
 
-- [ ] TASK-05 / Priority 1: Reconcile affected documentation with current behavior (AC-05, AC-06).
+- [x] TASK-05 / Priority 1: Reconcile affected documentation with current behavior (AC-05, AC-06).
 - [ ] TASK-01 / Priority 2: Resolve review evidence and finalization ordering (AC-01, AC-06).
 - [ ] TASK-02 / Priority 3: Reduce the remaining contract and scope interruptions (AC-02, AC-06).
 - [ ] TASK-03 / Priority 4: Extend behavioral evals to completion and functional outcomes (AC-03, AC-06).
@@ -110,10 +110,10 @@ Planned validation: compare current claims with their implementation and relevan
 - Conversation: review of the local repository followed by the request to record the recommendations in a new worktree, optionally as a TCK.
 - Follow-up review of this plan checked each cited file and line against revision `cfe8f82`: every finding matched the code. That review reordered the tasks, narrowed TASK-02 and TASK-04, and added the TASK-01 recommendation.
 - The findings above are static observations or explicitly labeled inferences. Existing test source was read; its existence does not establish that tests currently pass.
-- Implementation: not started.
-- Tests and paid evals: NOT_RUN for this planning-only work.
+- Implementation: TASK-05 done; `.lean/CUSTOMIZING.md` now points to `workflow.py tracker archive`, and `evals/README.md` describes Codex's PreToolUse and Stop contract enforcement. `git grep` found no other current statement of either claim. TASK-01 to TASK-04 not started.
+- Quality Gate passed after the TASK-05 edits. Paid evals: NOT_RUN.
 - Independent implementation review: not performed; there is no implementation diff in this workset.
 
 ## Next step
 
-Start with TASK-05: correct the two stale statements in `.lean/CUSTOMIZING.md` and `evals/README.md`. Then TASK-01: reproduce the suspected conflict in an isolated fixture and present the content-identity protocol with observable acceptance for approval before changing workflow behavior. Reuse this plan and the recorded evidence; expand context only where the chosen task requires it.
+TASK-01: reproduce the suspected conflict in an isolated fixture and present the content-identity protocol with observable acceptance for approval before changing workflow behavior. Reuse this plan and the recorded evidence; expand context only where the chosen task requires it.

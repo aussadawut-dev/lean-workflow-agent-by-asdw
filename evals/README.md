@@ -52,7 +52,7 @@ Codex parity follows the project rule: every case runs under both providers, and
 - **Shell writes.** Codex often edits through its shell. A shell command counts as a write when its text shows one (a redirection, `tee`, `sed -i`, `apply_patch`, a Python `open(..., "w")`, `mv`/`cp`/`touch`/`rm`), and every path-like word in it counts as written. A write the pattern misses can let `contract-line` pass wrongly; a command that only names a file can be blamed for writing it. `apply_patch` file changes carry exact paths. The same rule applies to Claude `Bash` writes.
 - **Budget.** Codex reports tokens, not money, and only when a turn ends, so there is no per-run cap; `--timeout` bounds a run instead.
 - **Reviewer.** Codex has no named `reviewer` subagent type, and `codex exec --json` does not stream `spawn_agent` calls. The grader reads them from the session rollout (`$CODEX_HOME/sessions/**/rollout-*-<thread>.jsonl`), where the spawn message is encrypted but its task name is not. `high-review` passes when a task named for review starts fresh; a reviewer spawned with `fork_turns=all` inherits the author's reasoning and fails, as `REVIEW.md` requires.
-- **Contract enforcement.** Codex's Stop hook does not check the contract line yet, so a Codex session is not refused for a missing contract. The graders still check it.
+- **Contract enforcement.** Codex cannot read the reply's first line, so its hooks enforce a declared contract instead: the PreToolUse guard denies writes until `contract_guard.py declare` runs, and a gate-running Stop refuses changed work that has no declaration for the session. Neither checks that the contract line came first; the graders still check it.
 
 ## Reading results
 

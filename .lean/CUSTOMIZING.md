@@ -57,7 +57,8 @@ Cleanup archives DONE queue items only. Preserve `.agents/queue/history/` with p
 and version-control it; no history is shipped in this template or imported from another project.
 Update mode tooling and all procedures/discovery links before cleanup, stop old-tooling workers, and do
 not manually reuse IDs or remove archived prerequisites. History has no automatic expiry and
-remains readable by `queue history` after lowering the mode. Tracker archival is not implemented.
+remains readable by `queue history` after lowering the mode. Trackers archive separately with
+`workflow.py tracker archive`, which moves DONE trackers to `docs/history/agent-workflow/` and keeps their IDs reserved.
 
 ## Runtime limits
 
