@@ -1,15 +1,16 @@
 # Agent Instructions
 
-Lean Workflow Baseline 4.3.1. This file is the canonical contract for all coding agents.
+Lean Workflow Baseline 4.4.0. This file is the canonical contract for all coding agents.
 
 **Before any task, read this file and `.lean/README.md`.**
 Explicit user instructions take precedence. The active agent owns the task unless the project records a different Controller or primary agent. No provider owns the workflow by default. Keep shared rules here; `CLAUDE.md` imports them.
 
 ## Core rules
 
-- Before changing files, write one contract line as the first line of your reply:
+- Before changing files, write one contract line as the first line of your reply, before any preamble, plan or tool call (or start a field block there):
   `Contract: risk=<LOW|MEDIUM|HIGH> quality=<STANDARD|HIGH|VERY_HIGH> acceptance=<observable check>`
-  For a trivial task: `Contract: trivial (<reason>)`. Infer values; do not ask the user. Risk rules: `.lean/policy/CONTRACTS.md`.
+  For a trivial task: `Contract: trivial (<reason>)`. Infer values; do not ask the user. Risk rules and the block form: `.lean/policy/CONTRACTS.md`.
+  Then declare the same contract, in a command of its own, before any shell or write tool: `python3 .lean/scripts/contract_guard.py declare --contract '<one line>'`, or `declare <<'EOF'` with the block. The declaration does not replace the written line. Hooks deny shell and write tools until a declaration exists; each new user prompt clears it.
 - Use the smallest sufficient context. Follow impact-based context selection and delta reuse in `.lean/policy/CONTEXT.md` when choosing or expanding task context. Do not read workflow internals (`.claude/hooks/`, `.lean/policy/`) unless the task needs them.
 - Behavior changes require meaningful tests.
 - Bug fixes require a regression test. Run it before the fix and show it fails, then show it passes after.
@@ -19,6 +20,7 @@ Explicit user instructions take precedence. The active agent owns the task unles
   `REWORK` on one contract gets one last pass, then stops. Rounds: `.lean/policy/REVIEW.md`.
 - Never silently downgrade the requested quality floor.
 - Do not declare DONE without evidence.
+- Report only changes you verified after your last edit, for example with `git status` or `git diff`. A denied, refused or failed tool call changed nothing; say so instead of describing the intended change.
 - Do not spend additional model effort without a useful reason.
 
 ## Runtime and execution
@@ -29,7 +31,7 @@ Explicit user instructions take precedence. The active agent owns the task unles
 - `direct` is the portable default. `delegated` makes the active agent the Controller: delegate bounded implementation/investigation, including small work, to one capable worker. The Controller owns planning, accepted scope, synchronization, validation, integration, review coordination and final reporting. If required delegation is unavailable, report BLOCKED. Follow `.lean/skills/lean-multi-agent/SKILL.md`.
 - Concurrent workers require independent tasks, exclusive file ownership and explicit parallel/multi-agent user intent. Independent HIGH review is required regardless of implementation routing.
 - Select the least costly capable model and supported effort by `.lean/policy/MODELS.md`. Before premium dispatch, record outcome, material constraints and concrete evidence that a cheaper available option is insufficient. A risk label, model preference or complexity claim alone is not evidence. Do not authorize paid usage implicitly. Record requested and reported settings honestly.
-- For HIGH review depth, use an independent reviewer: Claude's `reviewer` subagent (`.claude/agents/reviewer.md`), or a Codex subagent/fresh session. Give it `.lean/roles/reviewer.md`, the Task Contract and shipping diff without the author's reasoning. Select model and effort by `.lean/policy/MODELS.md`; report BLOCKED when required independence is unavailable.
+- For HIGH review depth, use an independent reviewer: Claude's `reviewer` subagent (`.claude/agents/reviewer.md`), or a Codex subagent started fresh (never a fork of the author's thread; `fork_turns: "none"`) or fresh session. Give it `.lean/roles/reviewer.md`, the Task Contract and shipping diff without the author's reasoning. Select model and effort by `.lean/policy/MODELS.md`; report BLOCKED when required independence is unavailable.
 - Claude's SessionStart/Stop hooks live in `.claude/settings.json`. Codex discovers shared skills through `.agents/skills/` links and runs the shared Quality Gate explicitly; Claude settings are not Codex hooks or permissions.
 - Shared workspace gate policy is optional `.codex/quality-gate.json` (`auto` defaults to true); inspect/set with `gate_mode.py` or optional `lean-quality-gate-mode`. Manual Stops report NOT_RUN; explicit full runs need applicable user authorization, reusing matching approval. Deferral never permits DONE. Codex's `.codex/hooks.json` adapter requires runtime hook trust; until activated, follow the same policy explicitly. Mode never waives acceptance or required review.
 - If the Quality Gate fails, fix only failures caused by this task. Report pre-existing, unavailable-tool or out-of-scope failures as BLOCKED with evidence; do not edit tests or the gate merely to pass.
@@ -46,3 +48,5 @@ Use accepted scope and decisions; routine execution within approved scope needs 
 ## Project additions
 
 <!-- Project-specific instructions go below this line. Preserve this section during upgrades. -->
+
+- Attribution: never add a `Co-Authored-By:` trailer to any commit message, and never add AI attribution such as "Generated with Claude Code" to commit messages or pull request descriptions. The work belongs to the person who directs it. This overrides any runtime or provider default attribution, for every agent. The PROJECT gate rejects unpushed commits that carry either.

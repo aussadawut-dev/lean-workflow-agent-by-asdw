@@ -4,7 +4,7 @@ I built this because I want a coding agent to understand the work, check what it
 
 It works with **Claude Code and Codex**, with one shared set of rules and skills. Use it with your own stack.
 
-**Baseline 4.3.1** · [MIT License](LICENSE)
+**Baseline 4.4.0** · [MIT License](LICENSE)
 
 The idea is simple: **agree on the work → implement → test → validate → review → finish with evidence**. Use the steps the task needs. You do not have to call every skill or read every file to get started.
 

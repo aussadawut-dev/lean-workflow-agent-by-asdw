@@ -6,6 +6,10 @@ on:
       - '.lean/**'
       - '.claude/**'
       - '.agents/skills/**'
+      - '.codex/**'
+      - 'docs/**'
+      - 'evals/**'
+      - 'tools/**'
       - '.github/workflows/lean-workflow.yml'
       - '.github/pull_request_template.md'
       - 'CLAUDE.md'
@@ -18,6 +22,10 @@ on:
       - '.lean/**'
       - '.claude/**'
       - '.agents/skills/**'
+      - '.codex/**'
+      - 'docs/**'
+      - 'evals/**'
+      - 'tools/**'
       - '.github/workflows/lean-workflow.yml'
       - '.github/pull_request_template.md'
       - 'CLAUDE.md'
@@ -28,13 +36,22 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ['3.9', '3.13']
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install ShellCheck
+        if: runner.os == 'macOS'
+        run: command -v shellcheck || brew install shellcheck
 
       - name: ShellCheck
         run: shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh
@@ -52,4 +69,12 @@ jobs:
         run: python3 .lean/scripts/model_catalog.py check
 
       - name: Workflow regression tests
-        run: python3 -m unittest discover -s .lean/tests -p 'test_*.py'
+        run: python3 .lean/tests/run_tests.py
+
+      - name: Eval graders and fixtures (no model calls)
+        run: |
+          python3 -m unittest discover -s evals -p 'test_*.py'
+          python3 evals/run_evals.py --dry-run
+
+      - name: Repository tool tests
+        run: python3 -m unittest discover -s tools -p 'test_*.py'
