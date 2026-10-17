@@ -245,6 +245,20 @@ class GuardHookTests(HookFixture):
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertIn("review receipt", result.stderr)
         self.assertEqual(self.tool("codex", "Bash", session, command=f"cat {receipt}").returncode, 0)
+        # Review round 1: copy-and-run in one command, extension-less copies, reads with redirects
+        # and an unrelated pipeline.
+        for command in (f"cp .lean/scripts/gate_evidence.py g && python3 g record-review --contract '{LINE}'",
+                        f"ln -s .lean/scripts/gate_evidence.py /tmp/g.py; python3 /tmp/g.py record-review --contract '{LINE}'"):
+            self.assertTrue(contract_guard.records_own_receipt(command, LINE, self.root), command)
+        shutil.copy2(copy, self.root / "tools/ge")
+        self.assertTrue(contract_guard.records_own_receipt(
+            f"python3 tools/ge record-review --contract '{LINE}'", LINE, self.root))
+        self.assertFalse(contract_guard.records_own_receipt(
+            "grep record-review notes.txt | python3 .lean/scripts/gate_evidence.py state", LINE, self.root))
+        for command in (f"grep x {receipt} 2>&1", f"cat {receipt} 2>/dev/null", f"python3 -m json.tool {receipt} > out.json"):
+            self.assertFalse(contract_guard.writes_receipt("Bash", {"command": command}), command)
+        for command in (f"tee {receipt} < x", f"sed -i '' s/a/b/ {receipt}", f"printf x >> {receipt}"):
+            self.assertTrue(contract_guard.writes_receipt("Bash", {"command": command}), command)
         # Text that only mentions the receipt path is not a write to it.
         for name, tool_input in (("Edit", {"file_path": "CHANGELOG.md", "new_string": f"Never edit `{receipt}`."}),
                                  ("Bash", {"command": f"git commit -m 'refuse writes to {receipt} > now'"}),
@@ -273,6 +287,9 @@ class GuardHookTests(HookFixture):
                     result = self.tool(provider, name, **tool_input)
                     self.assertEqual(result.returncode, 0, (name, result.stderr))
                 self.assertEqual(self.tool(provider, "Edit", file_path="app.py").returncode, 2)
+                # Review round 1: repair mode takes the guard path itself, not a word that ends with it.
+                expanded = "git checkout -- $(touch pwned).lean/scripts/contract_guard.py"
+                self.assertEqual(self.tool(provider, "Bash", command=expanded).returncode, 2)
 
     def test_declaration_records_contract_metadata_and_runtime_model(self):
         result = self.tool("codex", "Bash", "s9", command=f"{DECLARE} <<'EOF'\n{BLOCK}\nEOF")

@@ -226,12 +226,30 @@ def shell_words(command):
 GATE_MARKER = '("record-review", ' + '"check-review")'  # Split so this file is not mistaken for one.
 RECEIPT = ".agent-runtime/review.json"
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit", "apply_patch"}
-SHELL_WRITE = re.compile(r">|\btee\b|\bcp\b|\bmv\b|\bln\b|\binstall\b|\bdd\b|\brsync\b|\bsed\s+-i"
-                         r"|\btouch\b|open\([^)]*['\"][wax]|write_(text|bytes)\(")
+
+
+WRITERS = {"cp", "mv", "ln", "install", "tee", "dd", "rsync", "touch", "truncate"}
+COPIERS = {"cp", "mv", "ln", "install", "rsync"}
+
+
+def simple_commands(words):
+    """Split shell words into simple commands at operators."""
+    command = []
+    for word in words:
+        if word in OPERATORS:
+            yield command
+            command = []
+        else:
+            command.append(word)
+    yield command
 
 
 def writes_receipt(name, tool_input):
-    """Whether a tool call writes the receipt file itself (mentioning its path in text is fine)."""
+    """Whether a tool call writes the receipt file itself (mentioning or reading it is fine).
+
+    A heuristic: redirect targets and writer arguments are checked, so a write through a path the
+    guard cannot see (`cd .agent-runtime && echo > review.json`) is not caught.
+    """
     if not isinstance(tool_input, dict):
         return False
     if name in EDIT_TOOLS - {"apply_patch"}:
@@ -244,20 +262,34 @@ def writes_receipt(name, tool_input):
                    for line in command.splitlines())
     if name != "Bash":
         return False
-    words = shell_words(command) or command.split()
-    # A path word naming the receipt in a writing command (`cp x RECEIPT`, `echo > RECEIPT`), or
-    # inline code that opens it for writing; a commit message or a read is not a write.
-    path_target = any(word.endswith(RECEIPT) for word in words) and bool(SHELL_WRITE.search(command))
-    inline = any(RECEIPT in word and re.search(r"open\([^)]*['\"][wax]|write_(text|bytes)\(", word)
-                 for word in words)
-    return path_target or inline
+    words = shell_words(command)
+    if words is None:
+        return True  # Unparseable and naming the receipt: refuse rather than guess.
+    for index, word in enumerate(words[:-1]):
+        if word in (">", ">>", ">|") and words[index + 1].endswith(RECEIPT):
+            return True
+    for command_words in simple_commands(words):
+        if not command_words:
+            continue
+        tool = Path(command_words[0]).name
+        targets = any(word.endswith(RECEIPT) for word in command_words[1:])
+        if targets and (tool in WRITERS or (tool == "sed" and any(w.startswith("-i") for w in command_words))):
+            return True
+        if any(RECEIPT in word and re.search(r"open\([^)]*['\"][wax]|write_(text|bytes)\(", word)
+               for word in command_words):
+            return True
+    return False
 
 
-def gate_tool(word, cwd):
-    """Whether a word names gate_evidence: by name, through a path the guard cannot read, or a copy."""
+def gate_tool(word, cwd, previous=""):
+    """Whether a word names gate_evidence: by name, through a path the guard cannot read, or a copy.
+
+    A copy is recognised by content when it is a .py file or the script python runs, so a renamed
+    or extension-less copy that already exists still counts.
+    """
     if "gate_evidence" in word or "$" in word or "`" in word:
         return True
-    if cwd is None or not word.endswith(".py"):
+    if cwd is None or not (word.endswith(".py") or Path(previous).name.startswith("python")):
         return False
     path = Path(word) if Path(word).is_absolute() else Path(cwd) / word
     try:
@@ -270,11 +302,13 @@ def records_own_receipt(command, declared, cwd=None, depth=0):
     """Whether `command` runs `record-review` for `declared`, or for a contract the guard cannot read.
 
     A receipt call is a standalone `record-review` word with gate_evidence (by name, a hidden path,
-    or a renamed copy) earlier in the same simple command, or anywhere in a pipeline that feeds it
-    (`echo record-review | xargs python3 gate_evidence.py`). Any other argument that itself holds a
-    command mentioning it (`sh -c`, `bash -lc`, here-strings, `echo ... | sh`, `eval`) is checked the
-    same way; the `--contract` value and the contract text itself are data, not commands. A call
-    passes only with a literal `--contract` value that differs from the declared contract.
+    or a copy) earlier in the same simple command, or in a later `xargs` command of the same
+    pipeline (`echo record-review | xargs python3 gate_evidence.py`). A command that also copies
+    or links gate_evidence counts, since the copy does not exist yet when the guard runs. Any
+    other argument that itself holds a command mentioning it (`sh -c`, `bash -lc`, here-strings,
+    `echo ... | sh`, `eval`) is checked the same way; the `--contract` value and the contract text
+    itself are data, not commands. A call passes only with a literal `--contract` value that
+    differs from the declared contract.
     """
     words = shell_words(command)
     if words is None or depth > 3:
@@ -294,20 +328,29 @@ def records_own_receipt(command, declared, cwd=None, depth=0):
             continue
         if records_own_receipt(candidate, declared, cwd, depth + 1):
             return True
+    standalone = "record-review" in words
+    copies = any(command_words and Path(command_words[0]).name in COPIERS
+                 and any("gate_evidence" in word for word in command_words[1:])
+                 for command_words in simple_commands(words))
     # `grep -rn record-review gate_evidence.py` only searches: the word comes before the tool in the
-    # same simple command. Across a pipe it can be the tool's input (xargs), so order does not matter.
-    called = tool = in_segment = in_pipeline = False
+    # same simple command. Across a pipe only xargs turns input into the tool's arguments.
+    called = standalone and copies
+    tool = in_pipeline = in_segment = xargs = False
+    previous = ""
     for word in words:
         if word == "|":
-            in_pipeline, in_segment, tool = in_pipeline or in_segment, False, False
+            in_pipeline, in_segment, tool, xargs = in_pipeline or in_segment, False, False, False
         elif word in OPERATORS:
-            in_pipeline = in_segment = tool = False
+            in_pipeline = in_segment = tool = xargs = False
         elif word == "record-review":
             called = called or tool
             in_segment = True
-        elif gate_tool(word, cwd):
+        elif Path(word).name == "xargs":
+            xargs = True
+        elif gate_tool(word, cwd, previous):
             tool = True
-            called = called or in_pipeline
+            called = called or (in_pipeline and xargs)
+        previous = word
     if not called:
         return False
     if not values or declared in command:
@@ -350,7 +393,9 @@ def repairs_guard(payload):
         return bool(files) and all(line.rstrip().endswith(GUARD) for line in files)
     words = shell_words(command) or []
     restores = name == "Bash" and words[:2] in (["git", "checkout"], ["git", "restore"])
-    return restores and all(word in ("git", "checkout", "restore", "--", "--staged") or word.endswith(GUARD)
+    # The guard path itself (relative or absolute, plain characters only), so no expansion runs.
+    plain = re.compile(r"(?:/[\w./-]*/|\./)?" + re.escape(GUARD))
+    return restores and all(word in ("git", "checkout", "restore", "--", "--staged") or plain.fullmatch(word)
                             for word in words)
 
 

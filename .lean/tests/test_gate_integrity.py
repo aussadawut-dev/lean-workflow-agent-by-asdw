@@ -256,6 +256,12 @@ class GateIntegrityTests(unittest.TestCase):
                                        "--evidence", "fixture", "--verdict", "REWORK").returncode, 0)
         (self.root / "secure/rule.txt").write_text("deny\n")
         self.assertEqual(self.gate("--contract", status).returncode, 2)  # The latest receipt is not a PASS.
+        # Review round 1: a PASS under a lower contract (say, written by mistake or by the author)
+        # does not stand in for the review a High-risk change needs.
+        self.assertEqual(self.evidence("record-review", "--contract", "Contract: risk=LOW quality=STANDARD acceptance=y",
+                                       "--reviewer", "r", "--evidence", "e", "--verdict", "PASS").returncode, 0)
+        low = self.gate("--contract", status)
+        self.assertEqual(low.returncode, 2, low.stderr)
 
     def test_very_high_quality_requires_review_at_low_or_medium_risk(self):
         for risk in ("LOW", "MEDIUM"):

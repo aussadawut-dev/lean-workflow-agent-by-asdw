@@ -166,7 +166,9 @@ check_receipt() {
   if [ "$require_review" -eq 1 ]; then
     python3 "$helper" --root "$root" check-review --contract "$contract" || review_refused
   elif [ -n "$risky" ]; then
-    python3 "$helper" --root "$root" check-shipped || review_refused
+    # A receipt for this exact contract, or a HIGH-depth receipt for exactly this state.
+    python3 "$helper" --root "$root" check-review --contract "$contract" 2>/dev/null ||
+      python3 "$helper" --root "$root" check-shipped || review_refused
   fi
 }
 

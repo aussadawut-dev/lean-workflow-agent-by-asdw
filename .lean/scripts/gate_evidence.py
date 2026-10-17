@@ -174,10 +174,13 @@ def check_shipped(root):
     contract that changes nothing (a status reply, say) ships that same reviewed state.
     """
     receipt = json.loads((root / ".agent-runtime/review.json").read_text())
+    contract = CONTRACT.fullmatch(str(receipt.get("contract", "")))
+    # Only a review at HIGH depth stands in for the floor: a PASS under a lower contract (a typo or a
+    # receipt the author wrote) never required an independent reviewer.
+    high = contract and (contract.group(1) == "HIGH" or contract.group(2) == "VERY_HIGH")
     if (receipt.get("schema") != 1 or receipt.get("verdict") != "PASS" or receipt.get("state") != state(root)
-            or not CONTRACT.fullmatch(str(receipt.get("contract", "")))
-            or not receipt.get("reviewer") or not receipt.get("evidence")):
-        raise ValueError("No PASS review receipt covers the current shipping state")
+            or not high or not receipt.get("reviewer") or not receipt.get("evidence")):
+        raise ValueError("No HIGH-depth PASS review receipt covers the current shipping state")
 
 
 def main():
