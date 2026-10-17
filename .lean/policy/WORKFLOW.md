@@ -50,6 +50,14 @@ copies; history is authoritative and retry removes the leftover source. A change
 an error. A failed batch may have archived earlier items: report partial progress and retry after
 resolving the error, never delete files by hand to bypass it. Stop old-tooling workers before cleanup.
 
+`tracker archive [--id TCKNNN] --dry-run|--apply` moves DONE trackers from `docs/tracking/` to
+`docs/history/agent-workflow/` only on an explicit request. It validates all records first and
+refuses invalid ones rather than hiding them from `check`; in full mode a DONE tracker already
+requires linked DONE queue items. Every destination is checked before the first move, and a failed
+move reports what was archived. Archived trackers are read-only: they still satisfy queue links,
+`tracker status` refuses them, and their IDs stay reserved. `context` prints a read-only summary
+(mode, active tracker, claims, Git and last gate marker) for resuming work.
+
 ## Steps
 
 1. **Task Contract** — one contract line before any change. See `CONTRACTS.md`. Trivial tasks write `Contract: trivial (<reason>)`.

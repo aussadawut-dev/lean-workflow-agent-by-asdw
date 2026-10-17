@@ -23,6 +23,7 @@ TRACKER_STATES = ("PLANNED", "IN_PROGRESS", "VALIDATING", "REVIEWING", "DONE", "
 LEASE_SECONDS = 30 * 60
 ID = re.compile(r"Q[0-9]{4,}")
 TRACKER = re.compile(r"TCK[0-9]{3,}")
+HISTORY = "docs/history/agent-workflow"  # Archived trackers: read-only, IDs stay reserved.
 REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{7,127}")
 TEMPLATE_ROOT = None  # CLI-selected workflow assets; record roots never contain scripts.
 CHECKLIST_HEADING = re.compile(r"(?:acceptance criteri(?:a|on)|tasks?)\b", re.IGNORECASE)
@@ -44,7 +45,7 @@ def validate_project_paths(root):
     Local CLI locking coordinates cooperating processes; it does not protect
     against another process replacing filesystem paths during an operation.
     """
-    for relative in (".lean/config.json", ".gitignore", ".agent-runtime", "docs/tracking", ".agents/queue"):
+    for relative in (".lean/config.json", ".gitignore", ".agent-runtime", "docs/tracking", HISTORY, ".agents/queue"):
         path = root
         for part in Path(relative).parts:
             path = path / part
@@ -161,17 +162,30 @@ def configure_locked(root, mode, execution=None):
     print(f"mode: {mode}")
 
 
-def tracker_file(root, tracker_id):
+def tracker_matches(directory, tracker_id, recursive=False, suffix=".md"):
+    """Files in a directory whose name carries this exact ID; suffix="" matches any history file."""
+    if not directory.is_dir():
+        return []
+    pattern = f"{tracker_id}*{suffix}"
+    found = directory.rglob(pattern) if recursive else directory.glob(pattern)
+    return [p for p in found if p.is_file() and (p.stem == tracker_id or p.stem.startswith(tracker_id + "-"))]
+
+
+def reserved_by_history(root, tracker_id):
+    """Any archived file named for this ID keeps the ID reserved."""
+    return bool(tracker_matches(root / HISTORY, tracker_id, recursive=True, suffix=""))
+
+
+def tracker_file(root, tracker_id, archived=False):
+    """Resolve an active tracker; archived=True also resolves read-only history for linkage."""
     if not TRACKER.fullmatch(tracker_id):
         fail("invalid tracker id")
-    directory = root / "docs/tracking"
-    matches = [p for p in directory.glob(f"{tracker_id}*.md")
-               if p.stem == tracker_id or p.stem.startswith(tracker_id + "-")]
-    if not matches:
-        history_dir = root / "docs/history/agent-workflow"
-        if history_dir.is_dir():
-            matches = [p for p in history_dir.rglob(f"{tracker_id}*.md")
-                       if p.stem == tracker_id or p.stem.startswith(tracker_id + "-")]
+    matches = tracker_matches(root / "docs/tracking", tracker_id)
+    history = tracker_matches(root / HISTORY, tracker_id, recursive=True)
+    if not matches and history and not archived:
+        fail(f"tracker is archived and read-only: {tracker_id}")
+    if archived:
+        matches += history
     if len(matches) != 1:
         fail(f"expected one tracker document for {tracker_id}, found {len(matches)}")
     return matches[0]
@@ -223,9 +237,8 @@ def tracker_command(root, args):
             matches = list(directory.glob(f"{args.id}*.md"))
             if any(p.stem == args.id or p.stem.startswith(args.id + "-") for p in matches):
                 fail(f"tracker already exists: {args.id}")
-            archived = (root / 'docs/history/agent-workflow').rglob(f'{args.id}*')
-            if any(p.is_file() and (p.stem == args.id or p.stem.startswith(args.id + '-')) for p in archived):
-                fail(f'tracker id reserved by history: {args.id}')
+            if reserved_by_history(root, args.id):
+                fail(f"tracker id reserved by history: {args.id}")
             content = tracker_template(root)
             content = content.replace("TCKNNN — Title", f"{args.id} — {title}", 1)
             path = directory / f"{args.id}.md"
@@ -256,42 +269,47 @@ def tracker_command(root, args):
             write_text(path, content)
             print(f"tracker {args.id}: {args.status}")
         elif args.action == "archive":
-            directory = root / "docs/tracking"
-            history_dir = root / "docs/history/agent-workflow"
-            targets = []
+            archive_trackers(root, args)
+
+
+def archive_trackers(root, args):
+    """Move valid DONE trackers to history; every check runs before the first move."""
+    mode = config(root)["mode"]
+    # Refuse invalid records instead of hiding them from check in history.
+    validate_records(root, mode)
+    directory, history = root / "docs/tracking", root / HISTORY
+    if args.id:
+        if not TRACKER.fullmatch(args.id):
+            fail("invalid tracker id")
+        targets = tracker_matches(directory, args.id)
+        if not targets:
+            if tracker_matches(history, args.id, recursive=True):
+                fail(f"tracker is already archived: {args.id}")
+            fail(f"expected one tracker document for {args.id}, found 0")
+    else:
+        targets = sorted(directory.glob("TCK*.md"))
+    selected = []
+    for path in targets:
+        tracker_id = path.stem.split("-", 1)[0]
+        status = re.findall(r"(?m)^Status: ([A-Z_]+)$", path.read_text())[0]
+        if status != "DONE":
             if args.id:
-                if not TRACKER.fullmatch(args.id):
-                    fail("invalid tracker id")
-                targets = [tracker_file(root, args.id)]
-            else:
-                for path in sorted(directory.glob("TCK*.md")):
-                    if re.fullmatch(r"TCK[0-9]{3,}(?:-[a-zA-Z0-9_-]+)?", path.stem):
-                        targets.append(path)
-            selected = []
-            for path in targets:
-                content = path.read_text()
-                statuses = re.findall(r"(?m)^Status: ([A-Z_]+)$", content)
-                if len(statuses) == 1 and statuses[0] == "DONE":
-                    tracker_id = path.stem.split("-", 1)[0]
-                    if config(root)["mode"] == "full":
-                        linked = [item for item in items(root).values() if item["tracker"] == tracker_id]
-                        if any(item["status"] != "DONE" for item in linked):
-                            continue
-                    selected.append((tracker_id, path))
-            report = {
-                "selected": [tid for tid, _ in selected],
-                "archived": [],
-                "applied": args.apply,
-            }
-            if args.apply:
-                history_dir.mkdir(parents=True, exist_ok=True)
-                for tid, path in selected:
-                    dest = history_dir / path.name
-                    if dest.exists():
-                        fail(f"archived tracker destination already exists: {dest}")
-                    os.replace(path, dest)
-                    report["archived"].append(tid)
+                fail(f"only DONE trackers can be archived: {tracker_id} is {status}")
+            continue
+        if reserved_by_history(root, tracker_id) or (history / path.name).exists():
+            fail(f"tracker id already archived: {tracker_id}")
+        selected.append((tracker_id, path))
+    report = {"selected": [tid for tid, _ in selected], "archived": [], "applied": args.apply}
+    if args.apply and selected:
+        try:
+            history.mkdir(parents=True, exist_ok=True)
+            for tracker_id, path in selected:
+                os.replace(path, history / path.name)
+                report["archived"].append(tracker_id)
+        except OSError as error:
             print(json.dumps(report, indent=2))
+            fail(f"archive stopped after {len(report['archived'])} of {len(selected)} trackers: {error}")
+    print(json.dumps(report, indent=2))
 
 
 def queue_history(root):
@@ -352,7 +370,7 @@ def items(root):
             fail(f"missing title: {item_id}")
         if not isinstance(value.get("tracker"), str) or not TRACKER.fullmatch(value["tracker"]):
             fail(f"invalid tracker: {item_id}")
-        tracker_file(root, value["tracker"])
+        tracker_file(root, value["tracker"], archived=True)
         for field in ("created_at", "completed_at"):
             if field in value:
                 timestamp(value[field])
@@ -705,6 +723,24 @@ def queue_command(root, args):
             fail("no claimable queue item")
 
 
+def gate_status(root):
+    """Last Claude-hook gate result as the runner's markers record it, never a fresh validation."""
+    failed, cache = root / ".claude/.gate-failed", root / ".claude/.gate-cache"
+    if failed.is_file():
+        # A "c" marker is a contract refusal, which says nothing about the checks.
+        return "CONTRACT_REFUSED" if failed.read_text().startswith("c") else "FAIL"
+    if not cache.is_file():
+        return "NOT_RUN"
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from gate_evidence import state
+        current = state(root)
+    except (ImportError, OSError, ValueError, subprocess.CalledProcessError):
+        return "UNKNOWN"
+    # A cached PASS covers only the state it recorded; any later change makes it stale.
+    return "PASS" if cache.read_text().strip() == current else "STALE"
+
+
 def context_command(root, args):
     with locked(root, read_only=True):
         cfg = config(root)
@@ -767,7 +803,8 @@ def context_command(root, args):
                     capture_output=True, text=True, check=False,
                 ).stdout.strip() or "detached"
                 status_proc = subprocess.run(
-                    ["git", "-C", str(root), "status", "--porcelain"],
+                    # --no-optional-locks: status must not refresh and rewrite the index.
+                    ["git", "--no-optional-locks", "-C", str(root), "status", "--porcelain"],
                     capture_output=True, text=True, check=False,
                 )
                 status_out = status_proc.stdout.splitlines()
@@ -779,16 +816,9 @@ def context_command(root, args):
                     "modified": modified[:20],
                     "untracked": untracked[:20],
                 }
-        except Exception:
-            pass
-        gate_failed = root / ".claude/.gate-failed"
-        gate_cache = root / ".claude/.gate-cache"
-        if gate_failed.exists():
-            report["gate"] = {"status": "FAIL"}
-        elif gate_cache.exists():
-            report["gate"] = {"status": "PASS"}
-        else:
-            report["gate"] = {"status": "NOT_RUN"}
+        except OSError:
+            pass  # No Git available: report git as null.
+        report["gate"] = {"status": gate_status(root)}
         print(json.dumps(report, indent=2))
 
 
