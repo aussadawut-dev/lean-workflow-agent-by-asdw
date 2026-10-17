@@ -20,7 +20,7 @@ This tracker records the recommendations requested by the user after the convers
 
 ## Acceptance criteria
 
-- [ ] AC-01: A documented finalization protocol allows a reviewed HIGH-depth change to complete queue/tracker updates and the intended Git staging/commit sequence without unexplained receipt invalidation. Changes to reviewed behavior, relevant instructions or validation controls still invalidate evidence appropriately.
+- [x] AC-01: A documented finalization protocol allows a reviewed HIGH-depth change to complete queue/tracker updates and the intended Git staging/commit sequence without unexplained receipt invalidation. Changes to reviewed behavior, relevant instructions or validation controls still invalidate evidence appropriately.
 - [ ] AC-02: The approved contract/scope lifecycle reuses valid user authorization and context during a continuing task, while material scope changes and unresolved material decisions still stop dependent work. Both providers have equivalent intended outcomes and documented runtime gaps.
 - [ ] AC-03: Behavioral evals cover the approved finalization lifecycle, continuing conversations and independent functional outcomes. Review cases check valid final review evidence, rather than only reviewer dispatch.
 - [ ] AC-04: Cost and outcome comparisons can be reproduced from a committed script and retained sanitized artifacts, reporting task correctness, total usage/cost where available, elapsed time and user interventions with model/runtime/revision/run-count details. Template changes and project-local settings are reported separately.
@@ -30,7 +30,7 @@ This tracker records the recommendations requested by the user after the convers
 ## Tasks
 
 - [x] TASK-05 / Priority 1: Reconcile affected documentation with current behavior (AC-05, AC-06).
-- [ ] TASK-01 / Priority 2: Resolve review evidence and finalization ordering (AC-01, AC-06).
+- [x] TASK-01 / Priority 2: Resolve review evidence and finalization ordering (AC-01, AC-06).
 - [ ] TASK-02 / Priority 3: Reduce the remaining contract and scope interruptions (AC-02, AC-06).
 - [ ] TASK-03 / Priority 4: Extend behavioral evals to completion and functional outcomes (AC-03, AC-06).
 - [ ] TASK-04 / Priority 5: Make cost measurement reproducible (AC-04).
@@ -115,11 +115,11 @@ Planned validation: compare current claims with their implementation and relevan
 - TASK-01 review round 1: REWORK. The reviewer found that a commit of unreviewed bytes, a staged deletion of a file still on disk and a partial commit kept the receipt valid, and that blob ids were abbreviated. Fixed by recording HEAD's tree in the receipt and checking the index and HEAD against the reviewed content (`shipping_gap`); four regression tests failed before the fix and pass after.
 - TASK-01 review round 2: REWORK. A commit between the reviewer's state capture and recording could ship unreviewed bytes, and `core.fileMode=false` hid staged or committed mode changes. Final bounded pass: the captured `state` binds HEAD's tree, and gap checks force `core.fileMode=true`; two regression tests failed before and pass after.
 - TASK-01 final review pass: PASS, recorded by the independent reviewer; `check-review` passes. Accepted known gaps: intermediate commits with unreviewed bytes stay in history when the final tree matches the reviewed content, and forcing `core.fileMode=true` can refuse a valid receipt on filesystems without modes.
-- TASK-01 implemented, pending independent review and user acceptance of the protected control change: `gate_evidence.py` adds `review_state()` (CLI `state`) for receipts and keeps `state()` (new CLI `gate-state`) for the gate cache and baselines; `quality-gate.sh` uses `gate-state`; `REVIEW.md`, `lean-task` and the changelog describe the new binding and order. New tests failed before the change (3 of 5; the 2 regression guards already passed) and pass after: all 360 `.lean/tests` (after the round-2 fixes), 108 hook tests, eval harness tests and every PROJECT gate command run directly. The full Quality Gate refuses until the user accepts the control change.
+- TASK-01 done in `7939a6d`: the user accepted the protected control change, the full Quality Gate passed with the review receipt check, and `check-review` still passed after the commit. Implementation: `gate_evidence.py` adds `review_state()` (CLI `state`) for receipts and keeps `state()` (new CLI `gate-state`) for the gate cache and baselines; `quality-gate.sh` uses `gate-state`; `REVIEW.md`, `lean-task` and the changelog describe the new binding and order. New tests failed before the change (3 of 5; the 2 regression guards already passed) and pass after: all 360 `.lean/tests` (after the round-2 fixes), 108 hook tests, eval harness tests and every PROJECT gate command run directly. The full Quality Gate refuses until the user accepts the control change.
 - TASK-05 done; `.lean/CUSTOMIZING.md` now points to `workflow.py tracker archive`, and `evals/README.md` describes Codex's PreToolUse and Stop contract enforcement. `git grep` found no other current statement of either claim. TASK-02 to TASK-04 not started.
 - Quality Gate passed after the TASK-05 edits. Paid evals: NOT_RUN.
 - Independent implementation review: not performed; there is no implementation diff in this workset.
 
 ## Next step
 
-Finish TASK-01: independent HIGH review, user `accept-controls`, Quality Gate, commit. Then TASK-02 needs its own scope approval. Reuse this plan and the recorded evidence; expand context only where the chosen task requires it.
+Next: TASK-02 needs its own scope approval; draft it from the remaining concerns listed above, starting with the missed same-reply contract binding.
