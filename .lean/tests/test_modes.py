@@ -649,6 +649,19 @@ class WorkflowModeTests(unittest.TestCase):
         self.assertTrue(first.is_file())
         self.assertFalse((self.root / "docs/history/agent-workflow/TCK001.md").exists())
 
+    def test_archive_keeps_a_takeover_original_next_to_its_active_tracker(self):
+        self.run_cli("configure", "tracker")
+        self.done_tracker("TCK001")
+        history = self.root / "docs/history/agent-workflow"
+        history.mkdir(parents=True)
+        original = history / "TCK001.txt"  # takeover keeps a migrated tracker's original here.
+        original.write_text("foreign original")
+        self.run_cli("check")
+        data = json.loads(self.run_cli("tracker", "archive", "--apply").stdout)
+        self.assertEqual(data["archived"], ["TCK001"])
+        self.assertEqual(original.read_text(), "foreign original")
+        self.assertTrue((history / "TCK001.md").is_file())
+
     def test_archive_by_id(self):
         self.run_cli("configure", "tracker")
         self.done_tracker("TCK001")

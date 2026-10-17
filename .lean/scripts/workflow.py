@@ -296,7 +296,9 @@ def archive_trackers(root, args):
             if args.id:
                 fail(f"only DONE trackers can be archived: {tracker_id} is {status}")
             continue
-        if reserved_by_history(root, tracker_id) or (history / path.name).exists():
+        # Only an archived tracker document collides; takeover keeps a migrated tracker's
+        # original as a .txt beside the still-active tracker.
+        if tracker_matches(history, tracker_id, recursive=True) or (history / path.name).exists():
             fail(f"tracker id already archived: {tracker_id}")
         selected.append((tracker_id, path))
     report = {"selected": [tid for tid, _ in selected], "archived": [], "applied": args.apply}
