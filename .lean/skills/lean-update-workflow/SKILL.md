@@ -1,6 +1,6 @@
 ---
 name: lean-update-workflow
-description: Update Lean from its upstream repository with a pinned release, preservation plan and guarded recovery; not for model catalog refreshes.
+description: Update Lean from its upstream repository with a pinned release, preservation plan and guarded recovery; not for model catalog refreshes or installing Lean into a foreign workflow.
 user-invocable: true
 argument-hint: "[--ref <tag|branch|commit>]"
 ---

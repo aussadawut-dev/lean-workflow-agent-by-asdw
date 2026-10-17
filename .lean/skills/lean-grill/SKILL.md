@@ -1,6 +1,6 @@
 ---
 name: lean-grill
-description: Stress-test a requirement or plan before coding. Use for high-risk design or unresolved decisions on architecture, security, data, permissions or acceptance.
+description: Stress-test a requirement or plan before coding. Use for /lean-grill, high-risk design, or unresolved decisions on architecture, security, data, permissions, workflow behavior, integrations or acceptance.
 user-invocable: true
 argument-hint: "<requirement or plan>"
 ---
