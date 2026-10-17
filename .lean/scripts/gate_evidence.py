@@ -11,7 +11,8 @@ import subprocess
 import sys
 
 sys.dont_write_bytecode = True
-CONTRACT = re.compile(r"Contract: (?:risk=(LOW|MEDIUM|HIGH) quality=(STANDARD|HIGH|VERY_HIGH) acceptance=([^<\s].*)|trivial \(([^<].*)\))\Z")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from contract_guard import LINE as CONTRACT, parse as parse_contract  # noqa: E402
 
 
 def digest(value):
@@ -50,6 +51,7 @@ def state(root):
 
 def controls(root):
     names = [".claude/settings.json", ".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py"]
+    names += [".lean/scripts/contract_guard.py"]
     names += [".lean/scripts/gate_mode.py", ".codex/hooks.json", ".codex/hooks/quality_gate.py", ".codex/quality-gate.json"]
     names += [str(path.relative_to(root)) for path in sorted((root / ".claude/hooks").glob("*.sh"))]
     values = {}
@@ -102,11 +104,13 @@ def contract_from_transcript(path):
             if block.get("type") == "tool_use" and block.get("name") in {"Edit", "Write", "MultiEdit", "apply_patch"}:
                 raise ValueError("Task Contract must precede write tools in the current turn")
             if block.get("type") == "text" and not text_seen:
-                first = block.get("text", "").splitlines()
-                if first:
+                text = block.get("text", "")
+                if text.strip():
                     text_seen = True
-                if first and CONTRACT.fullmatch(first[0]):
-                    return first[0]
+                    try:
+                        return parse_contract(text.lstrip("\n").split("\n\n", 1)[0])[0]
+                    except ValueError:
+                        pass
     raise ValueError("No Task Contract first line found in the current turn transcript")
 
 
@@ -163,6 +167,22 @@ def check_review(root, contract):
         raise ValueError("Review receipt does not cover the current contract and shipping state")
 
 
+def check_shipped(root):
+    """A PASS receipt for exactly this shipping state, under any contract.
+
+    The High-risk floor asks that the delta which ships was independently reviewed; a later
+    contract that changes nothing (a status reply, say) ships that same reviewed state.
+    """
+    receipt = json.loads((root / ".agent-runtime/review.json").read_text())
+    contract = CONTRACT.fullmatch(str(receipt.get("contract", "")))
+    # Only a review at HIGH depth stands in for the floor: a PASS under a lower contract (a typo or a
+    # receipt the author wrote) never required an independent reviewer.
+    high = contract and (contract.group(1) == "HIGH" or contract.group(2) == "VERY_HIGH")
+    if (receipt.get("schema") != 1 or receipt.get("verdict") != "PASS" or receipt.get("state") != state(root)
+            or not high or not receipt.get("reviewer") or not receipt.get("evidence")):
+        raise ValueError("No HIGH-depth PASS review receipt covers the current shipping state")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
@@ -172,10 +192,11 @@ def main():
     accept.add_argument("--reason", required=True)
     commands.add_parser("state")
     commands.add_parser("high-risk")
+    commands.add_parser("check-shipped")
     transcript = commands.add_parser("contract")
     transcript.add_argument("--transcript", required=True)
     field = commands.add_parser("hook-field")
-    field.add_argument("--field", choices=("stop_hook_active", "transcript_path"), required=True)
+    field.add_argument("--field", choices=("stop_hook_active", "transcript_path", "session_id"), required=True)
     for name in ("record-review", "check-review"):
         cmd = commands.add_parser(name)
         cmd.add_argument("--contract", required=True)
@@ -204,6 +225,8 @@ def main():
                 raise ValueError("Protected gate controls changed. Inspect the diff; use accept-controls --reason only for an already user-approved change")
         elif args.command == "state":
             print(state(root))
+        elif args.command == "check-shipped":
+            check_shipped(root)
         elif args.command == "high-risk":
             for path in high_risk_changes(root):
                 print(path)
@@ -218,7 +241,7 @@ def main():
                 print("1" if value else "0")
             else:
                 if not isinstance(value, str) or "\n" in value:
-                    raise ValueError("transcript_path must be a single-line path")
+                    raise ValueError(f"{args.field} must be a single-line string")
                 print(value)
         else:
             if not CONTRACT.fullmatch(args.contract):

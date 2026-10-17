@@ -17,7 +17,7 @@ class GateModeTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         for name in (".lean/scripts/gate_mode.py", ".codex/hooks/quality_gate.py", ".codex/hooks.json",
-                     ".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py",
+                     ".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py", ".lean/scripts/contract_guard.py",
                      ".claude/hooks/quality-gate.sh", ".claude/hooks/session-start.sh"):
             target = self.root / name
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -37,6 +37,15 @@ class GateModeTests(unittest.TestCase):
     def codex(self, event="stop", payload=None, extra=()):
         return subprocess.run(["python3", str(self.root / ".codex/hooks/quality_gate.py"), event, *extra],
                               input=json.dumps({} if payload is None else payload), text=True, capture_output=True)
+
+    @staticmethod
+    def refusal(result):
+        """Exit 2 with a message, or (Claude's Stop adapter) a JSON decision block on exit 0."""
+        if result.returncode == 0 and result.stdout.strip():
+            output = json.loads(result.stdout)
+            if output.get("decision") == "block":
+                return output["reason"]
+        return result.stderr if result.returncode == 2 else None
 
     def claude(self, *args, force=False):
         env = dict(os.environ, CLAUDE_PROJECT_DIR=str(self.root))
@@ -123,9 +132,11 @@ class GateModeTests(unittest.TestCase):
     def test_invalid_policy_blocks_cli_and_explicit_runs(self):
         for text in ('{"auto":"false"}', '{"auto":0}', '[]', '{}', '{bad', '{"auto":true,"auto":false}'):
             self.config.write_text(text)
-            for result in (self.mode(), self.mode("manual"), self.codex("run"), self.claude(), self.claude(force=True)):
+            for result in (self.mode(), self.mode("manual"), self.codex("run")):
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
                 self.assertIn("NOT_RUN", result.stdout + result.stderr)
+            for result in (self.claude(), self.claude(force=True)):
+                self.assertIn("NOT_RUN", self.refusal(result) or "", result.stdout + result.stderr)
             output = json.loads(self.codex().stdout)
             self.assertIn("NOT_RUN", output["systemMessage"])
             self.assertFalse(self.marker.exists())
@@ -137,7 +148,9 @@ class GateModeTests(unittest.TestCase):
         self.config.symlink_to(outside)
         self.assertEqual(self.mode("manual").returncode, 2)
         self.assertEqual(self.codex("run").returncode, 2)
-        self.assertEqual(self.claude().returncode, 2)
+        refused = self.claude()
+        self.assertEqual(refused.returncode, 0, refused.stderr)
+        self.assertTrue(self.refusal(refused))
         self.assertEqual(outside.read_text(), '{"auto":true}')
 
     def test_invalid_codex_input_never_runs_checks(self):
@@ -162,8 +175,7 @@ class GateModeTests(unittest.TestCase):
         with (runtime / "quality-gate.lock").open("w") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             for result in (self.codex("run"), self.claude(force=True)):
-                self.assertEqual(result.returncode, 2, result.stderr)
-                self.assertIn("busy", result.stderr)
+                self.assertIn("busy", self.refusal(result) or "", result.stdout + result.stderr)
             self.assertFalse(self.marker.exists())
 
     def test_auto_stop_reuses_only_current_review_for_high_risk_changes(self):

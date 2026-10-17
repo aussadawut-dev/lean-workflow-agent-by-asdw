@@ -11,12 +11,23 @@ ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = "Contract: risk=HIGH quality=HIGH acceptance=fixture checks pass"
 
 
+def stop_refusal(result):
+    """Claude's Stop adapter refuses with a JSON decision block on exit 0; read it as exit 2 + reason."""
+    try:
+        data = json.loads(result.stdout) if result.returncode == 0 and result.stdout.strip() else None
+    except ValueError:
+        data = None
+    if isinstance(data, dict) and data.get("decision") == "block":
+        return subprocess.CompletedProcess(result.args, 2, "", result.stderr + data["reason"])
+    return result
+
+
 class GateIntegrityTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="lean integrity ")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        for name in (".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py", ".lean/scripts/gate_mode.py",
+        for name in (".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py", ".lean/scripts/gate_mode.py", ".lean/scripts/contract_guard.py",
                      ".claude/hooks/quality-gate.sh", ".claude/hooks/session-start.sh", ".gitignore"):
             source = ROOT / name
             if source.exists():
@@ -49,9 +60,9 @@ class GateIntegrityTests(unittest.TestCase):
     def configured_stop(self, payload=None):
         settings = json.loads((ROOT / ".claude/settings.json").read_text())
         command = settings["hooks"]["Stop"][0]["hooks"][0]["command"]
-        return subprocess.run(["bash", "-c", command], input=json.dumps(payload or {}),
-                              env={**os.environ, "CLAUDE_PROJECT_DIR": str(self.root)},
-                              text=True, capture_output=True)
+        return stop_refusal(subprocess.run(["bash", "-c", command], input=json.dumps(payload or {}),
+                                           env={**os.environ, "CLAUDE_PROJECT_DIR": str(self.root)},
+                                           text=True, capture_output=True))
 
     def test_configured_stop_reuses_pass_but_rechecks_changes_and_failures(self):
         command = "printf 'run\\n' >> .agent-runtime/check-runs; test ! -f code.txt"
@@ -216,6 +227,41 @@ class GateIntegrityTests(unittest.TestCase):
                 path = self.transcript([self.user("task"), self.assistant(contract)])
                 result = self.gate("--claude-hook", payload={"transcript_path": path})
                 self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_reviewed_shipping_state_meets_the_high_risk_floor_for_a_later_contract(self):
+        self.project.write_text(self.project.read_text() + "\n## High-risk areas\n\n- `secure/`: fixture boundary.\n")
+        (self.root / "secure").mkdir()
+        (self.root / "secure/rule.txt").write_text("deny\n")
+        status = "Contract: trivial (status report)"
+        refused = self.gate("--contract", status)
+        self.assertEqual(refused.returncode, 2, refused.stderr)
+        self.assertIn("High-risk areas changed", refused.stderr)
+        self.assertEqual(self.evidence("record-review", "--contract", CONTRACT, "--reviewer", "independent-test",
+                                       "--evidence", "fixture", "--verdict", "PASS").returncode, 0)
+        # The reviewed state is what ships, so a later status-only contract needs no new review...
+        for contract in (status, "Contract: risk=LOW quality=STANDARD acceptance=answer only"):
+            result = self.gate("--contract", contract)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        path = self.transcript([self.user("how far along?"), self.assistant(status)])
+        hooked = self.gate("--claude-hook", payload={"transcript_path": path})
+        self.assertEqual(hooked.returncode, 0, hooked.stderr)
+        # ...but a HIGH contract still needs a receipt for itself, and any further change needs review.
+        other_high = "Contract: risk=HIGH quality=HIGH acceptance=another reviewed change"
+        self.assertEqual(self.gate("--contract", other_high).returncode, 2)
+        (self.root / "secure/rule.txt").write_text("allow\n")
+        changed = self.gate("--contract", status)
+        self.assertEqual(changed.returncode, 2, changed.stderr)
+        self.assertIn("High-risk areas changed", changed.stderr)
+        self.assertEqual(self.evidence("record-review", "--contract", CONTRACT, "--reviewer", "independent-test",
+                                       "--evidence", "fixture", "--verdict", "REWORK").returncode, 0)
+        (self.root / "secure/rule.txt").write_text("deny\n")
+        self.assertEqual(self.gate("--contract", status).returncode, 2)  # The latest receipt is not a PASS.
+        # Review round 1: a PASS under a lower contract (say, written by mistake or by the author)
+        # does not stand in for the review a High-risk change needs.
+        self.assertEqual(self.evidence("record-review", "--contract", "Contract: risk=LOW quality=STANDARD acceptance=y",
+                                       "--reviewer", "r", "--evidence", "e", "--verdict", "PASS").returncode, 0)
+        low = self.gate("--contract", status)
+        self.assertEqual(low.returncode, 2, low.stderr)
 
     def test_very_high_quality_requires_review_at_low_or_medium_risk(self):
         for risk in ("LOW", "MEDIUM"):

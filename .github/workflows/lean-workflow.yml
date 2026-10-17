@@ -9,6 +9,7 @@ on:
       - '.codex/**'
       - 'docs/**'
       - 'evals/**'
+      - 'tools/**'
       - '.github/workflows/lean-workflow.yml'
       - '.github/pull_request_template.md'
       - 'CLAUDE.md'
@@ -24,6 +25,7 @@ on:
       - '.codex/**'
       - 'docs/**'
       - 'evals/**'
+      - 'tools/**'
       - '.github/workflows/lean-workflow.yml'
       - '.github/pull_request_template.md'
       - 'CLAUDE.md'
@@ -73,3 +75,6 @@ jobs:
         run: |
           python3 -m unittest discover -s evals -p 'test_*.py'
           python3 evals/run_evals.py --dry-run
+
+      - name: Repository tool tests
+        run: python3 -m unittest discover -s tools -p 'test_*.py'

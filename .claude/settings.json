@@ -32,6 +32,26 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.lean/scripts/contract_guard.py --root \"$CLAUDE_PROJECT_DIR\" pre-tool || exit 2"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.lean/scripts/contract_guard.py --root \"$CLAUDE_PROJECT_DIR\" prompt"
+          }
+        ]
+      }
     ]
   }
 }
