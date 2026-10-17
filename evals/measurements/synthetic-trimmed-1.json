@@ -1,0 +1,1 @@
+{"schema":"lean-measure/1","synthetic":true,"case":"synthetic-case","run":1,"arm":{"name":"synthetic-trimmed","kind":"template"},"meta":{"provider":"claude","model":"synthetic-model","runtime":"synthetic-runtime","revision":"rev-b"},"outcome":"correct","tokens":800,"cost_usd":null,"seconds":25.0,"tool_turns":6,"user_exchanges":1}

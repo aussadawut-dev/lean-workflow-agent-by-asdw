@@ -1,0 +1,1 @@
+{"schema":"lean-measure/1","synthetic":true,"case":"synthetic-case","run":1,"arm":{"name":"synthetic-local","kind":"local-settings"},"meta":{"provider":"claude","model":"synthetic-model","runtime":"synthetic-runtime","revision":"rev-a"},"outcome":"correct","tokens":900,"cost_usd":0.04,"seconds":28.0,"tool_turns":7,"user_exchanges":2}

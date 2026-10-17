@@ -123,8 +123,21 @@ def git(root, *args):
                           cwd=root, check=True, text=True, capture_output=True).stdout
 
 
+class Conversation(str):
+    """A prompt plus follow-up prompts, each sent as a new user message in the same session."""
+
+    def __new__(cls, first, *followups):
+        value = super().__new__(cls, first)
+        value.followups = tuple(followups)
+        return value
+
+
+# Written between turns of a multi-prompt run; the transcript parsers turn it into a `turn` event.
+TURN_MARKER = json.dumps({"type": "lean_eval_turn"})
+
+
 def build_fixture(root, case):
-    """Template copy + application files, configured standard/direct, committed clean."""
+    """Template copy + application files, configured standard/direct (or the case's mode), committed clean."""
     root = Path(root)
     bootstrap(root)
     (root / "calc.py").write_text(CALC)
@@ -136,8 +149,12 @@ def build_fixture(root, case):
     (root / ".lean/PROJECT.md").write_text(project_md(case.get("gate", [TEST_COMMAND]), case.get("high_risk", ())))
     for name, text in case.get("files", {}).items():
         (root / name).write_text(text)
-    subprocess.run([sys.executable, str(root / ".lean/scripts/workflow.py"), "configure", "standard",
-                    "--execution", "direct"], cwd=root, check=True, capture_output=True)
+    workflow = [sys.executable, str(root / ".lean/scripts/workflow.py")]
+    subprocess.run([*workflow, "configure", case.get("mode", "standard"), "--execution", "direct"], cwd=root,
+                   check=True, capture_output=True)
+    if case.get("tracker"):
+        subprocess.run([*workflow, "tracker", "new", "--id", case["tracker"], "--title", "Eval workset"], cwd=root,
+                       check=True, capture_output=True)
     git(root, "add", "-A")
     git(root, "commit", "-q", "-m", "Eval fixture")
     return root
@@ -157,8 +174,15 @@ def tests_pass(root):
     return subprocess.run(TEST_COMMAND.split(), cwd=root, capture_output=True).returncode == 0
 
 
-def agent_command(model, budget, provider="claude"):
-    """The session command; the prompt goes on stdin. Codex has no per-run budget flag."""
+def agent_command(model, budget, provider="claude", resume=False):
+    """The session command; the prompt goes on stdin. Codex has no per-run budget flag.
+
+    `resume` continues the most recent session in the fixture for a follow-up prompt.
+    """
+    if provider == "codex" and resume:
+        # `exec resume` takes no --sandbox flag; the sandbox mode comes in as a config override.
+        return ["codex", "exec", "resume", "--last", "--json", "--dangerously-bypass-hook-trust",
+                "-c", 'sandbox_mode="workspace-write"', "--model", model, "-"]
     if provider == "codex":
         # Run under `codex_home`: its config trusts only the fixture, so the project's hooks load
         # and user hooks, plugins and code mode do not. (--ignore-user-config also drops project
@@ -168,7 +192,8 @@ def agent_command(model, budget, provider="claude"):
                 "--dangerously-bypass-hook-trust",
                 # No --ephemeral: subagent threads (the reviewer) fail to spawn without a stored session.
                 "--sandbox", "workspace-write", "--model", model, "-"]
-    return ["claude", "-p", "--output-format", "stream-json", "--verbose", "--model", model,
+    return ["claude", "-p", *(["--continue"] if resume else []), "--output-format", "stream-json", "--verbose",
+            "--model", model,
             # Sessions persist: the fixture's Stop hook reads the transcript to find the contract.
             "--max-budget-usd", f"{budget:.2f}",
             # Project settings only: user-level plugins, hooks and output styles would change behavior.
@@ -230,15 +255,29 @@ def codex_home(root, source=None):
         shutil.rmtree(home, ignore_errors=True)
 
 
-def run_agent(root, prompt, model, budget, timeout, provider="claude", env=None):
-    """Run one session; return (JSON event lines, exit code, stderr). The prompt goes on stdin."""
+def run_turn(root, prompt, model, budget, timeout, provider, env, resume):
     try:
-        result = subprocess.run(agent_command(model, budget, provider), cwd=root, input=prompt, text=True,
+        result = subprocess.run(agent_command(model, budget, provider, resume), cwd=root, input=prompt, text=True,
                                 capture_output=True, timeout=timeout, env=env)
         return result.stdout.splitlines(), result.returncode, result.stderr
     except subprocess.TimeoutExpired as error:
         output = error.stdout.decode() if isinstance(error.stdout, bytes) else (error.stdout or "")
         return output.splitlines(), None, "timeout"
+
+
+def run_agent(root, prompt, model, budget, timeout, provider="claude", env=None):
+    """Run one session; return (JSON event lines, exit code, stderr). The prompt goes on stdin.
+
+    A `Conversation` prompt sends each follow-up as a resumed turn, separated by TURN_MARKER lines;
+    each turn gets the same per-run budget and timeout, and a timeout ends the conversation.
+    """
+    lines, code, stderr = run_turn(root, str(prompt), model, budget, timeout, provider, env, False)
+    for followup in getattr(prompt, "followups", ()):
+        if code is None:
+            break
+        more, code, stderr = run_turn(root, followup, model, budget, timeout, provider, env, True)
+        lines += [TURN_MARKER, *more]
+    return lines, code, stderr
 
 
 class Transcript:
@@ -250,12 +289,16 @@ class Transcript:
     def __init__(self, lines):
         self.events = []
         self.result = {}
+        self.spent = None
         for line in lines:
             try:
                 item = json.loads(line)
             except ValueError:
                 continue
             if not isinstance(item, dict):
+                continue
+            if item.get("type") == "lean_eval_turn":
+                self.events.append({"kind": "turn"})
                 continue
             if item.get("parent_tool_use_id"):
                 continue  # Subagent traffic; the reviewer's own calls are not the author's.
@@ -279,6 +322,8 @@ class Transcript:
                                             "text": body or "", "is_error": bool(block.get("is_error"))})
             elif kind == "result":
                 self.result = item
+                if isinstance(item.get("total_cost_usd"), (int, float)):
+                    self.spent = (self.spent or 0.0) + item["total_cost_usd"]
 
     @property
     def final_text(self):
@@ -289,11 +334,17 @@ class Transcript:
 
     @property
     def cost(self):
-        return self.result.get("total_cost_usd")
+        # Summed over the turns of a multi-prompt run.
+        return self.spent
 
     def tools(self, *names):
         return [(index, event) for index, event in enumerate(self.events)
                 if event["kind"] == "tool" and (not names or event["name"] in names)]
+
+    def turn_ranges(self):
+        """(start, end) event ranges, one per user prompt; a single-prompt run is one range."""
+        marks = [index for index, event in enumerate(self.events) if event["kind"] == "turn"]
+        return list(zip([0] + [index + 1 for index in marks], marks + [len(self.events)]))
 
     def first_text(self):
         for index, event in enumerate(self.events):
@@ -347,6 +398,9 @@ class CodexTranscript(Transcript):
                 continue
             if not isinstance(item, dict):
                 continue
+            if item.get("type") == "lean_eval_turn":
+                self.events.append({"kind": "turn"})
+                continue
             if item.get("type") == "thread.started":
                 self.thread_id = item.get("thread_id")
             if item.get("type") == "turn.completed" and isinstance(item.get("usage"), dict):
@@ -381,8 +435,10 @@ class CodexTranscript(Transcript):
             except (ValueError, AttributeError, KeyError, TypeError):
                 continue
             if payload.get("type") == "function_call" and isinstance(arguments, dict):
+                # None when omitted: the default is not the author's explicit choice of a fresh agent.
+                fork = arguments.get("fork_turns")
                 self.spawns.append({"task_name": str(arguments.get("task_name") or ""),
-                                    "fork_turns": str(arguments.get("fork_turns") or "")})
+                                    "fork_turns": None if fork is None else str(fork)})
 
     @property
     def final_text(self):

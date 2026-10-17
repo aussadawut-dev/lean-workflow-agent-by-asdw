@@ -1,6 +1,6 @@
 # TCK001 — Lean improvement plan from the Astra review
 
-Status: IN_PROGRESS
+Status: DONE
 Owner: unassigned
 
 ## Goal
@@ -22,18 +22,18 @@ This tracker records the recommendations requested by the user after the convers
 
 - [x] AC-01: A documented finalization protocol allows a reviewed HIGH-depth change to complete queue/tracker updates and the intended Git staging/commit sequence without unexplained receipt invalidation. Changes to reviewed behavior, relevant instructions or validation controls still invalidate evidence appropriately.
 - [x] AC-02: The approved contract/scope lifecycle reuses valid user authorization and context during a continuing task, while material scope changes and unresolved material decisions still stop dependent work. Both providers have equivalent intended outcomes and documented runtime gaps.
-- [ ] AC-03: Behavioral evals cover the approved finalization lifecycle, continuing conversations and independent functional outcomes. Review cases check valid final review evidence, rather than only reviewer dispatch.
-- [ ] AC-04: Cost and outcome comparisons can be reproduced from a committed script and retained sanitized artifacts, reporting task correctness, total usage/cost where available, elapsed time and user interventions with model/runtime/revision/run-count details. Template changes and project-local settings are reported separately.
+- [x] AC-03: Behavioral evals cover the approved finalization lifecycle, continuing conversations and independent functional outcomes. Review cases check valid final review evidence, rather than only reviewer dispatch.
+- [x] AC-04: Cost and outcome comparisons can be reproduced from a committed script and retained sanitized artifacts, reporting task correctness, total usage/cost where available, elapsed time and user interventions with model/runtime/revision/run-count details. Template changes and project-local settings are reported separately.
 - [x] AC-05: Current documentation agrees with implemented tracker archival and Codex contract enforcement; other documentation edits stay within the affected routes.
-- [ ] AC-06: Each implemented work item has its required deterministic validation and semantic review over the state that ships. Missing or deferred checks remain explicitly unverified.
+- [x] AC-06: Each implemented work item has its required deterministic validation and semantic review over the state that ships. Missing or deferred checks remain explicitly unverified.
 
 ## Tasks
 
 - [x] TASK-05 / Priority 1: Reconcile affected documentation with current behavior (AC-05, AC-06).
 - [x] TASK-01 / Priority 2: Resolve review evidence and finalization ordering (AC-01, AC-06).
 - [x] TASK-02 / Priority 3: Reduce the remaining contract and scope interruptions (AC-02, AC-06).
-- [ ] TASK-03 / Priority 4: Extend behavioral evals to completion and functional outcomes (AC-03, AC-06).
-- [ ] TASK-04 / Priority 5: Make cost measurement reproducible (AC-04).
+- [x] TASK-03 / Priority 4: Extend behavioral evals to completion and functional outcomes (AC-03, AC-06).
+- [x] TASK-04 / Priority 5: Make cost measurement reproducible (AC-04).
 
 ## Findings and proposed approach
 
@@ -121,9 +121,13 @@ Planned validation: compare current claims with their implementation and relevan
 - TASK-02 review round 2: PASS, recorded by the independent reviewer. Accepted low findings: check output that varies between runs (timings, temp paths) never matches the fingerprint, so such a repeated failure keeps the three-refusal cap (errs toward blocking); the saved stderr descriptor is inherited by check commands, harmlessly.
 - TASK-02 done: the user approved the protected `quality-gate.sh` change on 2026-10-18 and ran `accept-controls` themselves (the auto-mode classifier refused it from the agent); the full Quality Gate passed with the round-2 PASS receipt; the full `.lean/tests` suite (20 files), 107 hook tests and shellcheck passed before the gate.
 - TASK-03 and TASK-04 dispatched in standard mode: `Dispatch TASK-03 | role=worker | requested model/effort=sonnet/medium | reason=normal implementation | reported model/effort=unavailable/unavailable`, and TASK-04 with the same settings. The worker worktrees branched from `main`, so the Controller integrates their diffs here.
+- TASK-03 done: `review_receipt_final_state` (independent PASS that `check-review` accepts for the final state, no main-thread `record-review`) on `high-review` and the new cases; `outcome(...)` functional graders; new `tracker-finalization`, `followup-new-contract` and `followup-after-review` cases with `tracker_done`, `work_committed`, `final_gate_after_last_change`, `contract_each_writing_turn` and `no_writes_in_last_turn`; `Conversation` follow-ups sent as resumed turns; Codex reviewers fresh only with explicit `fork_turns` none/0. Each new grader has positive and negative fixtures. Gaps: resuming a later session is not covered; resumed-turn CLI paths are unit-tested with a fake runner only, because paid runs were not authorized.
+- TASK-04 done: `evals/measure.py` `extract`/`report` with sanitized `lean-measure/1` artifacts in `evals/measurements/` (moved from the git-ignored `evals/results/`), a labeled synthetic sample and 12 tests. The changelog's historical 4.4.0 numbers cannot be reproduced: their raw runs were not retained.
+- Integrated validation after TASK-03/04: `check-structure.sh` ok, `.lean/tests` 20 files OK, eval tests 58 OK (46 harness + 12 measure), `tools` tests OK, `run_evals.py --dry-run` builds all 9 fixtures. Paid evals: NOT_RUN.
+- TASK-03/04 review round 1: PASS, recorded by the independent reviewer subagent under this session's contract; `check-review` passes. Accepted LOW findings: a hand-written receipt with a plausible reviewer name and the correct state, written without the receipt command, would pass `review_receipt_final_state` (`reviewer_dispatched` partly covers it); the `false_success` claim regex is heuristic; the resumed-turn command shapes are unverified against live runtimes.
 - TASK-05 done; `.lean/CUSTOMIZING.md` now points to `workflow.py tracker archive`, and `evals/README.md` describes Codex's PreToolUse and Stop contract enforcement. `git grep` found no other current statement of either claim. TASK-03 and TASK-04 not started.
 - Paid evals: NOT_RUN.
 
 ## Next step
 
-Integrate TASK-03 and TASK-04, then validation, independent HIGH review, Quality Gate and commit.
+None. All TCK001 tasks are done. Optional follow-ups: a paid eval run to confirm the resumed-turn paths and the Codex `fork_turns` default, and committed measurement artifacts behind the next release's cost claim.
