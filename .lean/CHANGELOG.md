@@ -4,6 +4,11 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
+## Unreleased
+
+- Accept protected gate controls that equal a trusted upstream ref without a manual step. PROJECT.md may list remote-tracking `refs/remotes/*` names in one `<!-- trusted-control-refs: ... -->` line; when every control matches one of them, `gate_evidence.py guard-controls` records an automatic acceptance naming the ref and commit, for Claude and Codex alike. Merging a reviewed release previously stopped every Stop until a person ran `accept-controls`, which an agent cannot approve for itself. Local edits, local branches, tags, `HEAD` and commit ids still need the manual procedure, Git replace objects are ignored, and the line is itself a control. Projects without the line keep their recorded baseline.
+- Add `workflow.py context`, a read-only JSON summary (mode, active tracker and next step, claims, Git state, last gate result) for resuming work, and `workflow.py tracker archive --dry-run|--apply [--id TCKnnn]`, which moves `DONE` trackers (with all linked queue items DONE in full mode) to `docs/history/agent-workflow/`. Archived trackers stay resolvable by ID.
+
 ## 4.4.0 — 2026-10-17
 
 - A turn whose shipping state equals the latest PASS receipt's state now meets the High-risk floor without a new review, under a later contract, when that receipt was recorded for a HIGH-risk or VERY_HIGH-quality contract (`gate_evidence.py check-shipped`); a PASS under a lower contract never required an independent reviewer and does not count. After a session committed High-risk paths, every later Stop (even a status reply) demanded a receipt for its own contract and was released UNVERIFIED. A HIGH contract still needs a receipt for itself, and any further change needs review.

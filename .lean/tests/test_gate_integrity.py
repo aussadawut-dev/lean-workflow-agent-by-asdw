@@ -295,5 +295,142 @@ class GateIntegrityTests(unittest.TestCase):
         self.assertIn("Quality Gate undefined", result.stdout)
 
 
+class TrustedControlRefTests(unittest.TestCase):
+    """Protected controls that equal a trusted remote-tracking ref are accepted without a manual step."""
+    TRUSTED = "<!-- trusted-control-refs: refs/remotes/origin/develop refs/remotes/origin/main -->\n"
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="lean trusted refs ")
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        for name in (".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py",
+                     ".lean/scripts/gate_mode.py", ".lean/scripts/contract_guard.py", ".claude/hooks/quality-gate.sh",
+                     ".claude/hooks/session-start.sh", ".codex/hooks.json", ".codex/hooks/quality_gate.py", ".gitignore"):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / name, path)
+        self.project = self.root / ".lean/PROJECT.md"
+        self.project.write_text("<!-- gate:start -->\n```sh\ntrue\n```\n<!-- gate:end -->\n" + self.TRUSTED)
+        self.settings = self.root / ".claude/settings.json"
+        self.settings.write_text("{}")
+        self.git("init", "-q")
+        self.commit("init")
+        self.assertEqual(self.claude().returncode, 0)  # First use records the baseline.
+
+    def git(self, *args):
+        return subprocess.run(["git", "-C", str(self.root), "-c", "user.name=test", "-c", "user.email=test@example.invalid",
+                               *args], check=True, text=True, capture_output=True).stdout.strip()
+
+    def commit(self, message):
+        self.git("add", "-A")
+        self.git("commit", "-qm", message)
+
+    def upstream(self, ref="refs/remotes/origin/develop"):
+        """Simulate a fetched upstream ref whose tree is the current commit."""
+        self.git("update-ref", ref, "HEAD")
+
+    def claude(self):
+        env = dict(os.environ, CLAUDE_PROJECT_DIR=str(self.root))
+        env.pop("CLAUDE_GATE_FORCE", None)
+        return stop_refusal(subprocess.run(["bash", str(self.root / ".claude/hooks/quality-gate.sh")],
+                                           input="{}", text=True, capture_output=True, env=env))
+
+    def codex(self):
+        return subprocess.run(["python3", str(self.root / ".codex/hooks/quality_gate.py"), "run", "--root", str(self.root)],
+                              input="{}", text=True, capture_output=True)
+
+    def history(self):
+        return json.loads((self.root / ".agent-runtime/gate-controls.json").read_text())["history"]
+
+    def test_controls_matching_a_trusted_remote_ref_are_accepted_for_both_providers(self):
+        for adapter in (self.claude, self.codex):
+            with self.subTest(adapter=adapter.__name__):
+                self.settings.write_text(json.dumps({"from": adapter.__name__}))
+                self.commit("upstream controls")
+                self.upstream()
+                result = adapter()
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("match refs/remotes/origin/develop", result.stderr)
+                self.assertTrue(self.history()[-1]["reason"].startswith("automatic: controls match trusted ref"))
+                self.assertEqual(adapter().returncode, 0)
+
+    def test_a_later_listed_ref_matches_after_an_unresolvable_one(self):
+        self.settings.write_text('{"main": true}')
+        self.commit("release")
+        blob = self.git("rev-parse", "HEAD:.claude/settings.json")
+        self.git("update-ref", "refs/remotes/origin/develop", blob)  # Exists, but is not a commit.
+        self.upstream("refs/remotes/origin/main")
+        result = self.claude()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("match refs/remotes/origin/main", result.stderr)
+
+    def test_a_local_tag_is_not_trusted(self):
+        self.project.write_text(self.project.read_text().replace("refs/remotes/origin/main", "refs/tags/v1"))
+        self.commit("list a tag")
+        self.git("tag", "v1")
+        result = self.claude()
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("accepts only refs/remotes/*", result.stderr)
+
+    def test_replace_objects_cannot_make_a_trusted_ref_match_local_edits(self):
+        self.upstream()
+        trusted = self.git("rev-parse", "refs/remotes/origin/develop:.claude/settings.json")
+        self.settings.write_text('{"local": true}')
+        local = self.git("hash-object", "-w", str(self.settings))
+        self.git("replace", trusted, local)
+        self.assertEqual(self.claude().returncode, 2)
+
+    def test_local_drift_from_every_trusted_ref_still_blocks_for_both_providers(self):
+        self.upstream()
+        self.settings.write_text('{"local": true}')
+        for adapter in (self.claude, self.codex):
+            with self.subTest(adapter=adapter.__name__):
+                result = adapter()
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("No trusted-control-refs entry matches", result.stderr)
+        self.assertEqual(self.history(), [])
+
+    def test_a_local_commit_without_a_trusted_ref_blocks(self):
+        self.settings.write_text('{"committed": true}')
+        self.commit("local only")
+        self.git("branch", "develop")  # refs/heads/develop is not a trusted ref.
+        self.assertEqual(self.claude().returncode, 2)
+
+    def test_executable_bit_and_extra_hooks_must_match(self):
+        self.upstream()
+        hook = self.root / ".claude/hooks/session-start.sh"
+        hook.chmod(0o644)
+        self.assertEqual(self.claude().returncode, 2)
+        hook.chmod(0o755)
+        extra = self.root / ".claude/hooks/extra.sh"
+        extra.write_text("#!/bin/sh\n")
+        self.assertEqual(self.claude().returncode, 2)
+        extra.unlink()
+        self.assertEqual(self.claude().returncode, 0)
+
+    def test_local_branch_head_or_commit_ids_are_rejected_as_trusted_refs(self):
+        for value in ("refs/heads/develop", "refs/tags/v1", "HEAD", self.git("rev-parse", "HEAD"), "refs/remotes/../heads/x"):
+            with self.subTest(value=value):
+                self.project.write_text(self.project.read_text().replace(self.TRUSTED, "")
+                                        + f"<!-- trusted-control-refs: {value} -->\n")
+                self.TRUSTED = f"<!-- trusted-control-refs: {value} -->\n"
+                result = self.claude()
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("accepts only refs/remotes/*", result.stderr)
+
+    def test_adding_a_trusted_ref_is_itself_a_protected_change(self):
+        self.upstream()
+        self.project.write_text(self.project.read_text().replace("refs/remotes/origin/main", "refs/remotes/origin/main refs/remotes/evil/x"))
+        self.assertEqual(self.claude().returncode, 2)
+
+    def test_without_trusted_refs_drift_still_needs_manual_acceptance(self):
+        self.project.write_text(self.project.read_text().replace(self.TRUSTED, ""))
+        self.commit("drop trusted refs")
+        self.upstream()
+        result = self.claude()
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertNotIn("trusted-control-refs", result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

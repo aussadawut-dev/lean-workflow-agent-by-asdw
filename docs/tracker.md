@@ -18,6 +18,19 @@ Fill in the goal, acceptance criteria, decisions, task progress, evidence and ne
 
 Before setting `DONE`, the CLI requires evidence and checked acceptance/task lists. Full mode also requires all linked queue items to be DONE. Record completion after the actual Quality Gate and required review pass.
 
+## Archive completed trackers
+
+Archive `DONE` trackers to `docs/history/agent-workflow/` to keep `docs/tracking/` focused on active work and eliminate context waste:
+
+```sh
+python3 .lean/scripts/workflow.py tracker archive --dry-run
+python3 .lean/scripts/workflow.py tracker archive --apply
+# Or archive a specific tracker:
+python3 .lean/scripts/workflow.py tracker archive --id TCK001 --apply
+```
+
+`python3 .lean/scripts/workflow.py context` prints mode, the active tracker and its next step, claims, Git state and the last gate result as JSON, to resume work after a break or context loss. Both commands run in a shell, so the contract guard requires a declared Task Contract first, even for `context` and `--dry-run`.
+
 ## Upgrade or downgrade modes
 
 Move to a higher mode with `configure`. Existing records stay in place:

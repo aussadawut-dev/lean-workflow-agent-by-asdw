@@ -49,19 +49,94 @@ def state(root):
                             ensure_ascii=True, sort_keys=True).encode())
 
 
+CONTROL_NAMES = (".claude/settings.json", ".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py",
+                 ".lean/scripts/gate_lock.py", ".lean/scripts/contract_guard.py", ".lean/scripts/gate_mode.py",
+                 ".codex/hooks.json", ".codex/hooks/quality_gate.py", ".codex/quality-gate.json")
+PROJECT = ".lean/PROJECT.md"
+TRUSTED_LINE = re.compile(r"(?m)^<!-- trusted-control-refs:(.*?)-->[ \t]*$")
+TRUSTED_REF = re.compile(r"refs/remotes/[A-Za-z0-9._/-]+")
+
+
+def project_controls(values, text):
+    """Add the PROJECT.md parts that are gate controls: the gate block and any trusted refs line."""
+    values["gate"] = text.split("<!-- gate:start -->", 1)[-1].split("<!-- gate:end -->", 1)[0]
+    lines = TRUSTED_LINE.findall(text)
+    if lines:
+        # Absent unless configured, so projects that do not use it keep their recorded baseline.
+        values["trusted_control_refs"] = [line.split() for line in lines]
+    return values
+
+
 def controls(root):
-    names = [".claude/settings.json", ".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py"]
-    names += [".lean/scripts/contract_guard.py"]
-    names += [".lean/scripts/gate_mode.py", ".codex/hooks.json", ".codex/hooks/quality_gate.py", ".codex/quality-gate.json"]
+    names = list(CONTROL_NAMES)
     names += [str(path.relative_to(root)) for path in sorted((root / ".claude/hooks").glob("*.sh"))]
     values = {}
     for name in names:
         path = root / name
         values[name] = {"sha256": digest(path.read_bytes()), "mode": path.stat().st_mode & 0o777} if path.is_file() else None
-    project = root / ".lean/PROJECT.md"
-    text = project.read_text() if project.is_file() else ""
-    values["gate"] = text.split("<!-- gate:start -->", 1)[-1].split("<!-- gate:end -->", 1)[0]
-    return values
+    project = root / PROJECT
+    return project_controls(values, project.read_text() if project.is_file() else "")
+
+
+def controls_at(root, commit):
+    """The controls() view of a commit's tree, so it can be compared with the working tree."""
+    def entry(name):
+        listed = git(root, "--no-replace-objects", "ls-tree", "-z", commit, "--", name).split(b"\0")[0]
+        if not listed:
+            return None, None
+        meta, _ = listed.split(b"\t", 1)
+        mode, kind, blob = meta.decode().split()
+        if kind != "blob":
+            return None, None
+        if mode not in ("100644", "100755"):
+            return {"unsupported": mode}, None  # A symlink or other entry never matches a local file.
+        data = git(root, "--no-replace-objects", "cat-file", "blob", blob)
+        return {"sha256": digest(data), "mode": int(mode[-3:], 8)}, data
+
+    hooks = [os.fsdecode(name) for name in git(root, "--no-replace-objects", "ls-tree", "-z", "--name-only", commit, "--", ".claude/hooks/").split(b"\0")]
+    names = list(CONTROL_NAMES) + sorted(name for name in hooks if fnmatch.fnmatch(name, ".claude/hooks/*.sh")
+                                         and "/" not in name[len(".claude/hooks/"):])
+    values = {name: entry(name)[0] for name in names}
+    _, project = entry(PROJECT)
+    return project_controls(values, project.decode() if project is not None else "")
+
+
+def comparable(values):
+    """Compare file bytes and the executable bit; other permission bits depend on the local umask."""
+    return {name: dict(value, mode=bool(value["mode"] & 0o111)) if isinstance(value, dict) and "mode" in value else value
+            for name, value in values.items()}
+
+
+def trusted_match(root, current):
+    """Return (ref, commit) when every control equals a configured trusted ref, else None.
+
+    Only remote-tracking refs are accepted: a local branch, tag, HEAD or commit id is whatever
+    the agent last wrote. Replace objects are ignored so the ref's own content is compared.
+    This is drift detection, not a security boundary; moving a trusted ref (git update-ref,
+    a push) still changes what is trusted.
+    """
+    refs = current.get("trusted_control_refs")
+    if not refs:
+        return None
+    if len(refs) != 1:
+        raise ValueError("PROJECT.md must have at most one trusted-control-refs line")
+    for ref in refs[0]:
+        if not TRUSTED_REF.fullmatch(ref) or ".." in ref or ref.endswith(("/", ".lock")):
+            raise ValueError(f"trusted-control-refs accepts only refs/remotes/* names: {ref}")
+    names = list(CONTROL_NAMES) + [PROJECT] + [str(path.relative_to(root)) for path in (root / ".claude/hooks").glob("*.sh")]
+    if any((root / name).is_symlink() for name in names):
+        return None
+    for ref in refs[0]:
+        if subprocess.run(["git", "-C", str(root), "show-ref", "--verify", "--quiet", ref]).returncode != 0:
+            continue
+        resolved = subprocess.run(["git", "-C", str(root), "--no-replace-objects", "rev-parse", "--verify", "--quiet",
+                                   ref + "^{commit}"], capture_output=True)
+        if resolved.returncode != 0:
+            continue  # A ref that is not a commit matches nothing; try the next one.
+        commit = resolved.stdout.decode().strip()
+        if comparable(controls_at(root, commit)) == comparable(current):
+            return ref, commit
+    return None
 
 
 def save(path, value):
@@ -221,8 +296,19 @@ def main():
                 save(path, {"schema": 1, "controls": current, "history": history})
             elif not path.exists():
                 save(path, {"schema": 1, "controls": current, "history": []})
-            elif json.loads(path.read_text()).get("controls") != current:
-                raise ValueError("Protected gate controls changed. Inspect the diff; use accept-controls --reason only for an already user-approved change")
+            else:
+                old = json.loads(path.read_text())
+                if old.get("controls") != current:
+                    match = trusted_match(root, current)
+                    if match is None:
+                        hint = (" No trusted-control-refs entry matches them." if current.get("trusted_control_refs") else "")
+                        raise ValueError("Protected gate controls changed. Inspect the diff; use accept-controls --reason "
+                                         "only for an already user-approved change." + hint)
+                    ref, commit = match
+                    reason = f"automatic: controls match trusted ref {ref} at {commit}"
+                    history = old.get("history", []) + [{"before": old.get("controls"), "after": current, "reason": reason}]
+                    save(path, {"schema": 1, "controls": current, "history": history})
+                    print(f"Gate evidence: protected gate controls accepted; they match {ref} ({commit[:12]}).", file=sys.stderr)
         elif args.command == "state":
             print(state(root))
         elif args.command == "check-shipped":

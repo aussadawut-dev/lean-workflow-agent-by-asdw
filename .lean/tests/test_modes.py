@@ -529,6 +529,192 @@ class WorkflowModeTests(unittest.TestCase):
         self.run_cli("queue", "claim", "--id", "Q0001", "--agent", "two",
                      "--request-id", "request-00000001", success=False)
 
+    def test_context_command_in_standard_and_tracker_modes(self):
+        # In unconfigured standard mode
+        res = self.run_cli("context")
+        data = json.loads(res.stdout)
+        self.assertEqual(data["mode"], "standard")
+        self.assertEqual(data["execution"], "direct")
+        self.assertFalse(data["configured"])
+        self.assertIsNone(data["active_tracker"])
+
+        # Switch to tracker mode and create an active tracker
+        self.run_cli("configure", "tracker")
+        self.tracker_doc("TCK001.md")
+        self.run_cli("tracker", "status", "--id", "TCK001", "--status", "IN_PROGRESS")
+        res2 = self.run_cli("context")
+        data2 = json.loads(res2.stdout)
+        self.assertEqual(data2["mode"], "tracker")
+        self.assertIsNotNone(data2["active_tracker"])
+        self.assertEqual(data2["active_tracker"]["id"], "TCK001")
+        self.assertEqual(data2["active_tracker"]["status"], "IN_PROGRESS")
+
+    def test_tracker_archive_dry_run_and_apply(self):
+        self.run_cli("configure", "tracker")
+        doc = self.checklist_tracker()
+        doc.write_text(doc.read_text().replace("- [ ]", "- [x]"))
+        self.run_cli("tracker", "status", "--id", "TCK001", "--status", "DONE", "--evidence", "all done")
+
+        # Dry run does not move the file
+        dry = self.run_cli("tracker", "archive", "--dry-run")
+        dry_data = json.loads(dry.stdout)
+        self.assertIn("TCK001", dry_data["selected"])
+        self.assertFalse(dry_data["applied"])
+        self.assertTrue((self.root / "docs/tracking/TCK001.md").is_file())
+
+        # Apply moves to docs/history/agent-workflow
+        applied = self.run_cli("tracker", "archive", "--apply")
+        app_data = json.loads(applied.stdout)
+        self.assertIn("TCK001", app_data["archived"])
+        self.assertTrue(app_data["applied"])
+        self.assertFalse((self.root / "docs/tracking/TCK001.md").exists())
+        self.assertTrue((self.root / "docs/history/agent-workflow/TCK001.md").is_file())
+
+        # History is checked and integrity holds
+        self.run_cli("check")
+
+    def done_tracker(self, tracker_id):
+        """A valid DONE tracker created through the CLI (tracker mode)."""
+        self.tracker_doc(f"{tracker_id}.md")
+        self.run_cli("tracker", "status", "--id", tracker_id, "--status", "DONE", "--evidence", "validated")
+        return self.root / "docs/tracking" / f"{tracker_id}.md"
+
+    def snapshot(self):
+        files = (p for p in self.root.rglob("*") if p.is_file())
+        return {str(p.relative_to(self.root)): p.read_bytes() for p in files
+                if p.relative_to(self.root).parts[0] != ".git"}
+
+    def test_archive_refuses_invalid_done_tracker_instead_of_hiding_it(self):
+        self.run_cli("configure", "tracker")
+        doc = self.checklist_tracker()
+        doc.write_text(doc.read_text().replace("Status: PLANNED", "Status: DONE"))
+        self.run_cli("check", success=False)
+        result = self.run_cli("tracker", "archive", "--apply", success=False)
+        self.assertIn("DONE tracker without evidence", result.stderr)
+        self.assertTrue(doc.is_file())
+        self.assertFalse((self.root / "docs/history").exists())
+        self.run_cli("check", success=False)
+
+    def test_full_mode_archive_requires_linked_done_items_and_keeps_links(self):
+        self.run_cli("configure", "full")
+        self.tracker_doc()
+        self.item("Q0001", ["area:api"])
+        claim = json.loads(self.run_cli("queue", "claim-next", "--agent", "one").stdout)
+        self.run_cli("queue", "complete", "--id", "Q0001", "--token", claim["token"], "--evidence", "validated")
+        self.run_cli("tracker", "status", "--id", "TCK001", "--status", "DONE", "--evidence", "validated")
+        orphan = self.tracker_doc("TCK002.md")
+        orphan.write_text("# Orphan\n\nStatus: DONE\n\n## Evidence\n\n- manual\n")
+        result = self.run_cli("tracker", "archive", "--apply", success=False)
+        self.assertIn("DONE tracker has unfinished queue items: TCK002", result.stderr)
+        self.assertTrue((self.root / "docs/tracking/TCK001.md").is_file())
+        orphan.unlink()
+        data = json.loads(self.run_cli("tracker", "archive", "--apply").stdout)
+        self.assertEqual(data["archived"], ["TCK001"])
+        self.run_cli("check")  # Q0001 still resolves its archived tracker.
+        self.run_cli("queue", "list")
+        result = self.run_cli("tracker", "new", "--id", "TCK001", "--title", "reuse", success=False)
+        self.assertIn("reserved by history", result.stderr)
+
+    def test_archived_tracker_is_read_only(self):
+        self.run_cli("configure", "tracker")
+        self.done_tracker("TCK001")
+        self.run_cli("tracker", "archive", "--apply")
+        archived = self.root / "docs/history/agent-workflow/TCK001.md"
+        before = archived.read_bytes()
+        result = self.run_cli("tracker", "status", "--id", "TCK001", "--status", "IN_PROGRESS", success=False)
+        self.assertIn("archived and read-only", result.stderr)
+        self.assertEqual(archived.read_bytes(), before)
+
+    def test_archive_rejects_a_symlinked_history_directory(self):
+        self.run_cli("configure", "tracker")
+        doc = self.done_tracker("TCK001")
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        (self.root / "docs/history").mkdir(parents=True)
+        (self.root / "docs/history/agent-workflow").symlink_to(outside.name)
+        result = self.run_cli("tracker", "archive", "--apply", success=False)
+        self.assertIn("must not be a symlink", result.stderr)
+        self.assertTrue(doc.is_file())
+        self.assertEqual(list(Path(outside.name).iterdir()), [])
+
+    def test_archive_checks_every_destination_and_id_before_moving(self):
+        self.run_cli("configure", "tracker")
+        first = self.done_tracker("TCK001")
+        self.done_tracker("TCK002")
+        older = self.root / "docs/history/agent-workflow/2025"
+        older.mkdir(parents=True)
+        (older / "TCK002-old.md").write_text("# Old\n\nStatus: DONE\n")
+        result = self.run_cli("tracker", "archive", "--apply", success=False)
+        self.assertIn("tracker id already archived: TCK002", result.stderr)
+        self.assertTrue(first.is_file())
+        self.assertFalse((self.root / "docs/history/agent-workflow/TCK001.md").exists())
+
+    def test_archive_keeps_a_takeover_original_next_to_its_active_tracker(self):
+        self.run_cli("configure", "tracker")
+        self.done_tracker("TCK001")
+        history = self.root / "docs/history/agent-workflow"
+        history.mkdir(parents=True)
+        original = history / "TCK001.txt"  # takeover keeps a migrated tracker's original here.
+        original.write_text("foreign original")
+        self.run_cli("check")
+        data = json.loads(self.run_cli("tracker", "archive", "--apply").stdout)
+        self.assertEqual(data["archived"], ["TCK001"])
+        self.assertEqual(original.read_text(), "foreign original")
+        self.assertTrue((history / "TCK001.md").is_file())
+
+    def test_archive_by_id(self):
+        self.run_cli("configure", "tracker")
+        self.done_tracker("TCK001")
+        self.done_tracker("TCK002")
+        self.tracker_doc("TCK003.md")
+        data = json.loads(self.run_cli("tracker", "archive", "--id", "TCK002", "--apply").stdout)
+        self.assertEqual(data["archived"], ["TCK002"])
+        self.assertTrue((self.root / "docs/tracking/TCK001.md").is_file())
+        self.assertIn("already archived", self.run_cli("tracker", "archive", "--id", "TCK002", "--apply",
+                                                       success=False).stderr)
+        self.assertIn("only DONE trackers", self.run_cli("tracker", "archive", "--id", "TCK003", "--dry-run",
+                                                         success=False).stderr)
+        self.assertIn("invalid tracker id", self.run_cli("tracker", "archive", "--id", "../TCK001", "--apply",
+                                                         success=False).stderr)
+        self.assertIn("found 0", self.run_cli("tracker", "archive", "--id", "TCK999", "--apply",
+                                              success=False).stderr)
+
+    def test_context_is_read_only_and_reports_git_and_gate(self):
+        (self.root / ".gitignore").write_text(".env\n.claude/.gate-cache\n.claude/.gate-failed\n")
+        self.run_cli("configure", "full")
+        self.tracker_doc()
+        self.item("Q0001", ["area:api"])
+        self.run_cli("queue", "claim-next", "--agent", "one")
+        claim = self.root / ".agent-runtime/claims/Q0001.json"
+        expired = json.loads(claim.read_text())
+        expired["expires_at"] = 0
+        claim.write_text(json.dumps(expired))
+        subprocess.run(["git", "-C", str(self.root), "init", "-q"], check=True)
+        before = self.snapshot()
+        index = self.root / ".git/index"
+        data = json.loads(self.run_cli("context").stdout)
+        self.assertEqual(self.snapshot(), before)
+        self.assertTrue(claim.is_file())  # An expired claim is reported, never cleaned up.
+        self.assertFalse(index.exists())  # git status did not write an index.
+        self.assertEqual(data["active_claims"], [])
+        self.assertEqual(data["git"]["status"], "modified")
+        self.assertIn("docs/", data["git"]["untracked"])
+        self.assertEqual(data["gate"]["status"], "NOT_RUN")
+
+        markers = self.root / ".claude"
+        markers.mkdir()
+        (markers / ".gate-failed").write_text("c1")
+        self.assertEqual(json.loads(self.run_cli("context").stdout)["gate"]["status"], "CONTRACT_REFUSED")
+        (markers / ".gate-failed").write_text("2")
+        self.assertEqual(json.loads(self.run_cli("context").stdout)["gate"]["status"], "FAIL")
+        (markers / ".gate-failed").unlink()
+        (markers / ".gate-cache").write_text("0" * 64)
+        self.assertEqual(json.loads(self.run_cli("context").stdout)["gate"]["status"], "STALE")
+        state = subprocess.run(["python3", str(SCRIPT.parent / "gate_evidence.py"), "--root", str(self.root), "state"],
+                               text=True, capture_output=True, check=True).stdout.strip()
+        (markers / ".gate-cache").write_text(state)
+        self.assertEqual(json.loads(self.run_cli("context").stdout)["gate"]["status"], "PASS")
+
 
 if __name__ == "__main__":
     unittest.main()

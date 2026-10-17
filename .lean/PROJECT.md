@@ -36,6 +36,9 @@ python3 -m unittest discover -s tools -p 'test_*.py'
 python3 tools/check_commit_attribution.py --root .
 ```
 <!-- gate:end -->
+<!-- trusted-control-refs: refs/remotes/origin/develop refs/remotes/origin/main -->
+
+Gate controls that equal `origin/develop` or `origin/main` are accepted automatically; see `policy/QUALITY.md`.
 
 ## High-risk areas
 
