@@ -1,6 +1,6 @@
 ---
 name: lean-review
-description: Review the current change at the depth Lean Workflow requires. Uses an independent reviewer for HIGH depth. Use after implementation and deterministic validation, or when the user asks for a review.
+description: Review the current change at the required depth; HIGH depth uses an independent reviewer. Use after implementation and validation, or when asked.
 user-invocable: true
 argument-hint: "[diff or scope]"
 ---

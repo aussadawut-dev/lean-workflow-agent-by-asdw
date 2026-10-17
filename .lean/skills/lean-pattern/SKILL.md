@@ -1,6 +1,6 @@
 ---
 name: lean-pattern
-description: Propose or maintain project standards with evidence, applicability and accepted exceptions. Use for conventions shared across tasks, rather than ordinary feature scope or a single diff review.
+description: Propose or maintain project standards with evidence and accepted exceptions; for conventions shared across tasks, not one feature or diff.
 user-invocable: true
 argument-hint: "<project area or standard to define/update>"
 ---

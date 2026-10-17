@@ -1,6 +1,6 @@
 ---
 name: lean-skill-effort
-description: Inspect or set Lean skill procedure intensity (standard, high, ultra), globally or per skill, shared by Codex and Claude. Use for /lean-skill-effort; separate from model reasoning effort.
+description: Inspect or set Lean procedure intensity (standard|high|ultra), globally or per skill; separate from model reasoning effort.
 user-invocable: true
 argument-hint: "[standard|high|ultra|reset] [lean-skill-name]"
 ---

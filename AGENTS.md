@@ -21,23 +21,22 @@ Explicit user instructions take precedence. The active agent owns the task unles
 - Never silently downgrade the requested quality floor.
 - Do not declare DONE without evidence.
 - Report only changes verified after your last edit. A successful edit, test or gate result is that evidence; do not rerun `git diff` only to confirm it. A denied, refused or failed tool call changed nothing; say so instead of describing the intended change.
+- Batch independent tool calls in one turn (several reads or searches together). Do not repeat a call whose result you already hold.
 - Do not spend additional model effort without a useful reason.
 
 ## Runtime and execution
 
 - Read `.lean/PROJECT.md` before unfamiliar work. Use `python3 .lean/scripts/workflow.py show` to read mode and execution settings. Missing configuration uses unconfigured `standard`/`direct`; do not silently select a heavier mode.
 - For a submodule target, start from Lean and run `python3 .lean/scripts/submodule.py context`. Read its `project_file` and target instructions. Workflow rules/tools stay in `workflow_root`; project-owned PROJECT/config/catalog, trackers, queue and runtime state stay in `record_root`. Application code, commands and Git operations use `project_root`. Default workflow/catalog CLI commands select target records; `--root` overrides selection. Run the target gate explicitly in Codex and retain Lean's own gate for workflow changes. Never install workflow files into the target or silently fall back when its context is invalid.
-- `standard` uses session evidence; `tracker` adds workset documents; `full` adds queue claims. These modes do not select a model, execution strategy, quality floor or review depth.
-- `direct` is the portable default. `delegated` makes the active agent the Controller: it delegates bounded work, including small work, to one capable worker and keeps planning, scope, validation, integration, review and reporting (`.lean/skills/lean-multi-agent/SKILL.md`). If required delegation is unavailable, report BLOCKED.
-- Concurrent workers require independent tasks, exclusive file ownership and explicit parallel/multi-agent user intent. Independent HIGH review is required regardless of implementation routing.
+- `delegated` makes the active agent the Controller: it delegates bounded work, including small work, to one capable worker and keeps planning, scope, validation, integration, review and reporting (`.lean/skills/lean-multi-agent/SKILL.md`). If required delegation is unavailable, report BLOCKED. Concurrent workers need independent tasks, exclusive file ownership and explicit parallel/multi-agent user intent; independent HIGH review is required regardless of routing.
 - Select the least costly capable model and supported effort by `.lean/policy/MODELS.md`. Premium dispatch needs recorded, task-specific evidence that a cheaper option is insufficient; never authorize paid usage implicitly. Record requested and reported settings honestly.
 - For HIGH review depth, use an independent reviewer: Claude's `reviewer` subagent (`.claude/agents/reviewer.md`), or a fresh Codex subagent or session (never a fork; `.lean/policy/REVIEW.md`). Give it `.lean/roles/reviewer.md`, the Task Contract and shipping diff without the author's reasoning. Select model and effort by `.lean/policy/MODELS.md`; report BLOCKED when required independence is unavailable.
-- Claude hooks live in `.claude/settings.json`; Codex hooks in `.codex/hooks.json` run only after runtime trust, otherwise run the shared Quality Gate explicitly. Neither provider's settings or permissions apply to the other. Optional `.codex/quality-gate.json` sets gate automation for both (`auto` defaults to true; `.lean/policy/QUALITY.md`); manual Stops report NOT_RUN, and deferral never permits DONE or waives acceptance or review.
+- Claude hooks live in `.claude/settings.json`; Codex hooks in `.codex/hooks.json` apply only after runtime trust, otherwise run the shared Quality Gate explicitly. Neither provider's settings or permissions apply to the other. Optional `.codex/quality-gate.json` sets gate automation for both (`.lean/policy/QUALITY.md`); manual Stops report NOT_RUN, and deferral never permits DONE or waives acceptance or review.
 - If the Quality Gate fails, fix only failures caused by this task. Report pre-existing, unavailable-tool or out-of-scope failures as BLOCKED with evidence; do not edit tests or the gate merely to pass.
 
 ## Workflow procedures
 
-Core procedures live under `.lean/skills/`, linked from `.claude/skills/` and `.agents/skills/`; all discovered Lean skills are user-invocable. Procedure intensity follows `.lean/policy/SKILL-EFFORT.md` (default standard; it never changes model reasoning effort). Optional procedures and discovery controls: `.lean/OPTIONAL.md`.
+Procedures live under `.lean/skills/` (optional ones: `.lean/OPTIONAL.md`); their intensity follows `.lean/policy/SKILL-EFFORT.md` and never changes model reasoning effort.
 Use accepted scope and decisions; routine execution within approved scope needs no repeated approval. Scope changes and unresolved material decisions need the user's input before dependent work.
 
 ## Policy router

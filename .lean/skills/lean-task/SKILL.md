@@ -1,6 +1,6 @@
 ---
 name: lean-task
-description: Run a task through contract, accepted scope, configured execution, tests, validation, review and Quality Gate.
+description: Run a task through contract, scope, execution, tests, validation, review and Quality Gate.
 user-invocable: true
 argument-hint: "<task description>"
 ---
