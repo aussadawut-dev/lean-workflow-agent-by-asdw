@@ -4,7 +4,7 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
-## Unreleased
+## 4.4.0 — 2026-10-17
 
 - A turn whose shipping state equals the latest PASS receipt's state now meets the High-risk floor without a new review, under a later contract, when that receipt was recorded for a HIGH-risk or VERY_HIGH-quality contract (`gate_evidence.py check-shipped`); a PASS under a lower contract never required an independent reviewer and does not count. After a session committed High-risk paths, every later Stop (even a status reply) demanded a receipt for its own contract and was released UNVERIFIED. A HIGH contract still needs a receipt for itself, and any further change needs review.
 - The receipt guard now also recognizes renamed, extension-less or copied `gate_evidence.py` scripts (by content, including a copy made in the same command) and `echo record-review | xargs ...` pipelines, and refuses Write/Edit/apply_patch targets, redirect targets and writer arguments (`cp`, `tee`, `sed -i`, ...) of `.agent-runtime/review.json`; reads and text that only mention the path are allowed. A write through a path the guard cannot see (`cd .agent-runtime && ...`) is a known gap.
