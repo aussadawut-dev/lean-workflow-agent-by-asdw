@@ -10,6 +10,17 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def stop_refusal(result):
+    """Claude's Stop adapter refuses with a JSON decision block on exit 0; read it as exit 2 + reason."""
+    try:
+        data = json.loads(result.stdout) if result.returncode == 0 and result.stdout.strip() else None
+    except ValueError:
+        data = None
+    if isinstance(data, dict) and data.get("decision") == "block":
+        return subprocess.CompletedProcess(result.args, 2, "", result.stderr + data["reason"])
+    return result
+
+
 class SubmoduleTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="lean submodule ")
@@ -23,7 +34,7 @@ class SubmoduleTests(unittest.TestCase):
                     "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "test@example.invalid"}
         for name in (".lean/scripts/submodule.py", ".lean/scripts/workflow.py", ".lean/scripts/model_catalog.py",
                      ".lean/templates/tracker.md", ".lean/templates/queue-item.json",
-                     ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py", ".lean/scripts/gate_mode.py", ".lean/scripts/skill_effort.py", ".lean/scripts/quality-gate.sh", ".claude/hooks/quality-gate.sh", ".claude/hooks/session-start.sh", ".gitignore", "AGENTS.md"):
+                     ".lean/scripts/gate_evidence.py", ".lean/scripts/contract_guard.py", ".lean/scripts/gate_lock.py", ".lean/scripts/gate_mode.py", ".lean/scripts/skill_effort.py", ".lean/scripts/quality-gate.sh", ".claude/hooks/quality-gate.sh", ".claude/hooks/session-start.sh", ".gitignore", "AGENTS.md"):
             dst = self.root / name
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / name, dst)
@@ -74,7 +85,7 @@ class SubmoduleTests(unittest.TestCase):
         result = subprocess.run(["bash", str(self.root / ".claude/hooks/quality-gate.sh"), *(["--seed"] if seed else [])],
                                 input="{}", env={**self.env, "CLAUDE_PROJECT_DIR": str(self.root)},
                                 text=True, capture_output=True)
-        return result
+        return stop_refusal(result)
 
     def test_preview_has_no_filesystem_or_index_effects(self):
         before = self.git(self.root, "status", "--porcelain")

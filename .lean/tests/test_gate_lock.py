@@ -1,5 +1,6 @@
 """Gate entry points serialize checks within a checkout and fail closed when busy."""
 import fcntl
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -8,6 +9,17 @@ import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def stop_refusal(result):
+    """Claude's Stop adapter refuses with a JSON decision block on exit 0; read it as exit 2 + reason."""
+    try:
+        data = json.loads(result.stdout) if result.returncode == 0 and result.stdout.strip() else None
+    except ValueError:
+        data = None
+    if isinstance(data, dict) and data.get("decision") == "block":
+        return subprocess.CompletedProcess(result.args, 2, "", result.stderr + data["reason"])
+    return result
 
 
 class GateLockTests(unittest.TestCase):
@@ -21,9 +33,9 @@ class GateLockTests(unittest.TestCase):
 
     def gate(self, hook=False, **kwargs):
         script = '.claude/hooks/quality-gate.sh' if hook else '.lean/scripts/quality-gate.sh'
-        return subprocess.run(['bash', str(ROOT / script), '--root', str(self.root)], input='{}',
-                              env={**os.environ, 'CLAUDE_PROJECT_DIR': str(self.root)},
-                              text=True, capture_output=True, timeout=10, **kwargs)
+        return stop_refusal(subprocess.run(['bash', str(ROOT / script), '--root', str(self.root)], input='{}',
+                                           env={**os.environ, 'CLAUDE_PROJECT_DIR': str(self.root)},
+                                           text=True, capture_output=True, timeout=10, **kwargs))
 
     def test_busy_lock_blocks_direct_and_claude_without_running_checks(self):
         self.runtime.mkdir()
@@ -35,6 +47,15 @@ class GateLockTests(unittest.TestCase):
                 self.assertIn('NOT_RUN', result.stderr)
                 self.assertFalse((self.root / 'runs').exists())
         self.assertEqual(self.gate().returncode, 0)
+
+    def test_direct_runner_without_arguments_uses_the_working_directory(self):
+        # macOS /bin/bash 3.2 treats an empty "${array[@]}" as unbound under `set -u`.
+        shell = '/bin/bash' if Path('/bin/bash').exists() else 'bash'
+        result = subprocess.run([shell, str(ROOT / '.lean/scripts/quality-gate.sh')], cwd=self.root,
+                                text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn('unbound variable', result.stderr)
+        self.assertEqual((self.root / 'runs').read_text(), 'ran')
 
     def test_running_gate_holds_lock_and_releases_after_failure(self):
         self.root.joinpath('.lean/PROJECT.md').write_text(
@@ -91,7 +112,7 @@ class GateLockTests(unittest.TestCase):
         fixture = self.root / 'fixture'
         scripts = fixture / '.lean/scripts'
         scripts.mkdir(parents=True)
-        for name in ('quality-gate.sh', 'gate_lock.py', 'gate_evidence.py'):
+        for name in ('quality-gate.sh', 'gate_lock.py', 'gate_evidence.py', 'contract_guard.py'):
             shutil.copy2(ROOT / '.lean/scripts' / name, scripts / name)
         shutil.copy2(self.root / '.lean/PROJECT.md', fixture / '.lean/PROJECT.md')
         command = ['bash', str(scripts / 'quality-gate.sh'), '--root', str(fixture)]

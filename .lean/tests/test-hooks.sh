@@ -42,6 +42,22 @@ fixture() {
   echo "$dir"
 }
 
+# A Claude Stop refusal arrives as {"decision":"block","reason":...} on exit 0;
+# map it back to exit 2 and the reason so cases can assert on code and $err.
+blocked_as_refusal() {
+  raw_code=$code
+  raw_out="$out"
+  local reason
+  if [ "$code" -eq 0 ] && reason="$(printf '%s' "$out" | python3 -c 'import json, sys
+data = json.loads(sys.stdin.read() or "null")
+assert isinstance(data, dict) and data.get("decision") == "block"
+print(data["reason"])' 2>/dev/null)"; then
+    code=2
+    err="$err$reason"
+    out=""
+  fi
+}
+
 # run_gate <dir> <stdin json>; sets $code, $err and $out
 run_gate() {
   # These legacy cases intentionally edit gate commands; acceptance is fixture setup.
@@ -49,6 +65,7 @@ run_gate() {
   err="$(printf '%s' "$2" | CLAUDE_PROJECT_DIR="$1" bash "$gate" --cache-tree 2>&1 >"$work/stdout")"
   code=$?
   out="$(cat "$work/stdout")"
+  blocked_as_refusal
 }
 
 expect_code() {
@@ -65,6 +82,18 @@ dir="$(fixture)"
 echo change > "$dir/file.txt"
 run_gate "$dir" '{}'
 expect_code "gate: empty block is undefined" 2
+
+# 2b. A refusal is a JSON Stop block on exit 0, which headless `claude -p` feeds back.
+dir="$(fixture 'false')"
+echo change > "$dir/file.txt"
+run_gate "$dir" '{}'
+if [ "$raw_code" -eq 0 ] && printf '%s' "$raw_out" | python3 -c 'import json, sys
+data = json.load(sys.stdin)
+assert data["decision"] == "block" and "Quality Gate failed" in data["reason"]'; then
+  ok "gate: refusal is a JSON decision block on exit 0"
+else
+  bad "gate: refusal is a JSON decision block on exit 0 (exit $raw_code, stdout $raw_out)"
+fi
 
 # 3. Failing command blocks with a message
 dir="$(fixture 'false')"
@@ -678,6 +707,7 @@ run_raw() { # <dir> <stdin json>; no fixture control acceptance
   err="$(printf '%s' "$2" | CLAUDE_PROJECT_DIR="$1" bash "$gate" 2>&1 >"$work/stdout")"
   code=$?
   out="$(cat "$work/stdout")"
+  blocked_as_refusal
 }
 dir="$(fixture 'true')"
 run_raw "$dir" '{"stop_hook_active":false}'

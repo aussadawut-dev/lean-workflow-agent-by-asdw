@@ -32,7 +32,8 @@ done
 root="$(cd "$root" && pwd)" || exit 2
 lock_helper="$(dirname "$helper")/gate_lock.py"
 if ! python3 "$lock_helper" --check "$root"; then
-  exec python3 "$lock_helper" --run "$root" "$0" "${gate_args[@]}"
+  # Bash 3.2 (macOS /bin/bash) treats an empty "${gate_args[@]}" as unbound under set -u.
+  exec python3 "$lock_helper" --run "$root" "$0" ${gate_args[@]+"${gate_args[@]}"}
 fi
 project="$root/.lean/PROJECT.md"
 cache="$root/.claude/.gate-cache"
@@ -42,11 +43,13 @@ baseline="$root/.agent-runtime/gate-baseline"
 
 active=0
 transcript=""
+session=""
 if [ "$hook" -eq 1 ] && [ "$seed" -eq 0 ]; then
   input="$(cat)"
 
   active="$(printf '%s' "$input" | python3 "$helper" --root "$root" hook-field --field stop_hook_active)" || exit 2
   transcript="$(printf '%s' "$input" | python3 "$helper" --root "$root" hook-field --field transcript_path)" || exit 2
+  session="$(printf '%s' "$input" | python3 "$helper" --root "$root" hook-field --field session_id)" || exit 2
 fi
 
 # Record a refusal; $1 is "c" for a contract refusal, empty for a gate failure.
@@ -121,7 +124,14 @@ changed=1
 for prior in "$baseline" "$cache"; do
   if [ -n "$state" ] && [ -f "$prior" ] && [ "$(cat "$prior")" = "$state" ]; then changed=0; fi
 done
-if [ "$hook" -eq 1 ] && [ -n "$transcript" ]; then
+# A contract declared through the PreToolUse guard is the session's contract; the
+# transcript is only a fallback, because a runtime may not persist every text block.
+declared=""
+if [ "$hook" -eq 1 ] && [ -z "$contract" ] && [ -n "$session" ]; then
+  declared="$(python3 "$(dirname "$helper")/contract_guard.py" --root "$root" current --session "$session" 2>/dev/null)" &&
+    contract="$declared"
+fi
+if [ "$hook" -eq 1 ] && [ -z "$declared" ] && [ -n "$transcript" ]; then
   if [ ! -r "$transcript" ]; then
     echo "Contract transcript unreadable: $transcript" >&2
     refuse c; exit 2
@@ -142,7 +152,6 @@ risky=""
 if [ "$changed" -eq 1 ]; then
   risky="$(python3 "$helper" --root "$root" high-risk)" || { refuse; exit 2; }
 fi
-[ -z "$risky" ] || require_review=1
 
 # Explain a refused review receipt, naming any High-risk areas that required it.
 review_refused() {
@@ -151,12 +160,22 @@ review_refused() {
   exit 2
 }
 
+# A HIGH contract needs a receipt for itself. The High-risk floor needs only that the state
+# which ships was reviewed: a later contract that changes nothing ships that reviewed state.
+check_receipt() {
+  if [ "$require_review" -eq 1 ]; then
+    python3 "$helper" --root "$root" check-review --contract "$contract" || review_refused
+  elif [ -n "$risky" ]; then
+    # A receipt for this exact contract, or a HIGH-depth receipt for exactly this state.
+    python3 "$helper" --root "$root" check-review --contract "$contract" 2>/dev/null ||
+      python3 "$helper" --root "$root" check-shipped || review_refused
+  fi
+}
+
 # Only a real passing run can be cached; contracts and HIGH review are checked first.
 if [ "$cache_tree" -eq 1 ] && [ "$hook" -eq 1 ] && [ -n "$state" ] && [ ! -f "$failed" ] &&
    [ -f "$cache" ] && [ "$(cat "$cache")" = "$state" ]; then
-  if [ "$require_review" -eq 1 ]; then
-    python3 "$helper" --root "$root" check-review --contract "$contract" || review_refused
-  fi
+  check_receipt
   exit 0
 fi
 
@@ -195,9 +214,7 @@ while IFS= read -r cmd; do
   exit 2
 done <<< "$commands"
 
-if [ "$require_review" -eq 1 ]; then
-  python3 "$helper" --root "$root" check-review --contract "$contract" || review_refused
-fi
+check_receipt
 [ "$hook" -eq 0 ] || rm -f "$failed"
 [ -n "$state" ] && printf '%s' "$state" > "$cache"
 exit 0

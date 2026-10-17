@@ -21,6 +21,27 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)\"/.lean/scripts/contract_guard.py --root \"$(git rev-parse --show-toplevel)\" pre-tool || exit 2",
+            "statusMessage": "Checking Lean Task Contract"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)\"/.lean/scripts/contract_guard.py --root \"$(git rev-parse --show-toplevel)\" prompt"
+          }
+        ]
+      }
     ]
   }
 }

@@ -4,7 +4,7 @@ Project-owned facts and routes. Keep this map short; read the linked reference o
 
 ## Purpose
 
-Lean Workflow Baseline 4.3.1: a portable Claude/Codex workflow template. This repository contains workflow files, no application code or Web/API/Database areas.
+Lean Workflow Baseline 4.4.0: a portable Claude/Codex workflow template. This repository contains workflow files, no application code or Web/API/Database areas.
 
 ## Architecture
 
@@ -32,6 +32,8 @@ python3 .lean/scripts/workflow.py --root . check
 python3 .lean/scripts/model_catalog.py --root . check
 python3 -m unittest discover -s .lean/tests -p 'test_gate_integrity.py'
 python3 -m unittest discover -s .lean/tests -p 'test_skill_pack.py'
+python3 -m unittest discover -s tools -p 'test_*.py'
+python3 tools/check_commit_attribution.py --root .
 ```
 <!-- gate:end -->
 
@@ -39,8 +41,13 @@ python3 -m unittest discover -s .lean/tests -p 'test_skill_pack.py'
 
 - `.claude/hooks/` and `.claude/settings.json`: run on every turn and control permissions; a bug can block all work or widen access.
 - `.lean/scripts/gate_lock.py`: controls gate serialization and must be reviewed with the runner.
+- `.lean/scripts/contract_guard.py`: PreToolUse contract guard for both providers; a bug can block every write or let writes through undeclared.
 - `.lean/scripts/gate_mode.py`, `.codex/hooks.json` and `.codex/hooks/`: shared gate policy and Codex lifecycle adapter.
 - `.lean/policy/`: changes alter behavior for every downstream project on upgrade.
+
+## Development rules
+
+- Provider parity: every workflow feature, hook and enforcement must work for both Claude and Codex with equivalent outcomes. Where a runtime cannot support part of it, record the gap explicitly in the feature's documentation and tests; never ship Claude-only or Codex-only behavior silently. Changes include tests for both providers' adapters.
 
 ## Documentation routes
 
