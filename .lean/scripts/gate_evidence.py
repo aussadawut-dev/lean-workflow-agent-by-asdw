@@ -236,10 +236,18 @@ def high_risk_changes(root):
 
 def check_review(root, contract):
     receipt = json.loads((root / ".agent-runtime/review.json").read_text())
-    if (receipt.get("schema") != 1 or receipt.get("verdict") != "PASS"
-            or receipt.get("contract") != contract or receipt.get("state") != state(root)
-            or not receipt.get("reviewer") or not receipt.get("evidence")):
-        raise ValueError("Review receipt does not cover the current contract and shipping state")
+    reasons = []  # Name what differs, so the reviewer can fix the receipt in one step.
+    if receipt.get("schema") != 1 or not receipt.get("reviewer") or not receipt.get("evidence"):
+        reasons.append("the receipt is malformed")
+    if receipt.get("verdict") != "PASS":
+        reasons.append(f"its verdict is {receipt.get('verdict')!r}, not PASS")
+    if receipt.get("contract") != contract:
+        reasons.append(f"its contract {receipt.get('contract')!r} is not the exact contract {contract!r}; "
+                       "the reviewer re-records with that exact line")
+    if receipt.get("state") != state(root):
+        reasons.append("the shipping state changed since review")
+    if reasons:
+        raise ValueError("Review receipt does not cover the current contract and shipping state: " + "; ".join(reasons))
 
 
 def check_shipped(root):

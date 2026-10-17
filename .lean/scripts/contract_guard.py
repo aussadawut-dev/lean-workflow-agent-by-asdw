@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Task Contract declarations shared by the Claude and Codex hooks.
 
-A session declares its contract with a `declare` shell command. The PreToolUse
-hook binds the declared text to the session and denies write-capable tools
-until a declaration exists; a person's prompt clears it. These records catch
+The PreToolUse hook binds a session's contract from the first line of its reply
+(read from the Claude transcript) or from a `declare` shell command, and denies
+write-capable tools until one exists; a person's prompt clears it. These records catch
 mistakes; they are not a security boundary.
 """
 import argparse
@@ -42,11 +42,13 @@ HEREDOC = re.compile(r"\s*<<-?\s*(?P<quote>['\"])(?P<word>\w+)(?P=quote)\s*\Z")
 RUNTIME_PROMPTS = ("<task-notification>", "<agent-message", "<cross-session-message", "<system-reminder>",
                    "[SYSTEM NOTIFICATION", "Stop hook feedback:")
 MAX_SESSIONS = 64
-HELP = ("Declare the Task Contract first, in its own command:\n"
-        "python3 .lean/scripts/contract_guard.py declare <<'EOF'\nContract:\nrisk: LOW\nquality: STANDARD\n"
-        "acceptance: <observable check>\nEOF\n"
-        "or: python3 .lean/scripts/contract_guard.py declare --contract 'Contract: trivial (<reason>)'.\n"
-        "Write the same contract at the top of your reply. A new user prompt clears the declaration.")
+HELP = ("Write the Task Contract as the first line of your reply, before any tool call; the guard reads it\n"
+        "from the transcript. Without a readable transcript, declare it in a command of its own:\n"
+        "python3 .lean/scripts/contract_guard.py declare --contract 'Contract: risk=LOW quality=STANDARD "
+        "acceptance=<observable check>'\n"
+        "(or a quoted heredoc with the block form). A new user prompt clears the declaration.")
+TRANSCRIPT_WAIT = 1.0  # Seconds to re-read a transcript whose current reply may not be flushed yet.
+TRANSCRIPT_TAIL = 4_000_000  # Bytes read from the end of a transcript; the current turn is near the end.
 
 
 def parse(text):
@@ -167,6 +169,126 @@ def baseline(root, session, value=None):
     return value
 
 
+def text_of(content):
+    """Plain text of a message body, or None when it carries tool results (not a prompt)."""
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return None
+    if any(isinstance(block, dict) and block.get("type") == "tool_result" for block in content):
+        return None
+    return "\n".join(block.get("text", "") for block in content
+                     if isinstance(block, dict) and block.get("type") == "text")
+
+
+def transcript_contract(path):
+    """The contract that opens the reply to the latest person prompt in a Claude transcript, or None.
+
+    Only the first non-empty assistant text after that prompt counts, so a contract written
+    later in the reply, in an earlier turn or by a subagent (sidechain) never does. Runtime
+    turns (hook feedback, notices, compaction summaries) and tool results continue the turn. Unreadable lines are skipped.
+    """
+    if not isinstance(path, str) or not path:
+        return None
+    try:
+        with open(path, "rb") as source:
+            source.seek(0, os.SEEK_END)
+            size = source.tell()
+            source.seek(max(0, size - TRANSCRIPT_TAIL))
+            data = source.read().decode("utf-8", errors="replace")
+    except OSError:
+        return None
+    lines = data.splitlines()
+    if size > TRANSCRIPT_TAIL:
+        lines = lines[1:]  # The first line may be cut.
+    prompt_seen, first = False, None
+    for line in lines:
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if (not isinstance(entry, dict) or entry.get("isSidechain") or entry.get("isMeta")
+                or entry.get("isCompactSummary")):
+            continue
+        message = entry.get("message") if isinstance(entry.get("message"), dict) else {}
+        if entry.get("type") == "user":
+            text = text_of(message.get("content"))
+            if text is not None and text.strip() and not text.lstrip().startswith(RUNTIME_PROMPTS):
+                prompt_seen, first = True, None
+        elif entry.get("type") == "assistant" and prompt_seen and first is None:
+            content = message.get("content")
+            blocks = [content] if isinstance(content, str) else content if isinstance(content, list) else []
+            for block in blocks:
+                text = block if isinstance(block, str) else block.get("text") if (
+                    isinstance(block, dict) and block.get("type") == "text") else None
+                if isinstance(text, str) and text.strip():
+                    first = text
+                    break
+    if first is None:
+        return None
+    try:
+        return parse(first.strip().split("\n\n", 1)[0])
+    except ValueError:
+        return None
+
+
+def bind_transcript(root, session, payload):
+    """Bind the contract that opens the reply (Claude transcript) to the session; return it or None."""
+    path = payload.get("transcript_path")
+    found = transcript_contract(path)
+    # Claude can persist the reply's text a moment after PreToolUse starts for a tool in the same
+    # response (observed: present on a re-read 0.1s later), so re-read briefly before denying.
+    deadline = time.monotonic() + TRANSCRIPT_WAIT
+    while not found and isinstance(path, str) and os.path.isfile(path) and time.monotonic() < deadline:
+        time.sleep(0.05)
+        found = transcript_contract(path)
+    if not found:
+        return None
+    with Store(root) as store:
+        store.sessions.setdefault(session, {}).update(
+            {"contract": found[0], "meta": found[1], "source": "transcript", "at": time.time(),
+             "model": payload.get("model") if isinstance(payload.get("model"), str) else None})
+        store.save()
+    return found[0]
+
+
+# Shell reads allowed before a contract: one simple command or a pipeline of them, no redirection,
+# chaining, expansion or newline. Git takes only these subcommands, given directly (no `-c` options).
+READ_COMMANDS = {"grep", "cat", "head", "tail", "wc", "ls"}
+READ_GIT = {"status", "diff", "log", "show", "ls-files", "rev-parse", "blame"}
+WRITING_OPTIONS = ("--output", "--ext-diff", "--textconv")
+
+
+def read_only_shell(command):
+    """Whether a shell command only reads, by a conservative allowlist (unknown means no)."""
+    if not command.strip() or any(mark in command for mark in ("\n", "\r", "$", "`")):
+        return False
+    words = shell_words(command)
+    if not words:
+        return False
+    parts, current = [], []
+    for word in words:
+        if word == "|":
+            parts.append(current)
+            current = []
+        elif any(mark in word for mark in ";&|<>()"):
+            # shlex keeps runs such as `>&`, `&>` or `>|` as one token, so refuse any
+            # operator character outside a lone pipe (a quoted one only costs a declaration).
+            return False
+        else:
+            current.append(word)
+    parts.append(current)
+    for part in parts:
+        if not part or any(word.startswith(WRITING_OPTIONS) for word in part):
+            return False
+        if part[0] == "git":
+            if len(part) < 2 or part[1] not in READ_GIT:
+                return False
+        elif part[0] not in READ_COMMANDS:
+            return False
+    return True
+
+
 def pre_tool(root, payload):
     """Return None to allow, or the reason to deny."""
     session = session_of(payload)
@@ -196,7 +318,10 @@ def pre_tool(root, payload):
                 "gate_evidence.py, never edited directly. If the reviewer cannot record it, report BLOCKED.")
     if name in READ_ONLY or name.startswith(READ_ONLY_PREFIXES):
         return None
-    declared = current(root, session)
+    if isinstance(command, str) and read_only_shell(command):
+        return None  # A plain read changes nothing, so it needs no contract yet.
+    # Bind a transcript contract before any check that depends on the session's contract.
+    declared = current(root, session) or bind_transcript(root, session, payload)
     cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else root
     if (declared and isinstance(command, str) and not payload.get("agent_id")
             and records_own_receipt(command, declared, cwd)):

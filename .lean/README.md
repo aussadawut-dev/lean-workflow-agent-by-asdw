@@ -14,7 +14,7 @@ Explicit mode lowering uses `downgrade <lower-mode> --dry-run` and `--apply`; ad
 - `tracker`: standard plus one workset tracker per non-trivial task.
 - `full`: tracker plus local lease-backed queue ownership.
 
-Direct execution is the portable default; delegated execution uses the Controller/worker procedure. Repository mode, execution strategy, model choice and review depth are separate. Unix tools support macOS/Linux/WSL; native Windows is not supported. Claude hooks are provider-specific; Codex runs the gate explicitly or through its trusted lifecycle adapter. Both providers follow the shared auto/manual policy in `policy/QUALITY.md`.
+Direct execution is the portable default; delegated execution uses the Controller/worker procedure. Repository mode, execution strategy, model choice and review depth are separate. Unix tools support macOS/Linux/WSL; native Windows is not supported. Claude hooks are provider-specific; Codex runs the gate explicitly or through its trusted lifecycle adapter.
 
 ## Optional maintenance
 
@@ -48,7 +48,7 @@ Mode setup creates project-owned tracking/queue guides; the distributable templa
 
 Start with the shallowest sufficient context. Do not load every policy or workflow internal by default. Trivial work still needs its contract/evidence but no formal tracker or scope spec.
 
-Use `policy/CONTEXT.md` to select documents and procedures by affected behavior, expand along dependencies and continue from feedback with delta context. Discovery exposes choices; it does not invoke every skill. Context selection leaves required tests, review and gate checks intact.
+`policy/CONTEXT.md` selects context by affected behavior; discovery does not invoke every skill, and selection never skips tests, review or gate checks.
 
 ## Procedure intensity
 

@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -80,6 +81,24 @@ class DeclareCommandTests(unittest.TestCase):
             f"python3 $(touch pwned).lean/scripts/contract_guard.py declare --contract '{LINE}'"))
 
 
+class ReadOnlyShellTests(unittest.TestCase):
+    def test_plain_reads_and_pipes_of_reads_are_read_only(self):
+        for command in ("grep -n -i regression .lean/policy/TESTING.md", "cat a.py | head -5", "ls -la src",
+                        "git status --short", "git diff", "git log --oneline -3", "wc -l a.py b.py",
+                        "git show HEAD:a.py | tail -n 20", "grep -rn 'two words' src"):
+            self.assertTrue(contract_guard.read_only_shell(command), command)
+
+    def test_writes_chains_expansion_and_unknown_commands_are_not(self):
+        for command in ("grep x f > out", "cat a; rm b", "cat a && touch b", "cat a\nrm b", "ls $(touch x)",
+                        "cat `touch x`", "git diff --output=x", "grep x f | tee out", "head f >> y",
+                        "git -c core.pager=sh log", "git checkout -- a", "sed -n 1p f", "find . -delete",
+                        "X=1 cat f", "rg --pre sh x", "python3 -c 'print(1)'", "cat <(touch x)", "", "cat 'open",
+                        # Review round 1: multi-character operators shlex keeps as one token.
+                        "cat a >& f", "cat a &> f", "cat a >|f", "cat a |& tee f", "cat a <& 3", "cat a >&2",
+                        "cat a &", "cat a ||cat b", "(cat a)"):
+            self.assertFalse(contract_guard.read_only_shell(command), command)
+
+
 class HookFixture(unittest.TestCase):
     """Run hooks exactly as each provider's configured command does, in a disposable checkout."""
 
@@ -122,12 +141,12 @@ class GuardHookTests(HookFixture):
                 denied = self.tool(provider, write[0], session, **write[1])
                 self.assertEqual(denied.returncode, 2, denied.stderr)
                 self.assertIn("declare", denied.stderr)
-                self.assertEqual(self.tool(provider, shell, session, command="git status").returncode, 2)
+                self.assertEqual(self.tool(provider, shell, session, command="touch x").returncode, 2)
                 self.assertEqual(self.tool(provider, "Read", session, file_path="x.py").returncode, 0)
                 declared = self.tool(provider, shell, session, command=f"{DECLARE} <<'EOF'\n{BLOCK}\nEOF")
                 self.assertEqual(declared.returncode, 0, declared.stderr)
                 self.assertEqual(self.tool(provider, write[0], session, **write[1]).returncode, 0)
-                self.assertEqual(self.tool(provider, shell, session, command="git status").returncode, 0)
+                self.assertEqual(self.tool(provider, shell, session, command="touch x").returncode, 0)
                 # A subagent shares the session and its declaration.
                 self.assertEqual(self.hook(provider, "PreToolUse", {
                     "session_id": session, "agent_id": "a1", "tool_name": shell,
@@ -290,6 +309,110 @@ class GuardHookTests(HookFixture):
                 # Review round 1: repair mode takes the guard path itself, not a word that ends with it.
                 expanded = "git checkout -- $(touch pwned).lean/scripts/contract_guard.py"
                 self.assertEqual(self.tool(provider, "Bash", command=expanded).returncode, 2)
+
+    def transcript(self, *entries):
+        """A Claude-style JSONL transcript: ("user", text|blocks) or ("assistant", text, sidechain?)."""
+        lines = []
+        for entry in entries:
+            kind, body = entry[0], entry[1]
+            sidechain = len(entry) > 2 and entry[2]
+            if kind == "assistant":
+                content = [{"type": "text", "text": body}] if isinstance(body, str) else body
+            else:
+                content = body
+            lines.append(json.dumps({"type": kind, "isSidechain": sidechain,
+                                     "message": {"role": kind, "content": content}}))
+        path = self.root / f"transcript-{len(list(self.root.glob('transcript-*')))}.jsonl"
+        path.write_text("\n".join(lines) + "\n")
+        return str(path)
+
+    def edit_with(self, transcript, session="t1"):
+        return self.hook("claude", "PreToolUse", {"session_id": session, "tool_name": "Edit",
+                                                  "tool_input": {"file_path": "x.py"}, "transcript_path": transcript})
+
+    def test_read_only_shell_runs_before_a_contract_but_writes_do_not(self):
+        self.assertEqual(self.tool("claude", "Bash", "ro", command="grep -n x README.md").returncode, 0)
+        self.assertEqual(self.tool("codex", "Bash", "ro", command="git status --short").returncode, 0)
+        denied = self.tool("claude", "Bash", "ro", command="grep -n x README.md > out.txt")
+        self.assertEqual(denied.returncode, 2, denied.stderr)
+
+    def test_contract_written_first_in_the_reply_counts_as_the_declaration(self):
+        tool_use = [{"type": "tool_use", "id": "u1", "name": "Read", "input": {}}]
+        result = [{"type": "tool_result", "tool_use_id": "u1", "content": "file"}]
+        allowed = self.edit_with(self.transcript(("user", "Fix the bug"), ("assistant", f"{LINE}\n\nI'll look."),
+                                                 ("assistant", tool_use), ("user", result)))
+        self.assertEqual(allowed.returncode, 0, allowed.stderr)
+        record = json.loads((self.root / ".agent-runtime/contract-sessions.json").read_text())["sessions"]["t1"]
+        self.assertEqual((record["contract"], record["source"]), (LINE, "transcript"))
+        # The block form and a trivial contract count the same way.
+        block = self.edit_with(self.transcript(("user", "Do x"), ("assistant", BLOCK + "\n\nPlan.")), "t2")
+        self.assertEqual(block.returncode, 0, block.stderr)
+        # Runtime turns (hook feedback, notices) continue the task; they do not start a new one.
+        runtime = self.edit_with(self.transcript(
+            ("user", "Typo please"), ("assistant", "Contract: trivial (typo)"),
+            ("user", "Stop hook feedback:\nGate evidence: refused"),
+            ("user", [{"type": "text", "text": "<task-notification>done</task-notification>"}])), "t3")
+        self.assertEqual(runtime.returncode, 0, runtime.stderr)
+
+    def test_transcript_bound_contract_still_blocks_the_authors_own_receipt(self):
+        # Review round 1: binding from the transcript must happen before the own-receipt check.
+        path = self.transcript(("user", "High task"), ("assistant", f"{LINE}\n\nWorking."))
+        record = (f"python3 .lean/scripts/gate_evidence.py record-review --contract '{LINE}' --reviewer r "
+                  "--evidence e --verdict PASS --state abc")
+        base = {"session_id": "r1", "tool_name": "Bash", "tool_input": {"command": record}, "transcript_path": path}
+        own = self.hook("claude", "PreToolUse", base)
+        self.assertEqual(own.returncode, 2, own.stderr)
+        self.assertIn("independent reviewer", own.stderr)
+        reviewer = self.hook("claude", "PreToolUse", {**base, "agent_id": "rev"})
+        self.assertEqual(reviewer.returncode, 0, reviewer.stderr)
+
+    def test_compaction_summary_and_meta_entries_do_not_start_a_turn(self):
+        path = Path(self.transcript(("user", "Fix it"), ("assistant", LINE)))
+        extra = [{"type": "user", "isCompactSummary": True, "message": {"role": "user", "content": "Summary of chat"}},
+                 {"type": "user", "isMeta": True, "message": {"role": "user", "content": "Caveat: local command"}}]
+        path.write_text(path.read_text() + "".join(json.dumps(entry) + "\n" for entry in extra))
+        allowed = self.edit_with(str(path), "c1")
+        self.assertEqual(allowed.returncode, 0, allowed.stderr)
+
+    def test_contract_flushed_just_after_the_hook_starts_still_counts(self):
+        # Claude may persist the reply's text a moment after it runs PreToolUse for a tool in the same response.
+        path = Path(self.transcript(("user", "Typo please")))
+        config = json.loads((self.root / ".claude/settings.json").read_text())
+        command = config["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+        payload = {"session_id": "late", "tool_name": "Edit", "tool_input": {"file_path": "x.py"},
+                   "transcript_path": str(path)}
+        process = subprocess.Popen(["sh", "-c", command], cwd=self.root, text=True, stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   env=dict(os.environ, CLAUDE_PROJECT_DIR=str(self.root)))
+        process.stdin.write(json.dumps(payload))
+        process.stdin.close()
+        time.sleep(0.3)
+        with path.open("a") as output:
+            output.write(json.dumps({"type": "assistant", "message": {"role": "assistant", "content": [
+                {"type": "text", "text": "Contract: trivial (typo)"}]}}) + "\n")
+        self.assertEqual(process.wait(timeout=10), 0, process.stderr.read())
+
+    def test_transcript_contract_must_open_the_reply_to_the_latest_person_prompt(self):
+        cases = {
+            "late": (("user", "Fix it"), ("assistant", "Bug: max compares strings."), ("assistant", LINE)),
+            "old turn": (("user", "First task"), ("assistant", LINE), ("user", "Second task"),
+                         ("assistant", "Looking now.")),
+            "no reply": (("user", "First task"), ("assistant", LINE), ("user", "Second task")),
+            "sidechain": (("user", "Fix it"), ("assistant", LINE, True)),
+            "placeholder": (("user", "Fix it"), ("assistant", "Contract: risk=<LOW> quality=<HIGH> acceptance=<x>")),
+            "no prompt": (("assistant", LINE),),
+        }
+        for name, entries in cases.items():
+            with self.subTest(name):
+                denied = self.edit_with(self.transcript(*entries), f"d-{name}")
+                self.assertEqual(denied.returncode, 2, denied.stderr)
+                self.assertIn("first line", denied.stderr)
+        for path in (str(self.root / "missing.jsonl"), 7):
+            self.assertEqual(self.edit_with(path, "d-missing").returncode, 2)
+        # A broken line is skipped rather than trusted or fatal.
+        broken = self.root / "broken.jsonl"
+        broken.write_text("{not json\n" + Path(self.transcript(("user", "Fix it"), ("assistant", LINE))).read_text())
+        self.assertEqual(self.edit_with(str(broken), "d-broken").returncode, 0)
 
     def test_declaration_records_contract_metadata_and_runtime_model(self):
         result = self.tool("codex", "Bash", "s9", command=f"{DECLARE} <<'EOF'\n{BLOCK}\nEOF")
