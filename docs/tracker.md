@@ -29,6 +29,8 @@ python3 .lean/scripts/workflow.py tracker archive --apply
 python3 .lean/scripts/workflow.py tracker archive --id TCK001 --apply
 ```
 
+`python3 .lean/scripts/workflow.py context` prints mode, the active tracker and its next step, claims, Git state and the last gate result as JSON, to resume work after a break or context loss. Both commands run in a shell, so the contract guard requires a declared Task Contract first, even for `context` and `--dry-run`.
+
 ## Upgrade or downgrade modes
 
 Move to a higher mode with `configure`. Existing records stay in place:
