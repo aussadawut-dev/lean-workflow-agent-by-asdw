@@ -101,7 +101,7 @@ Planned validation: compare current claims with their implementation and relevan
 
 - The user requested saving the review recommendations in a new worktree and accepted a TCK document as the format.
 - The recommended sequence is TASK-05 → TASK-01 → TASK-02 → TASK-03 → TASK-04. TASK-05 goes first because it is independent and low risk. Correct other directly affected documentation alongside each implementation.
-- TASK-01 recommends content-identity receipts over a two-phase finalization protocol; the post-review tracker edit remains an open TASK-01 decision.
+- TASK-01 uses content-identity receipts rather than a two-phase finalization protocol. The user approved the TASK-01 scope and chose option 1: top-level `docs/tracking/*.md` records are left out of the receipt state and stay validated by `workflow.py check`.
 - TASK-04 is limited to reproducible measurement; a new multi-arm paid study is out of scope.
 - No remediation approach, workflow authority change, paid experiment, mode change or publication is approved merely by recording this plan.
 - Existing `standard` / unconfigured / `direct` settings are retained. This explicitly requested planning record does not enable tracker or full mode.
@@ -112,10 +112,14 @@ Planned validation: compare current claims with their implementation and relevan
 - Conversation: review of the local repository followed by the request to record the recommendations in a new worktree, optionally as a TCK.
 - Follow-up review of this plan checked each cited file and line against revision `cfe8f82`: every finding matched the code. That review reordered the tasks, narrowed TASK-02 and TASK-04, and added the TASK-01 recommendation.
 - The findings above are static observations or explicitly labeled inferences. Existing test source was read; its existence does not establish that tests currently pass.
-- Implementation: TASK-05 done; `.lean/CUSTOMIZING.md` now points to `workflow.py tracker archive`, and `evals/README.md` describes Codex's PreToolUse and Stop contract enforcement. `git grep` found no other current statement of either claim. TASK-01 to TASK-04 not started.
+- TASK-01 review round 1: REWORK. The reviewer found that a commit of unreviewed bytes, a staged deletion of a file still on disk and a partial commit kept the receipt valid, and that blob ids were abbreviated. Fixed by recording HEAD's tree in the receipt and checking the index and HEAD against the reviewed content (`shipping_gap`); four regression tests failed before the fix and pass after.
+- TASK-01 review round 2: REWORK. A commit between the reviewer's state capture and recording could ship unreviewed bytes, and `core.fileMode=false` hid staged or committed mode changes. Final bounded pass: the captured `state` binds HEAD's tree, and gap checks force `core.fileMode=true`; two regression tests failed before and pass after.
+- TASK-01 final review pass: PASS, recorded by the independent reviewer; `check-review` passes. Accepted known gaps: intermediate commits with unreviewed bytes stay in history when the final tree matches the reviewed content, and forcing `core.fileMode=true` can refuse a valid receipt on filesystems without modes.
+- TASK-01 implemented, pending independent review and user acceptance of the protected control change: `gate_evidence.py` adds `review_state()` (CLI `state`) for receipts and keeps `state()` (new CLI `gate-state`) for the gate cache and baselines; `quality-gate.sh` uses `gate-state`; `REVIEW.md`, `lean-task` and the changelog describe the new binding and order. New tests failed before the change (3 of 5; the 2 regression guards already passed) and pass after: all 360 `.lean/tests` (after the round-2 fixes), 108 hook tests, eval harness tests and every PROJECT gate command run directly. The full Quality Gate refuses until the user accepts the control change.
+- TASK-05 done; `.lean/CUSTOMIZING.md` now points to `workflow.py tracker archive`, and `evals/README.md` describes Codex's PreToolUse and Stop contract enforcement. `git grep` found no other current statement of either claim. TASK-02 to TASK-04 not started.
 - Quality Gate passed after the TASK-05 edits. Paid evals: NOT_RUN.
 - Independent implementation review: not performed; there is no implementation diff in this workset.
 
 ## Next step
 
-TASK-01: reproduce the suspected conflict in an isolated fixture and present the content-identity protocol with observable acceptance for approval before changing workflow behavior. Reuse this plan and the recorded evidence; expand context only where the chosen task requires it.
+Finish TASK-01: independent HIGH review, user `accept-controls`, Quality Gate, commit. Then TASK-02 needs its own scope approval. Reuse this plan and the recorded evidence; expand context only where the chosen task requires it.

@@ -162,7 +162,7 @@ class GateIntegrityTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn("Contract", result.stderr)
 
-    def test_high_review_is_required_and_bound_to_current_bytes_modes_and_index(self):
+    def test_high_review_is_required_and_bound_to_current_bytes_and_modes_not_staging(self):
         path = self.transcript([self.user("task"), self.assistant(CONTRACT)])
         result = self.gate("--claude-hook", payload={"transcript_path": path})
         self.assertEqual(result.returncode, 2, result.stderr)
@@ -174,8 +174,163 @@ class GateIntegrityTests(unittest.TestCase):
         os.chmod(self.root / "code.txt", 0o755)
         self.assertNotEqual(self.gate("--require-review", "--contract", CONTRACT).returncode, 0)
         os.chmod(self.root / "code.txt", 0o644)
+        # Staging the reviewed bytes changes no content, so the receipt still covers what ships.
         self.git("add", "code.txt")
-        self.assertNotEqual(self.gate("--require-review", "--contract", CONTRACT).returncode, 0)
+        self.assertEqual(self.gate("--require-review", "--contract", CONTRACT).returncode, 0)
+
+    def commit(self, message):
+        self.git("-c", "user.name=test", "-c", "user.email=test@example.invalid", "commit", "-qm", message)
+
+    def record_pass(self):
+        result = self.evidence("record-review", "--contract", CONTRACT, "--reviewer", "independent-test",
+                               "--evidence", "fixture", "--verdict", "PASS")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def covered(self):
+        return self.evidence("check-review", "--contract", CONTRACT).returncode == 0
+
+    def test_receipt_survives_staging_committing_and_tracker_bookkeeping(self):
+        tracking = self.root / "docs/tracking"
+        tracking.mkdir(parents=True)
+        (tracking / "TCK001.md").write_text("Status: REVIEWING\n")
+        (self.root / "old.txt").write_text("retired\n")
+        self.git("add", ".")
+        self.commit("base")
+        (self.root / "code.txt").write_text("reviewed\n")
+        (self.root / "old.txt").unlink()
+        self.record_pass()
+        self.git("add", "-A")
+        self.assertTrue(self.covered(), "staging the reviewed change")
+        self.commit("reviewed change")
+        self.assertTrue(self.covered(), "committing the reviewed change")
+        (tracking / "TCK001.md").write_text("Status: DONE\nEvidence: review PASS\n")
+        (tracking / "TCK002.md").write_text("Status: PLANNED\n")
+        self.assertTrue(self.covered(), "tracker records written after review")
+        self.git("add", "-A")
+        self.commit("close tracker")
+        self.assertTrue(self.covered(), "committing tracker records")
+
+    def test_receipt_rejects_any_unreviewed_content_change(self):
+        (self.root / "base.txt").write_text("base\n")
+        (self.root / "moved.txt").write_text("moved\n")
+        self.git("add", ".")
+        self.commit("base")
+        (self.root / "base.txt").write_text("reviewed\n")
+        self.record_pass()
+
+        def write(name, text):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
+        changes = {
+            "other Markdown": lambda: write("docs/guide.md", "new\n"),
+            "nested tracking file": lambda: write("docs/tracking/notes/TCK009.md", "x\n"),
+            "non-Markdown tracking file": lambda: write("docs/tracking/data.json", "{}\n"),
+            "deletion": lambda: (self.root / "moved.txt").unlink(),
+            "rename": lambda: (self.root / "moved.txt").rename(self.root / "renamed.txt"),
+            "gate control": lambda: (self.root / ".claude/settings.json").write_text('{"changed": true}'),
+        }
+        for name, change in changes.items():
+            with self.subTest(change=name):
+                self.assertTrue(self.covered())
+                change()
+                self.assertFalse(self.covered(), name)
+                self.git("checkout", "-q", "HEAD", "--", ".")
+                shutil.rmtree(self.root / "docs", ignore_errors=True)
+                (self.root / "renamed.txt").unlink(missing_ok=True)
+                (self.root / "base.txt").write_text("reviewed\n")
+
+    def test_receipt_rejects_staged_content_that_differs_from_the_reviewed_bytes(self):
+        # Committing would ship the staged bytes, which nobody reviewed.
+        (self.root / "base.txt").write_text("base\n")
+        self.git("add", ".")
+        self.commit("base")
+        (self.root / "base.txt").write_text("reviewed\n")
+        self.record_pass()
+        (self.root / "base.txt").write_text("unreviewed\n")
+        self.git("add", "base.txt")
+        (self.root / "base.txt").write_text("reviewed\n")
+        self.assertFalse(self.covered())
+
+    def reviewed_pair(self):
+        """Commit a.txt and b.txt, then review a change to both."""
+        for name in ("a.txt", "b.txt"):
+            (self.root / name).write_text("base\n")
+        self.git("add", ".")
+        self.commit("base")
+        for name in ("a.txt", "b.txt"):
+            (self.root / name).write_text("reviewed\n")
+        self.record_pass()
+
+    def test_receipt_rejects_committed_bytes_that_were_never_reviewed(self):
+        # Committing unreviewed bytes and restoring the reviewed ones leaves the tree unchanged.
+        self.reviewed_pair()
+        (self.root / "a.txt").write_text("unreviewed\n")
+        self.git("add", "-A")
+        self.commit("unreviewed")
+        (self.root / "a.txt").write_text("reviewed\n")
+        self.assertFalse(self.covered())
+
+    def test_receipt_rejects_a_staged_deletion_of_a_file_still_on_disk(self):
+        self.reviewed_pair()
+        self.git("rm", "-q", "--cached", "b.txt")
+        self.assertFalse(self.covered(), "staged deletion")
+        self.commit("drop b")
+        self.assertFalse(self.covered(), "committed deletion")
+
+    def test_receipt_rejects_a_partial_commit_of_the_reviewed_change(self):
+        # The commit would ship a.txt without b.txt, a combination nobody reviewed.
+        self.reviewed_pair()
+        self.git("add", "a.txt")
+        self.commit("only a")
+        self.assertFalse(self.covered(), "partial commit")
+        self.git("add", "b.txt")
+        self.commit("rest")
+        self.assertTrue(self.covered(), "the whole reviewed change is committed")
+
+    def test_commit_during_review_cannot_be_recorded_as_reviewed(self):
+        # The captured state must bind HEAD: a commit between capture and record ships unseen bytes.
+        self.reviewed_pair()
+        captured = self.evidence("state").stdout.strip()
+        (self.root / "a.txt").write_text("unreviewed\n")
+        self.git("add", "-A")
+        self.commit("during review")
+        (self.root / "a.txt").write_text("reviewed\n")
+        recorded = self.evidence("record-review", "--contract", CONTRACT, "--reviewer", "independent-test",
+                                 "--evidence", "fixture", "--verdict", "PASS", "--state", captured)
+        self.assertNotEqual(recorded.returncode, 0)
+        self.assertFalse(self.covered())
+
+    def test_committed_mode_change_is_caught_without_core_filemode(self):
+        self.reviewed_pair()
+        self.git("config", "core.fileMode", "false")
+        self.git("update-index", "--chmod=+x", "a.txt")
+        self.assertFalse(self.covered(), "staged mode change")
+        self.git("add", "b.txt")
+        self.commit("mode")
+        self.assertFalse(self.covered(), "committed mode change")
+
+    def test_receipt_without_a_reviewed_base_is_refused(self):
+        self.record_pass()
+        path = self.root / ".agent-runtime/review.json"
+        receipt = json.loads(path.read_text())
+        receipt.pop("base", None)
+        path.write_text(json.dumps(receipt))
+        self.assertFalse(self.covered())
+
+    def test_gate_state_still_changes_with_commits_and_trackers(self):
+        # The gate cache must rerun checks that read history or tracker records.
+        tracking = self.root / "docs/tracking"
+        tracking.mkdir(parents=True)
+        (tracking / "TCK001.md").write_text("Status: PLANNED\n")
+        before = self.evidence("gate-state").stdout.strip()
+        self.assertTrue(before)
+        (tracking / "TCK001.md").write_text("Status: DONE\n")
+        tracker_edit = self.evidence("gate-state").stdout.strip()
+        self.assertNotEqual(tracker_edit, before)
+        self.git("add", "-A")
+        self.commit("tracker")
+        self.assertNotEqual(self.evidence("gate-state").stdout.strip(), tracker_edit)
 
     def test_review_cannot_be_reused_for_another_contract_or_a_rework(self):
         self.assertEqual(self.evidence("record-review", "--contract", CONTRACT, "--reviewer", "test-reviewer",

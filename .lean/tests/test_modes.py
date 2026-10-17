@@ -710,7 +710,7 @@ class WorkflowModeTests(unittest.TestCase):
         (markers / ".gate-failed").unlink()
         (markers / ".gate-cache").write_text("0" * 64)
         self.assertEqual(json.loads(self.run_cli("context").stdout)["gate"]["status"], "STALE")
-        state = subprocess.run(["python3", str(SCRIPT.parent / "gate_evidence.py"), "--root", str(self.root), "state"],
+        state = subprocess.run(["python3", str(SCRIPT.parent / "gate_evidence.py"), "--root", str(self.root), "gate-state"],
                                text=True, capture_output=True, check=True).stdout.strip()
         (markers / ".gate-cache").write_text(state)
         self.assertEqual(json.loads(self.run_cli("context").stdout)["gate"]["status"], "PASS")

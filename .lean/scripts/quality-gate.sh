@@ -107,10 +107,10 @@ commands="$(awk '
 
 cd "$root" || { refuse; exit 2; }
 
-# State receipts cover Git-visible files, modes, index and submodule work.
+# The gate cache and baseline cover HEAD, index, Git-visible files, modes and submodule work.
 state=""
 if [ "$hook" -eq 1 ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  state="$(python3 "$helper" --root "$root" state)" || { refuse; exit 2; }
+  state="$(python3 "$helper" --root "$root" gate-state)" || { refuse; exit 2; }
 fi
 
 # SessionStart records a change baseline, never a passing cache.

@@ -23,15 +23,15 @@ def git(root, *args):
     return subprocess.check_output(["git", "-C", str(root), *args], stderr=subprocess.PIPE)
 
 
-def state(root):
-    """Bind HEAD, index and all Git-visible bytes, paths, symlinks and modes."""
+def entries(root, skip=lambda name: False):
+    """Bytes, modes and links of every Git-visible path."""
     names = set(git(root, "ls-files", "--cached", "--others", "--exclude-standard", "-z").split(b"\0")) - {b""}
-    entries = []
+    found = []
     for raw in sorted(names):
         name = os.fsdecode(raw)
         path = root / name
         # A retired index path under a moved symlink is represented by the link itself.
-        if any((root / parent).is_symlink() for parent in Path(name).parents):
+        if skip(name) or any((root / parent).is_symlink() for parent in Path(name).parents):
             continue
         if path.is_symlink():
             value = {"link": os.readlink(path)}
@@ -42,11 +42,95 @@ def state(root):
             value = {"submodule": state(path)} if (path / ".git").exists() else {"directory": True}
         else:
             value = None
-        entries.append([name, value])
+        found.append([name, value])
+    return found
+
+
+def state(root):
+    """Gate cache and change baseline: HEAD, index and all Git-visible bytes, paths, symlinks and modes."""
     head = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True)
     return digest(json.dumps([head.stdout.decode().strip(), controls(root),
-                             git(root, "ls-files", "--stage", "-z").hex(), entries],
+                             git(root, "ls-files", "--stage", "-z").hex(), entries(root)],
                             ensure_ascii=True, sort_keys=True).encode())
+
+
+EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+
+def tracker_record(name):
+    """A tracker file directly under docs/tracking/, written after review to record its result."""
+    path = Path(name)
+    return path.parent == Path("docs/tracking") and path.suffix == ".md"
+
+
+def review_state(root):
+    """The reviewed content: Git-visible bytes, modes, links, paths and gate controls.
+
+    Git bookkeeping is left out, so staging or committing keeps this value; `shipping_gap`
+    checks that the index and HEAD ship only that content. Submodules keep their full `state`,
+    HEAD included. Top-level tracker records are left out (`workflow.py check` validates them).
+    """
+    found = [entry for entry in entries(root, tracker_record)
+             if entry[1] is not None]  # A missing file reads the same deleted, staged or committed.
+    return digest(json.dumps(["review", controls(root), found], ensure_ascii=True, sort_keys=True).encode())
+
+
+def head_tree(root):
+    head = subprocess.run(["git", "-C", str(root), "rev-parse", "-q", "--verify", "HEAD^{tree}"], capture_output=True)
+    return head.stdout.decode().strip() if head.returncode == 0 else EMPTY_TREE
+
+
+def captured_state(root):
+    """What a reviewer captures before reading: the reviewed content and HEAD's tree together.
+
+    Binding HEAD here means a commit between capture and recording is refused, so the recorded
+    base is the tree the reviewer actually saw.
+    """
+    return digest(json.dumps(["capture", review_state(root), head_tree(root)]).encode())
+
+
+def shipping_gap(root, base):
+    """Why the index or HEAD would ship something other than the reviewed content, or None.
+
+    `base` is HEAD's tree when the review began. While HEAD is still there, each staged path must
+    hold its reviewed working-tree bytes (or be unchanged). Once HEAD moves, the commits must
+    contain the whole reviewed content: a partial commit ships a combination nobody reviewed.
+    """
+    env = dict(os.environ, GIT_OPTIONAL_LOCKS="0")
+    def names(*args):
+        # core.fileMode=true: compare modes even where the repository hides them.
+        out = subprocess.check_output(["git", "-C", str(root), "-c", "core.fileMode=true", *args],
+                                      stderr=subprocess.PIPE, env=env)
+        return {os.fsdecode(name) for name in out.split(b"\0") if name}
+    keep = lambda found: sorted(name for name in found if not tracker_record(name))
+    if head_tree(root) == base:
+        unstaged = names("diff", "--no-ext-diff", "--no-renames", "--name-only", "-z")
+        raw = subprocess.check_output(["git", "-C", str(root), "-c", "core.fileMode=true", "diff", "--no-ext-diff", "--no-renames", "--cached",
+                                       "--raw", "--full-index", "-z", base], stderr=subprocess.PIPE, env=env).split(b"\0")
+        gaps = []
+        for meta, raw_name in zip(raw[0::2], raw[1::2]):
+            name = os.fsdecode(raw_name)
+            if not meta.startswith(b":") or tracker_record(name):
+                continue
+            deleted = set(meta.split()[3].decode()) == {"0"}
+            if (deleted and os.path.lexists(root / name)) or (not deleted and name in unstaged):
+                gaps.append(name)
+        return f"staged content differs from the reviewed working tree: {', '.join(gaps)}" if gaps else None
+    pending = keep(names("diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", "HEAD")
+                   | names("diff", "--no-ext-diff", "--no-renames", "--cached", "--name-only", "-z", "HEAD")
+                   | names("ls-files", "--others", "--exclude-standard", "-z"))
+    return (f"HEAD moved since review without the whole reviewed content: {', '.join(pending)}"
+            if pending else None)
+
+
+def receipt_gap(root, receipt):
+    """Why a receipt does not cover the current shipping state, or None."""
+    base = receipt.get("base")
+    if not isinstance(base, str) or not re.fullmatch(r"[0-9a-f]{40,64}", base):
+        return "the receipt has no reviewed base; the reviewer re-records it"
+    if receipt.get("state") != review_state(root):
+        return "the shipping state changed since review"
+    return shipping_gap(root, base)
 
 
 CONTROL_NAMES = (".claude/settings.json", ".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py",
@@ -244,8 +328,9 @@ def check_review(root, contract):
     if receipt.get("contract") != contract:
         reasons.append(f"its contract {receipt.get('contract')!r} is not the exact contract {contract!r}; "
                        "the reviewer re-records with that exact line")
-    if receipt.get("state") != state(root):
-        reasons.append("the shipping state changed since review")
+    gap = receipt_gap(root, receipt)
+    if gap:
+        reasons.append(gap)
     if reasons:
         raise ValueError("Review receipt does not cover the current contract and shipping state: " + "; ".join(reasons))
 
@@ -261,7 +346,7 @@ def check_shipped(root):
     # Only a review at HIGH depth stands in for the floor: a PASS under a lower contract (a typo or a
     # receipt the author wrote) never required an independent reviewer.
     high = contract and (contract.group(1) == "HIGH" or contract.group(2) == "VERY_HIGH")
-    if (receipt.get("schema") != 1 or receipt.get("verdict") != "PASS" or receipt.get("state") != state(root)
+    if (receipt.get("schema") != 1 or receipt.get("verdict") != "PASS" or receipt_gap(root, receipt)
             or not high or not receipt.get("reviewer") or not receipt.get("evidence")):
         raise ValueError("No HIGH-depth PASS review receipt covers the current shipping state")
 
@@ -273,7 +358,8 @@ def main():
     commands.add_parser("guard-controls")
     accept = commands.add_parser("accept-controls")
     accept.add_argument("--reason", required=True)
-    commands.add_parser("state")
+    commands.add_parser("state", help="the shipping state a review receipt covers")
+    commands.add_parser("gate-state", help="the state a gate cache and change baseline cover")
     commands.add_parser("high-risk")
     commands.add_parser("check-shipped")
     transcript = commands.add_parser("contract")
@@ -318,6 +404,8 @@ def main():
                     save(path, {"schema": 1, "controls": current, "history": history})
                     print(f"Gate evidence: protected gate controls accepted; they match {ref} ({commit[:12]}).", file=sys.stderr)
         elif args.command == "state":
+            print(captured_state(root))
+        elif args.command == "gate-state":
             print(state(root))
         elif args.command == "check-shipped":
             check_shipped(root)
@@ -343,11 +431,12 @@ def main():
             if args.command == "record-review":
                 if not args.reviewer.strip() or not args.evidence.strip():
                     raise ValueError("Reviewer identity and review evidence are required")
-                current = state(root)
-                if args.state != current:
-                    raise ValueError("Shipping state changed since review began; review the new delta")
+                if args.state != captured_state(root):
+                    raise ValueError("Shipping state or HEAD changed since review began; review the new delta "
+                                     "(capture it with `gate_evidence.py state`)")
+                current, base = review_state(root), head_tree(root)
                 save(root / ".agent-runtime/review.json", {"schema": 1, "contract": args.contract,
-                     "state": current, "reviewer": args.reviewer, "verdict": args.verdict,
+                     "state": current, "base": base, "reviewer": args.reviewer, "verdict": args.verdict,
                      "evidence": args.evidence})
             else:
                 check_review(root, args.contract)
