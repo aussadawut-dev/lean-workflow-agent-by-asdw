@@ -41,7 +41,9 @@ This tracker records the recommendations requested by the user after the convers
 
 Evidence: [`lean-task`](../../.lean/skills/lean-task/SKILL.md) orders semantic review (step 6) before completion/evidence and tracker synchronization (step 7). [`gate_evidence.py`](../../.lean/scripts/gate_evidence.py) `state()` hashes `git rev-parse HEAD`, the gate controls, the raw `git ls-files --stage` output and the bytes/modes/links of every Git-visible path, including untracked ones; `check_review()` compares that digest with the receipt. `docs/tracking/` is not ignored, so tracker edits are part of the state. [`test_gate_integrity.py`](../../.lean/tests/test_gate_integrity.py) (`test_high_review_is_required_and_bound_to_current_bytes_modes_and_index`) asserts that `git add` alone invalidates a PASS receipt, so this binding is intended behavior today.
 
-Static conclusion: bookkeeping edits after review, staging, or committing change the receipt state even when reviewed source bytes are unchanged. A commit changes HEAD; staging changes the index blob ids; a tracker update changes Git-visible bytes. The exact end-to-end closeout failure has not been reproduced in this review. Treat this as a lifecycle conflict to investigate, not a runtime test result.
+Static conclusion: bookkeeping edits after review, staging, or committing change the receipt state even when reviewed source bytes are unchanged. A commit changes HEAD; staging changes the index blob ids; a tracker update changes Git-visible bytes.
+
+Reproduced on 2026-10-17 at `246c83f` in a disposable fixture with copies of the gate scripts, comparing `gate_evidence.py state` (the value `check-review` compares) after an untracked reviewed change: setting the tracker to DONE changed the state (reverting it restored the state); `git add` of the reviewed file changed it; committing the staged state changed it although the tree did not change. Each step alone invalidates a PASS receipt. The comparison used `state` directly because the contract guard correctly denies a main-thread `record-review`.
 
 Recommended approach (to confirm with a reproduction before implementation):
 
