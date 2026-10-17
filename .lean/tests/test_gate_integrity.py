@@ -108,18 +108,71 @@ class GateIntegrityTests(unittest.TestCase):
     def user(self, text):
         return {"type": "user", "message": {"content": text}}
 
-    def test_continued_stops_release_unverified_without_success(self):
+    def test_continued_stops_that_keep_changing_release_unverified_after_three(self):
         self.project.write_text(self.project.read_text().replace("true", "false"))
+        self.evidence("accept-controls", "--reason", "Fixture selects a failing gate")
         for index in range(3):
+            (self.root / "attempt.txt").write_text(f"attempt {index}\n")
             result = self.gate("--claude-hook", payload={"stop_hook_active": index > 0})
             self.assertEqual(result.returncode, 2, result.stderr)
+        (self.root / "attempt.txt").write_text("attempt 3\n")
         released = self.gate("--claude-hook", payload={"stop_hook_active": True})
         self.assertEqual(released.returncode, 0, released.stderr)
         self.assertIn("UNVERIFIED", json.loads(released.stdout)["systemMessage"])
         self.assertTrue((self.root / ".claude/.gate-failed").exists())
         self.assertFalse((self.root / ".claude/.gate-cache").exists())
+        (self.root / "attempt.txt").write_text("attempt 4\n")
         fresh = self.gate("--claude-hook", payload={"stop_hook_active": False})
         self.assertEqual(fresh.returncode, 2, fresh.stderr)
+
+    def test_an_unchanged_refusal_blocks_once_then_only_warns(self):
+        # The agent has already seen this refusal; blocking every Stop while it waits on the user loops.
+        self.project.write_text(self.project.read_text().replace("true", "false"))
+        self.evidence("accept-controls", "--reason", "Fixture selects a failing gate")
+        first = self.gate("--claude-hook", payload={"stop_hook_active": False, "session_id": "s"})
+        self.assertEqual(first.returncode, 2, first.stderr)
+        for active in (True, False):
+            with self.subTest(stop_hook_active=active):
+                repeated = self.gate("--claude-hook", payload={"stop_hook_active": active, "session_id": "s"})
+                self.assertEqual(repeated.returncode, 0, repeated.stderr)
+                self.assertIn("UNVERIFIED", json.loads(repeated.stdout)["systemMessage"])
+                self.assertTrue((self.root / ".claude/.gate-failed").exists())
+                self.assertFalse((self.root / ".claude/.gate-cache").exists())
+        (self.root / "changed.txt").write_text("new work\n")
+        changed = self.gate("--claude-hook", payload={"stop_hook_active": False, "session_id": "s"})
+        self.assertEqual(changed.returncode, 2, changed.stderr)
+
+    def test_a_new_refusal_reason_blocks_even_when_the_state_is_unchanged(self):
+        # Accepting drift changes no Git-visible byte, but the failing check is news to the agent.
+        self.assertEqual(self.gate("--claude-hook", "--seed").returncode, 0)
+        self.project.write_text(self.project.read_text().replace("true", "echo CHECK-FAILED; false"))
+        drift = self.gate("--claude-hook", payload={"session_id": "s"})
+        self.assertEqual(drift.returncode, 2, drift.stderr)
+        self.assertIn("protected", drift.stderr.lower())
+        self.evidence("accept-controls", "--reason", "User approved fixture gate change")
+        failing = self.gate("--claude-hook", payload={"stop_hook_active": True, "session_id": "s"})
+        self.assertEqual(failing.returncode, 2, failing.stderr)
+        self.assertIn("CHECK-FAILED", failing.stderr)
+
+    def test_another_session_is_shown_a_refusal_it_has_not_seen(self):
+        self.project.write_text(self.project.read_text().replace("true", "false"))
+        self.evidence("accept-controls", "--reason", "Fixture selects a failing gate")
+        self.assertEqual(self.gate("--claude-hook", payload={"session_id": "one"}).returncode, 2)
+        self.assertEqual(self.gate("--claude-hook", payload={"session_id": "one"}).returncode, 0)
+        other = self.gate("--claude-hook", payload={"session_id": "two"})
+        self.assertEqual(other.returncode, 2, other.stderr)
+
+    def test_an_unchanged_control_drift_refusal_blocks_once(self):
+        self.assertEqual(self.gate("--claude-hook", "--seed").returncode, 0)
+        self.project.write_text(self.project.read_text().replace("true", "echo changed"))
+        self.assertEqual(self.gate("--claude-hook", payload={"session_id": "s"}).returncode, 2)
+        repeated = self.gate("--claude-hook", payload={"stop_hook_active": True, "session_id": "s"})
+        self.assertEqual(repeated.returncode, 0, repeated.stderr)
+        self.assertIn("UNVERIFIED", json.loads(repeated.stdout)["systemMessage"])
+        # Accepting the drift lets the gate run its checks, which pass and clear the refusal.
+        self.evidence("accept-controls", "--reason", "User approved fixture gate change")
+        self.assertEqual(self.gate("--claude-hook", payload={"session_id": "s"}).returncode, 0)
+        self.assertFalse((self.root / ".claude/.gate-failed").exists())
 
     def test_empty_gate_and_missing_project_are_explicitly_unconfigured(self):
         self.project.write_text("<!-- gate:start -->\n```sh\n```\n<!-- gate:end -->\n")

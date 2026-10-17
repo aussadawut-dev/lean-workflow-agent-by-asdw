@@ -88,10 +88,36 @@ class ReadOnlyShellTests(unittest.TestCase):
                         "git show HEAD:a.py | tail -n 20", "grep -rn 'two words' src"):
             self.assertTrue(contract_guard.read_only_shell(command), command)
 
+    def test_common_inspection_commands_and_chains_of_reads_are_read_only(self):
+        for command in ("rg -n 'def state' .lean/scripts", "rg --files src | sort", "sed -n 26,58p gate.py",
+                        "sed -n -e 1p -e 5,9p a.py b.py", "find . -name '*.py' -type f", "find src -maxdepth 2",
+                        "sort -u names.txt", "cut -d: -f1 /etc/group | sort", "grep -n x a.py && sed -n 3,9p a.py",
+                        "ls src; git status --short", "git log -1 && rg TODO src | head -5",
+                        "rg -n -i --glob '*.py' -C 2 todo src", "rg -l --hidden -e a -e b .", "rg -tpy x",
+                        "find . -type f -name '*.md' -mtime -1 -print", "find . -path ./node_modules -prune -o -name x -print",
+                        "sort -rn -k2 counts.txt", "sort -t: -k3,3n f", "sort --unique --reverse f", "grep -n 'a#b' f"):
+            self.assertTrue(contract_guard.read_only_shell(command), command)
+
+    def test_writing_forms_of_the_added_commands_are_not_read_only(self):
+        for command in ("sed -i 1d f", "sed -n -i 1p f", "sed --in-place -n 1p f", "sed 1p f", "sed -n 1w out f",
+                        "sed -n '1p;w out' f", "sed -n 1e f", "sed -n /x/p f", "sed -n -f script.sed f",
+                        "find . -exec rm {} +", "find . -execdir sh -c x {} +", "find . -ok rm {} +",
+                        "find . -okdir rm {} +", "find . -fprint out", "find . -fprintf out x", "find . -fls out",
+                        "find . -fprint0 out", "sort -o out f", "sort -uo out f", "sort --output=out f",
+                        "sort --compress-program=sh f", "rg --pre=sh x", "rg --pre-glob '*' --pre sh x",
+                        "rg x && touch y", "ls; rm -rf build", "cat a || touch b",
+                        # Review round 1: shlex comments, bfs -rm, rg helper programs, sort abbreviations.
+                        "cat a#; rm -rf x", "ls x#;touch y", "grep x#&&touch y f", "find d -name v -rm",
+                        "find d -fdelete", "rg --hostname-bin=./h.sh --hyperlink-format=default x f",
+                        "rg --hostname-bin ./h.sh x f", "rg -z x f", "rg --search-zip x f",
+                        "sort --out=o1 f", "sort --o=x f", "sort --comp=sh f", "sort -T /tmp f",
+                        "sort --temporary-directory=/tmp f"):
+            self.assertFalse(contract_guard.read_only_shell(command), command)
+
     def test_writes_chains_expansion_and_unknown_commands_are_not(self):
         for command in ("grep x f > out", "cat a; rm b", "cat a && touch b", "cat a\nrm b", "ls $(touch x)",
                         "cat `touch x`", "git diff --output=x", "grep x f | tee out", "head f >> y",
-                        "git -c core.pager=sh log", "git checkout -- a", "sed -n 1p f", "find . -delete",
+                        "git -c core.pager=sh log", "git checkout -- a", "sed -n 1p f > out", "find . -delete",
                         "X=1 cat f", "rg --pre sh x", "python3 -c 'print(1)'", "cat <(touch x)", "", "cat 'open",
                         # Review round 1: multi-character operators shlex keeps as one token.
                         "cat a >& f", "cat a &> f", "cat a >|f", "cat a |& tee f", "cat a <& 3", "cat a >&2",
@@ -391,6 +417,15 @@ class GuardHookTests(HookFixture):
             output.write(json.dumps({"type": "assistant", "message": {"role": "assistant", "content": [
                 {"type": "text", "text": "Contract: trivial (typo)"}]}}) + "\n")
         self.assertEqual(process.wait(timeout=10), 0, process.stderr.read())
+
+    def test_unsaved_reply_denial_says_to_declare_before_a_first_write(self):
+        # Claude may not save the reply's text until a tool result arrives, so a turn whose first tool
+        # call writes cannot bind the first-line contract from the transcript; declaring first works.
+        path = self.transcript(("user", "Fix the typo"))
+        denied = self.edit_with(path, "unsaved")
+        self.assertEqual(denied.returncode, 2)
+        self.assertIn("first tool call", denied.stderr)
+        self.assertIn("declare", denied.stderr)
 
     def test_transcript_contract_must_open_the_reply_to_the_latest_person_prompt(self):
         cases = {

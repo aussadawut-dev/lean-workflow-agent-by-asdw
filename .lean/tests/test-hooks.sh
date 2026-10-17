@@ -105,14 +105,13 @@ case "$err" in
   *) bad "gate: failure names the command (got: $err)" ;;
 esac
 
-# 4. stop_hook_active no longer waves a failing gate through, but the loop is bounded:
-# after three refusals the Stop is released UNVERIFIED, never recorded as a pass.
-run_gate "$dir" '{"stop_hook_active":true}'
-expect_code "gate: stop_hook_active still refuses a failing gate (2nd refusal)" 2
-run_gate "$dir" '{"stop_hook_active":true}'
-expect_code "gate: stop_hook_active still refuses a failing gate (3rd refusal)" 2
-run_gate "$dir" '{"stop_hook_active":true}'
-expect_code "gate: continued failure is released after three refusals" 0
+# 4. A refusal the agent has already seen, with nothing changed since, is released UNVERIFIED
+# instead of blocking again; it is never recorded as a pass. (Changing work keeps the
+# three-refusal cap, covered in test_gate_integrity.py.)
+run_gate "$dir" '{"stop_hook_active":true,"session_id":"s"}'
+expect_code "gate: a refusal first shown to this session blocks" 2
+run_gate "$dir" '{"stop_hook_active":true,"session_id":"s"}'
+expect_code "gate: an unchanged continued refusal is released at once" 0
 case "$out" in
   *'"systemMessage"'*UNVERIFIED*) ok "gate: the release tells the user the work is unverified" ;;
   *) bad "gate: the release tells the user the work is unverified (got: $out)" ;;
@@ -122,8 +121,11 @@ if [ -f "$dir/.claude/.gate-failed" ] && [ ! -f "$dir/.claude/.gate-cache" ]; th
 else
   bad "gate: a release keeps the refusal and caches nothing"
 fi
-run_gate "$dir" '{"stop_hook_active":false}'
-expect_code "gate: a fresh Stop is gated again after the cap" 2
+run_gate "$dir" '{"stop_hook_active":false,"session_id":"s"}'
+expect_code "gate: a fresh Stop with nothing changed only warns" 0
+echo again > "$dir/file.txt"
+run_gate "$dir" '{"stop_hook_active":false,"session_id":"s"}'
+expect_code "gate: a fresh Stop after a change is gated again" 2
 if [ "$(cat "$dir/.claude/.gate-failed")" = "1" ]; then ok "gate: a fresh refusal restarts the count"; else bad "gate: a fresh refusal restarts the count"; fi
 
 # 5. A clean tree is not a validated tree: committed work is still gated.
@@ -713,20 +715,17 @@ dir="$(fixture 'true')"
 run_raw "$dir" '{"stop_hook_active":false}'
 expect_code "cap: first use records gate controls" 0
 sed -i.bak 's/^true$/test -d ./' "$dir/.lean/PROJECT.md" && rm -f "$dir/.lean/PROJECT.md.bak"
-run_raw "$dir" '{"stop_hook_active":false}'
+run_raw "$dir" '{"stop_hook_active":false,"session_id":"s"}'
 expect_code "cap: changed controls refuse" 2
-run_raw "$dir" '{"stop_hook_active":true}'
-run_raw "$dir" '{"stop_hook_active":true}'
-expect_code "cap: changed controls still refuse (3rd)" 2
-run_raw "$dir" '{"stop_hook_active":true}'
-expect_code "cap: changed-control refusals are released after three" 0
+run_raw "$dir" '{"stop_hook_active":true,"session_id":"s"}'
+expect_code "cap: an unchanged changed-control refusal is released at once" 0
 case "$out" in *UNVERIFIED*) ok "cap: control release is marked unverified" ;; *) bad "cap: control release is marked unverified (got: $out)" ;; esac
 dir="$(fixture 'true')"
 rm "$dir/.lean/PROJECT.md"
-for active in false true true; do run_raw "$dir" "{\"stop_hook_active\":$active}"; done
-expect_code "cap: an undefined gate still refuses (3rd)" 2
-run_raw "$dir" '{"stop_hook_active":true}'
-expect_code "cap: undefined-gate refusals are released after three" 0
+run_raw "$dir" '{"stop_hook_active":false,"session_id":"s"}'
+expect_code "cap: an undefined gate refuses" 2
+run_raw "$dir" '{"stop_hook_active":true,"session_id":"s"}'
+expect_code "cap: an unchanged undefined-gate refusal is released at once" 0
 dir="$(fixture 'true')"
 rm "$dir/.lean/PROJECT.md"
 CLAUDE_PROJECT_DIR="$dir" bash "$gate" --seed </dev/null

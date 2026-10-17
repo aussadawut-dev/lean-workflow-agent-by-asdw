@@ -33,7 +33,7 @@ EOF
 python3 .lean/scripts/contract_guard.py declare --contract 'Contract: trivial (typo in README)'
 ```
 
-The Claude and Codex PreToolUse hooks bind the contract to the session (subagents share it) and deny shell, edit and unknown tools until one exists; read-only tools and plain shell reads (`grep`, `cat`, `head`, `tail`, `wc`, `ls` and read-only `git` subcommands, alone or piped, with no redirection, chaining or expansion) stay available. A new user prompt clears it. Run outside a hook, `declare` only validates. Use a quoted heredoc or single-quoted `--contract`: the guard accepts no shell expansion or chained command in a declaration.
+The Claude and Codex PreToolUse hooks bind the contract to the session (subagents share it) and deny shell, edit and unknown tools until one exists; read-only tools and plain shell reads (`grep`, `cat`, `head`, `tail`, `wc`, `ls`, `cut`, `rg` and `sort` with only listed search, filter and output options spelled in full, `find` with only listed test and print primaries, `sed -n` with only numeric-range `p` scripts, and read-only `git` subcommands, alone or joined by `|`, `&&` or `;`, with no redirection or expansion) stay available; an unlisted option or primary needs a contract. A new user prompt clears it. Run outside a hook, `declare` only validates. Use a quoted heredoc or single-quoted `--contract`: the guard accepts no shell expansion or chained command in a declaration.
 
 The line is the whole contract at every risk and quality level. The fields below define what it means; write them out only if the user asks:
 

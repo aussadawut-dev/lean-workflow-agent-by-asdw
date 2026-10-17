@@ -43,7 +43,9 @@ RUNTIME_PROMPTS = ("<task-notification>", "<agent-message", "<cross-session-mess
                    "[SYSTEM NOTIFICATION", "Stop hook feedback:")
 MAX_SESSIONS = 64
 HELP = ("Write the Task Contract as the first line of your reply, before any tool call; the guard reads it\n"
-        "from the transcript. Without a readable transcript, declare it in a command of its own:\n"
+        "from the transcript. Claude may not save the reply until a tool result arrives, so when this\n"
+        "turn's first tool call writes or runs a non-read command (or there is no readable transcript),\n"
+        "declare it first in a command of its own:\n"
         "python3 .lean/scripts/contract_guard.py declare --contract 'Contract: risk=LOW quality=STANDARD "
         "acceptance=<observable check>'\n"
         "(or a quoted heredoc with the block form). A new user prompt clears the declaration.")
@@ -252,11 +254,106 @@ def bind_transcript(root, session, payload):
     return found[0]
 
 
-# Shell reads allowed before a contract: one simple command or a pipeline of them, no redirection,
-# chaining, expansion or newline. Git takes only these subcommands, given directly (no `-c` options).
-READ_COMMANDS = {"grep", "cat", "head", "tail", "wc", "ls"}
+# Shell reads allowed before a contract: simple commands joined by `|`, `&&` or `;`, with no
+# redirection, expansion or newline. Git takes only these subcommands, given directly (no `-c`).
+READ_COMMANDS = {"grep", "cat", "head", "tail", "wc", "ls", "rg", "sort", "cut", "find", "sed"}
 READ_GIT = {"status", "diff", "log", "show", "ls-files", "rev-parse", "blame"}
 WRITING_OPTIONS = ("--output", "--ext-diff", "--textconv")
+SEPARATORS = {"|", "&&", ";"}
+SED_PRINT = re.compile(r"[0-9]+(,[0-9]+)?p")
+# rg, sort and find take only listed options: their option sets differ by version and platform
+# (bfs's `-rm`, rg's `--hostname-bin`, abbreviated long options), so unknown means no.
+# Long options must be spelled in full; a value may follow `=` or come as the next word.
+RG_SHORT = set("nilcwvFxsSHhNoLqUa0") | {"e", "g", "t", "T", "C", "A", "B", "m", "j", "d", "M", "E", "r"}
+RG_VALUED = set("egtTCABmjdMEr")
+RG_LONG = {"--line-number", "--ignore-case", "--files-with-matches", "--files-without-match", "--count",
+           "--word-regexp", "--invert-match", "--fixed-strings", "--line-regexp", "--case-sensitive",
+           "--smart-case", "--with-filename", "--no-filename", "--no-line-number", "--only-matching",
+           "--follow", "--quiet", "--multiline", "--text", "--null", "--files", "--hidden", "--no-ignore",
+           "--no-heading", "--heading", "--vimgrep", "--json", "--column", "--color", "--sort", "--sortr",
+           "--glob", "--iglob", "--type", "--type-not", "--context", "--after-context", "--before-context",
+           "--max-count", "--max-depth", "--max-columns", "--regexp", "--encoding", "--replace", "--threads"}
+SORT_SHORT = set("bdfghiMnRrsuVc") | {"k", "t"}
+SORT_VALUED = {"k", "t"}
+SORT_LONG = {"--ignore-leading-blanks", "--dictionary-order", "--ignore-case", "--general-numeric-sort",
+             "--human-numeric-sort", "--ignore-nonprinting", "--month-sort", "--numeric-sort", "--random-sort",
+             "--reverse", "--stable", "--unique", "--version-sort", "--check", "--key", "--field-separator"}
+FIND_TESTS = {"-name", "-iname", "-path", "-ipath", "-wholename", "-iwholename", "-regex", "-iregex", "-type",
+              "-maxdepth", "-mindepth", "-mtime", "-mmin", "-atime", "-amin", "-ctime", "-cmin", "-newer", "-size",
+              "-empty", "-perm", "-user", "-group", "-links", "-prune", "-print", "-print0", "-not", "-and", "-or",
+              "-a", "-o", "-true", "-false", "-depth", "-xdev", "-mount", "-follow", "-L", "-H", "-P"}
+LONG_VALUED = {"--glob", "--iglob", "--type", "--type-not", "--context", "--after-context", "--before-context",
+               "--max-count", "--max-depth", "--max-columns", "--regexp", "--encoding", "--replace", "--threads",
+               "--sort", "--sortr", "--color", "--key", "--field-separator"}
+
+
+def listed_options(args, short, valued, long_names):
+    """Every option is listed; a short cluster ends at its first option that takes a value."""
+    skip = False
+    for word in args:
+        if skip:
+            skip = False
+            continue
+        if word == "--":
+            return True
+        if word.startswith("--"):
+            name, has_value = word.split("=", 1)[0], "=" in word
+            if name not in long_names:
+                return False
+            skip = not has_value and name in LONG_VALUED
+        elif word.startswith("-") and len(word) > 1 and not word[1:].isdigit():
+            for index, char in enumerate(word[1:]):
+                if char not in short:
+                    return False
+                if char in valued:
+                    skip = index == len(word) - 2  # Value is the next word unless attached.
+                    break
+    return True
+
+
+def read_only_find(args):
+    """Paths and patterns, plus only listed test/print primaries and signed numbers (`-mtime -1`)."""
+    return all(not word.startswith(("-", "+")) or word in FIND_TESTS
+               or re.fullmatch(r"[-+][0-9]+[a-zA-Z]?", word) for word in args)
+
+
+def read_only_sed(args):
+    """`sed -n` with only numeric-range print scripts (`3p`, `10,40p`); anything else may write."""
+    if "-n" not in args:
+        return False
+    scripts, files, take = [], [], False
+    for word in args:
+        if take:
+            scripts.append(word)
+            take = False
+        elif word == "-e":
+            take = True
+        elif word == "-n":
+            continue
+        elif word.startswith("-"):
+            return False  # -i, --in-place, -f, -s and the rest.
+        elif not scripts and not files:
+            scripts.append(word)
+        else:
+            files.append(word)
+    return not take and bool(scripts) and all(SED_PRINT.fullmatch(script) for script in scripts)
+
+
+def read_only_part(part):
+    name, args = part[0], part[1:]
+    if any(word.startswith(WRITING_OPTIONS) for word in part):
+        return False
+    if name == "git":
+        return bool(args) and args[0] in READ_GIT
+    if name == "rg":
+        return listed_options(args, RG_SHORT, RG_VALUED, RG_LONG)
+    if name == "sort":
+        return listed_options(args, SORT_SHORT, SORT_VALUED, SORT_LONG)
+    if name == "find":
+        return read_only_find(args)
+    if name == "sed":
+        return read_only_sed(args)
+    return name in READ_COMMANDS
 
 
 def read_only_shell(command):
@@ -268,25 +365,17 @@ def read_only_shell(command):
         return False
     parts, current = [], []
     for word in words:
-        if word == "|":
+        if word in SEPARATORS:
             parts.append(current)
             current = []
         elif any(mark in word for mark in ";&|<>()"):
-            # shlex keeps runs such as `>&`, `&>` or `>|` as one token, so refuse any
-            # operator character outside a lone pipe (a quoted one only costs a declaration).
+            # shlex keeps runs such as `>&`, `&>` or `>|` as one token, so refuse any other
+            # operator character (a quoted one only costs a declaration).
             return False
         else:
             current.append(word)
     parts.append(current)
-    for part in parts:
-        if not part or any(word.startswith(WRITING_OPTIONS) for word in part):
-            return False
-        if part[0] == "git":
-            if len(part) < 2 or part[1] not in READ_GIT:
-                return False
-        elif part[0] not in READ_COMMANDS:
-            return False
-    return True
+    return all(part and read_only_part(part) for part in parts)
 
 
 def pre_tool(root, payload):
@@ -342,6 +431,7 @@ def shell_words(command):
     try:
         lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
         lexer.whitespace_split = True
+        lexer.commenters = ""  # Bash reads `a#` as a word, so `#` must not hide what follows.
         return list(lexer)
     except ValueError:
         return None
