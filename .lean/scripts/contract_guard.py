@@ -23,8 +23,8 @@ FIELDS = ("topic", "risk", "quality", "budget", "skill", "acceptance")
 REQUIRED = ("risk", "quality", "acceptance")
 VALUES = {"risk": ("LOW", "MEDIUM", "HIGH"), "quality": ("STANDARD", "HIGH", "VERY_HIGH"),
           "budget": ("CHEAP", "BALANCED", "EXPENSIVE")}
-# Tools that cannot change files by themselves. Everything else, including shell
-# and MCP tools, waits for a declaration; an unknown tool is guarded, not trusted.
+# Tools that cannot change files by themselves; they never consult the contract. Any other tool
+# runs too, unless it is an edit tool or a shell command that writes (see shell_writes).
 READ_ONLY = {"Read", "Glob", "Grep", "LS", "NotebookRead", "WebFetch", "WebSearch", "ToolSearch", "Skill",
              "AskUserQuestion", "TodoWrite", "Agent", "Task", "SendMessage", "ListAgents", "EnterPlanMode",
              "ExitPlanMode", "update_plan", "view_image", "web_search", "request_user_input"}
@@ -43,9 +43,9 @@ RUNTIME_PROMPTS = ("<task-notification>", "<agent-message", "<cross-session-mess
                    "[SYSTEM NOTIFICATION", "Stop hook feedback:")
 MAX_SESSIONS = 64
 HELP = ("Write the Task Contract as the first line of your reply, before any tool call; the guard reads it\n"
-        "from the transcript. Claude may not save the reply until a tool result arrives, so when this\n"
-        "turn's first tool call writes or runs a non-read command (or there is no readable transcript),\n"
-        "declare it first in a command of its own:\n"
+        "from the transcript once a tool result has arrived. Reads and inspection run without a contract;\n"
+        "only write tools and writing shell commands wait for it. When the turn's first tool call writes\n"
+        "(or the guard cannot read a transcript, as in Codex), declare it first in a command of its own:\n"
         "python3 .lean/scripts/contract_guard.py declare --contract 'Contract: risk=LOW quality=STANDARD "
         "acceptance=<observable check>'\n"
         "(or a quoted heredoc with the block form). A new user prompt clears the declaration.")
@@ -254,137 +254,15 @@ def bind_transcript(root, session, payload):
     return found[0]
 
 
-# Shell reads allowed before a contract: simple commands joined by `|`, `&&` or `;`, with no
-# redirection, expansion or newline. Git takes only these subcommands, given directly (no `-c`).
-READ_COMMANDS = {"grep", "cat", "head", "tail", "wc", "ls", "rg", "sort", "cut", "find", "sed"}
-READ_GIT = {"status", "diff", "log", "show", "ls-files", "rev-parse", "blame"}
-WRITING_OPTIONS = ("--output", "--ext-diff", "--textconv")
-SEPARATORS = {"|", "&&", ";"}
-SED_PRINT = re.compile(r"[0-9]+(,[0-9]+)?p")
-# rg, sort and find take only listed options: their option sets differ by version and platform
-# (bfs's `-rm`, rg's `--hostname-bin`, abbreviated long options), so unknown means no.
-# Long options must be spelled in full; a value may follow `=` or come as the next word.
-RG_SHORT = set("nilcwvFxsSHhNoLqUa0") | {"e", "g", "t", "T", "C", "A", "B", "m", "j", "d", "M", "E", "r"}
-RG_VALUED = set("egtTCABmjdMEr")
-RG_LONG = {"--line-number", "--ignore-case", "--files-with-matches", "--files-without-match", "--count",
-           "--word-regexp", "--invert-match", "--fixed-strings", "--line-regexp", "--case-sensitive",
-           "--smart-case", "--with-filename", "--no-filename", "--no-line-number", "--only-matching",
-           "--follow", "--quiet", "--multiline", "--text", "--null", "--files", "--hidden", "--no-ignore",
-           "--no-heading", "--heading", "--vimgrep", "--json", "--column", "--color", "--sort", "--sortr",
-           "--glob", "--iglob", "--type", "--type-not", "--context", "--after-context", "--before-context",
-           "--max-count", "--max-depth", "--max-columns", "--regexp", "--encoding", "--replace", "--threads"}
-SORT_SHORT = set("bdfghiMnRrsuVc") | {"k", "t"}
-SORT_VALUED = {"k", "t"}
-SORT_LONG = {"--ignore-leading-blanks", "--dictionary-order", "--ignore-case", "--general-numeric-sort",
-             "--human-numeric-sort", "--ignore-nonprinting", "--month-sort", "--numeric-sort", "--random-sort",
-             "--reverse", "--stable", "--unique", "--version-sort", "--check", "--key", "--field-separator"}
-FIND_TESTS = {"-name", "-iname", "-path", "-ipath", "-wholename", "-iwholename", "-regex", "-iregex", "-type",
-              "-maxdepth", "-mindepth", "-mtime", "-mmin", "-atime", "-amin", "-ctime", "-cmin", "-newer", "-size",
-              "-empty", "-perm", "-user", "-group", "-links", "-prune", "-print", "-print0", "-not", "-and", "-or",
-              "-a", "-o", "-true", "-false", "-depth", "-xdev", "-mount", "-follow", "-L", "-H", "-P"}
-LONG_VALUED = {"--glob", "--iglob", "--type", "--type-not", "--context", "--after-context", "--before-context",
-               "--max-count", "--max-depth", "--max-columns", "--regexp", "--encoding", "--replace", "--threads",
-               "--sort", "--sortr", "--color", "--key", "--field-separator"}
-
-
-def listed_options(args, short, valued, long_names):
-    """Every option is listed; a short cluster ends at its first option that takes a value."""
-    skip = False
-    for word in args:
-        if skip:
-            skip = False
-            continue
-        if word == "--":
-            return True
-        if word.startswith("--"):
-            name, has_value = word.split("=", 1)[0], "=" in word
-            if name not in long_names:
-                return False
-            skip = not has_value and name in LONG_VALUED
-        elif word.startswith("-") and len(word) > 1 and not word[1:].isdigit():
-            for index, char in enumerate(word[1:]):
-                if char not in short:
-                    return False
-                if char in valued:
-                    skip = index == len(word) - 2  # Value is the next word unless attached.
-                    break
-    return True
-
-
-def read_only_find(args):
-    """Paths and patterns, plus only listed test/print primaries and signed numbers (`-mtime -1`)."""
-    return all(not word.startswith(("-", "+")) or word in FIND_TESTS
-               or re.fullmatch(r"[-+][0-9]+[a-zA-Z]?", word) for word in args)
-
-
-def read_only_sed(args):
-    """`sed -n` with only numeric-range print scripts (`3p`, `10,40p`); anything else may write."""
-    if "-n" not in args:
-        return False
-    scripts, files, take = [], [], False
-    for word in args:
-        if take:
-            scripts.append(word)
-            take = False
-        elif word == "-e":
-            take = True
-        elif word == "-n":
-            continue
-        elif word.startswith("-"):
-            return False  # -i, --in-place, -f, -s and the rest.
-        elif not scripts and not files:
-            scripts.append(word)
-        else:
-            files.append(word)
-    return not take and bool(scripts) and all(SED_PRINT.fullmatch(script) for script in scripts)
-
-
-def read_only_part(part):
-    name, args = part[0], part[1:]
-    if any(word.startswith(WRITING_OPTIONS) for word in part):
-        return False
-    if name == "git":
-        return bool(args) and args[0] in READ_GIT
-    if name == "rg":
-        return listed_options(args, RG_SHORT, RG_VALUED, RG_LONG)
-    if name == "sort":
-        return listed_options(args, SORT_SHORT, SORT_VALUED, SORT_LONG)
-    if name == "find":
-        return read_only_find(args)
-    if name == "sed":
-        return read_only_sed(args)
-    return name in READ_COMMANDS
-
-
-def read_only_shell(command):
-    """Whether a shell command only reads, by a conservative allowlist (unknown means no)."""
-    if not command.strip() or any(mark in command for mark in ("\n", "\r", "$", "`")):
-        return False
-    words = shell_words(command)
-    if not words:
-        return False
-    parts, current = [], []
-    for word in words:
-        if word in SEPARATORS:
-            parts.append(current)
-            current = []
-        elif any(mark in word for mark in ";&|<>()"):
-            # shlex keeps runs such as `>&`, `&>` or `>|` as one token, so refuse any other
-            # operator character (a quoted one only costs a declaration).
-            return False
-        else:
-            current.append(word)
-    parts.append(current)
-    return all(part and read_only_part(part) for part in parts)
-
-
 def pre_tool(root, payload):
     """Return None to allow, or the reason to deny."""
     session = session_of(payload)
     name = payload.get("tool_name")
     if not isinstance(name, str):
         raise ValueError("hook input has no tool_name")
-    command = (payload.get("tool_input") or {}).get("command") if name == "Bash" else None
+    tool_input = payload.get("tool_input") or {}
+    # Any shell-like tool carries its text as `command`; edit tools carry a patch or content there.
+    command = tool_input.get("command") if name not in EDIT_TOOLS else None
     if isinstance(command, str):
         try:
             text = declared_text(command)
@@ -401,18 +279,25 @@ def pre_tool(root, payload):
                      "model": payload.get("model") if isinstance(payload.get("model"), str) else None})
                 store.save()
             return None
-    if writes_receipt(name, payload.get("tool_input") or {}):
+    if writes_receipt(name, tool_input):
         # Only gate_evidence.py writes the receipt, so its state and contract checks always apply.
         return ("Lean contract guard: the review receipt is written only by the reviewer through "
                 "gate_evidence.py, never edited directly. If the reviewer cannot record it, report BLOCKED.")
     if name in READ_ONLY or name.startswith(READ_ONLY_PREFIXES):
         return None
-    if isinstance(command, str) and read_only_shell(command):
-        return None  # A plain read changes nothing, so it needs no contract yet.
+    # Only write tools and writing shell commands wait for the contract; the Stop gate still refuses
+    # changed work without one, so reads, inspection and tools the guard does not know run first.
+    # A command whose parsed words mention record-review is a write and takes the receipt check
+    # whatever the heuristic says: a renamed copy of gate_evidence.py looks like any other script.
+    words = shell_words(command) if isinstance(command, str) else []
+    mentions_receipt = isinstance(command, str) and (words is None or any("record-review" in w for w in words))
+    writing = name in EDIT_TOOLS or mentions_receipt or (isinstance(command, str) and shell_writes(command))
+    if not writing:
+        return None
     # Bind a transcript contract before any check that depends on the session's contract.
     declared = current(root, session) or bind_transcript(root, session, payload)
     cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else root
-    if (declared and isinstance(command, str) and not payload.get("agent_id")
+    if (declared and mentions_receipt and not payload.get("agent_id")
             and records_own_receipt(command, declared, cwd)):
         # The author's main thread never records the review of its own contract (REVIEW.md);
         # a reviewer subagent carries an agent_id, and a fresh reviewer session declares its own.
@@ -420,7 +305,8 @@ def pre_tool(root, payload):
                 "session's contract. Ask the reviewer to record it; if it cannot, report BLOCKED.")
     if declared:
         return None
-    return f"Lean contract guard: no Task Contract is declared for this prompt, so `{name}` is blocked.\n{HELP}"
+    return (f"Lean contract guard: no Task Contract is declared for this prompt, so this writing `{name}` call "
+            f"is blocked.\n{HELP}")
 
 
 OPERATORS = set(";&|<>()") | {"&&", "||", ";;", "|&", ">>", "<<", "<<<"}
@@ -457,6 +343,204 @@ def simple_commands(words):
         else:
             command.append(word)
     yield command
+
+
+# Shell commands that write, by a best-effort pattern over the parsed words. Reads and inspection
+# run before a contract; the Stop gate still refuses changed work that has no contract, so this
+# check only makes the contract come before the first write. Unparseable text, a command named by
+# an expansion (`eval "$cmd"`, `$tool x`), a backtick, `sudo`, `npx` and `wget` count as writes; an
+# unlisted interpreter, tool or script, a write hidden in a heredoc body, or a path hidden behind
+# `cd` is not caught.
+READ_GIT = {"status", "diff", "log", "show", "ls-files", "rev-parse", "blame", "describe", "rev-list", "cat-file",
+            "ls-tree", "ls-remote", "grep", "shortlog", "reflog", "for-each-ref", "merge-base", "name-rev",
+            "check-ignore", "diff-tree", "diff-index", "count-objects", "symbolic-ref", "var", "version", "help"}
+GIT_LISTERS = {"branch", "tag", "remote", "stash", "worktree", "config"}  # List or change, by argument.
+GIT_LIST_FLAGS = {"-l", "--list", "-a", "-r", "--all", "--remotes", "--contains", "--no-contains", "--merged",
+                  "--no-merged", "--points-at", "--show-current", "-v", "-vv", "--verbose", "-n"}
+GIT_CHANGERS = {"-d", "-D", "-m", "-M", "-c", "-C", "-u", "-f", "-F", "-s", "-e", "--delete", "--move", "--copy",
+                "--force", "--annotate", "--sign", "--set-upstream-to", "--unset-upstream", "--edit-description",
+                "--track", "add", "rm", "remove", "rename", "set-url", "set-head", "set-branches", "prune", "update",
+                "push", "pop", "drop", "apply", "clear", "create", "unset", "--unset", "--unset-all", "--add",
+                "--replace-all", "--edit", "--rename-section", "--remove-section", "lock", "unlock", "move", "repair"}
+GIT_OUTPUT_OPTIONS = ("--output", "--ext-diff", "--textconv")
+WRITE_COMMANDS = WRITERS | {"rm", "rmdir", "mkdir", "chmod", "chown", "chgrp", "patch", "apply_patch", "make", "sudo",
+                            "npx", "wget"}
+KEYWORDS = {"do", "then", "else", "elif", "if", "while", "until", "!", "{", "}", "coproc", "function"}
+SHELLS = {"sh", "bash", "zsh", "dash", "ksh"}
+RUNNERS = {"xargs", "env", "nohup", "time", "nice", "command", "builtin"}
+INSTALLERS = {"npm", "pnpm", "yarn", "pip", "pip3", "uv", "cargo", "go", "brew"}
+INSTALL_WORDS = {"install", "i", "ci", "add", "remove", "rm", "uninstall", "publish", "init", "update", "upgrade", "build"}
+PIP_MODULES = {"pip", "pip3", "uv", "pipx"}
+MODULE_WRITES = {"venv", "ensurepip", "build", "twine"}
+CONTAINER_READS = {"ps", "images", "logs", "inspect", "version", "info", "stats", "top", "port", "diff", "history",
+                   "events", "search"}
+INTERPRETERS = {"python", "python2", "python3", "node", "ruby", "perl", "php"}
+INLINE_WRITE = re.compile(r"open\([^,)]*,\s*['\"][rbt+]*[wax]|mode\s*=\s*['\"][rbt+]*[wax]|\.write_(text|bytes)\("
+                          r"|os\.(remove|unlink|rename|replace|makedirs|mkdir|rmdir|chmod|system)\(|subprocess\."
+                          r"|shutil\.|\.(unlink|rmdir|mkdir|touch)\(|writeFile(Sync)?\(|fs\.(rm|unlink|rename|mkdir)")
+FILE_REDIRECTS = {">", ">>", ">|", ">>|", "&>", "&>>"}
+DEV_SINKS = {"/dev/null", "/dev/stderr", "/dev/stdout", "/dev/tty"}
+SED_WRITE = re.compile(r"(?<![a-zA-Z])[wW](?![a-zA-Z])")  # A `w` command or an `s///w` flag writes a file.
+# Lean scripts whose listed first argument only reads: every other call to a listed script writes,
+# an unlisted script under .lean/scripts/ writes, and None marks a script that never writes.
+LEAN_READS = {"workflow.py": {"show", "check", "context"},
+              "gate_evidence.py": {"state", "gate-state", "check-review", "check-shipped"},
+              "contract_guard.py": {"current", "declare", "pre-tool", "prompt"},
+              "skill_pack.py": {"status"}, "model_catalog.py": {"check", "show"},
+              "submodule.py": {"context", "gate", "show", "status"},
+              "takeover.py": {"inventory", "preview", "check", "status"},
+              "update_workflow.py": {"preview", "check", "status", "plan"},
+              "gate_mode.py": {"show", "status", "--check-auto"}, "model_drift.py": None, "check_structure.py": None,
+              "gate_lock.py": None, "shared_assets.py": None}
+LEAN_FLAG_WRITES = {"clean_repo.py": {"--apply"}, "skill_effort.py": {"standard", "high", "ultra", "reset"}}
+
+
+def git_writes(args):
+    """Whether a git command changes state: a subcommand outside the read set, or a lister with changing arguments."""
+    index = 0
+    while index < len(args) and args[index].startswith("-"):
+        if args[index].startswith("-c"):
+            return True  # `-c core.pager=...` runs a program.
+        index += 2 if args[index] in ("-C", "--git-dir", "--work-tree", "--namespace") else 1
+    if index >= len(args):
+        return False
+    sub, rest = args[index], args[index + 1:]
+    if any(word.startswith(GIT_OUTPUT_OPTIONS) for word in rest):
+        return True
+    if sub in READ_GIT:
+        return False
+    if sub not in GIT_LISTERS or any(word in GIT_CHANGERS for word in rest):
+        return True
+    positional = [word for word in rest if not word.startswith("-")]
+    if sub == "stash":
+        return not positional or positional[0] not in ("list", "show")
+    if sub == "worktree":
+        return not positional or positional[0] != "list"
+    if sub == "remote":
+        return bool(positional) and positional[0] not in ("show", "get-url")
+    if sub == "config":
+        return not any(word in ("--get", "--get-all", "--get-regexp", "--list", "-l") for word in rest)
+    return bool(positional) and not any(word in GIT_LIST_FLAGS for word in rest)  # branch, tag
+
+
+def lean_script_writes(script, rest):
+    """Whether a call to a Lean script changes records or settings (an unlisted script does)."""
+    name = Path(script).name
+    if name in LEAN_FLAG_WRITES:
+        return any(word in LEAN_FLAG_WRITES[name] for word in rest)
+    if name not in LEAN_READS:
+        return True
+    while rest[:1] == ["--root"]:
+        rest = rest[2:]
+    return LEAN_READS[name] is not None and not (rest and rest[0] in LEAN_READS[name])
+
+
+def redirect_writes(words):
+    """An output redirection to a file; descriptor duplication (`2>&1`, `>&-`) and device sinks are not."""
+    for index, word in enumerate(words):
+        target = words[index + 1] if index + 1 < len(words) else ""
+        if word in FILE_REDIRECTS and target not in DEV_SINKS:
+            return True
+        if word == ">&" and target and not target.isdigit() and target != "-" and target not in DEV_SINKS:
+            return True
+    return False
+
+
+def quoted_substitutions(words):
+    """Command substitutions kept inside quoted words: `echo "$(rm x)"` runs rm."""
+    for word in words:
+        for marker in ("$(", "<(", ">("):
+            start = word.find(marker)
+            if start != -1:
+                end = word.rfind(")")
+                yield word[start + 2:end if end > start else len(word)]
+
+
+def nested_writes(words, raw, depth):
+    """A runner's command, read from every non-option word on: `xargs -I % rm %` runs rm."""
+    return any(not word.startswith("-") and command_writes(words[index:], raw, depth + 1)
+               for index, word in enumerate(words))
+
+
+def command_writes(words, raw, depth=0):
+    """Whether one simple command writes; `raw` is the whole command text, for inline interpreter code."""
+    if depth > 3:
+        return True
+    while words and (words[0] in KEYWORDS or ("=" in words[0] and not words[0].startswith(("-", "=")))):
+        words = words[1:]  # Shell keywords and leading environment assignments.
+    if not words:
+        return False
+    if words[0].startswith("$"):
+        return True  # A command named by an expansion is invisible.
+    name, args = (words[0] if words[0] == "." else Path(words[0]).name), words[1:]
+    positional = [word for word in args if not word.startswith("-")]
+    if name in WRITE_COMMANDS or (name in INSTALLERS and any(word in INSTALL_WORDS for word in args)):
+        return True
+    if name == "yarn":
+        return not args  # Bare yarn installs.
+    if name in ("docker", "podman"):
+        return not positional or positional[0] not in CONTAINER_READS
+    if name == "unzip":
+        return not any(word in ("-l", "-t", "-Z", "-z") for word in args)
+    if name == "tar":
+        return bool(args) and (any(word.startswith(("--extract", "--create", "--append", "--update", "--delete"))
+                                   for word in args) or bool(re.match(r"-?[a-zA-Z]*[xcru]", args[0])))
+    if name == "curl":
+        return any(word.startswith(("--output", "--remote-name")) or re.match(r"-[a-zA-Z]*[oO]", word) for word in args)
+    if name in SHELLS:
+        nested = next((args[i + 1] for i, word in enumerate(args[:-1])
+                       if word.startswith("-") and not word.startswith("--") and "c" in word[1:]), None)
+        return nested is not None and shell_writes(nested, depth + 1)
+    if name in ("eval", "exec", "source", "."):
+        return shell_writes(" ".join(args), depth + 1)
+    if name in RUNNERS:
+        return nested_writes(args, raw, depth)
+    if name == "git":
+        return git_writes(args)
+    if name == "perl":
+        return any(word.startswith("--in-place") or re.match(r"-[0-9a-zA-Z]*i", word) for word in args)
+    if name == "sed":
+        scripts = positional + [args[i + 1] for i, word in enumerate(args[:-1]) if word in ("-e", "--expression")]
+        return (any(word.startswith(("--in-place", "-f", "--file")) or re.match(r"-[a-zA-Z]*i", word) for word in args)
+                or any(SED_WRITE.search(script) for script in scripts))
+    if name == "find":
+        return any(word.startswith(("-delete", "-exec", "-ok", "-fprint", "-fls", "-rm", "-fdelete")) for word in args)
+    if name == "sort":
+        return any(word.startswith("--output") or re.match(r"-[a-zA-Z]*o", word) for word in args)
+    if name in INTERPRETERS:
+        if INLINE_WRITE.search(raw):
+            return True
+        if "-m" in args[:-1]:
+            module = args[args.index("-m") + 1]
+            if module in MODULE_WRITES or (module in PIP_MODULES and any(word in INSTALL_WORDS for word in args)):
+                return True
+        script = positional[0] if positional else ""
+        if ".lean/scripts/" in script:
+            return lean_script_writes(script, args[args.index(script) + 1:])
+    return False
+
+
+def shell_writes(command, depth=0):
+    """Whether a shell command writes, by a best-effort pattern (unparseable or invisible means yes)."""
+    if depth > 3 or "`" in command:
+        return True
+    terminator = None
+    for line in command.splitlines():
+        if terminator is not None:
+            if line.strip() == terminator:
+                terminator = None
+            continue  # A heredoc body is data; inline interpreter code is checked on the whole text.
+        words = shell_words(line)
+        if words is None or redirect_writes(words):
+            return True
+        for index, word in enumerate(words[:-1]):
+            if word in ("<<", "<<-"):
+                terminator = words[index + 1].lstrip("-")
+        if any(command_writes(list(part), command, depth) for part in simple_commands(words)):
+            return True
+        if any(shell_writes(inner, depth + 1) for inner in quoted_substitutions(words)):
+            return True
+    return False
 
 
 def writes_receipt(name, tool_input):
