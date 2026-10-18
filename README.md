@@ -4,9 +4,9 @@ I built this because I want a coding agent to understand the work, check what it
 
 It works with **Claude Code and Codex**, with one shared set of rules and skills. Use it with your own stack.
 
-**Baseline 4.7.0** · [MIT License](LICENSE)
+**Baseline 4.8.0** · [MIT License](LICENSE)
 
-The `develop` branch also includes unreleased worker budgeting and handoff rules. See the [Unreleased changelog](.lean/CHANGELOG.md#unreleased) for changes and upgrade notes; the released baseline remains 4.7.0.
+This release adds bounded worker budgets and handoff rules. See the [4.8.0 release notes](.lean/CHANGELOG.md#480--2026-10-19) for changes and upgrade notes.
 
 The idea is simple: **agree on the work → implement → test → validate → review → finish with evidence**. Use the steps the task needs. You do not have to call every skill or read every file to get started.
 
