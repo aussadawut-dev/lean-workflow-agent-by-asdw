@@ -1,604 +1,549 @@
 # Changelog
 
-Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves files an existing
-install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
-was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
+Versions follow `MAJOR.MINOR.PATCH`: MAJOR changes existing workflow rules or required paths, MINOR adds rules, files or enforcement, and PATCH clarifies wording.
+
+Older entries describe the workflow at the time. For current installation and upgrade instructions, see [CUSTOMIZING.md](CUSTOMIZING.md).
+
+Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
 ## 4.8.0 — 2026-10-19
 
-- Worker budgeting initially sized each assignment to a few files and about 50 tool calls, and split larger slices by component or layer before dispatch; the measured replay below changes the budget to 50 turns (model requests). A replay of one real workset (TCK303, Opus Controller, Sonnet workers, six runs) traced most token spend to workers of 63–98 requests whose context grew about 3k tokens per call to 190k–308k; one worker used 19.1M tokens, more than two Controller runs together. A quadratic fit of those workers estimates about 35% fewer worker tokens at a 40-call split, while workers already near 40 calls cost more when split, so a slice that fits stays whole. Where the runtime caps a role, the budget is backed by it (Claude agent `maxTurns` and `autoCompactWindow`); Codex `spawn_agent` has no per-spawn turn cap, so there the brief carries the budget; the structure check keeps that gap recorded. A worker that reaches its budget hands back a consistent partial result with the remaining steps. A hard cap can instead cut a worker off mid-edit, so the Controller now inspects `git status` and the diff of a worker's assigned files before accepting its result, treats a missing handoff report as partial work, and releases or claims again any item the worker held before redispatch.
-- The worker brief now asks for located reads (line numbers first, then those ranges), edits instead of whole-file rewrites, tests for changed files while iterating and the full checks once before handoff.
-- A Controller that holds a `full`-mode claim heartbeats it before each dispatch and when each worker returns, and gives a worker that may outlast the remaining lease its own item and claim; a lapsed claim cannot be renewed and is claimed again with a new request ID. In the replay, Controller claims expired during 12–20 minute worker runs and the re-claim cost up to 17 extra lease commands in one run.
-- A measured replay of the same workset with this budget (two runs, Opus Controller, Sonnet workers) cost $8.61 on average against $11.11 for Lean 4.4.0 and $12.13 for 4.7.0 (n=4 each), with 20.0M tokens against 35.4M and 41.8M. Each run passed its tests, lint, the six touched areas and independent review. Worker requests stayed near the earlier count, but tokens per worker request halved (about 70k against 142k) and the largest worker context fell to 121k–167k. Compaction never triggered, so the savings are most likely from the slice size and the brief (two unpaired runs, not an isolated cause). Three lessons are now rules:
-  - The budget is counted in turns (model requests), not tool calls. Workers ran about two tool calls per turn, so a 50-call budget read as roughly 25 turns, while the workers used up to 52 turns against a 60-turn cap.
-  - The budget never removes required behavior tests. The budgeted runs wrote about 18% fewer new tests than 4.4.0 and about 40% fewer than fully delegated runs. The tests they dropped were page-level and call-chat parity tests of the largest UI slice. The brief now names each slice's required tests, including a page- or integration-level test for user-visible behavior, and the slice is split rather than those tests dropped.
-  - A worker that spent its budget is not resumed to continue the work. One resumed worker reached 72 requests, because resuming keeps the whole context. The remainder goes to a new slice with a fresh brief; a resume only finishes a handoff report or recovers from a transient runtime error.
-- `check-structure.sh` rejects a multi-agent skill that drops the turn budget, the required-test rule, the no-resume rule, the Codex turn-cap gap, the Controller's worker-tree check or the Controller heartbeat.
-- Refresh the root README to explain worker budgets and partial handoffs, accepted scope and Task Contracts, checkout-local review receipts, and the shared auto/manual gate policy.
+**Token highlight:** about **44% fewer than 4.4.0** and **52% fewer than 4.7.0** in the reported TCK303 replays: 20.0M tokens per run versus 35.4M and 41.8M. The budgeted setup had two unpaired runs; each baseline had four. This small sample does not isolate the causes of the saving.
 
-### Upgrade notes
+Keep long delegated tasks manageable with smaller assignments and clearer handoffs.
 
-Merge `lean-multi-agent`, `check_structure.py` and `test_structure.py` together. Projects that define their own Claude worker roles may add `maxTurns` (for example 60, above the 50-turn budget) and `autoCompactWindow` (for example 150000; Claude Code 2.1.302 accepts integers of 100000 or more) to those agent files; Claude Code ignores frontmatter fields it does not know. No record migration is required.
+- Give each worker a few files and about **50 turns**. A turn is one model request, even when it makes several tool calls. Split larger tasks before dispatch; keep tasks that already fit together.
+- Keep required tests in the brief, including page- or integration-level tests for user-visible behavior. Split the work rather than drop tests to fit the budget.
+- When the budget runs out, return changed files, check results and remaining steps. Send the next slice to a fresh worker. Resume a spent worker only to finish its handoff report or recover from a transient runtime error.
+- The Controller checks the worker's changes before accepting them, treats missing reports as partial work, and resolves unfinished claims before redispatch. In `full` mode, it renews its own claim before dispatch and when the worker returns; a worker that may outlast the remaining lease gets its own item and claim. Expired claims need a new request ID.
+- Structure checks and the README now cover these rules. Worker briefs also ask for focused reads, targeted edits and focused tests while working, followed by full assigned checks before completion.
+
+**Upgrade:** update `lean-multi-agent`, `check_structure.py` and `test_structure.py` together. No record migration is needed. Custom Claude roles can use `maxTurns` and `autoCompactWindow` to back the brief's budget; keep the turn budget below the cap. Codex has no per-spawn turn cap, so its brief carries the budget. A hard cap can interrupt an edit, so always inspect partial work before accepting it.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** จากบันทึกการทดลอง TCK303 ใช้ประมาณ **44% น้อยกว่า 4.4.0** และ **52% น้อยกว่า 4.7.0** คำนวณจาก 20.0M tokens ต่อรอบ เทียบกับ 35.4M และ 41.8M ตามลำดับ ชุดกำหนดงบมีเพียงสองรอบและไม่ได้จับคู่เปรียบเทียบ ส่วน baseline มีอย่างละสี่รอบ จึงยังแยกสาเหตุของการประหยัดไม่ได้
+
+แบ่งงานที่ส่งให้ worker ให้เล็กลง และส่งต่องานที่ยังไม่เสร็จให้ชัดเจนขึ้น
+
+- มอบหมายครั้งละไม่กี่ไฟล์และประมาณ **50 turns** โดย 1 turn คือการเรียกโมเดล 1 ครั้ง แม้จะเรียกหลาย tools ในครั้งนั้น งานใหญ่ให้แบ่งก่อนส่ง ส่วนงานที่พอดีอยู่แล้วให้ทำต่อเนื่อง
+- ระบุ tests ที่จำเป็นใน brief รวมถึง tests ระดับหน้าจอหรือ integration สำหรับพฤติกรรมที่ผู้ใช้เห็น หากเกินงบให้แบ่งงานเพื่อเก็บ tests ให้ครบ
+- เมื่อใช้งบครบ ให้รายงานไฟล์ที่แก้ ผลตรวจ และขั้นตอนที่เหลือ แล้วใช้ worker ใหม่ทำส่วนต่อไป การ resume ตัวเดิมทำได้เฉพาะเพื่อจบรายงานส่งมอบหรือกู้คืนจากข้อผิดพลาดชั่วคราวของ runtime
+- Controller ตรวจไฟล์ก่อนรับงาน ถือว่างานที่ไม่มีรายงานยังไม่ครบ และจัดการ claim ค้างก่อนส่งต่อ ในโหมด `full` ต้องต่ออายุ claim ของตัวเองก่อนส่งงานและเมื่อรับงานกลับ หาก worker อาจทำงานนานกว่า lease ที่เหลือ ให้มีรายการงานและ claim ของตัวเอง ส่วน claim ที่หมดอายุแล้วต้องขอใหม่ด้วย request ID ใหม่
+- เพิ่ม structure checks และอัปเดต README รองรับกติกานี้ brief ยังให้ค้นหาก่อนอ่าน แก้เฉพาะจุด รัน tests ที่เกี่ยวข้องระหว่างทำ และรัน checks ที่รับผิดชอบครบก่อนส่งมอบงานที่เสร็จแล้ว
+
+**เมื่ออัปเกรด:** อัปเดต `lean-multi-agent`, `check_structure.py` และ `test_structure.py` พร้อมกัน ไม่ต้องย้ายข้อมูลบันทึกงาน Claude role ที่กำหนดเองใช้ `maxTurns` และ `autoCompactWindow` ช่วยควบคุมงบได้ โดยตั้งงบ turns ต่ำกว่าเพดาน ส่วน Codex ยังไม่มีเพดานแยกต่อการ spawn จึงต้องระบุงบใน brief หาก hard cap ตัดระหว่างแก้ไฟล์ ต้องตรวจงานค้างก่อนรับเสมอ
+
+</details>
 
 ## 4.7.0 — 2026-10-18
 
-- The contract guard now catches shells that read commands from stdin (`bash <<EOF`, `... | sh`, `bash -s`, a shell with neither `-c` nor a script), `function NAME { ... }` bodies and `tar` extract or create flags after other options (`tar -C d -xf`), so those writes wait for a contract. It stops counting as writes: sed file names that contain a `w` (only the script is checked, for a `w` command after the start, an address, `!`, `;` or `{`, or an `s///` flag such as `gw` followed by a space and a file name), `perl -M`/`-I`/`-e` values, `command -v`, and runner arguments after the command (`xargs grep -l rm` runs grep; runners skip their own option values, short and long, so `xargs -I % rm %` and `xargs --max-args 1 rm` still run rm, and `env -S` runs its value as a command line). POSIX `NAME() { ... }` bodies are seen too, and `bash -o pipefail` without a script reads stdin. `CONTRACTS.md` now says runners are judged by the command they run and that `/dev/stdout`, `/dev/stderr` and `/dev/tty` are not file targets; the 4.6.0 bullet listed `eval`, `sh -c`, `exec` and `xargs` as denied outright and named only `/dev/null`. A quoted `>` still reads as a redirection. These were the low findings left from the 4.6.0 guard review.
-- Comments in `gate_evidence.py` and `quality-gate.sh` no longer say the author's main thread cannot record a receipt for the session contract; as `QUALITY.md` says, the guard blocks only the contract declared at that moment, so review acceptance of control drift is attestation-level.
-- `workflow.py context` reports where its gate status comes from (Claude Stop hook markers); a direct runner or Codex run leaves none, so it reads as `NOT_RUN` or `STALE`. `docs/tracker.md` says the same, and no longer says `context` needs a Task Contract (it only reads; `tracker archive` still needs one).
-- Links inside the archived TCK001 record resolve again from `docs/history/agent-workflow/`. `tracker archive` still moves files without rewriting their relative links.
+**Token highlight:** about **18% more than 4.4.0**, calculated from later TCK303 replay notes: 41.8M versus 35.4M tokens per run, with four runs per version. This workload did not show a token saving for 4.7.0.
 
-### Upgrade notes
+- The contract guard recognizes more ways to write files, including scripts read from stdin, shell functions and archive commands. Ordinary read commands are less likely to be blocked by mistake.
+- Clarify the limits of review evidence: local receipts help detect stale reviews but do not prove independence against someone who can write to the checkout.
+- `workflow.py context` now names the source of its gate status. A direct or Codex run may show `NOT_RUN` or `STALE` because that summary reads Claude hook markers.
+- Repair links in the archived tracker. Archiving still moves files without rewriting their links.
 
-Merge `contract_guard.py`, `gate_evidence.py`, `quality-gate.sh`, `workflow.py`, `CONTRACTS.md` and the tests together. `contract_guard.py`, `gate_evidence.py` and `quality-gate.sh` are protected controls: accept the upgrade with an independent HIGH-depth PASS review, a trusted-control-ref match or `accept-controls`. No record migration is required.
+**Upgrade:** take the updated guard, evidence helper, gate runner, workflow CLI, contract policy and tests together. Protected controls need a trusted-ref match, a covering independent HIGH review or matching recorded approval. No record migration is needed.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** คำนวณจากบันทึก TCK303 ที่รายงานภายหลัง ใช้ประมาณ **18% มากกว่า 4.4.0** หรือ 41.8M เทียบกับ 35.4M tokens ต่อรอบ จากรุ่นละสี่รอบ งานชุดนี้จึงไม่ได้แสดงว่า 4.7.0 ประหยัด token
+
+- contract guard รู้จักคำสั่งเขียนไฟล์ได้ครอบคลุมขึ้น เช่น shell ที่อ่านคำสั่งจาก stdin, shell functions และคำสั่ง archive พร้อมลดการบล็อกคำสั่งอ่านที่ไม่จำเป็น
+- อธิบายข้อจำกัดของหลักฐานรีวิวให้ชัดขึ้น: receipt ช่วยตรวจว่าผลรีวิวยังตรงกับงาน แต่ไม่ใช่หลักฐานยืนยันความเป็นอิสระที่ป้องกันผู้มีสิทธิ์เขียน checkout ได้
+- `workflow.py context` บอกที่มาของสถานะ gate แล้ว การรันตรงหรือผ่าน Codex อาจแสดง `NOT_RUN` หรือ `STALE` เพราะข้อมูลสรุปนี้อ่าน marker ของ Claude hook
+- แก้ลิงก์ใน tracker ที่เก็บเข้าประวัติแล้ว การ archive ยังย้ายไฟล์โดยไม่แก้ลิงก์ให้เอง
+
+**เมื่ออัปเกรด:** อัปเดต guard, evidence helper, gate runner, workflow CLI, contract policy และ tests พร้อมกัน การเปลี่ยน protected controls ต้องตรงกับ trusted ref มี independent HIGH review ที่ครอบคลุม หรือมีการบันทึกอนุมัติที่ตรงกับการเปลี่ยนแปลง ไม่ต้องย้ายข้อมูลบันทึกงาน
+
+</details>
 
 ## 4.6.0 — 2026-10-18
 
-- The Stop gate now accepts a protected-control change on its own when an independent HIGH-depth PASS review covers it: `guard-controls` tries the trusted-ref match first, then a review receipt for the session's Task Contract under a HIGH-risk or VERY_HIGH-quality contract, whose captured state (which binds the control bytes) matches the current shipping state, and in which every changed control is visible to Git and starts the reviewed diff at its accepted value, so the whole control change was in front of the reviewer; it records the acceptance with the reviewer, contract and receipt state. The runner resolves the session's declared contract before the control check and a direct run or the Codex adapter names the session with `--session <id>` and the runner reads that session's declared contract from the guard's store itself; an explicit `--contract` run, a free-text contract, or a Stop that falls back to the receipt's own contract does not accept drift by review, since the author's main thread may record a receipt under any other contract. The manual `accept-controls` step stalled unattended runs after every hook, guard or gate edit although the change had already passed independent review; it remains the procedure for an unreviewed change, and a receipt for another contract, a REWORK, lower-depth or stale receipt, a control change committed before the review began (even if edited again), an ignored control, or a Stop without a resolved session contract still refuses with a hint naming both routes. Both providers run the same runner. The receipt is attestation-level evidence like any other; the agent can still run `accept-controls`.
-- Before a contract is bound, the PreToolUse guard now denies only write tools (Edit, Write, MultiEdit, NotebookEdit, apply_patch) and shell commands that write: a redirection to anything but `/dev/null`; `cp`, `mv`, `rm`, `mkdir`, `tee`, `chmod` and the other file writers; `sed`/`perl` in place; `find -delete`/`-exec`; `sort -o`; Git subcommands that change state and `git -c`; interpreter code that opens a file for writing; Lean scripts that change records or settings; `eval`, `sh -c`, `exec`, `xargs`, `sudo`, `npx`, `make`, the install subcommands of `npm`, `pnpm`, `yarn`, `pip`, `uv`, `cargo`, `go`, `brew` and `python -m pip`, `docker` commands other than listing ones, downloads to a file (`curl -o`, `wget`) and archive extraction or creation (`tar x`, `tar c`, `unzip`); unparseable text, a backtick, or a command named by an expansion (`eval "$cmd"`, `$tool x`). Everything else, including `cd`, `echo`, loops, `$(...)` reads, `workflow.py show|check|context`, test runs, the gate runner and tools the guard does not know, runs without a contract, so the reply is saved by the time the first write needs the transcript and the extra `declare` turn disappears; a session on 4.5.0 had seven denied inspection calls over three prompts. The `rg`, `sort`, `find` and `sed` option allowlists are gone. The check is a best-effort pattern, not a security boundary: an unlisted tool, interpreter or script, a write hidden in a heredoc body, or a path hidden behind `cd` is not caught, and the Stop gate still refuses changed work that has no contract. `contract_guard.py` is a protected control: accept the change with `accept-controls` or a trusted-control-ref match on upgrade.
-- A clear implementation request approves the scope that matches it. `lean-scope` showed its draft and paused for approval on every non-trivial task, so a request that already said what to build cost one round trip; it now shows the draft and continues, and waits only when the request is ambiguous in a way that changes the work, a material decision is unresolved, the Task Contract risk is HIGH, or the user asked for a spec or analysis only. `lean-task` step 3 and the `AGENTS.md` workflow paragraph say the same. Scope protection afterwards is unchanged: a material expansion, added behavior, changed acceptance or a changed decision still stops dependent work and asks, and the `scope-stop` eval (an unresolved naming decision gets a question and no file changes) is unchanged.
-- `lean-init` and `CUSTOMIZING.md` now tell a project to list its reviewed upstream branches in PROJECT.md's `<!-- trusted-control-refs: ... -->` line, so merging a reviewed Lean release never stalls a Stop on a manual `accept-controls`; local edits to controls still need it.
+**Token highlight:** - · **Compared with:** -
 
-### Upgrade notes
+- A protected-control change can be accepted automatically when an independent HIGH review covers the entire change and its final state. Changes outside that coverage still need matching approval.
+- Read-only inspection can run before the Task Contract is bound. Writes still need the contract first.
+- A clear implementation request accepts the scope it names. Routine work continues; ambiguous requests, open material decisions, HIGH-risk work and spec-only requests still pause for clarification or approval as appropriate.
+- Setup now documents trusted upstream refs so reviewed upgrades can be recognized without a repeated manual acceptance step.
 
-Merge `AGENTS.md`, the router, `lean-scope`, `lean-task`, `lean-init`, `lean-quality-gate-mode`, `CONTRACTS.md`, `QUALITY.md`, `contract_guard.py`, `gate_evidence.py`, `quality-gate.sh`, the Codex adapter and the tests together; preserve project additions, PROJECT/config/records and permissions. `contract_guard.py`, `gate_evidence.py`, `quality-gate.sh` and `.codex/hooks/quality_gate.py` are protected controls: accept the upgrade with `accept-controls`, a trusted-control-ref match, or an independent HIGH-depth PASS review whose receipt covers it (new in this version). The guard no longer gates reads, inspection or unknown tools before a contract, only edit tools and writing shell commands. A clear implementation request now counts as accepted scope; projects that relied on the pause for every spec should say so in their additions. No mode, execution, tracker or queue record migration is required.
+**Upgrade:** update both providers' hooks/adapters and the shared guard, gate, policies and skills together. Preserve project additions and permissions. Use a trusted-ref match, a covering independent HIGH review or matching recorded approval for control changes. Projects that require approval for every scope draft should say so in their additions. No record migration is needed.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+- ยอมรับการเปลี่ยน protected controls อัตโนมัติได้ เมื่อ independent HIGH review ครอบคลุมทั้งการเปลี่ยนแปลงและสถานะสุดท้าย ส่วนที่อยู่นอกผลรีวิวยังต้องมีการอนุมัติที่ตรงกัน
+- อ่านและตรวจข้อมูลก่อนผูก Task Contract ได้ ส่วนการเขียนยังต้องมี contract ก่อน
+- คำขอให้ลงมือทำที่ชัดเจนถือว่ายอมรับขอบเขตนั้นแล้ว งานตามขอบเขตจึงเดินต่อได้ ส่วนคำขอที่กำกวม มีเรื่องสำคัญยังไม่ตัดสินใจ เสี่ยง HIGH หรือขอเพียง spec ยังต้องหยุดเพื่อถามหรือขออนุมัติตามกรณี
+- เพิ่มคำแนะนำเรื่อง trusted upstream refs เพื่อรับรู้การอัปเกรดที่ผ่านรีวิวแล้ว โดยไม่ต้องยืนยันการเปลี่ยน controls ซ้ำด้วยมือ
+
+**เมื่ออัปเกรด:** อัปเดต hooks/adapters ของทั้งสอง providers พร้อม guard, gate, policies และ skills ที่ใช้ร่วมกัน เก็บ project additions และ permissions ไว้ การเปลี่ยน controls ต้องผ่าน trusted ref, independent HIGH review ที่ครอบคลุม หรือการบันทึกอนุมัติที่ตรงกัน หากโปรเจกต์ต้องการอนุมัติ scope ทุกครั้ง ให้ระบุไว้ใน additions ไม่ต้องย้ายข้อมูลบันทึกงาน
+
+</details>
 
 ## 4.5.0 — 2026-10-18
 
-- Port three reusable downstream improvements: `/lean-clean-queue old --days N` sets a positive whole-day cutoff (default 30; rejected with `all`); queue path validation checks `.agent-runtime/queue.lock`, claims and their parents without blocking unrelated runtime dependency symlinks; `model_drift.py` inspects project catalog evidence against the local Codex CLI cache without networking, credentials or writes. Keep runtime parent/lock/claim symlink protection, history and project-owned catalogs/settings. New tests cover cutoff selection, invalid options, allowed dependency links, protected claim links, cache drift and selected target routing. Distribute the new script and tests through the portable registry.
+**Token highlight:** the reported pre-release smoke comparison used **103k tokens per run**, about **24% fewer than 4.1.0** (136k) and **29% fewer than 4.3.0** (145k), across 16 runs. These reports do not isolate template edits from project-local settings. A separate guard-only trial used **0.8% more than 4.3.0** overall; it was a different experiment.
 
-- Evals check outcomes and final review evidence, not only visible steps. `high-review` now also requires an independent PASS receipt that `check-review` accepts for the final state, so dispatching a reviewer and then editing fails, and outcome graders run the requested behavior in the finished fixture. New cases cover tracker-mode finalization (review, tracker DONE, commit, then a passing gate), a second writing prompt that needs its own contract, and a read-only follow-up after review; the harness sends follow-ups as resumed turns. Codex reviewer spawns count as fresh only with an explicit `fork_turns` of `none` or `0`. Add `evals/measure.py`, which turns paid eval runs into sanitized artifacts and reports correctness, false success, blocked runs, tokens, reported cost, time, tool turns and user exchanges per arm, keeping template and project-local-settings arms apart and refusing to merge runs from different models, runtimes or revisions. Retained artifacts go in `evals/measurements/`; the committed files are a labeled synthetic sample. Repository development only; no workflow rule, hook or gate changes.
-- Cut contract and Stop interruptions that a long Claude session showed, keeping every rule. The first-line contract could not bind when a turn's first tool call wrote: replaying that session's transcript, the parser found the contract every time, so Claude evidently had not saved the reply when PreToolUse ran, even 37s after writing it. `AGENTS.md` and the guard's denial now say to `declare` first in that case; binding from the transcript still works once a tool result has arrived. Plain shell reads before a contract now also cover `cut`, `rg` and `sort` with only listed options spelled in full, `find` with only listed test and print primaries, and `sed -n` with only numeric-range `p` scripts; reads may be joined by `&&` or `;` as well as `|`. The lists are allowlists because these tools can write or run programs through options that differ by version (Claude Code's `find` is bfs, whose `-rm` deletes; ripgrep's `--hostname-bin` runs a program; `sort` accepts abbreviated `--output`). The shell parser also no longer treats `#` inside a word as a comment, which had hidden a chained command (`cat a#; rm x`). A Claude Stop gate refusal that the session has already been shown, with the same reason, shipping state and contract, is now released at once with an UNVERIFIED message instead of blocking up to three times per prompt; the session waited on the user's `accept-controls` through about fifteen identical refusals. Another session, a new reason (a failing check after accepted drift) or a Stop without a session id blocks as before, contract refusals keep the three-refusal cap, and a release still never records a pass.
-- Let a reviewed change be finalized without losing its review receipt. The receipt was bound to HEAD, the raw index and every Git-visible file, so recording DONE in a tracker, `git add` or `git commit` after an independent PASS each invalidated it, although `lean-task` orders review before tracker synchronization. The receipt now stores the reviewed content (Git-visible paths with bytes, modes and links, gate controls and each submodule's full state) and, separately, HEAD's tree when review began. `gate_evidence.py state`, which reviewers capture first, binds both, so a commit made during review cannot be recorded as reviewed. `check-review` adds two rules, comparing modes even under `core.fileMode=false`. While HEAD is unchanged, every staged path must hold its reviewed working-tree bytes, so staged unreviewed bytes or a staged deletion of a file still on disk are refused. Once HEAD moves, it must contain the whole reviewed content, so a partial commit or a commit of unreviewed bytes is refused even if the working tree is restored. Top-level `docs/tracking/*.md` records are left out; `workflow.py check` still validates them. Receipts recorded before this change have no base and must be re-recorded. The gate cache and change baseline keep the full HEAD and index binding through the new `gate_evidence.py gate-state`, because gate checks read history and trackers. `lean-task` now synchronizes tracker progress before review. Changing `gate_evidence.py` and `quality-gate.sh` is protected control drift: accept it with `accept-controls` after review, or let a trusted-control-ref match.
-- Trim the text loaded into every turn, keeping every rule. `AGENTS.md` and the router it imports no longer state the same thing twice, the router drops setup and downgrade detail that `policy/WORKFLOW.md`, `OPTIONAL.md` and `CUSTOMIZING.md` already hold, every skill and reviewer description is shorter (each keeps what the skill is for and when to use it; a few lose a redundant "use for" lead-in that the skill body still states), the `auto=false` session message is shorter, and `AGENTS.md` gains one rule: batch independent tool calls in one turn and do not repeat a call whose result you already hold. Measured with a one-turn Sonnet probe on a project that adds its own sizing table and agents: the first turn read 28,513 tokens against 29,859 before. Separately, a project can hide tools and skills it never uses from every request through its own `.claude/settings.json` (not part of the template): `permissions.deny` for `Workflow`, `ScheduleWakeup`, `ReportFindings` and `ListAgents`, and `skillOverrides` set to `user-invocable-only` for built-in and optional skills. That took the same probe to 20,720 tokens, 27% below the 4.1.0 setup (28,319), and `/name` still works for a hidden skill. Over 16 smoke runs the result used 103k tokens per run against 136k for 4.1.0 and 145k for 4.3.0, with the same task results, the contract line first in 16/16 runs, and the independent reviewer dispatched in 4/4 auto-gate runs.
-- Cut the turns the contract guard and Stop gate add, keeping every rule. In a Sonnet smoke test against 4.1.0 (same four tasks), 4.4.0 used about 15% more tokens, mostly from extra turns: a `contract_guard.py declare` call, a `git diff` rerun to "verify" an edit, a denied first shell read, and Stop refusals that named control drift and the High-risk review one Stop apart. Claude's PreToolUse guard now binds the contract from the first text of the reply to the latest person prompt, read from the transcript (runtime turns, compaction summaries and tool results continue the turn; a later, earlier-turn or subagent contract does not count). It binds before the own-receipt check, and re-reads for up to 1s because Claude can persist that text just after the hook starts. Codex, or a session without a readable transcript, still declares, and the denial says so. Plain shell reads (`grep`, `cat`, `head`, `tail`, `wc`, `ls` and read-only `git` subcommands, alone or piped, with no operator characters, expansion or newline) run before a contract. `AGENTS.md` says a successful edit, test or gate result already verifies a change. A control-drift refusal also names the High-risk changes that will need HIGH review, and `check-review` says which part of a receipt differs (verdict, exact contract, shipping state). `AGENTS.md` and the router drop wording that `REVIEW.md`, `QUALITY.md`, `MODELS.md`, `OPTIONAL.md` and the multi-agent skill already state. Measured on a 4.3.0 project, the result used 0.8% more tokens than 4.3.0 over 16 runs (4.8% fewer in the last 8), with the contract line first in 16/16 runs instead of 11/16 and the same task results. The guard still fails closed.
-- Accept protected gate controls that equal a trusted upstream ref without a manual step. PROJECT.md may list remote-tracking `refs/remotes/*` names in one `<!-- trusted-control-refs: ... -->` line; when every control matches one of them, `gate_evidence.py guard-controls` records an automatic acceptance naming the ref and commit, for Claude and Codex alike. Merging a reviewed release previously stopped every Stop until a person ran `accept-controls`, which an agent cannot approve for itself. Local edits, local branches, tags, `HEAD` and commit ids still need the manual procedure, Git replace objects are ignored, and the line is itself a control. Projects without the line keep their recorded baseline.
-- Add `workflow.py context`, a read-only JSON summary (mode, active tracker and next step, claims, Git state, last gate result) for resuming work, and `workflow.py tracker archive --dry-run|--apply [--id TCKnnn]`, which moves `DONE` trackers (with all linked queue items DONE in full mode) to `docs/history/agent-workflow/`. Archived trackers stay resolvable by ID.
+- Queue cleanup accepts `old --days N`. Queue path checks allow unrelated dependency links while protecting workflow state. `model_drift.py` checks local Codex catalog evidence without network access or writes.
+- Review receipts can survive staging and committing the complete reviewed content. Partial commits or different content invalidate them. Routine tracker updates are excluded from the content fingerprint and still checked by the workflow CLI.
+- Reduce contract and Stop interruptions: support the first-write declaration case, keep more safe reads available, and release repeated identical refusals as `UNVERIFIED` so the agent can report `BLOCKED`.
+- Recognize protected controls that match reviewed upstream refs. Add `workflow.py context` and guarded archive support for completed trackers.
+- Shorten shared instructions and batch independent reads. Extend developer evals to check actual outcomes and final review evidence, with tools for comparing recorded runs.
 
-### Upgrade notes
+**Upgrade:** update shared guards, gates, policies, skills, CLI and tests together; preserve project settings and records. Old review receipts need to be recorded again by an independent reviewer. Register trusted upstream refs or use matching approval for control changes. No mode or record migration is needed.
 
-Merge `AGENTS.md`, the router, the skills, `contract_guard.py`, `gate_evidence.py`, `gate_mode.py`, `quality-gate.sh`, `workflow.py`, the registry and the tests together; preserve project additions, PROJECT/config/records and permissions. `contract_guard.py`, `gate_evidence.py`, `gate_mode.py` and `quality-gate.sh` are protected controls: after review, accept the drift with `gate_evidence.py accept-controls --reason '<matching user approval>'`, or list trusted upstream refs in PROJECT.md's `<!-- trusted-control-refs: ... -->` line so a merge whose controls match one of them is accepted automatically. Review receipts recorded before this version have no reviewed-content base and must be re-recorded by an independent reviewer. The hook tests that expected three identical Stop refusals were changed deliberately; take the upstream `test-hooks.sh`. `model_drift.py` reads only the local Codex CLI cache and never networks or writes. No mode, execution, tracker or queue record migration is required.
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** ผล smoke test ก่อนออก release ที่บันทึกไว้ใช้ **103k tokens ต่อรอบ** คิดเป็นประมาณ **24% น้อยกว่า 4.1.0** (136k) และ **29% น้อยกว่า 4.3.0** (145k) จาก 16 รอบ ผลรายงานนี้ยังแยกผลของ template ออกจาก settings เฉพาะโปรเจกต์ไม่ได้ ส่วนการทดลองเฉพาะ guard เป็นอีกชุดหนึ่ง และใช้ token รวม **0.8% มากกว่า 4.3.0**
+
+- ล้างคิวเก่าด้วย `old --days N` ได้ การตรวจ path ยอมให้มี dependency links ที่ไม่เกี่ยวข้อง พร้อมปกป้อง state ของ workflow และเพิ่ม `model_drift.py` สำหรับตรวจ catalog ของ Codex ในเครื่องโดยไม่ใช้เครือข่ายหรือเขียนไฟล์
+- receipt ยังใช้ได้หลัง stage และ commit เนื้อหาที่รีวิวครบแล้ว การ commit เพียงบางส่วนหรือเนื้อหาที่ต่างออกไปทำให้ receipt ใช้ไม่ได้ การอัปเดต tracker ตามปกติแยกออกจาก fingerprint แต่ยังผ่านการตรวจของ workflow CLI
+- ลดจังหวะสะดุดจาก contract และ Stop: รองรับการ declare ก่อนคำสั่งแรกที่เขียนไฟล์ เปิดทางให้คำสั่งอ่านที่ปลอดภัยมากขึ้น และปล่อยการปฏิเสธซ้ำเดิมเป็น `UNVERIFIED` เพื่อรายงาน `BLOCKED` ได้
+- รับรู้ controls ที่ตรงกับ upstream refs ที่ผ่านรีวิว เพิ่ม `workflow.py context` และการ archive tracker ที่เสร็จแล้วอย่างมีเงื่อนไขป้องกัน
+- ย่อคำสั่งที่ใช้ร่วมกัน รวมการอ่านที่ทำแยกกันได้ และเพิ่มเครื่องมือ eval สำหรับตรวจผลจริง หลักฐานรีวิวสุดท้าย และเปรียบเทียบผลการรันที่บันทึกไว้
+
+**เมื่ออัปเกรด:** อัปเดต guards, gates, policies, skills, CLI และ tests พร้อมกัน เก็บ settings และ records ของโปรเจกต์ไว้ receipt เก่าต้องให้ independent reviewer บันทึกใหม่ ตั้ง trusted upstream refs หรือใช้การอนุมัติที่ตรงกับการเปลี่ยน controls ไม่ต้องย้ายโหมดหรือข้อมูลบันทึกงาน
+
+</details>
 
 ## 4.4.0 — 2026-10-17
 
-- A turn whose shipping state equals the latest PASS receipt's state now meets the High-risk floor without a new review, under a later contract, when that receipt was recorded for a HIGH-risk or VERY_HIGH-quality contract (`gate_evidence.py check-shipped`); a PASS under a lower contract never required an independent reviewer and does not count. After a session committed High-risk paths, every later Stop (even a status reply) demanded a receipt for its own contract and was released UNVERIFIED. A HIGH contract still needs a receipt for itself, and any further change needs review.
-- The receipt guard now also recognizes renamed, extension-less or copied `gate_evidence.py` scripts (by content, including a copy made in the same command) and `echo record-review | xargs ...` pipelines, and refuses Write/Edit/apply_patch targets, redirect targets and writer arguments (`cp`, `tee`, `sed -i`, ...) of `.agent-runtime/review.json`; reads and text that only mention the path are allowed. A write through a path the guard cannot see (`cd .agent-runtime && ...`) is a known gap.
-- A crashing contract guard no longer locks the session out: a bug in it (not an undecidable input, which still denies) allows read-only tools and edits or `git checkout`/`git restore` of `.lean/scripts/contract_guard.py`, and denies everything else with a repair hint. A half-applied edit to the guard had blocked every tool, including the fix.
-- `AGENTS.md`: report only changes verified after the last edit; a denied or failed tool call changed nothing. Evals add a `claims_match_changes` grader to every case: a reply that says a file changed when it did not fails (it catches the one known false claim among 116 saved runs and no others).
+**Token highlight:** about **15% more than 4.1.0** in the recorded Sonnet smoke test on the same four tasks. That comparison showed increased usage, not a saving.
 
-- Add `.lean/tests/run_tests.py`, which runs each test file in its own process, several at once. It covers the same files as `unittest discover`, fails when any file fails, and cuts the suite from about 140s to about 40s on an 8-core machine. CI uses it. The serial command still works.
-- Add opt-in agent behavior evals under `evals/` (repository development only; not a portable asset). `evals/run_evals.py` copies the template into a temporary project with a tiny application and drives real `claude -p` sessions there, so CLAUDE.md/AGENTS.md, hooks, skills and the reviewer agent load as they do for users. Six cases grade, without a model judge, the contract line, trivial contracts, regression-test order, BLOCKED instead of DONE on a missing gate tool, reviewer dispatch for High-risk paths and stopping on an unresolved decision. Paid runs need `--model` and `--max-total-usd`; CI runs only the grader tests and `--dry-run`. No gate, hook or rule changes.
-- Only the independent reviewer records a review receipt. In a `claude -p` eval, the background reviewer was refused a piped command (`... | tail`), and the author then recorded the receipt itself, so the receipt no longer showed an independent review. `policy/REVIEW.md`, `QUALITY.md` and `lean-review` now say the author never records it and reports BLOCKED instead. The contract guard denies a main-thread `record-review` naming the session's own declared contract, on both providers. It parses the command into shell words with operators split out, and checks any other argument that itself holds a command (`sh -c`, `bash -lc`, here-strings, `echo ... | sh`, `eval`); the `--contract` value and the contract text are data. A `record-review` call passes only with a literal `--contract` value that differs from the declared contract, so quoting, glued operators (`'...';echo`), wrappers and expansion do not hide it, while commands that carry the declared contract only as data (as a `--contract` value in either form, or quoted inside another argument such as a commit message) are not affected. Any other argument that holds a command mentioning `record-review` is parsed as a command, because a wrapper such as `eval` may run it. A standalone `record-review` word counts as a call only after `gate_evidence` (or a path hidden behind `$` or a backtick) in the same simple command, so `grep -rn record-review .` is not refused; subagents (`agent_id`) and separate reviewer sessions may record. Evals allow `tail`, `head`, `grep` and `wc` for reviewers.
-- Claude's Stop adapter now refuses with `{"decision": "block", "reason": ...}` on exit 0 instead of exit 2. Headless `claude -p` reported an exit-2 Stop as "Stop hook error occurred" and ended the session with `success`, so a refused HIGH-risk change could finish without review; the JSON form feeds the reason back to the model, as Codex's adapter already did. SessionStart seeding and the UNVERIFIED release keep their behavior; if the JSON cannot be written, the adapter falls back to exit 2.
-- Keep the contract as the first line of the reply. Evals after the contract guard showed Codex opening with a plan and declaring later, and Claude declaring without writing the line. `AGENTS.md` and `policy/CONTRACTS.md` now say the line comes before any preamble, plan or tool call, and that the declaration does not replace it. The reviewer role asks for each `gate_evidence.py` command on its own with a literal state value, because Claude refused to permission-check a `$(...)` record-review command.
-- Evals: Codex runs use a temporary `CODEX_HOME` holding a 0600 copy of your `auth.json` and a config that trusts only the fixture, removed after each run. `--ignore-user-config` also dropped project trust, so no project hook (contract guard or Stop gate) had run in earlier Codex evals. Harness-fault detection now ignores agent text and tool output, which can quote the fault words.
-- Enforce the Task Contract before writes, for Claude and Codex alike. New `.lean/scripts/contract_guard.py` runs as both providers' PreToolUse and UserPromptSubmit hook: shell, edit, MCP and unknown tools are denied until the session declares its contract with `contract_guard.py declare` (a single-quoted `--contract` or a quoted heredoc, no expansion or chaining), read-only tools stay available, subagents share the declaration, and a person's prompt clears it (runtime turns such as task notifications, agent hand-backs and hook feedback, including ones wrapped in a system reminder, do not). A contract may now be written as a `Contract:` block of `field: value` lines (`topic`, `risk`, `quality`, `budget`, `skill`, `acceptance`); its canonical one-line form is unchanged for receipts and `--contract`. Claude's Stop prefers the declared contract over the transcript, which a runtime may not persist in full; Codex's Stop now refuses changed work without a declaration, measured from a per-session baseline that a later SessionStart for the same session (resume or subagent) does not overwrite. Model is recorded from hook input when the runtime sends it (Codex does; Claude does not), and effort is not available to hooks. Upgrades must take `.claude/settings.json`, `.codex/hooks.json`, the Codex adapter, `gate_evidence.py`, `quality-gate.sh` and the new script together, re-trust Codex hooks, and record the control change with `accept-controls`.
-- Fix `bash .lean/scripts/quality-gate.sh` with no arguments on macOS `/bin/bash` 3.2: re-running under the gate lock expanded an empty argument array under `set -u` and stopped with `gate_args[@]: unbound variable` before any check ran. Codex runs the gate this way; the Claude hook always passes arguments. A regression test runs the direct runner without arguments. Projects that patched the runner locally should take the upstream line.
-- Require a Codex HIGH reviewer to start fresh. `AGENTS.md`, `policy/REVIEW.md` and `lean-review` now say to spawn it with `fork_turns: "none"` and give it the reviewer role, exact contract and diff range, never as a fork of the author's thread. A Codex eval run spawned the reviewer with `fork_turns=all`, so it saw the author's reasoning, which the existing independence rule already forbids. Projects carrying local edits to these files should merge the added sentence.
-- Run the agent behavior evals under Codex too: `--provider codex` drives `codex exec --json` in the same fixtures, maps its events onto the graders' shapes and budgets with `--max-total-tokens`. Known gaps (heuristic shell-write detection, no per-run token cap, reviewer found from the stored session rollout and required to start fresh rather than fork the author's thread, no Codex Stop contract check yet) are listed in `evals/README.md`. Shell writes now count as file writes for Claude graders too. No gate, hook or rule changes.
-- Speed up `test_template.py`'s installed smoke: the three configured-mode copies now run their nested suites concurrently instead of one after another. Assertions are unchanged; the file drops from about 35s to about 16s.
+- Enforce a Task Contract before writes in both Claude and Codex. A new user prompt clears it; read-only inspection stays available. Contracts also support a field-block format.
+- Only the independent reviewer records its receipt. Codex reviewers start with a fresh context. An unchanged state already covered by a HIGH-depth PASS can satisfy the high-risk floor on later status turns; a new HIGH contract still needs its own receipt.
+- Make Claude's headless Stop refusals reach the agent correctly, require a contract for changed work in Codex, and fix the direct gate runner on macOS Bash 3.2.
+- Protect review receipts from direct edits and add a repair path for a broken contract guard. Reports must match changes that actually happened.
+- Add opt-in behavior evals for both providers and a faster parallel Python test runner. Paid evals require explicit model and budget limits; CI uses local grader tests and dry runs.
+
+**Upgrade:** update both providers' hook settings/adapters and shared guard/evidence/gate tooling together. Re-trust Codex hooks after the update and record matching approval for control changes. Merge local entrypoint changes, including the fresh-reviewer instruction.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** บันทึก Sonnet smoke test ที่ใช้งานสี่ข้อชุดเดียวกันพบว่าใช้ประมาณ **15% มากกว่า 4.1.0** ผลเปรียบเทียบนี้ใช้ token เพิ่มขึ้น
+
+- บังคับให้มี Task Contract ก่อนเขียนทั้ง Claude และ Codex ข้อความใหม่จากผู้ใช้จะล้าง contract เดิม แต่ยังอ่านตรวจข้อมูลได้ และเขียน contract แบบแบ่ง fields ได้ด้วย
+- ให้ independent reviewer เป็นผู้บันทึก receipt เท่านั้น reviewer ของ Codex ต้องเริ่มด้วย context ใหม่ หากเนื้อหาเดิมมี HIGH-depth PASS ครอบคลุมแล้ว ใช้รองรับการตอบสถานะภายหลังได้ แต่ contract HIGH ใหม่ยังต้องมี receipt ของตัวเอง
+- แก้การส่งผลปฏิเสธจาก Stop ใน Claude แบบ headless บังคับ contract สำหรับงานที่เปลี่ยนใน Codex และแก้ gate runner เมื่อเรียกตรงบน macOS Bash 3.2
+- ป้องกันการแก้ receipt โดยตรง เปิดทางซ่อม contract guard ที่เสีย และกำหนดให้รายงานตรงกับสิ่งที่เปลี่ยนจริง
+- เพิ่ม behavior evals ของทั้งสอง providers และตัวรัน Python tests แบบขนาน การรัน eval ที่เสียเงินต้องระบุโมเดลกับเพดานงบ ส่วน CI ใช้ grader tests และ dry run ในเครื่อง
+
+**เมื่ออัปเกรด:** อัปเดต hook settings/adapters ของทั้งสอง providers พร้อม guard, evidence และ gate tooling ต้อง trust Codex hooks ใหม่และบันทึกการอนุมัติที่ตรงกับการเปลี่ยน controls รวมคำสั่ง reviewer ที่ต้องเริ่ม context ใหม่เข้ากับ entrypoint ที่ปรับเอง
+
+</details>
 
 ## 4.3.1 — 2026-10-16
 
-- Let the installed template smoke tests pass in projects that own provider skills. While building its fresh copy, `test_template.py` dropped every undeclared `.agents/skills/*` and `.claude/skills/*` link, including project-owned links that project documents name, so the copy's structure check failed. Its discovery assertions also counted every entry, so project skill directories broke the expected 19 and 9. The copy now drops only undeclared links named after a canonical `.lean/skills/<name>` (local optional opt-ins), and the counts include only entries with a canonical `.lean/skills/<name>`. A downstream-shaped regression test covers both. This test-only patch changes no rule, configuration or record; projects carrying a local patch for it can take the upstream file on upgrade.
+Fix installed-template smoke tests in projects with custom provider skills. Project-owned skills are preserved and no longer counted as bundled Lean skills.
+
+**Upgrade:** take the updated `test_template.py` if you carry a local workaround. Workflow behavior and records are unchanged.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+แก้ smoke tests ของ template ที่ติดตั้งในโปรเจกต์ซึ่งมี provider skills ของตัวเอง โดยเก็บ skills เหล่านั้นไว้ และไม่นับรวมเป็น Lean skills ที่มากับชุดติดตั้ง
+
+**เมื่ออัปเกรด:** ใช้ `test_template.py` รุ่นใหม่แทน workaround ที่ทำไว้ได้ พฤติกรรม workflow และข้อมูลบันทึกงานไม่เปลี่ยน
+
+</details>
 
 ## 4.3.0 — 2026-10-15
 
-- Make model sizing hold at dispatch. `MODELS.md` already chose the least costly capable model per task, but no spawn site passed one: the dispatch example recorded `inherited/inherited`, Codex fell back to "available defaults" and the reviewer's `model: inherit` read as the default. Every subagent therefore ran on the session model, usually heavier than the task. Each spawn whose tool accepts them now passes the sized model and effort, reviewers included; inheriting needs a recorded reason. Projects may map the rows to concrete models in Project additions or the catalog. The active session's settings, premium evidence, review depth and the reviewer definition are unchanged. The structure check rejects a policy without the per-spawn rule and an inherited dispatch example.
-- Keep optional work in the active session when a spawn is not cheaper. A spawn costs a brief, cold re-reads and a handoff on top of the subagent's own work, so a session that already holds the context often finishes more cheaply itself. `MODELS.md` now spawns only when required (delegated execution, HIGH independent review, an explicit user request for workers) or cheaper, and favors spawns for large, read-heavy work a cheaper model can do without that context. Required delegation and review are unchanged; the structure check rejects removing the rule.
+**Token highlight:** about **7% more than 4.1.0**, calculated from the rounded baseline averages in later smoke-test notes: 145k versus 136k tokens per run. This is a historical baseline comparison, not a dedicated 4.3.0 benchmark.
+
+- Pass an appropriately sized model and effort on each subagent spawn that supports them, including reviewers. Inheriting session settings needs a recorded reason.
+- Keep optional work in the current session when a new worker would cost more. Required delegation and independent review still apply.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** คำนวณจากค่าเฉลี่ย baseline แบบปัดเศษในบันทึก smoke test ภายหลัง ใช้ประมาณ **7% มากกว่า 4.1.0** หรือ 145k เทียบกับ 136k tokens ต่อรอบ เป็นการเทียบ baseline ย้อนหลัง ไม่ใช่ benchmark เฉพาะรุ่น 4.3.0
+
+- ระบุโมเดลและ effort ที่เหมาะกับงานทุกครั้งที่ spawn subagent แล้ว runtime รองรับ รวมถึง reviewer หากใช้ค่าจาก session ต้องบันทึกเหตุผล
+- งานที่ไม่จำเป็นต้องแยก ให้ทำใน session เดิมเมื่อการเปิด worker ใหม่แพงกว่า กติกา delegation และ independent review ที่จำเป็นยังคงเดิม
+
+</details>
 
 ## 4.2.0 — 2026-10-14
 
-- Allow an economical reviewer model for wording-only diffs in HIGH review. The reviewer checks a before/after rule map and hands meaning changes back to a normally chosen reviewer; the HIGH floor, independence, receipt and round limits are unchanged.
+**Token highlight:** - · **Compared with:** -
 
-- Limit `/lean-compress` exhaustive reads to `workflow` audits. Named paths read their targets, AGENTS, the router and their dependencies, and escalate to a workflow audit when a target summarizes the whole workflow or its dependencies cannot be bounded.
+- Keep nine core skills visible by default and ten optional skills available through `skill_pack.py`. Add project standards, bounded audits, procedure intensity settings and pinned workflow updates.
+- Share auto/manual gate settings across Claude and Codex. Codex's lifecycle adapter needs runtime trust; manual mode reports `NOT_RUN` and does not waive validation or review.
+- Serialize gates per checkout. Rerun checks by default, allow explicit tree caching, and keep failed or undefined validation from becoming a pass. A released Stop remains `UNVERIFIED`.
+- Bind HIGH-review receipts to the exact contract and shipping state. Protect gate controls and check high-risk paths even after their changes have been committed.
+- Support economical reviewers for wording-only HIGH reviews when a checked rule map proves the meaning stayed the same. Use smaller document reads when dependencies are bounded, and prevent reuse of archived tracker IDs.
 
-- Complete approved audit remediation: template discovery contains only nine core skills, recommended standards remain nonblocking, and bounded audit behavior trials cover exceptions, missing evidence and unresolved decisions. Add shared auto/manual gate policy, an optional `lean-quality-gate-mode` command and Codex lifecycle adapter; missing preference preserves auto. Protect new controls and preserve project preferences during migration. Ten optional skills are available; manual skips remain NOT_RUN and never waive gate/review evidence. Codex hook trust remains runtime-owned.
+**Upgrade:** take the shared skills, registry/discovery links, policies, gate/evidence/lock helpers, both provider adapters and tests together. Preserve mode, execution, optional-pack choices and project preferences, including `.lean/skill-effort.json` and `.codex/quality-gate.json`. Configure real project checks if the old gate was empty. Review control changes and record matching approval; old caches are not validation evidence.
 
-- Add optional `lean-pattern` and `lean-audit` procedures with reusable project-standard and audit-finding formats. Reuse research/scope/Grill/task and project record routing; distinguish accepted requirements, exceptions, proposals and verification gaps. Nine core skills remain the default; the optional pack now exposes nine extras. Preserve previous 15/16-skill registries for migration. No new gate, automatic audit or automatic remediation/backlog is introduced.
+<details>
+<summary>ภาษาไทย</summary>
 
-- Clarify impact-based document and skill selection, cross-area dependency expansion and delta context on feedback. Keep required scope, high-risk Grill, review and gate checks; intensity does not activate extra skills. Add read-trace evaluation scenarios and shorten this repository's PROJECT map without changing its gate.
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
 
-- Port reusable Casetodian extensions: shared standard/high/ultra procedure settings and a core `lean-skill-effort` command, with global/named choices, read-only inspection, reset and submodule record routing. Missing settings remain standard; project preferences never ship as release assets.
-- Expose all discovered Lean skills to users while retaining the optional maintenance pack. Nine core and seven optional skills are available; previous eight-core/full registries remain readable during migration.
-- Serialize shared gate runs with a per-checkout lock, report busy/unavailable as NOT_RUN and guard the lock helper as a gate control. Keep existing automatic/explicit gate behavior and opt-in whole-tree caching.
-- Refuse new tracker IDs reserved by archived agent-workflow records, including nested history and Markdown/text records.
+- เปิดเก้า core skills ตามค่าเริ่มต้น และเปิดอีกสิบ optional skills ผ่าน `skill_pack.py` ได้ เพิ่มมาตรฐานโปรเจกต์ การ audit แบบมีขอบเขต การตั้งระดับความละเอียดของ procedure และการอัปเดต workflow โดยตรึงรุ่น
+- ใช้ settings ของ gate แบบ auto/manual ร่วมกันใน Claude และ Codex โดย lifecycle adapter ของ Codex ต้องผ่าน runtime trust ส่วน manual แสดง `NOT_RUN` และยังต้องตรวจ validation กับ review ให้ครบ
+- ให้ gate ทำงานทีละชุดต่อ checkout รัน checks ใหม่เป็นค่าเริ่มต้น เปิด tree cache ได้อย่างชัดเจน และไม่เปลี่ยนผลที่ล้มเหลวหรือยังไม่มีการตรวจให้เป็นผ่าน Stop ที่ถูกปล่อยยังเป็น `UNVERIFIED`
+- ผูก HIGH-review receipt กับ contract และเนื้อหาที่ส่งจริง ปกป้อง gate controls และตรวจ high-risk paths แม้ commit การเปลี่ยนแปลงไปแล้ว
+- ใช้ reviewer ที่ประหยัดกว่าสำหรับ HIGH review ที่แก้ถ้อยคำล้วนได้ เมื่อ rule map ที่ตรวจแล้วแสดงว่าความหมายเดิมครบ อ่านเอกสารเฉพาะส่วนเมื่อจำกัด dependencies ได้ และป้องกันการใช้ tracker ID ที่ archive แล้วซ้ำ
 
-### Upgrade notes for these extensions
+**เมื่ออัปเกรด:** อัปเดต shared skills, registry/discovery links, policies, gate/evidence/lock helpers, adapters ของทั้งสอง providers และ tests พร้อมกัน เก็บโหมด execution การเลือก optional pack และ preferences ของโปรเจกต์ไว้ รวมถึง `.lean/skill-effort.json` และ `.codex/quality-gate.json` หาก gate เดิมว่าง ต้องใส่ checks จริง ตรวจการเปลี่ยน controls และบันทึกอนุมัติที่ตรงกัน cache เก่าไม่ใช่หลักฐาน validation
 
-Merge canonical skills, policy, CLI, registry, discovery links, gate runner/lock helper and tests together. Preserve project `.lean/skill-effort.json` and per-target preferences; do not import downstream defaults, records or runtime hooks. Keep existing mode, execution and optional-pack choices. Merge the shared gate-mode helper, both provider adapters, optional command and tests together. Preserve workspace `.codex/quality-gate.json`; missing settings remain auto. No records-only cache or publishing is introduced.
-
-- Opt this repository's Claude Stop command into tree caching; keep contract/review checks and fresh validation after changes or refusals. Document forced checks for environment/dependency changes and downstream opt-out; test the configured Stop command end to end.
-
-- Add optional standard/high/ultra levels to scope, research and grill: preserve the default, deepen scope precision and question rounds, and broaden evidence-backed vendor/approach comparisons without changing workflow modes or authority.
-
-- Keep nine core procedures in default discovery; expose seven bundled maintenance procedures through explicit `skill_pack.py enable|disable|status`. Retain canonical tools/tests/resources and accept legacy full discovery registries. Preserve existing project pack choices and custom slots during upgrades.
-- Gate failures, including continued Stops, never become success after a retry cap. Missing/empty/malformed gates report undefined validation instead of passing silently. SessionStart records a change baseline rather than blessing a passing cache.
-- Rerun checks by default; tree caching is explicit for Git-visible inputs only. Bind state to SHA-256 file contents, modes, symlinks, HEAD, index, controls and submodule work. Contracts come from parsed assistant text in the current human turn, before known write tools; unreadable supplied transcripts block.
-- Release a Stop after three continued gate refusals with a user-visible UNVERIFIED message, so BLOCKED can be reported; a release keeps the refusal and never records a pass or cache. Do not treat runtime-injected skill, hook-feedback, task-notification or compaction entries as human turns. Require a HIGH review receipt when changes touch backticked paths/globs under PROJECT.md High-risk areas, including commits made since SessionStart.
-- Bind HIGH-review receipts to exact contracts and shipping state. Track local gate-control drift and require recorded matching user approval for intentional changes. Document first-use trust, writable evidence, missing transcript metadata, Codex's explicit checks and external CI/merge authority limits.
-- Shorten review/model/router prose. Keep the broad regression suite required before shipping behavior changes and in CI, with hook/discovery integrity checks in the turn gate.
-- Add `lean-update-workflow` with pinned stable-tag acquisition, release/version checks, local customization reconciliation and existing takeover staging/approval/recovery. Preserve project-owned provenance and all project records; no automatic update or publishing. Treat source text as untrusted evidence; pinning does not authenticate publishers.
-
-### Upgrade notes
-
-Merge the runner, evidence helper, hooks, skills, registry and tests together; preserve PROJECT/config/records/permissions. Configure real project checks if the old gate was empty. Existing cache files are advisory only; seeding no longer makes validation pass. Optional discovery is a separate choice from mode/execution. Review and accept any intentional control changes using `gate_evidence.py accept-controls --reason '<matching user approval>'`; never use acceptance to bypass a failing check.
+</details>
 
 ## 4.1.1 — 2026-10-14
 
-### Clearer public documentation
+Rewrite the README, contribution guide and public guides in plain English. Clarify setup, modes, delegation and runtime limits without changing the workflow requirements.
 
-- Rewrite the root README, CONTRIBUTING and all public guides in plain English with a more conversational tone. Keep the existing workflow concepts, commands and completion requirements.
-- Make setup, modes, procedure intensity, delegation and runtime limits easier to follow. Correct the contribution guide to match nine core and ten optional skills, and include Codex lifecycle files in the repository map.
-- Replace dated model-name examples and repeated delegation diagrams with capability-based guidance and links to official runtime documentation.
-- Synchronize current baseline references. This patch changes documentation only; the extensions listed under Unreleased remain unreleased. No release tag or GitHub publication is implied.
+**Upgrade:** update the guides and baseline references together, preserving project facts and preferences. No configuration or record migration is needed.
 
-### Upgrade from 4.1.0
+<details>
+<summary>ภาษาไทย</summary>
 
-Update the public guides and baseline references together. No configuration, record or runtime migration is required for this documentation patch. Preserve project-owned facts, commands, additions and preferences when merging.
+ปรับ README คู่มือ contribution และคู่มือสาธารณะให้อ่านง่ายขึ้น อธิบาย setup โหมด delegation และข้อจำกัดของ runtime ให้ชัด โดยไม่เปลี่ยนข้อกำหนดของ workflow
+
+**เมื่ออัปเกรด:** อัปเดตคู่มือและเลข baseline พร้อมกัน เก็บข้อมูลและ preferences ของโปรเจกต์ไว้ ไม่ต้องย้าย configuration หรือข้อมูลบันทึกงาน
+
+</details>
 
 ## 4.1.0
 
-### Evidence-backed repository cleanup
+**Token highlight:** - · **Compared with:** -
 
-- Add `/lean-clean-repo` for whole-repository or path-limited audits of generated clutter, obsolete source/tests/dependencies/docs/assets/configuration and workflow files. Preview exact operations, reference edits, evidence, impact and validation before matching approval; retain uncertain/protected candidates.
-- Add a Python helper with read-only inventory, exact-plan-ID apply, private external snapshots, per-operation journaling and guarded restore/resume. Preserve dirty/staged/untracked work by default, Git index, credentials, records/history and active instructions; reject symlink/hardlink/nested-repository boundaries, source drift and new descendants. Explicit regenerated selections require evidence in the approved plan. Stop repository writers during apply/restore. APPLIED still requires target checks and required review.
-- Register the fourteenth canonical skill and both runtime discovery links; add isolated cleanup/recovery tests. No cleanup is run automatically during installation/upgrade.
+Add `/lean-clean-repo` to preview repository cleanup before making changes. Approved cleanup uses external snapshots and a recovery journal; it preserves uncertain files, existing work, credentials and records. Nothing is cleaned automatically, and applied changes still need validation and review.
 
-### Upgrade from 4.0.x
+**Upgrade:** take the skill, helper, registry, discovery links and tests together. Keep cleanup sessions outside the repository and stop other writers during apply or restore.
 
-Update the registry, shared-assets identities, canonical skill/tooling reference, helper/tests and both discovery links together. Preserve project facts/configuration, local skills and work records. Plans/snapshots belong in external private sessions and are not distributed. Existing queue cleanup and workflow ownership stay compatible.
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+เพิ่ม `/lean-clean-repo` สำหรับเสนอรายการเก็บกวาด repository ก่อนลงมือ เมื่ออนุมัติแล้วจึงใช้ snapshot ภายนอกกับ journal สำหรับกู้คืน โดยเก็บไฟล์ที่ยังไม่แน่ใจ งานเดิม credentials และ records ไว้ ไม่มีการล้างอัตโนมัติ และงานที่ apply แล้วยังต้องผ่าน validation กับ review
+
+**เมื่ออัปเกรด:** อัปเดต skill, helper, registry, discovery links และ tests พร้อมกัน เก็บ cleanup sessions ไว้นอก repository และหยุดตัวเขียนไฟล์อื่นระหว่าง apply หรือ restore
+
+</details>
 
 ## 4.0.0
 
-### One shared source for Claude and Codex
+Claude and Codex now use one shared copy of the workflow.
 
-- Move all thirteen skills and resources into `.lean/skills/`; replace runtime skill copies/adapters with individual relative discovery symlinks. Rename `/clean-queue` to `/lean-clean-queue` so all skill names use the `lean-` prefix; keep the underlying `workflow.py clean-queue` subcommand, input meaning and Claude command visibility. Provider-specific local extensions remain separate.
-- Move reviewer instructions into `.lean/roles/reviewer.md`; Claude's reviewer entrypoint and Codex review routing use that source. Extract the Quality Gate into `.lean/scripts/quality-gate.sh`: direct calls always run; the Claude Stop adapter retains loop, seed, refusal and cache behavior.
-- Add schema-2 release registry links, strict link/target integrity checks and recoverable takeover support for declared skill slots only. Preserve exact legacy directory snapshots and guard staging, interrupted apply/resume, rollback and post-approval drift. Schema-1 sources without legacy provider skill assets remain readable; upgrade a legacy skill baseline to schema 2 before drafting.
+- Skills live in `.lean/skills/`; each runtime discovers them through relative symlinks.
+- Reviewer instructions live in `.lean/roles/reviewer.md`, and both providers use the shared gate runner.
+- Rename `/clean-queue` to `/lean-clean-queue`. The underlying CLI command stays the same.
 
-### Upgrade from 3.x
+**Upgrade from 3.x:** move local skill customizations into the shared source before replacing runtime copies with links. Update skills, roles, runner, tooling, registry and both discovery trees together. Preserve unrelated skills and project data. Copy symlinks without dereferencing them, then reload runtime skills when needed. Legacy provider-skill distributions need a schema-2 registry before takeover planning.
 
-Update canonical skills/resources, both sets of discovery links, roles, runtime entrypoints, runner/tooling, tests, registry and documentation together. Preserve project additions, facts/config/catalog, records, target registrations and permissions. Before replacing a legacy Lean skill directory, fully read and reconcile local customizations into the canonical skill; preserve unrelated runtime skills. Use the reviewed takeover plan for lossless snapshots and guarded recovery. Copy links without dereferencing; a copied duplicate or incorrect target fails the structure check. Existing Claude cache paths and settings stay compatible. Restart/reload skills in existing sessions when necessary.
+<details>
+<summary>ภาษาไทย</summary>
+
+Claude และ Codex ใช้ workflow จาก source ชุดเดียวกันแล้ว
+
+- skills อยู่ใน `.lean/skills/` และแต่ละ runtime ค้นพบผ่าน relative symlinks
+- คำสั่ง reviewer อยู่ใน `.lean/roles/reviewer.md` และทั้งสอง providers ใช้ gate runner ร่วมกัน
+- เปลี่ยนชื่อ `/clean-queue` เป็น `/lean-clean-queue` ส่วนคำสั่ง CLI ภายในยังเดิม
+
+**อัปเกรดจาก 3.x:** รวมการปรับ skills ของโปรเจกต์เข้ากับ shared source ก่อนแทนสำเนาใน runtime ด้วย links อัปเดต skills, roles, runner, tooling, registry และ discovery trees ของทั้งสองฝั่งพร้อมกัน เก็บ skills อื่นกับข้อมูลโปรเจกต์ไว้ คัดลอก symlinks โดยรักษาตัว links แล้ว reload skills ตามที่จำเป็น ชุดติดตั้งเก่าที่มี provider skills ต้องใช้ schema-2 registry ก่อนวางแผน takeover
+
+</details>
 
 ## 3.5.0
 
-### Application submodules
+Add `/lean-use-submodule <remote url>` to keep application code in `targets/<name>` while Lean and its project records stay outside the application repository. Workflow and catalog commands select active target records by default; application checks run in the target.
 
-- Add `/lean-use-submodule <remote url>` and a Codex adapter: Lean is the superproject, application code lives in `targets/<name>`, and workflow/project records stay outside the application repository.
-- Add read-only preview, guarded add/reuse, pinned-commit branch recovery for clean detached checkouts, per-target context/records, explicit deselection and application gates. Preserve staged work and custom target instructions; stage only the submodule registration through Git, never commit or push automatically.
-- Route workflow/catalog defaults to active target records, retaining explicit `--root` behavior and Lean template sourcing. Claude checks the application before its Lean cache can skip; Codex runs both gates explicitly. Add actual Git installation/reuse/clone, record isolation and gate tests. Upgrade all thirteen procedures/adapters, tooling, hooks and the assets registry together; preserve target registrations and records.
+**Upgrade:** update procedures/adapters, tooling, hooks, tests and the registry together. Give Lean's own workflow/catalog gate checks an explicit `--root .`. Preserve target registrations and records. The command does not remove workflow files already tracked inside an application.
 
-### Upgrade from 3.4.x
+<details>
+<summary>ภาษาไทย</summary>
 
-Update the contract/router, all shared procedures and matching adapters, tooling/hooks, tests and assets registry together. In Lean's own PROJECT gate, give workflow/catalog checks an explicit `--root .`; default commands now select active target records. Preserve target registrations, project data, runtime permissions and existing configured choices. The command keeps workflow outside the application Git history; it does not remove files already tracked there.
+เพิ่ม `/lean-use-submodule <remote url>` เพื่อเก็บ application code ใน `targets/<name>` และเก็บ Lean กับ project records ไว้นอก application repository คำสั่ง workflow และ catalog เลือก records ของ target ที่ใช้อยู่เป็นค่าเริ่มต้น ส่วน checks ของ application รันใน target
+
+**เมื่ออัปเกรด:** อัปเดต procedures/adapters, tooling, hooks, tests และ registry พร้อมกัน ใส่ `--root .` ให้ workflow/catalog checks ของ Lean เอง เก็บ target registrations และ records ไว้ คำสั่งนี้ไม่ลบ workflow files ที่เคยติดตามใน application อยู่แล้ว
+
+</details>
 
 ## 3.4.0
 
-### Workflow takeover
+Add `/lean-takeover-workflow` for moving an existing project's workflow into Lean. It audits the current setup, resolves migration decisions, previews a plan, and uses external snapshots for apply, resume and rollback. It also supports explicitly approved `casetodian-v1` queue/tracker conversions without losing original records.
 
-- Add `/lean-takeover-workflow "<target path>"` with a shared procedure and Codex adapter. Audit the complete authorized workflow, ask adaptive Grill questions for material user decisions, and map old requirements/documents into Lean ownership before presenting an exact migration plan.
-- Add external-session tooling for inventory/full-read attestations, release-registry baseline drafts, checked external staging, exact-plan approval, journaled apply/resume and guarded rollback. Preserve dirty/untracked originals and permission bits; reject private paths, nested repositories, source project capabilities, live Lean claims and stale revisions. APPLIED still needs target validation and HIGH independent review.
-- Expand adapter parity and command visibility checks to twelve shared skills and six user commands. Add takeover behavior/recovery tests and usage/ownership guidance. The global Grill procedure is unchanged; additional decision depth applies to takeover.
+**Upgrade:** update portable assets, registry, tooling, tests and adapters together. Preserve project additions, checks, configuration, records, custom skills and permissions. Takeover runs only when requested; applied migrations still need the target gate and an independent HIGH review.
 
-- Support explicit lossless `casetodian-v1` queue/tracker conversion with accepted mapping decisions, inert originals, trusted staged record validation, and journaled recovery. Preserve existing Lean record guards and reserve cancelled queue IDs without inventing DONE evidence.
+<details>
+<summary>ภาษาไทย</summary>
 
-### Upgrade from 3.3.x
+เพิ่ม `/lean-takeover-workflow` สำหรับย้าย workflow ของโปรเจกต์เดิมมาใช้ Lean โดยตรวจ setup เดิม สรุปเรื่องที่ต้องตัดสินใจ เสนอแผน และใช้ snapshots ภายนอกสำหรับ apply, resume และ rollback รองรับการแปลงคิวกับ tracker แบบ `casetodian-v1` ที่อนุมัติชัดเจน โดยเก็บ records ต้นฉบับไว้
 
-Update portable assets, the new `.lean/assets.json` release registry, tooling/tests and all matching adapters together. Preserve project additions, facts/gate, configuration, records, custom skills/agents and runtime permissions. No migration sessions or task records are shipped. Takeover is an explicit target operation; upgrading Lean does not run it or alter global skill discovery.
+**เมื่ออัปเกรด:** อัปเดต portable assets, registry, tooling, tests และ adapters พร้อมกัน เก็บ project additions, checks, configuration, records, custom skills และ permissions ไว้ takeover ทำเมื่อร้องขอเท่านั้น และหลัง apply ยังต้องผ่าน gate ของ target กับ independent HIGH review
+
+</details>
 
 ## 3.3.0
 
-### Guard enforcement
+Tighten existing checks so invalid records and unsafe paths cannot slip through.
 
-Existing rules now hold where tracker layout, CLI input or filesystem paths could bypass them.
-The rules are unchanged; their enforcement is stricter.
+- DONE trackers must have no open acceptance or task checkboxes, including those under subheadings.
+- Reject multiline tracker titles/evidence and ambiguous agent IDs.
+- Refuse symlinked workflow-state paths and detect changes in untracked files when checking gate caches.
 
-- DONE counts every unchecked checkbox under Acceptance criteria/Tasks headings at any level,
-  including subheadings, suffixed headings, other bullet styles and items without an
-  `AC-`/`TASK-` id. Checkboxes in other sections and inside code fences still do not count.
-  Before upgrading, check or remove open boxes in DONE trackers: `check` now reports them.
-- `tracker new --title` and `tracker status --evidence` must be single lines, so CLI text
-  cannot add a second `Status:` line or a forged Evidence section.
-- Agent ids with surrounding whitespace are rejected at claim time, and claim validation
-  compares trimmed ids, so one agent cannot hold two claims as `A` and `A `.
-- Workflow paths (config, `.gitignore`, runtime leases, tracking and queue) must not be
-  symlinks; the CLI refuses to lock or mutate through them.
-- The Quality Gate frames each untracked file by name and checksum, so redistributing bytes
-  between untracked files invalidates a passing cache.
-- Add regression tests for each guard and one end-to-end mode lifecycle test.
+**Upgrade:** review open checkboxes in DONE trackers and check workflow-state paths before running the stricter checks.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+เพิ่มความเข้มงวดให้ checks เดิม เพื่อไม่ให้ records ที่ไม่ถูกต้องหรือ paths ที่ไม่ปลอดภัยหลุดผ่าน
+
+- tracker ที่เป็น DONE ต้องไม่มี acceptance หรือ task checkboxes ค้างอยู่ รวมถึงหัวข้อย่อย
+- ไม่รับชื่อ tracker หรือ evidence หลายบรรทัด และ agent IDs ที่กำกวม
+- ไม่ยอมเขียนผ่าน workflow-state paths ที่เป็น symlinks และตรวจการเปลี่ยนไฟล์ untracked ก่อนใช้ gate cache
+
+**เมื่ออัปเกรด:** ตรวจ checkboxes ที่ยังเปิดใน DONE trackers และ paths ของ workflow state ก่อนรัน checks ที่เข้มงวดขึ้น
+
+</details>
 
 ## 3.2.0
 
-### User command entrypoints
+- Add user entrypoints for setup, tasks, model research, prose compression and queue cleanup, with shared Claude/Codex procedures.
+- `/lean-compress` previews wording changes within an approved scope. `/lean-model-update codex|claude|all` previews project catalog updates; neither silently changes runtime settings or authorizes paid use.
+- `/clean-queue old` archives DONE items older than 30 days; `all` archives every DONE item. Unfinished items and trackers stay in place, and archived dependencies remain valid.
 
-- Expose five Claude commands for users: init, task, model update, compression and queue cleanup. Keep six agent procedures available internally with `user-invocable: false`.
-- Document Codex skill invocation and its menu-visibility limitation; no custom-prompt installation. Add public argument hints and explicit preview-only queue arguments.
+**Upgrade:** update cleanup tooling and procedures before archiving so all workers can resolve history. Stop old workers and retain history in version control. Undated DONE items are skipped by `old` and can be archived by `all`. The command was renamed in 4.0.0.
 
-### Clarity-preserving workflow compression
+<details>
+<summary>ภาษาไทย</summary>
 
-- Add `/lean-compress` with a shared Claude/Codex procedure, complete-workflow read coverage, default preview and approved-scope prose edits. Preserve operational meaning, protected content, project additions and existing work; do not compress executable code or history.
-- Document usage and add adapter presence/target tests. Creating the skill does not compress the workflow.
+- เพิ่มคำสั่งสำหรับ setup งาน การค้นข้อมูลโมเดล การย่อข้อความ และการล้างคิว โดยใช้ procedures ร่วมกันใน Claude/Codex
+- `/lean-compress` เสนอการแก้ถ้อยคำในขอบเขตที่อนุมัติ ส่วน `/lean-model-update codex|claude|all` เสนอการอัปเดต catalog ของโปรเจกต์ ทั้งสองไม่เปลี่ยน runtime settings หรืออนุมัติค่าใช้จ่ายเอง
+- `/clean-queue old` เก็บ DONE items ที่เก่ากว่า 30 วันเข้าประวัติ ส่วน `all` เก็บ DONE items ทั้งหมด งานที่ยังไม่เสร็จและ trackers ยังคงอยู่ และ dependencies ที่อ้างประวัติยังใช้ได้
 
-### Project model research tooling
+**เมื่ออัปเกรด:** อัปเดต cleanup tooling และ procedures ก่อน archive เพื่อให้ workers ทุกตัวอ่าน history ได้ หยุด workers รุ่นเก่าและเก็บ history ใน version control DONE items ที่ไม่มีวันที่จะถูกข้ามโดย `old` แต่ archive ด้วย `all` ได้ คำสั่งนี้เปลี่ยนชื่อในรุ่น 4.0.0
 
-- Add `/lean-model-update codex|claude|all`, a shared scope/research/grill procedure and Codex adapter, plus offline catalog check/preview/apply tooling.
-- Preview is the default. Explicit proposal authorization updates only project evidence; runtime model settings, paid usage permissions and reviewer inheritance are unchanged.
-- Add fixture-based tests for evidence freshness, observed availability, proposal/base integrity, atomic failure recovery and adapter parity. Preserve optional project catalogs on import/upgrade; no live model catalog ships with the template.
-
-
-Queue-only cleanup with retained history. `/clean-queue old` archives DONE items completed
-strictly more than 30 days ago; `/clean-queue all` archives every DONE item. READY/BLOCKED
-items and trackers stay in place. The ninth shared procedure has a matching Codex adapter.
-
-- The CLI supports `clean-queue old|all --dry-run|--apply`, with read-only preview and shared
-  lock/revalidation for apply. No background cleanup or automatic commit/push.
-- New queue completions record `completed_at` in UTC. Existing undated DONE items remain
-  compatible: old reports/skips them, all can archive them. Never infer age from mtime.
-- Each history snapshot retains original JSON bytes (including custom fields), SHA-256,
-  archive timestamp and selection. Dependency and tracker validation resolve history;
-  queue list/claims exclude it. `queue history [--id QNNNN]` browses retained snapshots,
-  including after a mode downgrade. History is project-owned and has no expiry.
-- Archive publication and filesystem sync precede source deletion. Identical leftover source
-  copies are recovery state, not new work; retry finishes deletion. Changed duplicate IDs or
-  damaged history fail validation. Batches are recoverable per item, not all-or-nothing.
-- Update tooling, procedures/adapters and checks together before cleanup; old tools cannot
-  resolve archived dependencies. Stop old-version workers and retain history in version control.
+</details>
 
 ## 3.1.0
 
-Explicit, record-preserving mode downgrades: `full -> tracker`, `tracker -> standard`, and
-`full -> standard`. Use `downgrade <mode> --dry-run` for a read-only JSON report and `--apply`
-for an atomic configuration change. Both report blockers; exit 2 means refused or blocked.
+Add explicit mode downgrades without deleting work records. Preview with `downgrade <mode> --dry-run`; use `--apply` after resolving blockers.
 
-- Active leases block all downgrades. IN_PROGRESS, VALIDATING and REVIEWING trackers block
-  standard mode. `--keep-pending` explicitly acknowledges paused queue items and, when moving
-  to standard, PLANNED/BLOCKED/FAILED trackers. Records, IDs, evidence, expired leases,
-  execution routing and project config extensions remain intact. No automatic DONE or deletion.
-- Configure still refuses implicit downgrades. Upgrade validation checks retained records before
-  publishing the higher mode; a DONE tracker with unfinished queue items must be reconciled
-  before returning to full (reopen its tracker, or resolve its queue with real evidence).
-- Configure, downgrade and worker operations share the queue lock, and worker mode checks run
-  after acquiring it. Preview never creates a lock or expires claims; without an existing lock,
-  its snapshot is advisory. Apply always locks and rechecks the current state.
-- Templates still ship unconfigured standard/direct with no project records. Existing projects
-  need no config migration; update tooling, docs and tests together and run their actual gate.
+- Active claims block every downgrade. Active trackers block a move to `standard`.
+- `--keep-pending` explicitly acknowledges paused unfinished work. Existing records, IDs, evidence and execution settings stay intact.
+- Configure no longer permits an implicit downgrade; upgrades validate retained records too.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+เพิ่มการลดระดับโหมดอย่างชัดเจนโดยไม่ลบบันทึกงาน ดูแผนด้วย `downgrade <mode> --dry-run` และใช้ `--apply` หลังจัดการสิ่งที่บล็อกแล้ว
+
+- claims ที่ยังใช้งานบล็อกการลดทุกโหมด และ trackers ที่กำลังทำบล็อกการย้ายไป `standard`
+- `--keep-pending` ใช้ยืนยันการพักงานที่ยังไม่เสร็จ โดยคง records, IDs, evidence และ execution settings ไว้
+- configure ไม่ยอมลดโหมดโดยปริยายแล้ว และการอัปเกรดตรวจ records ที่เก็บไว้ด้วย
+
+</details>
 
 ## 3.0.0
 
-The reusable Claude/Codex extensions now ship in the template. This is a MAJOR because canonical authority, model/review policy and setup behavior change.
+Make Lean a shared Claude/Codex workflow with project-controlled ownership.
 
-- AGENTS is the provider-neutral canonical contract; CLAUDE imports it. The project chooses ownership. Eight shared skills have eight Codex adapters, including init/gate parity. Scope/research/grill and Controller/worker procedures are portable; no product stack, primary provider or volatile model IDs ship.
-- Config separates standard/tracker/full modes from direct/delegated execution. The fresh template is unconfigured standard/direct and contains no trackers, queue items or runtime leases. Unix mode/claim tooling preserves existing records and rejects implicit downgrades. Missing config prompts setup rather than silently skipping onboarding.
-- Portable least-cost-capable model/effort selection replaces the historical strongest-reviewer mandate. Premium dispatch needs task-specific cheaper-option evidence; paid usage still requires authorization. HIGH independent review is mandatory even when a reviewer is unavailable (report BLOCKED).
-- Structural checks cover both entrypoint imports, active canonical HIGH-review/model routing, both skill trees, eight adapters and relative targets. Git-visible Markdown scanning handles whitespace and excludes ignored dependencies. Before repair, seven new structure regression checks failed against the previous guard.
-- Duplicate tracker IDs are rejected in tracker and full checks; FAILED is a valid tracker state. Before repair, duplicate-ID cases passed check and FAILED was rejected by the CLI; new regression tests demonstrate both. Mode/claim tests exercise temporary repositories, including stable request receipts, ownership and completion evidence.
-- Workflow notice is preserved under `.lean/LICENSE`; root project licenses need not be overwritten on import. Current customizing/upgrade guidance replaces project-specific historical extension notes. Merge-debris ignore patterns remain, with lease/Python runtime exclusions added. Support is macOS/Linux/WSL (Bash, Git, Python 3.9+, Unix fcntl); native Windows and hosted/live runtime discovery are not claimed from local tests.
-- CI runs ShellCheck, structure, hook tests, mode checks and Python regression tests. PROJECT gate matches these commands; application gates remain project-owned.
-- Independent review caught two additional regressions before release: the installed smoke test assumed the host still had unconfigured template defaults, and completion allowed an unfinished dependency added after claim. Regression tests first failed on both. Smoke fixtures now isolate reusable assets and preserve configured hosts/licenses/records; completion rechecks current dependencies without losing a refused claim, and DONE dependencies are validated by check.
+- `AGENTS.md` becomes the canonical contract; `CLAUDE.md` imports it. Shared procedures cover scope, research, planning, delegation, review and gates.
+- Separate `standard` / `tracker` / `full` record keeping from `direct` / `delegated` execution. New templates start unconfigured in `standard` / `direct`.
+- Choose the least costly capable model and effort for each task, replacing the earlier strongest-reviewer rule. Required HIGH independent review remains mandatory; report `BLOCKED` if unavailable.
+- Preserve project records and licenses, reject duplicate tracker IDs, accept FAILED trackers, and recheck dependencies before completing queue work.
+- Support macOS, Linux and WSL with Bash, Git and Python 3.9+. Native Windows is unsupported.
 
 ### Migrating from 2.x or local extensions
 
-Before replacement, preserve existing CLAUDE/AGENTS additions, PROJECT, config, settings, records and local extensions. Move shared CLAUDE rules to AGENTS; make CLAUDE import it while preserving runtime-specific additions. Compare customized entrypoints rather than overwriting them. Keep configured tracker/full mode and all work records. If config has no execution field, direct is the compatibility default; projects with accepted mandatory delegation explicitly select delegated. Do not import another project's tasks or reset existing config to this template's unconfigured file.
+Preserve entrypoint additions, PROJECT, config, permissions, records and local extensions before replacement. Move shared rules from CLAUDE into AGENTS, then make CLAUDE import it while keeping runtime-specific additions. Reconcile customized files instead of overwriting them.
 
-Update shared skills and adapters, policy, hooks, tooling/templates/tests and workflow CI together; merge gitignore/settings and retain the workflow notice. Read CUSTOMIZING.md, fill actual project commands, run its Quality Gate and required independent review. Legacy CLAUDE authority is tolerated by the structure guard during migration; two competing contracts are not.
+Keep existing modes and work records. Missing execution settings default to `direct`; select `delegated` explicitly where required. Update shared procedures/adapters, policy, hooks, tooling, templates, tests and workflow CI together. Retain `.lean/LICENSE`, merge settings/gitignore and run the actual project's checks and required review.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+ปรับ Lean ให้เป็น workflow ร่วมของ Claude/Codex และให้โปรเจกต์กำหนดผู้รับผิดชอบเอง
+
+- ใช้ `AGENTS.md` เป็น contract หลัก และให้ `CLAUDE.md` import รองรับ scope, research, planning, delegation, review และ gates ผ่าน procedures ร่วมกัน
+- แยกการเก็บบันทึกแบบ `standard` / `tracker` / `full` ออกจาก execution แบบ `direct` / `delegated` โดย template ใหม่เริ่มแบบยังไม่ตั้งค่าใน `standard` / `direct`
+- เลือกโมเดลและ effort ที่ประหยัดที่สุดแต่ทำงานได้ตามคุณภาพ แทนกติกาเดิมที่ใช้ reviewer เก่งที่สุดเสมอ HIGH independent review ที่จำเป็นยังข้ามไม่ได้ หากใช้ไม่ได้ให้รายงาน `BLOCKED`
+- เก็บ records และ licenses ของโปรเจกต์ ปฏิเสธ tracker ID ซ้ำ รองรับ FAILED trackers และตรวจ dependencies ใหม่ก่อนจบงานคิว
+- รองรับ macOS, Linux และ WSL ด้วย Bash, Git และ Python 3.9+ ไม่รองรับ native Windows
+
+**ย้ายจาก 2.x หรือ workflow ที่ปรับเอง:** เก็บ entrypoint additions, PROJECT, config, permissions, records และ local extensions ก่อนแทนไฟล์ ย้าย shared rules จาก CLAUDE เข้า AGENTS แล้วให้ CLAUDE import โดยเก็บส่วนเฉพาะ runtime ไว้ รวมไฟล์ที่ปรับเองอย่างระมัดระวัง
+
+เก็บโหมดกับบันทึกงานเดิม หากไม่มี execution setting จะใช้ `direct` โปรเจกต์ที่ต้อง delegate ต้องเลือก `delegated` ชัดเจน อัปเดต procedures/adapters, policy, hooks, tooling, templates, tests และ workflow CI พร้อมกัน เก็บ `.lean/LICENSE` รวม settings/gitignore และรัน checks จริงกับ review ที่จำเป็นของโปรเจกต์
+
+</details>
 
 ## 2.4.0
 
-The Quality Gate tells a missing tool apart from a failing check. Both block; only one of them is
-about the change.
+The gate distinguishes a missing tool from a check that ran and failed. Both block completion, but the message now tells you whether to fix the environment or investigate a failure.
 
-- `quality-gate.sh` printed one verdict for every non-zero exit: `Quality Gate failed: <cmd>`, then
-  "If your change caused this, fix it. If it was already failing or is outside the task, do not touch
-  it: report BLOCKED and ask." Under that wording a command the shell never found reads as a check
-  that ran and said no, so the agent reports `BLOCKED` over a diff with nothing wrong with it.
-  Verified on the container Claude Code on the web runs in, which ships no `shellcheck` while
-  `shellcheck` is the first gate command in this repository's `.lean/PROJECT.md`: exit 2,
-  `shellcheck: command not found`, on every turn that touched a file.
-- Exit 127 from a bare command name now reports `Quality Gate could not run: <cmd>` and names the
-  tool, the environment, and the report it wants: `BLOCKED`, naming the gate command that could not
-  run and the check the change is therefore unverified by. It still exits 2, and the skip cache and
-  the `.claude/.gate-failed` marker treat it as the refusal it is. A message that let the turn finish
-  would be the fail-open, not the fix: a gate that could not run has not passed.
-- Three things have to hold before the gate blames the environment: exit 127, a lookup word that is a
-  plain command name, and that name failing to resolve here. Each is there because the simpler rule
-  before it was wrong about a shape a real gate block contains, and each was caught by review rather
-  than reasoned out in advance. Shape alone was wrong for wrappers: 127 travels up from the program a
-  wrapper ran, so `bash lint.sh` whose script calls a tool the diff never added exits 127 with bash
-  plainly installed, and the first attempt called that an environment problem and named bash as the
-  tool to install. The lookup alone was wrong for quoting: the `VAR=VALUE` strip is a regex over the
-  line, so `FOO="a b" cmd` leaves `b"` as the word to look up, nothing resolves a fragment, and the
-  wrapper case came back exculpated one quoted assignment later. And the status is not optional
-  either: in `optional-linter ; pytest` the word that did not resolve is not the word that decided
-  the verdict,
-  so without that condition the excuse would bury a real test failure. It settles a compound line
-  only when the deciding command's status is not 127; one that ends in 127 anyway is still
-  attributed to its first word, which the paragraph below records.
-- A word holding a slash names a file this repository points at, so a gate line whose script is
-  missing stays an ordinary failure -- as does 126 (found, will not execute; usually an exec bit
-  missing from the diff), and every other status. A word opening with a dash is an option, and an
-  option is nobody's package to install: a gate command wrapped over two lines hands the extractor
-  its continuation as a command of its own, and an indented `-x ...` reaches the shell as a command
-  word and exits 127, so before the name had to start like a name the gate asked for `-x` to be
-  installed. The same line unindented exits 2 instead, rejected as bash's own invocation option,
-  which is why the case pinning this one is indented. Leading `VAR=VALUE` words are stepped over,
-  or the verdict would turn on whether `CI=1` resolves as a command, which nothing does. Everything
-  unclear
-  takes the ordinary message, which sends the agent to look, because "not your change" is the verdict
-  that can wave a real failure through.
-- `test-hooks.sh` is now 55 checks. Three are the regression proper and fail against the 2.2.0 hook
-  (2.3.0 left `quality-gate.sh` untouched, so that is the revision before this one):
-  a missing program must say the gate could not run, must name the environment, and must not carry
-  the "If your change caused this" line. The rest pin what must not move, one case per shape that got
-  a condition wrong -- the wrapper, the quoted assignment, the compound line, the wrapped gate
-  command's continuation, the script named by path, and a command that exists and fails -- and every
-  term of the classification is pinned on its own: remove the status test, either half of the
-  command-name test, the resolve test or the assignment strip and a check fails. The missing-tool
-  branch is asserted to record the refusal the way the other branch does, with its fixture seeded
-  first; without a cache to clear, the half of that assertion covering the cache passes whatever the
-  hook does.
+Gate commands must still propagate their own failures. A command that masks an error can appear successful to the runner.
 
-One fail-open this does not close: a gate command that swallows its own 127 still passes. `test -z
-"$(gofmt -l .)"` with no `gofmt` prints the shell's complaint inside the substitution and then tests
-an empty string, and that is the shape `.lean/PROJECT.md` recommends for formatters. A pipeline
-masks it the same way, since the status is the last stage's. The hook reads the status of the command
-it was given, and the status is 0. Judging the output instead would block a turn on any gate command
-that merely prints those words, which in a downstream install is every turn,
-so closing it needs its own evidence rather than a guess bolted onto this one. A related limit,
-on attribution rather than on the verdict: when a compound line reaches 127 through a fallback --
-`lean-optional || bash lint.sh`, where what is absent is the wrapper's own inner tool -- the excuse
-attaches to the first word and can cover a check that did fail. It still blocks, and nothing outside
-the command can say which stage produced the status.
+<details>
+<summary>ภาษาไทย</summary>
 
-**Upgrading:** no steps. The gate blocks the same states it blocked before; one of them now explains
-itself differently.
+gate แยกได้ว่าเครื่องมือที่ต้องใช้หายไป หรือ check รันแล้วไม่ผ่าน ทั้งสองกรณียังบล็อกการจบงาน แต่ข้อความช่วยให้รู้ว่าควรแก้ environment หรือตรวจสาเหตุที่ check ล้มเหลว
+
+คำสั่งใน gate ยังต้องส่งสถานะล้มเหลวออกมาเอง หากคำสั่งกลบ error ไว้ runner อาจเห็นว่าเป็นการรันสำเร็จ
+
+</details>
 
 ## 2.3.0
 
-`MODELS.md` has put the strongest model on `HIGH` risk review since the rule was written, and
-nothing ever did it. `.claude/agents/reviewer.md` is `model: inherit` and no spawn site named a
-model, so the rule was a no-op that announced nothing: a session on a fast model spawned a reviewer
-on that same fast model for `HIGH` risk work, and the result reported review at `HIGH` depth --
-true about the depth, silent about the reviewer. The evidence is structural and was checked on this
-repository before the fix: `/lean-task` step 5, `/lean-review` step 4 and `CLAUDE.md`'s reviewer
-line contained no mention of a model, and the new structure check below fails on all three of them
-at the parent commit. For the absence half of that claim a scan is stronger than a run: no file
-named a model, so the behavior could not have occurred. The enforcing half was run rather than
-reasoned about -- this change's own `HIGH` review spawned the `reviewer` subagent with an explicit
-model override, so the primary instruction is followable and not merely aspirational, and the
-frontmatter's `model: inherit` is exactly what that spawn overrode.
+Make the existing reviewer-model rule apply at dispatch instead of silently inheriting the session model. At this release, HIGH review explicitly requested the strongest available model and disclosed when the reviewer ran on a weaker one. Version 3.0.0 later replaced this with capability-based model selection.
 
-- `/lean-review` step 4 and `/lean-task` step 5 spawn the reviewer on the strongest model available
-  to the session. `CLAUDE.md` carries the same instruction, because it sends an agent to the
-  reviewer without going through either skill -- the same reason it carries the round bound inline.
-- Where the reviewer did not run on the strongest model available, the result says so. The report
-  is conditioned on that outcome rather than on whether the model could be chosen: a session
-  already running the strongest model inherits it and loses nothing, so reporting an inherited
-  model as weaker would state something untrue. What is worth surfacing is the case this entry is
-  about -- a reviewer no stronger than the author.
-- `.claude/agents/reviewer.md` keeps `model: inherit`. Pinning the frontmatter would enforce the
-  rule in one line and would break every install whose plan does not carry that model, in a
-  repository whose whole purpose is to be copied into other projects. The frontmatter stays the
-  fallback; the spawn site is where a model that depends on the session belongs.
-- `.lean/scripts/check-structure.sh` fails if any of those three spawn sites stops naming the rule.
-  A rule written in `policy/` and wired nowhere is exactly the failure above, and prose is the only
-  place it can be wired, so a structural check is the only thing that holds it. The check reads the
-  three known spawn sites by path and skips a file that no longer names the `reviewer` subagent in
-  its code-span form: it is a gate command in every install, and the bare word is ordinary domain
-  vocabulary, so guarding on it would block every turn in a project that dropped the bullet and
-  writes about reviewers for any other reason. The anchor is the rule's phrase anywhere in the
-  file rather than on the spawn line, because in `/lean-review` the two sit on different lines of
-  wrapped prose: it catches the instruction being deleted, not a file that keeps the phrase
-  elsewhere while dropping the instruction.
+<details>
+<summary>ภาษาไทย</summary>
 
-Review depth, risk rules, the round bound and the reviewer's own instructions are unchanged. MINOR
-rather than MAJOR: the rule did not change, its enforcement did.
+ทำให้กติกาเลือกโมเดล reviewer มีผลตอนส่งงานจริง แทนการใช้โมเดลจาก session โดยเงียบ ๆ ในรุ่นนี้ HIGH review ระบุโมเดลที่เก่งที่สุดที่ใช้ได้อย่างชัดเจน และรายงานเมื่อ reviewer ใช้โมเดลที่อ่อนกว่า ต่อมาใน 3.0.0 เปลี่ยนเป็นการเลือกตามความสามารถที่งานต้องใช้
+
+</details>
 
 ## 2.2.0
 
-Review rounds are bounded. From this repository's own five-round run on one change, counted against
-the branch rather than recalled: rounds 1 to 3 each returned `REWORK`, round 4 was the first
-independent look at the regression fix and found seven things, round 5 found the fail-open described
-below. One round followed a `PASS`, not two.
+Bound review cycles so repeated fixes cannot extend one task indefinitely.
 
-- A review cycle covers one Task Contract, and a change counts toward the cap when its motivation is
-  a finding from that cycle's review. The most expensive round in that run came from taking on a
-  second task mid-cycle: its new code introduced a regression that reopened the loop for the first
-  task, and findings stopped mapping to a change. This rule separates the two, it does not shorten
-  either.
-- After the second `REWORK` on one contract, the cycle gets one last pass over the delta that fixes
-  those findings, then stops. A capped cycle still holding a `REWORK` is `BLOCKED`, never `DONE`: a
-  delta no reviewer has seen cannot satisfy condition 4 in `QUALITY.md`. Without that last pass a
-  capped cycle would always ship its final fix unreviewed, and on this branch every round found
-  something real in the previous round's fix, four times out of four.
-- A `PASS` ends the review, and anything applied afterwards is new work with its own contract line.
-  There is no carve-out for small fixes. Four were tried here and each one failed. "Cheap and clearly
-  right" was unbounded, and on this branch that licence produced a real defect: round 4 passed, its
-  seven advisory findings were applied, and one of them swapped a filesystem `grep -I` for
-  `git grep -I`. Filesystem `grep` reads binary-ness from content; `git grep` honours
-  `.gitattributes`, so a repository setting `*.md binary` skipped every markdown file while the scan
-  reported clean -- a fail-open in a gate command every project runs on every turn. Round 5 caught
-  it, and an unbounded rule means round 5 never happens, which makes this the rule that removes a
-  round rather than the one above. Borrowing `WORKFLOW.md`'s trivial test failed the other way: it
-  requires `LOW` risk and `CONTRACTS.md` makes every change inside a high-risk area `HIGH`, so it
-  forbade fixing a typo in this file. "Comment or prose text" reopened the first hole, because the
-  rules an agent follows are prose and `.lean/policy/` holds nothing else. Conditioning the prose
-  half left the comment half: rewording the `<!-- gate:start -->` marker in `.lean/PROJECT.md` is a
-  comment edit that turns the `Stop` hook into a silent no-op, verified. The carve-out went instead
-  of gaining a fifth wording. What that costs depends on where the fix lands: where `WORKFLOW.md`'s
-  trivial test can be met it is one contract line and no review, and inside a high-risk area it
-  cannot be met at all, so a typo in one of these policy files costs a full `HIGH` cycle. That is the
-  price of the area rather than of this rule -- the same price the borrowed trivial test charged --
-  and it buys a rule with no wording left to argue with.
+- One cycle covers one Task Contract and its review-driven fixes.
+- After the second `REWORK`, allow one final repair/review pass. Unresolved findings end as `BLOCKED`.
+- `PASS` ends the cycle. Later changes need their own contract, and review must cover the actual shipping changes.
 
-Run the corrected history through all three rules and the layout change is two `REWORK` rounds and
-then a confirm pass, with the gate fix as its own short cycle. Round 3 found something real in round
-2's fix, so that confirm pass plausibly returns `REWORK` too: three rounds ending `BLOCKED`, handed
-to the user. That is the honest projection, not two rounds and done.
+<details>
+<summary>ภาษาไทย</summary>
 
-`REVIEW.md` has a `Rounds` section; `CLAUDE.md` carries both halves of the bound inline, because it
-sends an agent to the `reviewer` subagent without going through the skill; `/lean-review` step 5
-cites the section from the `PASS` and `REWORK` branches rather than restating it; `RECOVERY.md` lists
-the capped case under `Blocked`, and `WORKFLOW.md` routes to the section. `QUALITY.md` condition 4
-and `/lean-gate` now ask that review covered the delta that ships, not only that it ran at the right
-depth -- `DONE` is decided on that path, and it does not read `REVIEW.md`. The round count goes in
-the Result Contract's Evidence together with the range that review covered against the range that
-ships, which `QUALITY.md` condition 4 now asks about. The pull request template prompts for both, so
-they travel with the branch and a fresh session can recover them. Review depth is unchanged.
+จำกัดรอบรีวิว เพื่อไม่ให้การแก้ซ้ำยืดงานเดิมออกไปไม่สิ้นสุด
+
+- หนึ่งรอบกระบวนการครอบคลุมหนึ่ง Task Contract กับการแก้ตามผลรีวิวของงานนั้น
+- หลัง `REWORK` ครั้งที่สอง ให้แก้และรีวิวอีกได้หนึ่งรอบ หากยังมีประเด็นค้างให้จบด้วย `BLOCKED`
+- `PASS` จบรอบนั้น การเปลี่ยนภายหลังต้องมี contract ของตัวเอง และผลรีวิวต้องครอบคลุมเนื้อหาที่ส่งจริง
+
+</details>
 
 ## 2.1.0
 
-The Quality Gate no longer skips a turn just because the working tree is clean.
+Run the Quality Gate after committed changes too; a clean working tree alone no longer skips validation. SessionStart records a baseline, while failed checks remain refused across turns and sessions until resolved.
 
-- `quality-gate.sh` decided whether to skip by asking whether the tree was dirty. Committing makes
-  a tree clean, so an agent that changed files, committed them and ended its turn was never gated.
-  That is the normal shape of a headless or CI run, and this hook is the only rule in the workflow
-  that cannot be talked out of running. Verified before the fix, with a gate of `false`:
-  uncommitted changes exited 2, the same changes committed exited 0.
-- Skipping is now decided only by the recorded state, which already covered the commit, the
-  uncommitted diff and untracked content. The clean-tree shortcut sat two lines above that
-  comparison and returned before it was ever reached.
-- `quality-gate.sh --seed` records the state and runs nothing; `session-start.sh` calls it. Without
-  it, dropping the shortcut would make the gate run once per session even for a question that
-  touched no files. If the SessionStart hook does not fire, the gate runs once at the first turn
-  end rather than skipping -- the safe direction.
-- A refused verdict now outlives the turn. A failing run records the state in
-  `.claude/.gate-failed`, and seeding declines while that marker exists, so a new session cannot
-  bless work the gate has already refused. Without it, seeding undid the fix after any SessionStart,
-  and on a dirty broken tree it was worse than 2.0.0, which blocked. A passing run clears the
-  marker. The marker is local state and gitignored, so it does not travel between checkouts and
-  does not survive `git clean -xd`: after a clean, the next session starts with no memory of the
-  refusal.
-- `git ls-files --others -z | xargs -0 cat` in the state became a hazard once seed mode stopped
-  draining stdin: with no untracked files, GNU xargs points the child's stdin at /dev/null but BSD
-  xargs does not, so `cat` there would read the hook's own input. It is a read loop now.
-- `check-structure.sh` gained three guards for this machinery: the gate's state files must be in
-  `.gitignore` (otherwise each run's state includes the file the last run wrote and the gate never
-  settles), `--seed` must not appear in `.claude/settings.json` (wiring it to Stop disables the gate
-  in silence), and the retired-path scan now runs `git grep --untracked` rather than walking the
-  working tree, so a vendored or ignored file naming a retired path cannot block a downstream
-  project's every turn, while a new file a contributor has not staged yet is still covered. It
-  matches text rather than references, so a project that owns a directory by either name should
-  delete the check rather than satisfy it. `.gitignore` also covers `*.orig` and `*.rej` now: a
-  conflicted merge of this very move is how such a file appears, and scanning untracked content
-  would otherwise let it block the gate. The `.gitignore` entries are asked for by effect, via
-  `git check-ignore`, so any equivalent pattern passes -- and both that and the scan need a git
-  work tree, which the `npx degit` install route does not leave behind.
-- `test-hooks.sh` is now 33 checks. Test 5 asserted "clean tree skips", which was the bug itself; it
-  now asserts that committed work is gated. Every term of the state hash is covered: remove any one
-  of the five and a check fails. Both guards that keep a refusal from being skipped are pinned
-  separately, so removing either one fails a check even though the other would still hold.
-  Restoring 2.0.0's clean-tree shortcut fails six.
+**Upgrade:** resolve existing failing project checks. The corrected gate may now block work that earlier versions skipped.
 
-**Upgrading to this from 2.0.0 or earlier:** if your Quality Gate currently fails, the first turn
-after the upgrade will block, because the gate now runs on states it used to skip. `CLAUDE.md` tells
-the agent not to repair a failure it did not cause, so it will report `BLOCKED` rather than fix it.
-Clear the failure, or empty the gate block in `.lean/PROJECT.md`, before you start.
+<details>
+<summary>ภาษาไทย</summary>
+
+gate ตรวจงานที่ commit แล้วด้วย การที่ working tree สะอาดเพียงอย่างเดียวไม่ทำให้ข้าม validation อีกต่อไป SessionStart บันทึก baseline ส่วน checks ที่ล้มเหลวยังคงถูกปฏิเสธข้าม turn และ session จนกว่าจะแก้แล้ว
+
+**เมื่ออัปเกรด:** จัดการ project checks ที่ล้มเหลวอยู่ก่อน gate ที่แก้แล้วอาจบล็อกงานซึ่งรุ่นก่อนเคยข้ามการตรวจ
+
+</details>
 
 ## 2.0.0
 
-Every workflow path moved. Nothing about how work is done changed, but the versioning rule at the
-top of this file was widened in the same commit: moving files an existing install depends on now
-counts as MAJOR, which is what makes this 2.0.0 instead of a MINOR. An existing install needs the
-migration steps below.
-
-- `.agent/` is now `.lean/`: one namespace for the whole workflow, instead of rules in `.agent/`
-  and self-checks in `.github/`.
-- Self-checks left `.github/`, which now holds GitHub platform files only:
-  - `.github/lean-workflow/check-structure.sh` -> `.lean/scripts/check-structure.sh`
-  - `.github/lean-workflow/test-hooks.sh` -> `.lean/tests/test-hooks.sh`
-- `check-structure.sh` gained three checks:
-  - The scripts under `.lean/scripts/` and `.lean/tests/` are executable. This names a lost exec
-    bit on `test-hooks.sh` instead of leaving it to CI. `check-structure.sh`'s own exec bit is not
-    covered, because CI runs it by path and fails on permission before it can check anything.
-  - The workflow version is present in both `.lean/README.md` and `.lean/CHANGELOG.md` and agrees.
-    `.lean/PROJECT.md` is project-owned and free-form, so its version line is not read: a project
-    whose own `PROJECT.md` says `Current version: 1.2.3` must not fail the workflow's checks.
-  - `.agent/` and `.github/lean-workflow/` appear nowhere outside this file. Every text file is
-    scanned, and the scan fails if it cannot complete rather than reading as clean. This check
-    exists because the first attempt at this move left the root `README.md` pointing at both, and
-    all three gate commands passed anyway -- the path check had just been repointed at the new
-    namespace, so nothing was watching the old one.
-- `CONTRIBUTING.md` and `.github/pull_request_template.md` added. The PR template is the Result
-  Contract from `policy/CONTRACTS.md`, so the repository reports its own changes in the format it
-  asks for.
-- Zone names stay namespaced on purpose. A downstream project keeps its own `scripts/`, `tests/`,
-  `docs/`, and root `CHANGELOG.md`, with nothing to rename and nothing to merge.
-- Entries below describe the `.agent/` paths that were current when they were written. They are
-  left as written.
+Move the workflow into its own namespace: `.agent/` becomes `.lean/`, and self-check scripts move from `.github/lean-workflow/` into `.lean/scripts/` and `.lean/tests/`. Project-owned `scripts/`, `tests/`, `docs/` and root `CHANGELOG.md` stay separate.
 
 ### Migrating from 1.x
 
-Run these **before** the `Upgrading` steps at the bottom of this file, not after. `git mv .agent
-.lean` when `.lean` already exists does not fail: it nests the old tree at `.lean/.agent/`, your
-`PROJECT.md` is no longer at `.lean/PROJECT.md`, and the `Stop` hook then silently does nothing,
-because a missing `PROJECT.md` is a no-op by design.
+1. Move `.agent` to `.lean` **before** copying the new release. Moving it after `.lean` exists can create an unwanted `.lean/.agent/` directory.
+2. Move the structure script into `.lean/scripts/` and hook tests into `.lean/tests/`. Take the release's workflow-owned files together; compare local customizations before replacement.
+3. Update project-owned references, including PROJECT's gate commands, README, hook/script paths and CI filters. Merge runtime settings rather than replacing permissions.
+4. Check for leftover old paths and nested directories, then run structure checks and hook tests.
 
-1. `git mv .agent .lean`
-2. `mkdir -p .lean/scripts .lean/tests`, then `git mv` `check-structure.sh` into `.lean/scripts/`
-   and `test-hooks.sh` into `.lean/tests/`. Remove the empty `.github/lean-workflow/`.
-3. Take the workflow-owned files from the 2.0.0 release instead of editing them; they already use
-   the new paths. That is `.lean/README.md`, `.lean/CHANGELOG.md`, `.lean/policy/`,
-   `.lean/scripts/`, `.lean/tests/`, `.claude/hooks/`, `.claude/skills/lean-*/`,
-   `.claude/agents/reviewer.md`, and everything in `CLAUDE.md` above `## Project additions`.
-   Also `AGENTS.md`, unless you edited it. If you edited any of the others, diff before
-   overwriting. `.claude/settings.json` is not in this list: it names no retired path, and
-   `Upgrading` step 6 has you merge it by hand.
-4. Edit only what is yours. In `.lean/PROJECT.md` replace `.agent/` with `.lean/` and repoint the
-   two script paths, including the ones inside its Quality Gate block. Do the same in your own
-   `README.md` and any project file that named them.
-5. Update `.github/workflows/lean-workflow.yml`: the two script paths, the `shellcheck` glob, and
-   the `paths:` filters.
-6. Confirm nothing was left behind, then validate:
-   - `git grep -l -e '[.]agent/' -e '[.]github/lean-workflow/'` should list nothing but this file.
-   - `ls .lean/.agent` should say no such directory.
-   - `.lean/scripts/check-structure.sh` and `.lean/tests/test-hooks.sh` should both pass.
+<details>
+<summary>ภาษาไทย</summary>
+
+ย้าย workflow เข้าสู่ namespace ของตัวเอง: `.agent/` เปลี่ยนเป็น `.lean/` และย้าย self-check scripts จาก `.github/lean-workflow/` เข้า `.lean/scripts/` กับ `.lean/tests/` ส่วน `scripts/`, `tests/`, `docs/` และ root `CHANGELOG.md` ของโปรเจกต์ยังแยกกัน
+
+**ย้ายจาก 1.x:**
+
+1. ย้าย `.agent` เป็น `.lean` **ก่อน** คัดลอกรุ่นใหม่ หากมี `.lean` อยู่ก่อน อาจกลายเป็นโฟลเดอร์ซ้อน `.lean/.agent/`
+2. ย้าย structure script เข้า `.lean/scripts/` และ hook tests เข้า `.lean/tests/` ใช้ workflow-owned files ของรุ่นใหม่พร้อมกัน โดยเทียบส่วนที่ปรับเองก่อนแทนไฟล์
+3. แก้ references ของโปรเจกต์ ทั้ง gate commands ใน PROJECT, README, hook/script paths และ CI filters รวม runtime settings โดยเก็บ permissions เดิม
+4. ตรวจว่าไม่เหลือ paths เก่าหรือโฟลเดอร์ซ้อน แล้วรัน structure checks และ hook tests
+
+</details>
 
 ## 1.4.0
 
-Changes from dogfooding (a Go CLI, 5 headless runs). The Task Contract was never written, `TESTING.md` was never read, and policy files were rarely opened outside skills. Rules that work are the ones in `CLAUDE.md` and the hooks.
+- Require a one-line Task Contract before edits and regression tests that fail before a bug fix and pass afterward.
+- Load workflow internals only when needed and keep the main task procedure shorter.
+- Fix only gate failures caused by the task; report unrelated failures as `BLOCKED`. Gate commands must return a failure status when they fail.
 
-- `CLAUDE.md` now carries the critical rules inline:
-  - a one-line contract as the first line before changing files;
-  - regression tests for bug fixes, shown failing before the fix and passing after;
-  - no reading of workflow internals unless the task needs them.
-- The Task Contract is one line at every risk and quality level. In round 2 the one-liner was written in 4/4 runs; the full block added nothing.
-- `/lean-task` is shorter and loads policy files only when needed.
-- Gate failures: fix only what your change caused. Pre-existing or out-of-scope failures are reported as `BLOCKED`, never patched under hook pressure. In round 2 the Stop hook pushed Claude into editing an unrelated test file.
-- Gate commands must exit non-zero on failure. `/lean-init` and `PROJECT.md` say so, with the `gofmt` example.
-- README note on headless and CI use.
+<details>
+<summary>ภาษาไทย</summary>
+
+- กำหนด Task Contract หนึ่งบรรทัดก่อนแก้ไฟล์ และมี regression test ที่ล้มเหลวก่อนแก้ bug แล้วผ่านหลังแก้
+- อ่าน workflow internals เท่าที่งานต้องใช้ และย่อ procedure หลักให้สั้นลง
+- แก้เฉพาะ gate failures ที่เกิดจากงานนี้ ส่วนที่ไม่เกี่ยวข้องให้รายงาน `BLOCKED` คำสั่งใน gate ต้องคืนสถานะล้มเหลวเมื่อรันไม่ผ่าน
+
+</details>
 
 ## 1.3.0
 
-- Self-checks for the workflow files in `.github/lean-workflow/`:
-  - `test-hooks.sh` — Quality Gate and SessionStart hook behavior in throwaway git repos.
-  - `check-structure.sh` — referenced paths exist, settings valid, hooks executable, skill/agent frontmatter, gate markers.
-- CI `.github/workflows/lean-workflow.yml` runs ShellCheck and both scripts when workflow files change.
+Add workflow self-checks and CI: verify referenced paths, hook behavior, settings, executable scripts and skill metadata alongside ShellCheck.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+เพิ่ม self-checks และ CI ของ workflow เพื่อตรวจ paths ที่อ้างถึง พฤติกรรม hooks, settings, สิทธิ์เรียก scripts และข้อมูลกำกับ skills ควบคู่กับ ShellCheck
+
+</details>
 
 ## 1.2.0
 
-- Policy files moved to `.agent/policy/`. `.agent/PROJECT.md` stays as the only project-owned file, so upgrades can replace `policy/` as a whole.
+Move shared policies into `.agent/policy/` so they can be upgraded together while preserving the project-owned `.agent/PROJECT.md`.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+ย้าย shared policies เข้า `.agent/policy/` เพื่ออัปเดตพร้อมกันได้ โดยเก็บ `.agent/PROJECT.md` ซึ่งเป็นข้อมูลของโปรเจกต์ไว้
+
+</details>
 
 ## 1.1.0
 
-- Claude-native layer in `.claude/`, pointing into `.agent/` with no rule duplication:
-  - `reviewer` subagent for independent `HIGH` review.
-  - Skills: `/lean-init`, `/lean-task`, `/lean-review`, `/lean-gate`.
-  - `SessionStart` hook suggests `/lean-init` while `PROJECT.md` is empty.
-  - Permissions: allow read-only git commands, deny reading `.env` files.
+Add Claude-native skills, an independent HIGH reviewer and onboarding hooks under `.claude/`, sharing the existing workflow rules. Default permissions allow read-only Git commands and deny reading `.env` files.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+เพิ่ม skills สำหรับ Claude, independent HIGH reviewer และ onboarding hooks ใน `.claude/` โดยใช้กติกา workflow เดิมร่วมกัน permissions เริ่มต้นอนุญาต Git แบบอ่านอย่างเดียว และไม่ให้อ่านไฟล์ `.env`
+
+</details>
 
 ## 1.0.0
 
-- Baseline #1: Task Contract, Quality Gate, risk-based testing and review, progressive context.
-- `CLAUDE.md` canonical, `AGENTS.md` adapter.
-- Defaults for quality, budget, and risk.
-- `Stop` hook Quality Gate driven by `PROJECT.md`.
+First baseline: Task Contracts, project-defined Quality Gates, risk-based tests and review, and context loaded as needed. `CLAUDE.md` is the canonical contract; `AGENTS.md` adapts it for other agents.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+baseline แรก: มี Task Contracts, Quality Gates ตาม checks ของโปรเจกต์ การทดสอบและรีวิวตามความเสี่ยง และการอ่าน context เท่าที่จำเป็น โดยใช้ `CLAUDE.md` เป็น contract หลัก และ `AGENTS.md` เป็นตัวปรับให้ agents อื่น
+
+</details>
 
 ## Upgrading
 
-Read the target release's migration entry first, especially when crossing a MAJOR. Current import/upgrade authority is documented in `.lean/CUSTOMIZING.md`; historical entries above describe the arrangements at that time.
+Read migration notes for every major version you cross, then follow [CUSTOMIZING.md](CUSTOMIZING.md) for the current process.
 
-1. Preserve project-owned PROJECT/config, records, local extensions and entrypoint additions.
-2. Upgrade policy/router/changelog, all shared skills and Codex adapters, hooks/reviewer, templates, tooling and installed self-tests together.
-3. Merge settings/gitignore/CI rather than replacing project permissions or application checks. Retain `.lean/LICENSE` and existing project licenses.
-4. Reconcile canonical ownership and project overrides explicitly; never silently reset mode, execution or primary agent.
-5. Run the actual project Quality Gate and workflow tests that remain installed. Complete required review over the final delta before reporting DONE.
+1. Preserve project facts, checks, configuration, records, local extensions and entrypoint additions.
+2. Update the workflow's shared files, skills, adapters, hooks, tooling, templates and tests together.
+3. Merge settings, gitignore and CI while keeping project permissions, application checks and licenses, including `.lean/LICENSE`.
+4. Reconcile ownership and overrides explicitly. Keep existing mode, execution and primary-agent choices unless you decide to change them.
+5. Run the actual project gate and installed workflow tests, then complete the required review over the final changes.
+
+<details>
+<summary>ภาษาไทย — การอัปเกรด</summary>
+
+อ่าน migration notes ของทุกรุ่น major ที่ต้องข้าม แล้วทำตาม [CUSTOMIZING.md](CUSTOMIZING.md) สำหรับขั้นตอนปัจจุบัน
+
+1. เก็บข้อมูลโปรเจกต์ checks, configuration, records, local extensions และ entrypoint additions ไว้
+2. อัปเดต shared files, skills, adapters, hooks, tooling, templates และ tests ของ workflow พร้อมกัน
+3. รวม settings, gitignore และ CI โดยคง permissions, application checks และ licenses ของโปรเจกต์ รวมถึง `.lean/LICENSE`
+4. สรุป ownership และ overrides ให้ชัด เก็บโหมด execution และ primary agent เดิม เว้นแต่จะตัดสินใจเปลี่ยน
+5. รัน gate จริงของโปรเจกต์กับ workflow tests ที่ติดตั้งไว้ แล้วทำ review ที่จำเป็นให้ครอบคลุมการเปลี่ยนแปลงสุดท้าย
+
+</details>
