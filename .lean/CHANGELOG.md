@@ -6,6 +6,29 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
+## 4.8.1 — 2026-10-19
+
+**Token highlight:** - · **Compared with:** -
+
+- Rewrite all 27 earlier release entries around what changed, its impact and any required upgrade steps. Remove long implementation stories and unnecessary experiment details.
+- Add a collapsed Thai translation to every release and the general upgrade guide.
+- Give token comparisons clear baselines and workload context. Show increased usage honestly, mark missing comparisons with `-`, and link to the original reports.
+
+**Upgrade:** update the documentation and baseline references together. No configuration, record or runtime migration is needed. This documentation patch adds no new token benchmark.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+- ปรับประวัติทั้ง 27 รุ่นก่อนหน้าให้เน้นสิ่งที่เปลี่ยน ผลต่อผู้ใช้ และขั้นตอนอัปเกรดที่จำเป็น ตัดเรื่องราวการแก้ภายในกับรายละเอียดทดลองที่ไม่จำเป็นออก
+- เพิ่มภาษาไทยแบบพับซ่อนในทุกรุ่นและคู่มืออัปเกรดโดยรวม
+- ระบุรุ่นที่ใช้เทียบกับขอบเขตการวัด token ให้ชัด บอกผลที่ใช้เพิ่มตามจริง ใส่ `-` เมื่อไม่มีข้อมูลเทียบ และเชื่อมไปยังรายงานต้นฉบับ
+
+**เมื่ออัปเกรด:** อัปเดตเอกสารและเลข baseline พร้อมกัน ไม่ต้องย้าย configuration, records หรือ runtime รุ่นนี้ปรับเอกสารและไม่มีการวัด token ชุดใหม่
+
+</details>
+
 ## 4.8.0 — 2026-10-19
 
 **Token highlight:** about **44% fewer than 4.4.0** and **52% fewer than 4.7.0** in the reported TCK303 replays: 20.0M tokens per run versus 35.4M and 41.8M. The budgeted setup had two unpaired runs; each baseline had four. This small sample does not isolate the causes of the saving.
