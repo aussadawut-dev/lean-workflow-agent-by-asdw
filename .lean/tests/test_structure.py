@@ -66,6 +66,36 @@ class StructureTests(unittest.TestCase):
         path.write_text(content[:start] + "requested model/effort=inherited/inherited" + content[end:])
         self.assertIn("inherited", self.check(False).lower())
 
+    def test_dispatch_requires_a_per_worker_budget(self):
+        path = self.root / ".lean/skills/lean-multi-agent/SKILL.md"
+        path.write_text(path.read_text().replace("about 50 turns", "as many turns as needed"))
+        self.assertIn("budget", self.check(False).lower())
+
+    def test_budget_cannot_remove_required_behavior_tests(self):
+        path = self.root / ".lean/skills/lean-multi-agent/SKILL.md"
+        path.write_text(path.read_text().replace("never removes required behavior tests", "may trim tests"))
+        self.assertIn("behavior tests", self.check(False).lower())
+
+    def test_spent_worker_is_redispatched_not_resumed(self):
+        path = self.root / ".lean/skills/lean-multi-agent/SKILL.md"
+        path.write_text(path.read_text().replace("Do not resume a worker that spent its budget", "Resume any worker"))
+        self.assertIn("instead of resuming", self.check(False).lower())
+
+    def test_codex_turn_cap_gap_stays_recorded(self):
+        path = self.root / ".lean/skills/lean-multi-agent/SKILL.md"
+        path.write_text(path.read_text().replace("has no per-spawn turn cap", "is capped"))
+        self.assertIn("codex", self.check(False).lower())
+
+    def test_controller_checks_a_worker_tree_before_accepting_it(self):
+        path = self.root / ".lean/skills/lean-multi-agent/SKILL.md"
+        path.write_text(path.read_text().replace("missing handoff report", "short handoff report"))
+        self.assertIn("handoff", self.check(False).lower())
+
+    def test_controller_keeps_its_own_claim_alive_while_workers_run(self):
+        path = self.root / ".lean/skills/lean-multi-agent/SKILL.md"
+        path.write_text(path.read_text().replace("heartbeat it before each dispatch", "leave it"))
+        self.assertIn("heartbeat", self.check(False).lower())
+
     def test_canonical_reviewer_routing_cannot_be_deleted(self):
         path = self.root / "AGENTS.md"
         lines = [line for line in path.read_text().splitlines() if "reviewer" not in line.lower() and "independent" not in line.lower()]
