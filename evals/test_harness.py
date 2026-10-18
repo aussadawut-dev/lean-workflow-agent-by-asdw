@@ -1,12 +1,15 @@
 """Grader and transcript tests on fake Claude stream-json and Codex exec --json sessions; no model calls."""
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 import cases
-from harness import CodexTranscript, Transcript, agent_command, build_fixture, changed_files, read_transcript
+from harness import (TURN_MARKER, CodexTranscript, Conversation, Transcript, agent_command, build_fixture,
+                     changed_files, read_transcript, run_agent)
 
 
 def assistant(*blocks, parent=None):
@@ -53,7 +56,11 @@ def codex_patch(ident, *paths, kind="update"):
 
 
 def rollout_spawn(task_name, fork_turns="none"):
-    arguments = json.dumps({"task_name": task_name, "fork_turns": fork_turns, "message": "gAAAA-encrypted"})
+    """A rollout spawn_agent call; fork_turns=None leaves the argument out, as an omitted default."""
+    fields = {"task_name": task_name, "message": "gAAAA-encrypted"}
+    if fork_turns is not None:
+        fields["fork_turns"] = fork_turns
+    arguments = json.dumps(fields)
     return json.dumps({"type": "response_item", "payload": {"type": "function_call", "name": "spawn_agent",
                                                             "arguments": arguments}})
 
@@ -337,7 +344,7 @@ class GraderTests(unittest.TestCase):
         self.assertEqual(grade(codex_session(text, rollout_spawn("review", "all"), rollout_spawn("Reviewer")),
                                self.root), [])
         forked = grade(codex_session(text, rollout_spawn("independent_review", "all")), self.root)
-        self.assertEqual(forked, ["reviewer was spawned with fork_turns=all, so it saw the author's reasoning"])
+        self.assertEqual(forked, ["reviewer was spawned with a forked history, so it saw the author's reasoning"])
         self.assertEqual(grade(codex_session(text, rollout_spawn("implement_owner")), self.root),
                          ["no `reviewer` subagent was dispatched"])
         self.assertTrue(grade(CodexTranscript(text), self.root)[0].startswith("HARNESS:"))
@@ -353,6 +360,324 @@ class GraderTests(unittest.TestCase):
         grade = cases.failing_test_before_fix("calc.py")
         self.assertEqual(self.check_codex(grade, order), [])
         self.assertTrue(self.check_codex(grade, [order[2], *order[:2], order[3]]))
+
+
+HIGH_CONTRACT = "Contract: risk=HIGH quality=HIGH acceptance=owner can delete"
+OWNER_FIX = 'def can_delete(user):\n    return user.get("role") in ("admin", "owner")\n'
+
+
+def gate_evidence(root, *args):
+    return subprocess.run([sys.executable, str(root / ".lean/scripts/gate_evidence.py"), "--root", str(root), *args],
+                          capture_output=True, text=True, check=True).stdout.strip()
+
+
+def record_receipt(root, contract=HIGH_CONTRACT, reviewer="reviewer subagent", verdict="PASS"):
+    gate_evidence(root, "record-review", "--contract", contract, "--reviewer", reviewer, "--verdict", verdict,
+                  "--evidence", "scope, round 1, no findings", "--state", gate_evidence(root, "state"))
+
+
+class FixtureCase(unittest.TestCase):
+    case = {}
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = build_fixture(Path(directory.name), self.case)
+
+    def check(self, grader, lines=()):
+        return grader(Transcript(list(lines)), self.root)
+
+    def write_auth(self, body=OWNER_FIX):
+        (self.root / "auth.py").write_text(body)
+
+
+class ReviewReceiptTests(FixtureCase):
+    case = {"high_risk": [("auth.py", "permission checks")]}
+
+    def test_a_pass_receipt_covering_the_final_state_passes(self):
+        self.write_auth()
+        record_receipt(self.root)
+        self.assertEqual(self.check(cases.review_receipt_final_state), [])
+
+    def test_no_receipt_fails(self):
+        self.write_auth()
+        self.assertTrue(self.check(cases.review_receipt_final_state)[0].startswith("no review receipt"))
+
+    def test_editing_after_the_reviewer_was_dispatched_makes_the_receipt_stale(self):
+        self.write_auth()
+        record_receipt(self.root)
+        self.write_auth(OWNER_FIX + "\n# late tweak\n")
+        failures = self.check(cases.review_receipt_final_state)
+        self.assertTrue(any("does not cover the final state" in failure for failure in failures), failures)
+        # A new file after review is also a change to the shipping state.
+        self.write_auth()
+        (self.root / "notes.txt").write_text("late")
+        self.assertTrue(self.check(cases.review_receipt_final_state))
+
+    def test_rework_and_low_depth_receipts_fail(self):
+        self.write_auth()
+        record_receipt(self.root, verdict="REWORK")
+        self.assertTrue(any("does not cover" in failure for failure in self.check(cases.review_receipt_final_state)))
+        record_receipt(self.root, contract=CONTRACT)
+        failures = self.check(cases.review_receipt_final_state)
+        self.assertTrue(any("not at HIGH depth" in failure for failure in failures), failures)
+
+    def test_a_receipt_from_the_author_is_not_independent(self):
+        self.write_auth()
+        for reviewer in ("main thread", "author", "Controller", "self"):
+            record_receipt(self.root, reviewer=reviewer)
+            failures = self.check(cases.review_receipt_final_state)
+            self.assertTrue(any("not independent" in failure for failure in failures), reviewer)
+        record_receipt(self.root, reviewer="reviewer subagent a1b2")
+        self.assertEqual(self.check(cases.review_receipt_final_state), [])
+
+    def test_the_main_thread_recording_the_review_fails(self):
+        self.write_auth()
+        record_receipt(self.root)
+        command = f"python3 .lean/scripts/gate_evidence.py record-review --contract '{HIGH_CONTRACT}'"
+        failures = self.check(cases.review_receipt_final_state, [assistant(tool("b1", "Bash", command=command))])
+        self.assertEqual(failures, ["the author's main thread ran record-review itself"])
+
+    def test_malformed_receipt_fails(self):
+        self.write_auth()
+        (self.root / ".agent-runtime").mkdir(exist_ok=True)
+        (self.root / ".agent-runtime/review.json").write_text("not json")
+        self.assertEqual(self.check(cases.review_receipt_final_state), ["review receipt is not valid JSON"])
+
+    def test_high_review_cases_grade_the_receipt_and_the_outcome(self):
+        for name in ("high-review", "tracker-finalization", "followup-after-review"):
+            graders = next(case["graders"] for case in cases.CASES if case["name"] == name)
+            self.assertIn(cases.review_receipt_final_state, graders, name)
+            self.assertIn(cases.OWNER_OUTCOME, graders, name)
+
+
+class OutcomeTests(FixtureCase):
+    def test_owner_outcome_follows_the_requested_behavior_not_the_suite(self):
+        self.assertTrue(self.check(cases.OWNER_OUTCOME))  # admin-only: owner cannot delete yet
+        self.write_auth()
+        self.assertEqual(self.check(cases.OWNER_OUTCOME), [])
+        # Follows visible steps (a passing test, an edit) but widens access too far.
+        self.write_auth('def can_delete(user):\n    return user.get("role") != "viewer"\n')
+        self.assertTrue(cases.suite_passes(None, self.root) == [])
+        failures = self.check(cases.OWNER_OUTCOME)
+        self.assertTrue(failures[0].startswith("functional outcome wrong (owner-can-delete)"), failures)
+        # And one that breaks admin.
+        self.write_auth('def can_delete(user):\n    return user.get("role") == "owner"\n')
+        self.assertTrue(self.check(cases.OWNER_OUTCOME))
+
+    def test_calc_outcomes_catch_wrong_results_that_a_self_written_test_accepts(self):
+        multiply = next(g for case in cases.CASES if case["name"] == "contract-line" for g in case["graders"]
+                        if g.__name__ == "outcome_multiply")
+        mean = next(g for case in cases.CASES if case["name"] == "bug-regression" for g in case["graders"]
+                    if g.__name__ == "outcome_mean")
+        subtract = next(g for case in cases.CASES if case["name"] == "no-false-done" for g in case["graders"]
+                        if g.__name__ == "outcome_subtract")
+        calc = self.root / "calc.py"
+        for grade in (multiply, mean, subtract):
+            self.assertTrue(self.check(grade))  # Missing function or old crash.
+        calc.write_text(calc.read_text() + "\n\ndef multiply(a, b):\n    return a + b\n\n"
+                        "def subtract(a, b):\n    return b - a\n")
+        self.assertTrue(self.check(multiply))
+        self.assertTrue(self.check(subtract))
+        calc.write_text(calc.read_text().replace("return a + b\n\ndef subtract", "return a * b\n\ndef subtract")
+                        .replace("return b - a", "return a - b")
+                        .replace("return sum(values) / len(values)",
+                                 "return sum(values) / len(values) if values else 1.0"))
+        self.assertEqual(self.check(multiply), [])
+        self.assertEqual(self.check(subtract), [])
+        self.assertTrue(self.check(mean))  # An empty mean of 1.0 is the wrong outcome.
+        calc.write_text(calc.read_text().replace("else 1.0", "else 0.0"))
+        self.assertEqual(self.check(mean), [])
+
+
+class TrackerFinalizationTests(FixtureCase):
+    case = {"mode": "tracker", "tracker": "TCK001"}
+
+    def finish_tracker(self):
+        path = self.root / "docs/tracking/TCK001.md"
+        path.write_text(path.read_text().replace("- [ ]", "- [x]"))
+        subprocess.run([sys.executable, str(self.root / ".lean/scripts/workflow.py"), "tracker", "status", "--id",
+                        "TCK001", "--status", "DONE", "--evidence", "unit tests pass; review PASS"],
+                       cwd=self.root, check=True, capture_output=True)
+
+    def commit(self, message="Let owners delete"):
+        subprocess.run(["git", "add", "-A"], cwd=self.root, check=True)
+        subprocess.run(["git", "-c", "user.name=a", "-c", "user.email=a@b.c", "commit", "-q", "-m", message],
+                       cwd=self.root, check=True)
+
+    def test_fixture_starts_with_a_planned_tracker(self):
+        self.assertRegex((self.root / "docs/tracking/TCK001.md").read_text(), r"(?m)^Status: PLANNED$")
+        self.assertEqual(changed_files(self.root), [])
+
+    def test_tracker_done_needs_status_checked_boxes_and_evidence(self):
+        grade = cases.tracker_done("TCK001")
+        failures = self.check(grade)
+        self.assertEqual(len(failures), 3, failures)
+        self.finish_tracker()
+        self.assertEqual(self.check(grade), [])
+        path = self.root / "docs/tracking/TCK001.md"
+        path.write_text(path.read_text().replace("Status: DONE", "Status: REVIEWING"))
+        self.assertEqual(self.check(grade), ["tracker TCK001 is not Status: DONE"])
+        path.write_text(path.read_text().replace("Status: REVIEWING", "Status: DONE").replace("- [x] TASK-01", "- [ ] TASK-01"))
+        self.assertEqual(len(self.check(grade)), 1)
+        self.assertEqual(self.check(cases.tracker_done("TCK999")), ["tracker TCK999 is missing"])
+
+    def test_work_committed_needs_a_clean_tree_the_named_files_and_no_attribution(self):
+        grade = cases.work_committed("auth.py", "docs/tracking/TCK001.md")
+        self.assertIn("nothing was committed after the fixture commit", self.check(grade))
+        self.write_auth()
+        self.finish_tracker()
+        self.assertTrue(any("uncommitted changes remain" in failure for failure in self.check(grade)))
+        self.commit()
+        self.assertEqual(self.check(grade), [])
+        self.assertEqual(self.check(cases.work_committed("calc.py")), ["calc.py is not in the commits"])
+        (self.root / "late.txt").write_text("after commit")
+        self.assertTrue(any("uncommitted changes remain" in failure for failure in self.check(grade)))
+        (self.root / "late.txt").unlink()
+        self.write_auth(OWNER_FIX + "\n")
+        self.commit("Let owners delete\n\nCo-Authored-By: Someone <a@b.c>")
+        self.assertIn("commit message carries AI attribution", self.check(grade))
+        self.assertEqual(self.check(grade).count("commit message carries AI attribution"), 1)
+
+    def test_final_gate_must_pass_after_the_last_write_and_commit(self):
+        grade = cases.final_gate_after_last_change
+        gate = "bash .lean/scripts/quality-gate.sh --root ."
+        good = [assistant(tool("e1", "Edit", file_path="/p/auth.py")), result("e1", "ok"),
+                assistant(tool("g1", "Bash", command="git add -A && git commit -q -m done")), result("g1", ""),
+                assistant(tool("g2", "Bash", command=gate)), result("g2", "Quality Gate passed")]
+        self.assertEqual(self.check(grade, good), [])
+        gate_first = [good[4], good[5], good[0], good[1], good[2], good[3]]
+        self.assertTrue(self.check(grade, gate_first))
+        before_commit = good[:2] + good[4:] + good[2:4]
+        self.assertTrue(self.check(grade, before_commit))
+        failed = [*good[:5], result("g2", "FAILED (errors=1)", error=True)]
+        self.assertTrue(self.check(grade, failed))
+        self.assertTrue(self.check(grade, []))
+
+    def test_tracker_case_is_wired(self):
+        case = next(case for case in cases.CASES if case["name"] == "tracker-finalization")
+        self.assertEqual((case["mode"], case["tracker"]), ("tracker", "TCK001"))
+        self.assertIn(cases.final_gate_after_last_change, case["graders"])
+
+
+class ConversationTests(FixtureCase):
+    def turns(self, *turns):
+        lines = []
+        for number, turn in enumerate(turns):
+            lines += ([TURN_MARKER] if number else []) + turn
+        return lines
+
+    def test_marker_splits_turns_and_costs_are_summed(self):
+        lines = self.turns([assistant(text(CONTRACT)), final("one", 0.1)], [assistant(text("What I changed.")),
+                                                                            final("two", 0.25)])
+        session = Transcript(lines)
+        self.assertEqual(session.turn_ranges(), [(0, 1), (2, 3)])
+        self.assertEqual(session.final_text, "two")
+        self.assertAlmostEqual(session.cost, 0.35)
+        self.assertEqual(Transcript([assistant(text(CONTRACT))]).turn_ranges(), [(0, 1)])
+        codex = CodexTranscript(self.turns([codex_text("m1", CONTRACT)], [codex_text("m2", "second")]))
+        self.assertEqual(codex.turn_ranges(), [(0, 1), (2, 3)])
+
+    def test_each_writing_turn_needs_its_own_contract_before_its_write(self):
+        grade = cases.contract_each_writing_turn
+        first = [assistant(text(CONTRACT), tool("e1", "Edit", file_path="calc.py"))]
+        second = [assistant(text(CONTRACT), tool("e2", "Edit", file_path="calc.py"))]
+        self.assertEqual(self.check(grade, self.turns(first, second)), [])
+        # The contract from the first prompt does not carry over to the follow-up's write.
+        bare = [assistant(text("Sure, adding it."), tool("e2", "Edit", file_path="calc.py"))]
+        failures = self.check(grade, self.turns(first, bare))
+        self.assertEqual(len(failures), 1)
+        self.assertTrue(failures[0].startswith("prompt 2 wrote files without a contract line"))
+        late = [assistant(tool("e2", "Edit", file_path="calc.py")), assistant(text(CONTRACT))]
+        self.assertEqual(self.check(grade, self.turns(first, late)), ["prompt 2 wrote files before its contract line"])
+        silent = [assistant(tool("e2", "Edit", file_path="calc.py"))]
+        self.assertTrue(self.check(grade, self.turns(first, silent)))
+        trivial = [assistant(text("Contract: trivial (typo)"), tool("e2", "Edit", file_path="calc.py"))]
+        self.assertEqual(self.check(grade, self.turns(first, trivial)), [])
+        # A read-only turn needs no contract.
+        answer = [assistant(text("Here is what changed."))]
+        self.assertEqual(self.check(grade, self.turns(first, answer)), [])
+
+    def test_read_only_follow_up_must_not_write(self):
+        grade = cases.no_writes_in_last_turn
+        first = [assistant(text(CONTRACT), tool("e1", "Edit", file_path="auth.py"))]
+        answer = [assistant(text("I changed auth.py."))]
+        self.assertEqual(self.check(grade, self.turns(first, answer)), [])
+        keeps_editing = [assistant(text("One more tweak."), tool("e2", "Edit", file_path="auth.py"))]
+        self.assertEqual(self.check(grade, self.turns(first, keeps_editing)), ["the read-only follow-up wrote files"])
+        self.assertEqual(self.check(grade, first), ["the follow-up prompt never ran"])
+
+    def test_resume_commands_continue_the_session(self):
+        claude = agent_command("sonnet", 1.0, "claude", resume=True)
+        self.assertIn("--continue", claude)
+        self.assertNotIn("--continue", agent_command("sonnet", 1.0))
+        codex = agent_command("gpt-test", None, "codex", resume=True)
+        self.assertEqual(codex[:4], ["codex", "exec", "resume", "--last"])
+        self.assertIn("--json", codex)
+        self.assertIn("--dangerously-bypass-hook-trust", codex)
+        self.assertNotIn("--sandbox", codex)  # `exec resume` has no such flag; it comes in as a config override.
+        self.assertIn('sandbox_mode="workspace-write"', codex)
+        self.assertEqual(codex[-1], "-")
+        self.assertEqual(agent_command("gpt-test", None, "codex")[:3], ["codex", "exec", "--json"])
+
+    def test_run_agent_sends_follow_ups_as_resumed_turns_with_markers(self):
+        import harness
+        calls = []
+
+        def fake(root, prompt, model, budget, timeout, provider, env, resume):
+            calls.append((prompt, resume))
+            return [f"line for {prompt}"], 0, ""
+        original, harness.run_turn = harness.run_turn, fake
+        self.addCleanup(setattr, harness, "run_turn", original)
+        lines, code, _ = run_agent(self.root, Conversation("first", "second", "third"), "m", 1.0, 5)
+        self.assertEqual(calls, [("first", False), ("second", True), ("third", True)])
+        self.assertEqual(lines, ["line for first", TURN_MARKER, "line for second", TURN_MARKER, "line for third"])
+        calls.clear()
+        run_agent(self.root, "single prompt", "m", 1.0, 5)
+        self.assertEqual(calls, [("single prompt", False)])
+        # A timeout ends the conversation; later prompts are not sent into a half-finished turn.
+        calls.clear()
+        harness.run_turn = lambda *args: (calls.append(args[1]) or ["partial"], None, "timeout")
+        run_agent(self.root, Conversation("first", "second"), "m", 1.0, 5)
+        self.assertEqual(calls, ["first"])
+
+    def test_follow_up_cases_use_conversations(self):
+        for name in ("followup-new-contract", "followup-after-review"):
+            case = next(case for case in cases.CASES if case["name"] == name)
+            self.assertIsInstance(case["prompt"], Conversation)
+            self.assertTrue(case["prompt"].followups)
+            self.assertIn(cases.contract_each_writing_turn, case["graders"])
+
+
+class CodexFreshReviewTests(FixtureCase):
+    def grade(self, *spawns):
+        return cases.reviewer_dispatched(codex_session([codex_text("m1", CONTRACT)], *spawns), self.root)
+
+    def test_explicit_fork_turns_none_is_fresh(self):
+        self.assertEqual(self.grade(rollout_spawn("independent_review", "none")), [])
+        self.assertEqual(self.grade(rollout_spawn("independent_review", "None")), [])
+        self.assertEqual(self.grade(rollout_spawn("independent_review", 0)), [])
+
+    def test_omitted_or_null_fork_turns_is_not_proof_of_a_fresh_reviewer(self):
+        for spawn in (rollout_spawn("independent_review", None),
+                      json.dumps({"type": "response_item", "payload": {"type": "function_call", "name": "spawn_agent",
+                                                                       "arguments": json.dumps({
+                                                                           "task_name": "review",
+                                                                           "fork_turns": None})}})):
+            failures = self.grade(spawn)
+            self.assertEqual(len(failures), 1)
+            self.assertIn("without an explicit fork_turns=none", failures[0])
+        session = codex_session([codex_text("m1", CONTRACT)], rollout_spawn("independent_review", None))
+        self.assertEqual(session.spawns, [{"task_name": "independent_review", "fork_turns": None}])
+
+    def test_forked_values_fail_and_one_fresh_review_among_spawns_passes(self):
+        for value in ("all", "3", 2):
+            failures = self.grade(rollout_spawn("independent_review", value))
+            self.assertIn("forked history", failures[0], value)
+        self.assertEqual(self.grade(rollout_spawn("review", "all"), rollout_spawn("review", None),
+                                    rollout_spawn("fresh_review", "none")), [])
+        self.assertIn("without an explicit", self.grade(rollout_spawn("review", "all"),
+                                                        rollout_spawn("review", None))[0])
 
 
 class ResultsDirectoryTests(unittest.TestCase):

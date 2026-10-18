@@ -39,17 +39,24 @@ project="$root/.lean/PROJECT.md"
 cache="$root/.claude/.gate-cache"
 failed="$root/.claude/.gate-failed"
 baseline="$root/.agent-runtime/gate-baseline"
+refusal="$root/.agent-runtime/gate-refusal"
 [ "$hook" -eq 0 ] || mkdir -p "$root/.claude" || exit 2
 
 active=0
 transcript=""
 session=""
+errlog=""
 if [ "$hook" -eq 1 ] && [ "$seed" -eq 0 ]; then
   input="$(cat)"
 
   active="$(printf '%s' "$input" | python3 "$helper" --root "$root" hook-field --field stop_hook_active)" || exit 2
   transcript="$(printf '%s' "$input" | python3 "$helper" --root "$root" hook-field --field transcript_path)" || exit 2
   session="$(printf '%s' "$input" | python3 "$helper" --root "$root" hook-field --field session_id)" || exit 2
+  # Keep this run's messages so a refusal is fingerprinted by its reason; they still reach
+  # stderr when the run ends.
+  errlog="$(mktemp "${TMPDIR:-/tmp}/lean-gate.XXXXXX")" || exit 2
+  exec 3>&2 2>"$errlog"
+  trap 'cat "$errlog" >&3; rm -f "$errlog"' EXIT
 fi
 
 # Record a refusal; $1 is "c" for a contract refusal, empty for a gate failure.
@@ -71,6 +78,20 @@ refuse() {
   [ "${1:-}" = "c" ] || rm -f "$cache"
   n=$((n + 1))
   printf '%s' "${1:-}$n" > "$failed"
+  # This session has already been shown this exact refusal (same reason, shipping state and
+  # contract); blocking every Stop while the agent waits on the user only loops, so warn instead.
+  # A contract refusal keeps the cap below: the agent can fix it in its next reply, which the
+  # state does not show.
+  local print reason
+  if [ "${1:-}" != "c" ] && [ -n "$session" ] && reason="$(cksum < "$errlog")" &&
+     print="$(python3 "$helper" --root "$root" gate-state 2>/dev/null)" && [ -n "$print" ]; then
+    print="$session $print $reason $contract"
+    if [ -f "$refusal" ] && [ "$(cat "$refusal")" = "$print" ]; then
+      printf '{"systemMessage":"Lean Quality Gate refused again with nothing changed since the last refusal; Stop released UNVERIFIED. The work is not DONE; see that refusal."}\n'
+      exit 0
+    fi
+    mkdir -p "$(dirname "$refusal")" && printf '%s' "$print" > "$refusal"
+  fi
   if [ "$n" -gt "$max_refusals" ]; then
     printf '{"systemMessage":"Lean Quality Gate still refused after %s attempts; Stop released UNVERIFIED. The work is not DONE; see the last gate refusal."}\n' "$max_refusals"
     exit 0
@@ -88,7 +109,12 @@ if [ "$seed" -eq 0 ] && { [ -e "$root/.agent-runtime/active-target.json" ] || [ 
   python3 "$root/.lean/scripts/submodule.py" --root "$root" gate --optional || { refuse; exit 2; }
 fi
 
-python3 "$helper" --root "$root" guard-controls || { refuse; exit 2; }
+# Name any High-risk review still ahead in the same refusal, so both steps are asked for at once.
+if ! python3 "$helper" --root "$root" guard-controls; then
+  pending="$(python3 "$helper" --root "$root" high-risk 2>/dev/null)" || pending=""
+  [ -z "$pending" ] || { echo "After that, HIGH independent review is also required for these High-risk changes:"; printf '%s\n' "$pending"; } >&2
+  refuse; exit 2
+fi
 [ -f "$project" ] || { echo "Quality Gate undefined: missing .lean/PROJECT.md; run /lean-init." >&2; refuse; exit 2; }
 
 commands="$(awk '
@@ -102,14 +128,16 @@ commands="$(awk '
 
 cd "$root" || { refuse; exit 2; }
 
-# State receipts cover Git-visible files, modes, index and submodule work.
+# The gate cache and baseline cover HEAD, index, Git-visible files, modes and submodule work.
 state=""
 if [ "$hook" -eq 1 ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  state="$(python3 "$helper" --root "$root" state)" || { refuse; exit 2; }
+  state="$(python3 "$helper" --root "$root" gate-state)" || { refuse; exit 2; }
 fi
 
 # SessionStart records a change baseline, never a passing cache.
 if [ "$seed" -eq 1 ]; then
+  # A new session has not seen any earlier refusal, so its first one blocks again.
+  rm -f "$refusal"
   gate_refused && exit 0
   rm -f "$failed"
   if [ -n "$state" ]; then
@@ -215,6 +243,6 @@ while IFS= read -r cmd; do
 done <<< "$commands"
 
 check_receipt
-[ "$hook" -eq 0 ] || rm -f "$failed"
+[ "$hook" -eq 0 ] || rm -f "$failed" "$refusal"
 [ -n "$state" ] && printf '%s' "$state" > "$cache"
 exit 0

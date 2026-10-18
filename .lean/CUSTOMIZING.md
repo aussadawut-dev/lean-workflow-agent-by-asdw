@@ -2,7 +2,7 @@
 
 ## Current authority
 
-Baseline 4.4.0 uses `AGENTS.md` as the shared canonical contract. `CLAUDE.md` is a runtime entrypoint. The active agent leads unless project additions record a different Controller or primary agent. No provider-specific ownership, product stack or model shortlist is imposed.
+Baseline 4.5.0 uses `AGENTS.md` as the shared canonical contract. `CLAUDE.md` is a runtime entrypoint. The active agent leads unless project additions record a different Controller or primary agent. No provider-specific ownership, product stack or model shortlist is imposed.
 
 Keep project facts, commands and gates in PROJECT; keep mode/execution in config and optional procedure preferences in `.lean/skill-effort.json`; keep accepted scope and work records in the project's chosen tracking system. Project overrides go below the contract's Project additions marker. Record local workflow extensions in project-owned documentation (an existing LOCAL-EXTENSIONS file may serve this purpose). Do not edit portable policy per project without tracking that delta.
 
@@ -57,7 +57,8 @@ Cleanup archives DONE queue items only. Preserve `.agents/queue/history/` with p
 and version-control it; no history is shipped in this template or imported from another project.
 Update mode tooling and all procedures/discovery links before cleanup, stop old-tooling workers, and do
 not manually reuse IDs or remove archived prerequisites. History has no automatic expiry and
-remains readable by `queue history` after lowering the mode. Tracker archival is not implemented.
+remains readable by `queue history` after lowering the mode. Trackers archive separately with
+`workflow.py tracker archive`, which moves DONE trackers to `docs/history/agent-workflow/` and keeps their IDs reserved.
 
 ## Runtime limits
 

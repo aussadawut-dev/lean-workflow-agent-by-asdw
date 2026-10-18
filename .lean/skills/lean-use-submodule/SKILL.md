@@ -1,6 +1,6 @@
 ---
 name: lean-use-submodule
-description: Add or reuse a remote application repository as a submodule inside Lean, keeping agent workflow and work records out of the application repository.
+description: Add or reuse a remote application repository as a Lean submodule, keeping workflow and work records out of it.
 user-invocable: true
 argument-hint: "<remote url>"
 ---

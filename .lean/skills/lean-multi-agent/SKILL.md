@@ -1,6 +1,6 @@
 ---
 name: lean-multi-agent
-description: Controller and worker delegation with bounded ownership, portable model selection, evidence and optional parallel work.
+description: Controller/worker delegation with bounded ownership, model selection, evidence and optional parallel work.
 user-invocable: true
 argument-hint: "<bounded delegation task>"
 ---

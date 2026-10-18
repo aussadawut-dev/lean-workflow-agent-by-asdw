@@ -1,6 +1,6 @@
 ---
 name: lean-clean-repo
-description: Audit repository clutter and obsolete source, tests, dependencies, docs, assets, configuration and workflow files; preview an evidence-backed cleanup plan, apply only approved items, and retain external recovery snapshots.
+description: Audit repository clutter and obsolete files; preview a cleanup plan, apply only approved items, keep recovery snapshots.
 user-invocable: true
 argument-hint: "[--path <relative-path>] | apply <plan-id> | restore <session-path>"
 ---

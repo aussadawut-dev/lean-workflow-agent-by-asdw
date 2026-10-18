@@ -108,18 +108,71 @@ class GateIntegrityTests(unittest.TestCase):
     def user(self, text):
         return {"type": "user", "message": {"content": text}}
 
-    def test_continued_stops_release_unverified_without_success(self):
+    def test_continued_stops_that_keep_changing_release_unverified_after_three(self):
         self.project.write_text(self.project.read_text().replace("true", "false"))
+        self.evidence("accept-controls", "--reason", "Fixture selects a failing gate")
         for index in range(3):
+            (self.root / "attempt.txt").write_text(f"attempt {index}\n")
             result = self.gate("--claude-hook", payload={"stop_hook_active": index > 0})
             self.assertEqual(result.returncode, 2, result.stderr)
+        (self.root / "attempt.txt").write_text("attempt 3\n")
         released = self.gate("--claude-hook", payload={"stop_hook_active": True})
         self.assertEqual(released.returncode, 0, released.stderr)
         self.assertIn("UNVERIFIED", json.loads(released.stdout)["systemMessage"])
         self.assertTrue((self.root / ".claude/.gate-failed").exists())
         self.assertFalse((self.root / ".claude/.gate-cache").exists())
+        (self.root / "attempt.txt").write_text("attempt 4\n")
         fresh = self.gate("--claude-hook", payload={"stop_hook_active": False})
         self.assertEqual(fresh.returncode, 2, fresh.stderr)
+
+    def test_an_unchanged_refusal_blocks_once_then_only_warns(self):
+        # The agent has already seen this refusal; blocking every Stop while it waits on the user loops.
+        self.project.write_text(self.project.read_text().replace("true", "false"))
+        self.evidence("accept-controls", "--reason", "Fixture selects a failing gate")
+        first = self.gate("--claude-hook", payload={"stop_hook_active": False, "session_id": "s"})
+        self.assertEqual(first.returncode, 2, first.stderr)
+        for active in (True, False):
+            with self.subTest(stop_hook_active=active):
+                repeated = self.gate("--claude-hook", payload={"stop_hook_active": active, "session_id": "s"})
+                self.assertEqual(repeated.returncode, 0, repeated.stderr)
+                self.assertIn("UNVERIFIED", json.loads(repeated.stdout)["systemMessage"])
+                self.assertTrue((self.root / ".claude/.gate-failed").exists())
+                self.assertFalse((self.root / ".claude/.gate-cache").exists())
+        (self.root / "changed.txt").write_text("new work\n")
+        changed = self.gate("--claude-hook", payload={"stop_hook_active": False, "session_id": "s"})
+        self.assertEqual(changed.returncode, 2, changed.stderr)
+
+    def test_a_new_refusal_reason_blocks_even_when_the_state_is_unchanged(self):
+        # Accepting drift changes no Git-visible byte, but the failing check is news to the agent.
+        self.assertEqual(self.gate("--claude-hook", "--seed").returncode, 0)
+        self.project.write_text(self.project.read_text().replace("true", "echo CHECK-FAILED; false"))
+        drift = self.gate("--claude-hook", payload={"session_id": "s"})
+        self.assertEqual(drift.returncode, 2, drift.stderr)
+        self.assertIn("protected", drift.stderr.lower())
+        self.evidence("accept-controls", "--reason", "User approved fixture gate change")
+        failing = self.gate("--claude-hook", payload={"stop_hook_active": True, "session_id": "s"})
+        self.assertEqual(failing.returncode, 2, failing.stderr)
+        self.assertIn("CHECK-FAILED", failing.stderr)
+
+    def test_another_session_is_shown_a_refusal_it_has_not_seen(self):
+        self.project.write_text(self.project.read_text().replace("true", "false"))
+        self.evidence("accept-controls", "--reason", "Fixture selects a failing gate")
+        self.assertEqual(self.gate("--claude-hook", payload={"session_id": "one"}).returncode, 2)
+        self.assertEqual(self.gate("--claude-hook", payload={"session_id": "one"}).returncode, 0)
+        other = self.gate("--claude-hook", payload={"session_id": "two"})
+        self.assertEqual(other.returncode, 2, other.stderr)
+
+    def test_an_unchanged_control_drift_refusal_blocks_once(self):
+        self.assertEqual(self.gate("--claude-hook", "--seed").returncode, 0)
+        self.project.write_text(self.project.read_text().replace("true", "echo changed"))
+        self.assertEqual(self.gate("--claude-hook", payload={"session_id": "s"}).returncode, 2)
+        repeated = self.gate("--claude-hook", payload={"stop_hook_active": True, "session_id": "s"})
+        self.assertEqual(repeated.returncode, 0, repeated.stderr)
+        self.assertIn("UNVERIFIED", json.loads(repeated.stdout)["systemMessage"])
+        # Accepting the drift lets the gate run its checks, which pass and clear the refusal.
+        self.evidence("accept-controls", "--reason", "User approved fixture gate change")
+        self.assertEqual(self.gate("--claude-hook", payload={"session_id": "s"}).returncode, 0)
+        self.assertFalse((self.root / ".claude/.gate-failed").exists())
 
     def test_empty_gate_and_missing_project_are_explicitly_unconfigured(self):
         self.project.write_text("<!-- gate:start -->\n```sh\n```\n<!-- gate:end -->\n")
@@ -162,7 +215,7 @@ class GateIntegrityTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn("Contract", result.stderr)
 
-    def test_high_review_is_required_and_bound_to_current_bytes_modes_and_index(self):
+    def test_high_review_is_required_and_bound_to_current_bytes_and_modes_not_staging(self):
         path = self.transcript([self.user("task"), self.assistant(CONTRACT)])
         result = self.gate("--claude-hook", payload={"transcript_path": path})
         self.assertEqual(result.returncode, 2, result.stderr)
@@ -174,8 +227,163 @@ class GateIntegrityTests(unittest.TestCase):
         os.chmod(self.root / "code.txt", 0o755)
         self.assertNotEqual(self.gate("--require-review", "--contract", CONTRACT).returncode, 0)
         os.chmod(self.root / "code.txt", 0o644)
+        # Staging the reviewed bytes changes no content, so the receipt still covers what ships.
         self.git("add", "code.txt")
-        self.assertNotEqual(self.gate("--require-review", "--contract", CONTRACT).returncode, 0)
+        self.assertEqual(self.gate("--require-review", "--contract", CONTRACT).returncode, 0)
+
+    def commit(self, message):
+        self.git("-c", "user.name=test", "-c", "user.email=test@example.invalid", "commit", "-qm", message)
+
+    def record_pass(self):
+        result = self.evidence("record-review", "--contract", CONTRACT, "--reviewer", "independent-test",
+                               "--evidence", "fixture", "--verdict", "PASS")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def covered(self):
+        return self.evidence("check-review", "--contract", CONTRACT).returncode == 0
+
+    def test_receipt_survives_staging_committing_and_tracker_bookkeeping(self):
+        tracking = self.root / "docs/tracking"
+        tracking.mkdir(parents=True)
+        (tracking / "TCK001.md").write_text("Status: REVIEWING\n")
+        (self.root / "old.txt").write_text("retired\n")
+        self.git("add", ".")
+        self.commit("base")
+        (self.root / "code.txt").write_text("reviewed\n")
+        (self.root / "old.txt").unlink()
+        self.record_pass()
+        self.git("add", "-A")
+        self.assertTrue(self.covered(), "staging the reviewed change")
+        self.commit("reviewed change")
+        self.assertTrue(self.covered(), "committing the reviewed change")
+        (tracking / "TCK001.md").write_text("Status: DONE\nEvidence: review PASS\n")
+        (tracking / "TCK002.md").write_text("Status: PLANNED\n")
+        self.assertTrue(self.covered(), "tracker records written after review")
+        self.git("add", "-A")
+        self.commit("close tracker")
+        self.assertTrue(self.covered(), "committing tracker records")
+
+    def test_receipt_rejects_any_unreviewed_content_change(self):
+        (self.root / "base.txt").write_text("base\n")
+        (self.root / "moved.txt").write_text("moved\n")
+        self.git("add", ".")
+        self.commit("base")
+        (self.root / "base.txt").write_text("reviewed\n")
+        self.record_pass()
+
+        def write(name, text):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
+        changes = {
+            "other Markdown": lambda: write("docs/guide.md", "new\n"),
+            "nested tracking file": lambda: write("docs/tracking/notes/TCK009.md", "x\n"),
+            "non-Markdown tracking file": lambda: write("docs/tracking/data.json", "{}\n"),
+            "deletion": lambda: (self.root / "moved.txt").unlink(),
+            "rename": lambda: (self.root / "moved.txt").rename(self.root / "renamed.txt"),
+            "gate control": lambda: (self.root / ".claude/settings.json").write_text('{"changed": true}'),
+        }
+        for name, change in changes.items():
+            with self.subTest(change=name):
+                self.assertTrue(self.covered())
+                change()
+                self.assertFalse(self.covered(), name)
+                self.git("checkout", "-q", "HEAD", "--", ".")
+                shutil.rmtree(self.root / "docs", ignore_errors=True)
+                (self.root / "renamed.txt").unlink(missing_ok=True)
+                (self.root / "base.txt").write_text("reviewed\n")
+
+    def test_receipt_rejects_staged_content_that_differs_from_the_reviewed_bytes(self):
+        # Committing would ship the staged bytes, which nobody reviewed.
+        (self.root / "base.txt").write_text("base\n")
+        self.git("add", ".")
+        self.commit("base")
+        (self.root / "base.txt").write_text("reviewed\n")
+        self.record_pass()
+        (self.root / "base.txt").write_text("unreviewed\n")
+        self.git("add", "base.txt")
+        (self.root / "base.txt").write_text("reviewed\n")
+        self.assertFalse(self.covered())
+
+    def reviewed_pair(self):
+        """Commit a.txt and b.txt, then review a change to both."""
+        for name in ("a.txt", "b.txt"):
+            (self.root / name).write_text("base\n")
+        self.git("add", ".")
+        self.commit("base")
+        for name in ("a.txt", "b.txt"):
+            (self.root / name).write_text("reviewed\n")
+        self.record_pass()
+
+    def test_receipt_rejects_committed_bytes_that_were_never_reviewed(self):
+        # Committing unreviewed bytes and restoring the reviewed ones leaves the tree unchanged.
+        self.reviewed_pair()
+        (self.root / "a.txt").write_text("unreviewed\n")
+        self.git("add", "-A")
+        self.commit("unreviewed")
+        (self.root / "a.txt").write_text("reviewed\n")
+        self.assertFalse(self.covered())
+
+    def test_receipt_rejects_a_staged_deletion_of_a_file_still_on_disk(self):
+        self.reviewed_pair()
+        self.git("rm", "-q", "--cached", "b.txt")
+        self.assertFalse(self.covered(), "staged deletion")
+        self.commit("drop b")
+        self.assertFalse(self.covered(), "committed deletion")
+
+    def test_receipt_rejects_a_partial_commit_of_the_reviewed_change(self):
+        # The commit would ship a.txt without b.txt, a combination nobody reviewed.
+        self.reviewed_pair()
+        self.git("add", "a.txt")
+        self.commit("only a")
+        self.assertFalse(self.covered(), "partial commit")
+        self.git("add", "b.txt")
+        self.commit("rest")
+        self.assertTrue(self.covered(), "the whole reviewed change is committed")
+
+    def test_commit_during_review_cannot_be_recorded_as_reviewed(self):
+        # The captured state must bind HEAD: a commit between capture and record ships unseen bytes.
+        self.reviewed_pair()
+        captured = self.evidence("state").stdout.strip()
+        (self.root / "a.txt").write_text("unreviewed\n")
+        self.git("add", "-A")
+        self.commit("during review")
+        (self.root / "a.txt").write_text("reviewed\n")
+        recorded = self.evidence("record-review", "--contract", CONTRACT, "--reviewer", "independent-test",
+                                 "--evidence", "fixture", "--verdict", "PASS", "--state", captured)
+        self.assertNotEqual(recorded.returncode, 0)
+        self.assertFalse(self.covered())
+
+    def test_committed_mode_change_is_caught_without_core_filemode(self):
+        self.reviewed_pair()
+        self.git("config", "core.fileMode", "false")
+        self.git("update-index", "--chmod=+x", "a.txt")
+        self.assertFalse(self.covered(), "staged mode change")
+        self.git("add", "b.txt")
+        self.commit("mode")
+        self.assertFalse(self.covered(), "committed mode change")
+
+    def test_receipt_without_a_reviewed_base_is_refused(self):
+        self.record_pass()
+        path = self.root / ".agent-runtime/review.json"
+        receipt = json.loads(path.read_text())
+        receipt.pop("base", None)
+        path.write_text(json.dumps(receipt))
+        self.assertFalse(self.covered())
+
+    def test_gate_state_still_changes_with_commits_and_trackers(self):
+        # The gate cache must rerun checks that read history or tracker records.
+        tracking = self.root / "docs/tracking"
+        tracking.mkdir(parents=True)
+        (tracking / "TCK001.md").write_text("Status: PLANNED\n")
+        before = self.evidence("gate-state").stdout.strip()
+        self.assertTrue(before)
+        (tracking / "TCK001.md").write_text("Status: DONE\n")
+        tracker_edit = self.evidence("gate-state").stdout.strip()
+        self.assertNotEqual(tracker_edit, before)
+        self.git("add", "-A")
+        self.commit("tracker")
+        self.assertNotEqual(self.evidence("gate-state").stdout.strip(), tracker_edit)
 
     def test_review_cannot_be_reused_for_another_contract_or_a_rework(self):
         self.assertEqual(self.evidence("record-review", "--contract", CONTRACT, "--reviewer", "test-reviewer",
@@ -200,6 +408,36 @@ class GateIntegrityTests(unittest.TestCase):
         settings = self.root / ".claude/settings.json"
         settings.write_text('{"changed":true}')
         self.assertEqual(self.gate().returncode, 2)
+
+    def test_receipt_mismatch_names_what_differs(self):
+        # A reviewer that paraphrased the contract can re-record in one step when told the exact text.
+        paraphrase = "Contract: risk=HIGH quality=HIGH acceptance=fixture check passes"
+        self.assertEqual(self.evidence("record-review", "--contract", paraphrase, "--reviewer", "independent-test",
+                                       "--evidence", "fixture", "--verdict", "PASS").returncode, 0)
+        result = self.evidence("check-review", "--contract", CONTRACT)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(CONTRACT, result.stderr)
+        self.assertIn(paraphrase, result.stderr)
+        self.assertEqual(self.evidence("record-review", "--contract", CONTRACT, "--reviewer", "independent-test",
+                                       "--evidence", "fixture", "--verdict", "PASS").returncode, 0)
+        (self.root / "later.txt").write_text("change after review")
+        changed = self.evidence("check-review", "--contract", CONTRACT)
+        self.assertNotEqual(changed.returncode, 0)
+        self.assertIn("shipping state changed", changed.stderr)
+
+    def test_control_drift_refusal_also_names_pending_high_risk_review(self):
+        # One refusal names both steps, so the agent can ask once instead of learning them a Stop at a time.
+        self.project.write_text(self.project.read_text() + "\n## High-risk areas\n\n- `secure/`: fixture boundary.\n")
+        self.git("-c", "user.name=test", "-c", "user.email=test@example.invalid", "commit", "-qam", "areas")
+        self.assertEqual(self.gate("--claude-hook", "--seed").returncode, 0)
+        (self.root / "secure").mkdir()
+        (self.root / "secure/rule.txt").write_text("deny\n")
+        self.project.write_text(self.project.read_text().replace("true", "echo changed"))
+        result = self.gate()
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("protected", result.stderr.lower())
+        self.assertIn("HIGH independent review", result.stderr)
+        self.assertIn("secure/rule.txt", result.stderr)
 
     def test_malformed_transcript_fails_with_diagnostic(self):
         path = Path(self.transcript([]))
@@ -293,6 +531,143 @@ class GateIntegrityTests(unittest.TestCase):
                                 env={**os.environ, "CLAUDE_PROJECT_DIR": str(self.root)},
                                 text=True, capture_output=True)
         self.assertIn("Quality Gate undefined", result.stdout)
+
+
+class TrustedControlRefTests(unittest.TestCase):
+    """Protected controls that equal a trusted remote-tracking ref are accepted without a manual step."""
+    TRUSTED = "<!-- trusted-control-refs: refs/remotes/origin/develop refs/remotes/origin/main -->\n"
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="lean trusted refs ")
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        for name in (".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py",
+                     ".lean/scripts/gate_mode.py", ".lean/scripts/contract_guard.py", ".claude/hooks/quality-gate.sh",
+                     ".claude/hooks/session-start.sh", ".codex/hooks.json", ".codex/hooks/quality_gate.py", ".gitignore"):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / name, path)
+        self.project = self.root / ".lean/PROJECT.md"
+        self.project.write_text("<!-- gate:start -->\n```sh\ntrue\n```\n<!-- gate:end -->\n" + self.TRUSTED)
+        self.settings = self.root / ".claude/settings.json"
+        self.settings.write_text("{}")
+        self.git("init", "-q")
+        self.commit("init")
+        self.assertEqual(self.claude().returncode, 0)  # First use records the baseline.
+
+    def git(self, *args):
+        return subprocess.run(["git", "-C", str(self.root), "-c", "user.name=test", "-c", "user.email=test@example.invalid",
+                               *args], check=True, text=True, capture_output=True).stdout.strip()
+
+    def commit(self, message):
+        self.git("add", "-A")
+        self.git("commit", "-qm", message)
+
+    def upstream(self, ref="refs/remotes/origin/develop"):
+        """Simulate a fetched upstream ref whose tree is the current commit."""
+        self.git("update-ref", ref, "HEAD")
+
+    def claude(self):
+        env = dict(os.environ, CLAUDE_PROJECT_DIR=str(self.root))
+        env.pop("CLAUDE_GATE_FORCE", None)
+        return stop_refusal(subprocess.run(["bash", str(self.root / ".claude/hooks/quality-gate.sh")],
+                                           input="{}", text=True, capture_output=True, env=env))
+
+    def codex(self):
+        return subprocess.run(["python3", str(self.root / ".codex/hooks/quality_gate.py"), "run", "--root", str(self.root)],
+                              input="{}", text=True, capture_output=True)
+
+    def history(self):
+        return json.loads((self.root / ".agent-runtime/gate-controls.json").read_text())["history"]
+
+    def test_controls_matching_a_trusted_remote_ref_are_accepted_for_both_providers(self):
+        for adapter in (self.claude, self.codex):
+            with self.subTest(adapter=adapter.__name__):
+                self.settings.write_text(json.dumps({"from": adapter.__name__}))
+                self.commit("upstream controls")
+                self.upstream()
+                result = adapter()
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("match refs/remotes/origin/develop", result.stderr)
+                self.assertTrue(self.history()[-1]["reason"].startswith("automatic: controls match trusted ref"))
+                self.assertEqual(adapter().returncode, 0)
+
+    def test_a_later_listed_ref_matches_after_an_unresolvable_one(self):
+        self.settings.write_text('{"main": true}')
+        self.commit("release")
+        blob = self.git("rev-parse", "HEAD:.claude/settings.json")
+        self.git("update-ref", "refs/remotes/origin/develop", blob)  # Exists, but is not a commit.
+        self.upstream("refs/remotes/origin/main")
+        result = self.claude()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("match refs/remotes/origin/main", result.stderr)
+
+    def test_a_local_tag_is_not_trusted(self):
+        self.project.write_text(self.project.read_text().replace("refs/remotes/origin/main", "refs/tags/v1"))
+        self.commit("list a tag")
+        self.git("tag", "v1")
+        result = self.claude()
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("accepts only refs/remotes/*", result.stderr)
+
+    def test_replace_objects_cannot_make_a_trusted_ref_match_local_edits(self):
+        self.upstream()
+        trusted = self.git("rev-parse", "refs/remotes/origin/develop:.claude/settings.json")
+        self.settings.write_text('{"local": true}')
+        local = self.git("hash-object", "-w", str(self.settings))
+        self.git("replace", trusted, local)
+        self.assertEqual(self.claude().returncode, 2)
+
+    def test_local_drift_from_every_trusted_ref_still_blocks_for_both_providers(self):
+        self.upstream()
+        self.settings.write_text('{"local": true}')
+        for adapter in (self.claude, self.codex):
+            with self.subTest(adapter=adapter.__name__):
+                result = adapter()
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("No trusted-control-refs entry matches", result.stderr)
+        self.assertEqual(self.history(), [])
+
+    def test_a_local_commit_without_a_trusted_ref_blocks(self):
+        self.settings.write_text('{"committed": true}')
+        self.commit("local only")
+        self.git("branch", "develop")  # refs/heads/develop is not a trusted ref.
+        self.assertEqual(self.claude().returncode, 2)
+
+    def test_executable_bit_and_extra_hooks_must_match(self):
+        self.upstream()
+        hook = self.root / ".claude/hooks/session-start.sh"
+        hook.chmod(0o644)
+        self.assertEqual(self.claude().returncode, 2)
+        hook.chmod(0o755)
+        extra = self.root / ".claude/hooks/extra.sh"
+        extra.write_text("#!/bin/sh\n")
+        self.assertEqual(self.claude().returncode, 2)
+        extra.unlink()
+        self.assertEqual(self.claude().returncode, 0)
+
+    def test_local_branch_head_or_commit_ids_are_rejected_as_trusted_refs(self):
+        for value in ("refs/heads/develop", "refs/tags/v1", "HEAD", self.git("rev-parse", "HEAD"), "refs/remotes/../heads/x"):
+            with self.subTest(value=value):
+                self.project.write_text(self.project.read_text().replace(self.TRUSTED, "")
+                                        + f"<!-- trusted-control-refs: {value} -->\n")
+                self.TRUSTED = f"<!-- trusted-control-refs: {value} -->\n"
+                result = self.claude()
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("accepts only refs/remotes/*", result.stderr)
+
+    def test_adding_a_trusted_ref_is_itself_a_protected_change(self):
+        self.upstream()
+        self.project.write_text(self.project.read_text().replace("refs/remotes/origin/main", "refs/remotes/origin/main refs/remotes/evil/x"))
+        self.assertEqual(self.claude().returncode, 2)
+
+    def test_without_trusted_refs_drift_still_needs_manual_acceptance(self):
+        self.project.write_text(self.project.read_text().replace(self.TRUSTED, ""))
+        self.commit("drop trusted refs")
+        self.upstream()
+        result = self.claude()
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertNotIn("trusted-control-refs", result.stderr)
 
 
 if __name__ == "__main__":

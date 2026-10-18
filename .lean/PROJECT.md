@@ -4,7 +4,7 @@ Project-owned facts and routes. Keep this map short; read the linked reference o
 
 ## Purpose
 
-Lean Workflow Baseline 4.4.0: a portable Claude/Codex workflow template. This repository contains workflow files, no application code or Web/API/Database areas.
+Lean Workflow Baseline 4.5.0: a portable Claude/Codex workflow template. This repository contains workflow files, no application code or Web/API/Database areas.
 
 ## Architecture
 
@@ -36,6 +36,9 @@ python3 -m unittest discover -s tools -p 'test_*.py'
 python3 tools/check_commit_attribution.py --root .
 ```
 <!-- gate:end -->
+<!-- trusted-control-refs: refs/remotes/origin/develop refs/remotes/origin/main -->
+
+Gate controls that equal `origin/develop` or `origin/main` are accepted automatically; see `policy/QUALITY.md`.
 
 ## High-risk areas
 

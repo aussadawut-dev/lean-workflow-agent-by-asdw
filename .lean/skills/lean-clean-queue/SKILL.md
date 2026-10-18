@@ -1,23 +1,23 @@
 ---
 name: lean-clean-queue
-description: Archive completed queue items with /lean-clean-queue old (completed over 30 days ago) or /lean-clean-queue all (all DONE items). Preserve history and trackers.
+description: Archive DONE queue items: `old [--days N]` (default over 30 days) or `all`. Preserves history and trackers.
 user-invocable: true
-argument-hint: "<old|all> [--preview]"
+argument-hint: "<old|all> [--days N] [--preview]"
 ---
 
 Input: `$ARGUMENTS` means the explicit invocation arguments, or the current user task when the runtime does not substitute it.
 
 Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity; keep model reasoning effort separate.
 
-Selection and options: $ARGUMENTS. Treat `--preview` as dry-run only; reject unknown options before running any archive operation.
+Selection and options: $ARGUMENTS. Treat `--preview` as dry-run only. `--days N` (positive whole number) sets the `old` cutoff and is invalid with `all`. Reject unknown options before running any archive operation.
 
 Read `AGENTS.md` and `.lean/README.md`. Use the project root for the commands below.
 
-- `old`: select DONE items whose timezone-aware `completed_at` is strictly more than 30 days ago. Legacy DONE items without a completion date are reported and retained; never infer age from file mtime or invent a date.
+- `old`: select DONE items whose timezone-aware `completed_at` is strictly more than N days ago (default 30). Legacy DONE items without a completion date are reported and retained; never infer age from file mtime or invent a date.
 - `all`: select every DONE item, including legacy undated items. READY/BLOCKED items are never selected. Do not clean trackers, tokens, caches, or history.
 - An explicit `/lean-clean-queue old` or `/lean-clean-queue all` authorizes that archive operation. If no selection is supplied, ask which one; do not broaden the requested selection. A request only to preview authorizes dry-run alone.
 
-Run `python3 .lean/scripts/workflow.py clean-queue <old|all> --dry-run`. Inspect selected IDs, recovery removals and unknown-age IDs. If it succeeds and apply is authorized, run the same command with `--apply`; no repeated approval is needed. The tool takes the shared lock and rechecks current state. Never bypass an error with shell deletion, change DONE/evidence, or release another worker's claim to make cleanup pass.
+Run `python3 .lean/scripts/workflow.py clean-queue <old|all> [--days N] --dry-run`. Inspect selected IDs, recovery removals and unknown-age IDs. If it succeeds and apply is authorized, run the same command with `--apply`; no repeated approval is needed. The tool takes the shared lock and rechecks current state. Never bypass an error with shell deletion, change DONE/evidence, or release another worker's claim to make cleanup pass.
 
 History snapshots under `.agents/queue/history/` retain the original UTF-8 JSON bytes, IDs, evidence, custom fields, checksum, archive time and selection. They remain dependency/tracker evidence and are not claimable or shown in the active queue list. Keep history in project version control; it has no automatic expiry. This command does not commit or push.
 

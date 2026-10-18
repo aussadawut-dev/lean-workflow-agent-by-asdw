@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Independent code reviewer for Lean Workflow. Use for HIGH review depth (see .lean/policy/REVIEW.md), or when the user asks for an independent review. Give it the Task Contract and the diff range, not your reasoning.
+description: Independent code reviewer for HIGH review depth or an independent-review request. Give it the Task Contract and diff range, not your reasoning.
 tools: Read, Grep, Glob, Bash
 model: inherit
 ---

@@ -1,6 +1,6 @@
 ---
 name: lean-model-update
-description: Research and propose refreshed Codex/Claude model metadata for the project catalog, applying only an explicitly authorized proposal. Does not switch session models or global runtime configuration.
+description: Propose refreshed Codex/Claude model metadata for the catalog; apply only an explicitly authorized proposal. Never switches session models or global runtime configuration.
 user-invocable: true
 argument-hint: "[codex|claude|all]"
 ---
@@ -12,6 +12,8 @@ Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity
 # Lean Model Update
 
 Read AGENTS, PROJECT and `workflow.py show`. Use the accepted scope; `/lean-scope` drafts new scope only if none matches. Default provider is the active agent's provider; ask if that cannot be determined. `/lean-model-update all` covers both providers. A request to refresh produces a proposal, not permission to apply it or switch a model.
+
+For a quick offline inspection of an existing catalog, use `python3 .lean/scripts/model_drift.py`; see [catalog format](references/catalog.md#offline-drift-inspection) for inputs, limits and exit codes. This does not refresh evidence or authorize apply.
 
 1. Use `/lean-research` to check current official model, configuration, effort, lifecycle and subagent documentation. Inspect only the relevant runtime's exposed choices and version. Public API model lists do not prove Codex/Claude Code account access. No paid inference probes or credential reads are needed. If browsing is unavailable, report that refresh could not be verified; never fabricate success or current timestamps.
 2. Read [catalog format](references/catalog.md) when preparing evidence. Keep source URLs and actual check dates, runtime/provider/version, exact model or alias, supported efforts and lifecycle. Mark availability `unknown` unless observed in the relevant runtime. Retain explicit user choices and record alias target changes; do not silently replace retired models. Research judgments about cost/capability are advisory and need sources, not inferred rankings from model names.
