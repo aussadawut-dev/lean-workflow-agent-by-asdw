@@ -79,6 +79,8 @@ def main():
         contract = reviewed
     if contract:
         command.extend(["--contract", contract])
+    if session:
+        command.extend(["--session", session])  # The runner reads that session's declared contract itself.
     if args.require_review or reviewed:
         command.append("--require-review")
     result = subprocess.run(command, text=True, capture_output=True, cwd=root)

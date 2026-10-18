@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Lean Workflow Baseline 4.5.0. This file is the canonical contract for all coding agents.
+Lean Workflow Baseline 4.6.0. This file is the canonical contract for all coding agents.
 
 **Before any task, read this file and `.lean/README.md`.**
 Explicit user instructions take precedence. The active agent owns the task unless the project records a different Controller or primary agent. No provider owns the workflow by default. Keep shared rules here; `CLAUDE.md` imports them.
@@ -10,7 +10,7 @@ Explicit user instructions take precedence. The active agent owns the task unles
 - Before changing files, write one contract line as the first line of your reply, before any preamble, plan or tool call (or start a field block there):
   `Contract: risk=<LOW|MEDIUM|HIGH> quality=<STANDARD|HIGH|VERY_HIGH> acceptance=<observable check>`
   For a trivial task: `Contract: trivial (<reason>)`. Infer values; do not ask the user. Risk rules and the block form: `.lean/policy/CONTRACTS.md`.
-  Hooks deny write-capable tools and non-read shell commands until the contract is bound; Claude's guard reads it from that first line once the reply is saved, which can wait for the first tool result. When the turn's first tool call writes or runs a non-read command, or the guard cannot read a transcript (Codex), first run `python3 .lean/scripts/contract_guard.py declare --contract '<one line>'` as a command of its own. Each new user prompt clears it.
+  Hooks deny only write tools and writing shell commands until the contract is bound; reads and inspection run first. Claude's guard reads the contract from that first line once the reply is saved, which can wait for the first tool result. When the turn's first tool call writes, or the guard cannot read a transcript (Codex), first run `python3 .lean/scripts/contract_guard.py declare --contract '<one line>'` as a command of its own. Each new user prompt clears it.
 - Use the smallest sufficient context: impact-based context selection in `.lean/policy/CONTEXT.md`. Do not read workflow internals (`.claude/hooks/`, `.lean/policy/`) unless the task needs them.
 - Behavior changes require meaningful tests.
 - Bug fixes require a regression test. Run it before the fix and show it fails, then show it passes after.
@@ -37,7 +37,7 @@ Explicit user instructions take precedence. The active agent owns the task unles
 ## Workflow procedures
 
 Procedures live under `.lean/skills/` (optional ones: `.lean/OPTIONAL.md`); their intensity follows `.lean/policy/SKILL-EFFORT.md` and never changes model reasoning effort.
-Use accepted scope and decisions; routine execution within approved scope needs no repeated approval. Scope changes and unresolved material decisions need the user's input before dependent work.
+Use accepted scope and decisions: a clear implementation request is accepted scope for the work it names, unless the request is ambiguous, risk is HIGH, or only a spec or analysis was asked for; routine execution within accepted scope needs no repeated approval. Material scope changes and unresolved material decisions need the user's input before dependent work.
 
 ## Policy router
 

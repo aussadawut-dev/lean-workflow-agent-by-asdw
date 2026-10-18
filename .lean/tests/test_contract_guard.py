@@ -81,48 +81,72 @@ class DeclareCommandTests(unittest.TestCase):
             f"python3 $(touch pwned).lean/scripts/contract_guard.py declare --contract '{LINE}'"))
 
 
-class ReadOnlyShellTests(unittest.TestCase):
-    def test_plain_reads_and_pipes_of_reads_are_read_only(self):
+class ShellWriteTests(unittest.TestCase):
+    def test_reads_inspection_chains_loops_and_other_tools_are_not_writes(self):
         for command in ("grep -n -i regression .lean/policy/TESTING.md", "cat a.py | head -5", "ls -la src",
-                        "git status --short", "git diff", "git log --oneline -3", "wc -l a.py b.py",
-                        "git show HEAD:a.py | tail -n 20", "grep -rn 'two words' src"):
-            self.assertTrue(contract_guard.read_only_shell(command), command)
+                        "git status --short", "git diff", "git log --oneline -3", "git show HEAD:a.py | tail -n 20",
+                        "rg -n 'def state' .lean/scripts", "sed -n 26,58p gate.py", "find . -name '*.py' -type f",
+                        "sort -u names.txt", "grep -n x a.py && sed -n 3,9p a.py", "ls src; git status --short",
+                        'cd /tmp && echo hi; for f in a b; do cat "$f"; done', 'x=$(git rev-parse HEAD); echo "$x"',
+                        "python3 .lean/scripts/workflow.py show", "python3 .lean/scripts/workflow.py context",
+                        "python3 .lean/scripts/gate_evidence.py --root . state", "python3 .lean/scripts/model_drift.py",
+                        "python3 -m unittest discover -s .lean/tests", "python3 .lean/tests/run_tests.py",
+                        "python3 .lean/scripts/clean_repo.py", "python3 .lean/scripts/skill_effort.py",
+                        "cat a 2>&1 | head", "ls > /dev/null", "cat a 2>/dev/null", "echo x >&2", "git branch -r",
+                        "git -C sub status", "git --no-pager log -1", "git tag -l 'v*'", "git remote -v",
+                        "git stash list", "git config --get user.name", "git worktree list", "git diff -M",
+                        "bash .lean/scripts/quality-gate.sh", "./script.sh --flag", "(cat a)", "cat a &",
+                        "grep 'a#b' f", "rg --hostname-bin=./h.sh x f", "find d -name v", "sed 1p f", "sed -n -e 1p f",
+                        "sort -T /tmp f", "sort -rn -k2 f", "python3 -c 'print(open(\"f\").read())'",
+                        "env | grep PATH", "time grep x f", "X=1 cat f", "xargs grep x", "npm test", "go test ./...",
+                        "cargo test", "perl -ne print f", "cat <<'EOF'\nhello\nEOF", "",
+                        # Review round 1: quoted substitutions, descriptor duplication, device sinks, keywords,
+                        # heredoc bodies, anchored open() modes, listing subcommands of tools that also write.
+                        'x="$(git rev-parse HEAD)"', 'echo "$(git status --short)"', "cmd >&2", "cmd 2>&1", "cmd >&-",
+                        "ls > /dev/stderr", "if grep -q x f; then echo yes; fi", "for f in a b; do cat $f; done",
+                        "python3 -c \"print(open('a.txt').read())\"", "cat <<'EOF'\ndon't\nEOF",
+                        "python3 - <<'PY'\n# don't\nprint(1)\nPY", "docker ps", "docker logs x", "curl -s url",
+                        "curl -sS -X POST url", "tar tf a.tgz", "unzip -l a.zip", "yarn test", "python3 -m pip list",
+                        "python3 -m unittest discover", "bash -c 'echo $HOME'", "sed -n 1p work.txt", "sed 's/x/y/' f",
+                        "time grep x f", "xargs -n 1 grep x", "brew list"):
+            self.assertFalse(contract_guard.shell_writes(command), command)
 
-    def test_common_inspection_commands_and_chains_of_reads_are_read_only(self):
-        for command in ("rg -n 'def state' .lean/scripts", "rg --files src | sort", "sed -n 26,58p gate.py",
-                        "sed -n -e 1p -e 5,9p a.py b.py", "find . -name '*.py' -type f", "find src -maxdepth 2",
-                        "sort -u names.txt", "cut -d: -f1 /etc/group | sort", "grep -n x a.py && sed -n 3,9p a.py",
-                        "ls src; git status --short", "git log -1 && rg TODO src | head -5",
-                        "rg -n -i --glob '*.py' -C 2 todo src", "rg -l --hidden -e a -e b .", "rg -tpy x",
-                        "find . -type f -name '*.md' -mtime -1 -print", "find . -path ./node_modules -prune -o -name x -print",
-                        "sort -rn -k2 counts.txt", "sort -t: -k3,3n f", "sort --unique --reverse f", "grep -n 'a#b' f"):
-            self.assertTrue(contract_guard.read_only_shell(command), command)
-
-    def test_writing_forms_of_the_added_commands_are_not_read_only(self):
-        for command in ("sed -i 1d f", "sed -n -i 1p f", "sed --in-place -n 1p f", "sed 1p f", "sed -n 1w out f",
-                        "sed -n '1p;w out' f", "sed -n 1e f", "sed -n /x/p f", "sed -n -f script.sed f",
-                        "find . -exec rm {} +", "find . -execdir sh -c x {} +", "find . -ok rm {} +",
-                        "find . -okdir rm {} +", "find . -fprint out", "find . -fprintf out x", "find . -fls out",
-                        "find . -fprint0 out", "sort -o out f", "sort -uo out f", "sort --output=out f",
-                        "sort --compress-program=sh f", "rg --pre=sh x", "rg --pre-glob '*' --pre sh x",
-                        "rg x && touch y", "ls; rm -rf build", "cat a || touch b",
-                        # Review round 1: shlex comments, bfs -rm, rg helper programs, sort abbreviations.
-                        "cat a#; rm -rf x", "ls x#;touch y", "grep x#&&touch y f", "find d -name v -rm",
-                        "find d -fdelete", "rg --hostname-bin=./h.sh --hyperlink-format=default x f",
-                        "rg --hostname-bin ./h.sh x f", "rg -z x f", "rg --search-zip x f",
-                        "sort --out=o1 f", "sort --o=x f", "sort --comp=sh f", "sort -T /tmp f",
-                        "sort --temporary-directory=/tmp f"):
-            self.assertFalse(contract_guard.read_only_shell(command), command)
-
-    def test_writes_chains_expansion_and_unknown_commands_are_not(self):
-        for command in ("grep x f > out", "cat a; rm b", "cat a && touch b", "cat a\nrm b", "ls $(touch x)",
-                        "cat `touch x`", "git diff --output=x", "grep x f | tee out", "head f >> y",
-                        "git -c core.pager=sh log", "git checkout -- a", "sed -n 1p f > out", "find . -delete",
-                        "X=1 cat f", "rg --pre sh x", "python3 -c 'print(1)'", "cat <(touch x)", "", "cat 'open",
-                        # Review round 1: multi-character operators shlex keeps as one token.
-                        "cat a >& f", "cat a &> f", "cat a >|f", "cat a |& tee f", "cat a <& 3", "cat a >&2",
-                        "cat a &", "cat a ||cat b", "(cat a)"):
-            self.assertFalse(contract_guard.read_only_shell(command), command)
+    def test_writes_runners_installers_and_invisible_commands_are_writes(self):
+        receipt_call = "python3 .lean/scripts/gate_evidence.py " + "record-" + "review --verdict PASS"
+        for command in ("cat a > b", "echo x >> f", "cat a >| f", "cat a &> f", "grep x f | tee out", "head f 1> y",
+                        "cmd 2> err.log", "sed -i '' s/a/b/ f", "sed -ni 1p f", "sed --in-place s/a/b/ f",
+                        "perl -pi -e s/a/b/ f", "perl -i.bak -ne print f", "rm -f x", "rm -rf build", "mkdir d",
+                        "touch x", "cp a b", "mv a b", "chmod +x f", "patch -p1", "/bin/rm x", "git commit -m x",
+                        "git add .", "git push", "git checkout -- f", "git -c core.pager=cat log", "git branch feature",
+                        "git tag v1", "git tag -d v1", "git remote add o url", "git stash", "git stash pop",
+                        "git config user.name x", "git worktree add ../w", "git fetch", "git reset --hard",
+                        "git diff --output=x", "git log --ext-diff", "python3 -c \"open('x','w').write('y')\"",
+                        "python3 - <<'PY'\nfrom pathlib import Path\nPath('x').write_text('y')\nPY",
+                        "node -e \"require('fs').writeFileSync('x','y')\"",
+                        "python3 .lean/scripts/workflow.py configure tracker",
+                        "python3 .lean/scripts/gate_evidence.py accept-controls --reason x", receipt_call,
+                        "python3 .lean/scripts/skill_pack.py enable", "python3 .lean/scripts/clean_repo.py --apply",
+                        "python3 .lean/scripts/skill_effort.py high", "python3 .lean/scripts/unknown.py",
+                        'eval "$cmd"', "bash -c 'cat a > b'", "sh -lc 'touch y'",
+                        "exec tee f", "env FOO=1 tee f", "nohup tee f", "xargs rm", "sudo ls", "npm install x",
+                        "pip install x", "go build ./...", "make", "cat a; rm b", "cat a && touch b",
+                        "cat a || touch b", "cat a\nrm b", "ls $(touch x)", "cat `touch x`", "find . -delete",
+                        "find . -exec rm {} +", "find d -name v -rm", "sort -o out f", "sort -uo out f",
+                        "sort --output=out f", "cat a#; rm -rf x", "cat 'open",
+                        # Review round 1: keywords hiding a writer, quoted substitutions, >& to a file, zsh >>|,
+                        # pip modules, brew, bare yarn, npx, docker, downloads, archives, perl digits, runner
+                        # option values, sed w, other inline writers, commands named by an expansion.
+                        "for f in a b; do cp $f /tmp; done", "if true; then rm x; fi", "{ rm x; }", "! rm x",
+                        "while true; do touch x; done", 'echo "$(rm -rf x)"', 'echo "$(git commit -m x)"',
+                        "cmd >& out.log", "cmd >&out", "cmd >>| f", "python3 -m pip install x", "python -m pip install x",
+                        "python3 -m venv .venv", "brew install jq", "yarn", "npx prettier --write .", "docker run x",
+                        "curl -o f url", "curl -sSLO url", "wget url", "tar xf a.tgz", "tar -czf out.tgz dir",
+                        "unzip a.zip", "perl -0pi -e s/a/b/ f", "xargs -I % rm %", "env -u X rm f", "nice -n 5 rm x",
+                        "sed -n '1w out' f", "sed 's/a/b/w out' f", "sed -f script.sed f",
+                        "python3 -c \"import os; os.system('rm x')\"",
+                        "python3 -c \"from pathlib import Path; Path('x').unlink()\"", "$cmd arg",
+                        '"$HOME/bin/rm" x', "${EDITOR} f"):
+            self.assertTrue(contract_guard.shell_writes(command), command)
 
 
 class HookFixture(unittest.TestCase):
@@ -209,6 +233,28 @@ class GuardHookTests(HookFixture):
                 self.assertEqual(self.tool(provider, "Bash", fresh,
                                            command=f"{DECLARE} --contract 'Contract: trivial (review)'").returncode, 0)
                 self.assertEqual(self.tool(provider, "Bash", fresh, command=record.format(LINE)).returncode, 0)
+
+    def test_receipt_calls_take_the_receipt_check_whatever_the_write_heuristic_says(self):
+        # Review round 1: a quoted word, a cd into the scripts directory and a dotted path all name a receipt
+        # call that the write heuristic alone would read as a plain script. (The word is split so that
+        # writing this file is not itself mistaken for a receipt call.)
+        word = "record-" "review"
+        plain = ("python3 .lean/scripts/gate_evidence.py WORD --contract '{}' --reviewer r "
+                 "--evidence e --verdict PASS --state abc").replace("WORD", word)
+        forms = (plain.replace(word, word.replace("review", '"review"')),
+                 plain.replace("python3 .lean/scripts/", "cd .lean/scripts && python3 "),
+                 plain.replace(".lean/scripts/", ".lean/tests/../scripts/"))
+        for command in forms:  # Without a contract every form is a write and waits for one.
+            denied = self.tool("claude", "Bash", "no-contract", command=command.format(LINE))
+            self.assertEqual(denied.returncode, 2, command)
+            self.assertIn("declare", denied.stderr)
+        self.assertEqual(self.tool("claude", "Bash", "author", command=f"{DECLARE} --contract '{LINE}'").returncode, 0)
+        for command in forms:  # With the author's contract declared, each reaches the own-receipt check.
+            denied = self.tool("claude", "Bash", "author", command=command.format(LINE))
+            self.assertEqual(denied.returncode, 2, command)
+            self.assertIn("independent reviewer", denied.stderr)
+        # A read that merely mentions the word runs once a contract exists.
+        self.assertEqual(self.tool("claude", "Bash", "author", command="grep -rn " + word + " .lean").returncode, 0)
 
     def test_receipt_check_parses_the_command_instead_of_matching_text(self):
         mentions = "Contract: risk=HIGH quality=HIGH acceptance=the author cannot record-review its own work"
@@ -356,11 +402,20 @@ class GuardHookTests(HookFixture):
         return self.hook("claude", "PreToolUse", {"session_id": session, "tool_name": "Edit",
                                                   "tool_input": {"file_path": "x.py"}, "transcript_path": transcript})
 
-    def test_read_only_shell_runs_before_a_contract_but_writes_do_not(self):
-        self.assertEqual(self.tool("claude", "Bash", "ro", command="grep -n x README.md").returncode, 0)
+    def test_reads_inspection_and_other_tools_run_before_a_contract_but_writes_do_not(self):
+        for command in ("grep -n x README.md", "cd /tmp && echo hi; for f in a; do cat $f; done",
+                        "python3 .lean/scripts/workflow.py show", "x=$(git rev-parse HEAD); echo $x"):
+            self.assertEqual(self.tool("claude", "Bash", "ro", command=command).returncode, 0, command)
         self.assertEqual(self.tool("codex", "Bash", "ro", command="git status --short").returncode, 0)
-        denied = self.tool("claude", "Bash", "ro", command="grep -n x README.md > out.txt")
-        self.assertEqual(denied.returncode, 2, denied.stderr)
+        self.assertEqual(self.tool("claude", "mcp__pencil__execute", "ro", script="x").returncode, 0)
+        self.assertEqual(self.tool("claude", "Agent", "ro", prompt="review").returncode, 0)
+        for name, tool_input in (("Bash", {"command": "grep -n x README.md > out.txt"}),
+                                 ("Bash", {"command": "git commit -m x"}), ("Write", {"file_path": "x.py"}),
+                                 ("NotebookEdit", {"notebook_path": "n.ipynb"})):
+            denied = self.tool("claude", name, "ro", **tool_input)
+            self.assertEqual(denied.returncode, 2, (name, denied.stderr))
+            self.assertIn("declare", denied.stderr)
+            self.assertNotIn("non-read", denied.stderr)
 
     def test_contract_written_first_in_the_reply_counts_as_the_declaration(self):
         tool_use = [{"type": "tool_use", "id": "u1", "name": "Read", "input": {}}]
@@ -463,7 +518,8 @@ class GuardHookTests(HookFixture):
         bad = self.tool("claude", "Bash", command=f"{DECLARE} --contract 'Contract: risk=LOW'")
         self.assertEqual(bad.returncode, 2)
         self.assertIn("Contract declaration rejected", bad.stderr)
-        self.assertEqual(self.tool("codex", "mcp__docs__update").returncode, 2)
+        # A tool the guard does not know is not gated before a contract; the Stop gate still checks changed work.
+        self.assertEqual(self.tool("codex", "mcp__docs__update").returncode, 0)
         self.assertEqual(self.tool("codex", "collaborationspawn_agent", task_name="review").returncode, 0)
         for payload in ({"tool_name": "Edit"}, {"session_id": "s1"}, ["not", "an", "object"]):
             self.assertEqual(self.hook("claude", "PreToolUse", payload).returncode, 2, payload)

@@ -409,6 +409,127 @@ class GateIntegrityTests(unittest.TestCase):
         settings.write_text('{"changed":true}')
         self.assertEqual(self.gate().returncode, 2)
 
+    def bind(self, session, contract):
+        """Declare `contract` for `session` the way the PreToolUse guard binds it."""
+        command = f"python3 .lean/scripts/contract_guard.py declare --contract '{contract}'"
+        bound = subprocess.run(["python3", str(self.root / ".lean/scripts/contract_guard.py"), "--root", str(self.root),
+                                "pre-tool"], input=json.dumps({"session_id": session, "tool_name": "Bash",
+                                                               "tool_input": {"command": command}}),
+                               text=True, capture_output=True)
+        self.assertEqual(bound.returncode, 0, bound.stderr)
+
+    def test_protected_gate_drift_is_accepted_by_an_independent_high_review(self):
+        # The manual accept-controls step stalled unattended runs after every reviewed hook or gate
+        # edit; a HIGH-depth PASS receipt for the session contract, whose state binds the changed
+        # controls, accepts them instead.
+        self.assertEqual(self.gate("--claude-hook", "--seed").returncode, 0)
+        self.project.write_text(self.project.read_text().replace("true", "echo changed"))
+        self.bind("s", CONTRACT)  # The runner reads the session's declared contract itself.
+        refused = self.gate("--session", "s")
+        self.assertEqual(refused.returncode, 2, refused.stderr)
+        self.assertIn("protected", refused.stderr.lower())
+        self.assertIn("PASS review", refused.stderr)
+        recorded = self.evidence("record-review", "--contract", CONTRACT, "--reviewer", "independent-test",
+                                 "--evidence", "fixture", "--verdict", "PASS")
+        self.assertEqual(recorded.returncode, 0, recorded.stderr)
+        accepted = self.gate("--session", "s")
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        self.assertIn("independent HIGH-depth PASS review by independent-test", accepted.stderr)
+        record = json.loads((self.root / ".agent-runtime/gate-controls.json").read_text())
+        self.assertTrue(record["history"][-1]["reason"].startswith(
+            "automatic: independent HIGH-depth review PASS by independent-test for " + CONTRACT))
+        self.assertEqual(record["history"][-1]["after"], record["controls"])
+        # A further control change is news again: the receipt no longer covers the state.
+        (self.root / ".claude/settings.json").write_text('{"changed":true}')
+        again = self.gate("--session", "s")
+        self.assertEqual(again.returncode, 2, again.stderr)
+        self.assertIn("protected", again.stderr.lower())
+
+    def test_other_receipts_and_a_missing_session_contract_do_not_accept_drift(self):
+        self.assertEqual(self.gate("--claude-hook", "--seed").returncode, 0)
+        stale = self.evidence("record-review", "--contract", CONTRACT, "--reviewer", "independent-test",
+                              "--evidence", "fixture", "--verdict", "PASS")  # Recorded before the drift.
+        self.assertEqual(stale.returncode, 0, stale.stderr)
+        self.project.write_text(self.project.read_text().replace("true", "echo changed"))
+        low = "Contract: risk=LOW quality=STANDARD acceptance=fixture"
+        other = "Contract: risk=HIGH quality=HIGH acceptance=some other task"
+        self.bind("s", CONTRACT)
+        self.bind("low", low)
+        cases = (("stale", None, None, ("--session", "s")),
+                 ("rework", "REWORK", CONTRACT, ("--session", "s")),
+                 ("low depth", "PASS", low, ("--session", "low")),
+                 ("another HIGH contract", "PASS", other, ("--session", "s")),
+                 # Review round 3: a valid receipt, but the contract came from the command line or a session
+                 # that declared nothing; only the guard's store names a contract the author cannot record for.
+                 ("explicit contract only", "PASS", CONTRACT, ("--contract", CONTRACT)),
+                 ("free-text session contract", None, None, ("--session-contract", CONTRACT)),
+                 ("session that declared nothing", None, None, ("--session", "nobody")),
+                 ("no session", None, None, ()))
+        for label, verdict, contract, gate_args in cases:
+            with self.subTest(receipt=label):
+                if verdict:
+                    recorded = self.evidence("record-review", "--contract", contract, "--reviewer", "independent-test",
+                                             "--evidence", "fixture", "--verdict", verdict)
+                    self.assertEqual(recorded.returncode, 0, recorded.stderr)
+                result = self.gate(*gate_args)
+                self.assertEqual(result.returncode, 2, (label, result.stderr))
+                if label != "free-text session contract":  # An unknown option is refused before any check.
+                    self.assertIn("protected", result.stderr.lower())
+                history = json.loads((self.root / ".agent-runtime/gate-controls.json").read_text())["history"]
+                self.assertFalse(any(entry["reason"].startswith("automatic") for entry in history))
+
+    def test_a_control_change_committed_before_the_review_is_not_accepted_by_it(self):
+        # Review round 1: a reviewer sees the diff against HEAD, so a control change already in HEAD
+        # when the review began was never in front of them; the reviewed base must still hold the
+        # accepted controls.
+        self.assertEqual(self.gate("--claude-hook", "--seed").returncode, 0)
+        (self.root / ".claude/settings.json").write_text('{"committed":true}')
+        self.git("-c", "user.name=test", "-c", "user.email=test@example.invalid", "commit", "-qam", "control change")
+        (self.root / "notes.txt").write_text("unrelated work\n")
+        recorded = self.evidence("record-review", "--contract", CONTRACT, "--reviewer", "independent-test",
+                                 "--evidence", "notes only", "--verdict", "PASS")
+        self.assertEqual(recorded.returncode, 0, recorded.stderr)
+        self.bind("s", CONTRACT)
+        result = self.gate("--session", "s")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("protected", result.stderr.lower())
+        self.assertEqual(self.evidence("accept-controls", "--reason", "User approved the committed control change").returncode, 0)
+        self.assertEqual(self.gate("--session", "s").returncode, 0)
+
+    def test_a_committed_control_change_edited_again_is_not_accepted_by_a_review_of_the_edit(self):
+        # Review of the new contract, round 1: the reviewer's diff starts at the committed value, so a
+        # review of a later edit must not accept the committed change underneath it.
+        self.assertEqual(self.gate("--claude-hook", "--seed").returncode, 0)
+        settings = self.root / ".claude/settings.json"
+        settings.write_text('{"hooks":"committed"}')
+        self.git("-c", "user.name=test", "-c", "user.email=test@example.invalid", "commit", "-qam", "control change")
+        settings.write_text('{"hooks":"committed","x":1}')
+        recorded = self.evidence("record-review", "--contract", CONTRACT, "--reviewer", "independent-test",
+                                 "--evidence", "edit only", "--verdict", "PASS")
+        self.assertEqual(recorded.returncode, 0, recorded.stderr)
+        self.bind("s", CONTRACT)
+        result = self.gate("--session", "s")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("protected", result.stderr.lower())
+
+    def test_a_control_git_does_not_show_is_not_accepted_by_review(self):
+        # An ignored control never appears in the reviewed diff, although the receipt state binds its bytes.
+        gitignore = self.root / ".gitignore"
+        gitignore.write_text(gitignore.read_text() + ".codex/quality-gate.json\n")
+        self.git("-c", "user.name=test", "-c", "user.email=test@example.invalid", "commit", "-qam", "ignore gate mode")
+        self.assertEqual(self.gate("--claude-hook", "--seed").returncode, 0)
+        self.assertEqual(self.gate().returncode, 0)  # Record the baseline with the ignore in place.
+        (self.root / ".codex").mkdir(exist_ok=True)
+        (self.root / ".codex/quality-gate.json").write_text('{"auto": true}\n')
+        (self.root / "notes.txt").write_text("unrelated work\n")
+        recorded = self.evidence("record-review", "--contract", CONTRACT, "--reviewer", "independent-test",
+                                 "--evidence", "notes only", "--verdict", "PASS")
+        self.assertEqual(recorded.returncode, 0, recorded.stderr)
+        self.bind("s", CONTRACT)
+        result = self.gate("--session", "s")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("protected", result.stderr.lower())
+
     def test_receipt_mismatch_names_what_differs(self):
         # A reviewer that paraphrased the contract can re-record in one step when told the exact text.
         paraphrase = "Contract: risk=HIGH quality=HIGH acceptance=fixture check passes"
@@ -567,18 +688,73 @@ class TrustedControlRefTests(unittest.TestCase):
         """Simulate a fetched upstream ref whose tree is the current commit."""
         self.git("update-ref", ref, "HEAD")
 
-    def claude(self):
+    def claude(self, payload=None):
         env = dict(os.environ, CLAUDE_PROJECT_DIR=str(self.root))
         env.pop("CLAUDE_GATE_FORCE", None)
         return stop_refusal(subprocess.run(["bash", str(self.root / ".claude/hooks/quality-gate.sh")],
-                                           input="{}", text=True, capture_output=True, env=env))
+                                           input=json.dumps(payload or {}), text=True, capture_output=True, env=env))
 
-    def codex(self):
-        return subprocess.run(["python3", str(self.root / ".codex/hooks/quality_gate.py"), "run", "--root", str(self.root)],
-                              input="{}", text=True, capture_output=True)
+    def codex(self, *args):
+        return subprocess.run(["python3", str(self.root / ".codex/hooks/quality_gate.py"), "run", "--root", str(self.root),
+                               *args], input="{}", text=True, capture_output=True)
+
+    def codex_event(self, event, session):
+        return stop_refusal(subprocess.run(["python3", str(self.root / ".codex/hooks/quality_gate.py"), event, "--root",
+                                            str(self.root)], input=json.dumps({"session_id": session}), text=True,
+                                           capture_output=True))
 
     def history(self):
         return json.loads((self.root / ".agent-runtime/gate-controls.json").read_text())["history"]
+
+    def test_reviewed_control_drift_is_accepted_for_both_providers(self):
+        helper = ["python3", str(self.root / ".lean/scripts/gate_evidence.py"), "--root", str(self.root)]
+        guard = ["python3", str(self.root / ".lean/scripts/contract_guard.py"), "--root", str(self.root), "pre-tool"]
+
+        def bind(session, contract):  # Declare the contract for the session, as the PreToolUse guard does.
+            declare = f"python3 .lean/scripts/contract_guard.py declare --contract '{contract}'"
+            bound = subprocess.run(guard, input=json.dumps({"session_id": session, "tool_name": "Bash",
+                                                            "tool_input": {"command": declare}}),
+                                   text=True, capture_output=True)
+            self.assertEqual(bound.returncode, 0, bound.stderr)
+
+        def record(contract):
+            snapshot = subprocess.run(helper + ["state"], text=True, capture_output=True).stdout.strip()
+            recorded = subprocess.run(helper + ["record-review", "--contract", contract, "--reviewer", "independent-test",
+                                                "--evidence", "fixture", "--verdict", "PASS", "--state", snapshot],
+                                      text=True, capture_output=True)
+            self.assertEqual(recorded.returncode, 0, recorded.stderr)
+
+        runs = {"claude": lambda: self.claude({"session_id": "claude-s"}),
+                "codex": lambda: self.codex_event("stop", "codex-s")}
+        for name, run in runs.items():
+            with self.subTest(adapter=name):
+                self.settings.write_text(json.dumps({"reviewed": name}))  # No trusted ref carries this.
+                bind(f"{name}-s", CONTRACT)
+                refused = run()
+                self.assertEqual(refused.returncode, 2, refused.stderr)
+                self.assertIn("protected", refused.stderr.lower())
+                record(CONTRACT)
+                if name == "codex":  # An explicit run trusts no contract for this: the author may have passed it.
+                    explicit = self.codex("--contract", CONTRACT)
+                    self.assertEqual(explicit.returncode, 2, explicit.stderr)
+                result = run()
+                self.assertEqual(result.returncode, 0, result.stderr)
+                if name == "claude":  # A passing Codex Stop reports a JSON message, not the runner's notes.
+                    self.assertIn("independent HIGH-depth PASS review", result.stderr)
+                self.assertTrue(self.history()[-1]["reason"].startswith(
+                    "automatic: independent HIGH-depth review PASS by independent-test"))
+                self.assertEqual(run().returncode, 0)
+                self.commit(f"accepted {name} controls")  # The next diff starts at the accepted value.
+        # Review round 2: a Codex Stop whose session declared nothing falls back to the receipt's own
+        # contract for its review check; that contract must not accept drift, or an author could record
+        # a PASS under a made-up HIGH contract and have the gate call it an independent review.
+        self.settings.write_text(json.dumps({"reviewed": "fabricated"}))
+        record("Contract: risk=HIGH quality=HIGH acceptance=fabricated")
+        self.assertEqual(self.codex_event("session-start", "fresh").returncode, 0)
+        fresh = self.codex_event("stop", "fresh")
+        self.assertEqual(fresh.returncode, 2, fresh.stderr)
+        self.assertIn("protected", fresh.stderr.lower())
+        self.assertFalse(any("fabricated" in entry["reason"] for entry in self.history()))
 
     def test_controls_matching_a_trusted_remote_ref_are_accepted_for_both_providers(self):
         for adapter in (self.claude, self.codex):

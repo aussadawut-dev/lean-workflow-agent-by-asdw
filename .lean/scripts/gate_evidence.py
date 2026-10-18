@@ -351,11 +351,54 @@ def check_shipped(root):
         raise ValueError("No HIGH-depth PASS review receipt covers the current shipping state")
 
 
+def reviewed_controls(root, old, current, contract):
+    """(reviewer, contract, state) of a PASS receipt for `contract` that reviewed the whole control change, or None.
+
+    The receipt must be for the session contract, which the author's main thread cannot record
+    (contract_guard), at HIGH depth. Its state binds the current control bytes, and its base is
+    HEAD's tree when the review began, so the reviewed diff runs from base to now. Each changed
+    control must start that diff at its accepted value and be visible to Git: a control change
+    committed before the review began (edited again or not) or an ignored control is not
+    accepted. The receipt is attestation-level evidence, like any receipt; the manual
+    accept-controls procedure stays for an unreviewed change.
+    """
+    if not contract or not isinstance(old, dict):
+        return None
+    try:
+        check_shipped(root)
+        check_review(root, contract)
+        receipt = json.loads((root / ".agent-runtime" / "review.json").read_text())
+        base = comparable(controls_at(root, receipt["base"]))
+    except (OSError, ValueError, AttributeError, TypeError, KeyError, subprocess.CalledProcessError):
+        return None
+    now, accepted = comparable(current), comparable(old.get("controls") or {})
+    for name in set(now) | set(base) | set(accepted):
+        if now.get(name) == accepted.get(name):
+            continue
+        # The reviewed diff runs from base to now, so it shows the whole change only when it starts
+        # at the accepted value and Git shows the file at all (an ignored control never appears).
+        path = PROJECT if name in ("gate", "trusted_control_refs") else name
+        if base.get(name) != accepted.get(name) or not git_visible(root, path):
+            return None
+    return str(receipt.get("reviewer")), str(receipt.get("contract")), str(receipt.get("state", ""))
+
+
+def git_visible(root, name):
+    """Whether Git shows this path in a diff: tracked, or untracked and not ignored."""
+    try:
+        listed = git(root, "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", name)
+        deleted = git(root, "ls-tree", "-z", "--name-only", "HEAD", "--", name)
+    except subprocess.CalledProcessError:
+        return False
+    return bool(listed.strip(b"\0") or deleted.strip(b"\0"))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("guard-controls")
+    guard = commands.add_parser("guard-controls")
+    guard.add_argument("--contract", help="the session's Task Contract, so a review receipt for it can accept drift")
     accept = commands.add_parser("accept-controls")
     accept.add_argument("--reason", required=True)
     commands.add_parser("state", help="the shipping state a review receipt covers")
@@ -394,15 +437,25 @@ def main():
                 old = json.loads(path.read_text())
                 if old.get("controls") != current:
                     match = trusted_match(root, current)
-                    if match is None:
-                        hint = (" No trusted-control-refs entry matches them." if current.get("trusted_control_refs") else "")
-                        raise ValueError("Protected gate controls changed. Inspect the diff; use accept-controls --reason "
-                                         "only for an already user-approved change." + hint)
-                    ref, commit = match
-                    reason = f"automatic: controls match trusted ref {ref} at {commit}"
+                    if match is not None:
+                        ref, commit = match
+                        reason = f"automatic: controls match trusted ref {ref} at {commit}"
+                        note = f"Gate evidence: protected gate controls accepted; they match {ref} ({commit[:12]})."
+                    else:
+                        reviewed = reviewed_controls(root, old, current, args.contract)
+                        if reviewed is None:
+                            hint = (" No trusted-control-refs entry matches them." if current.get("trusted_control_refs") else "")
+                            raise ValueError("Protected gate controls changed. Inspect the diff; use accept-controls --reason "
+                                             "only for an already user-approved change, or let an independent HIGH-depth "
+                                             "PASS review cover the change." + hint)
+                        reviewer, contract, receipt_state = reviewed
+                        reason = (f"automatic: independent HIGH-depth review PASS by {reviewer} for {contract} covers "
+                                  f"these controls (receipt state {receipt_state[:12]})")
+                        note = (f"Gate evidence: protected gate controls accepted; an independent HIGH-depth PASS review "
+                                f"by {reviewer} covers them.")
                     history = old.get("history", []) + [{"before": old.get("controls"), "after": current, "reason": reason}]
                     save(path, {"schema": 1, "controls": current, "history": history})
-                    print(f"Gate evidence: protected gate controls accepted; they match {ref} ({commit[:12]}).", file=sys.stderr)
+                    print(note, file=sys.stderr)
         elif args.command == "state":
             print(captured_state(root))
         elif args.command == "gate-state":

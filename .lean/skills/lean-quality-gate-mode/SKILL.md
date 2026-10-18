@@ -11,6 +11,6 @@ The optional project-owned `.codex/quality-gate.json` controls both providers at
 
 In manual mode, automatic Stops skip the full gate and report NOT_RUN. Obtain applicable user authorization before an explicit full run, reusing matching workset/batch approval. Deferred checks never count as a pass; keep VALIDATING/BLOCKED until current acceptance, gate and required review are satisfied. Direct shared runner calls and `python3 .codex/hooks/quality_gate.py run` remain explicit validation entry points; `CLAUDE_GATE_FORCE=1 .claude/hooks/quality-gate.sh` forces the Claude adapter.
 
-Mode changes are protected gate-control changes. Inspect control drift and record only matching already-given approval through the existing `gate_evidence.py accept-controls` procedure; do not use a toggle to approve unrelated hook or gate edits. Use exact contract/review flags for HIGH work. See [runtime guidance](../../policy/QUALITY.md). This command changes automation policy, not acceptance, review, publication or permissions.
+Mode changes are protected gate-control changes. Inspect control drift and record only matching already-given approval through the existing `gate_evidence.py accept-controls` procedure, or let an independent HIGH-depth PASS review cover the change; do not use a toggle to approve unrelated hook or gate edits. Use exact contract/review flags for HIGH work. See [runtime guidance](../../policy/QUALITY.md). This command changes automation policy, not acceptance, review, publication or permissions.
 
 $ARGUMENTS

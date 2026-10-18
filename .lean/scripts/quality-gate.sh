@@ -11,6 +11,8 @@ seed=0
 cache_tree=0
 require_review=0
 contract=""
+session=""  # From the hook payload, or --session for a direct run.
+session_contract=""  # Resolved from the guard's store by session id; never taken from the command line.
 helper="$(cd "$(dirname "$0")" && pwd)/gate_evidence.py"
 root="$(pwd)"
 while [ "$#" -gt 0 ]; do
@@ -22,6 +24,9 @@ while [ "$#" -gt 0 ]; do
     --contract)
       [ "$#" -ge 2 ] || { echo "--contract requires a line" >&2; exit 2; }
       contract="$2"; shift 2 ;;
+    --session)
+      [ "$#" -ge 2 ] || { echo "--session requires an id" >&2; exit 2; }
+      session="$2"; shift 2 ;;
     --root)
       [ "$#" -ge 2 ] || { echo "--root requires a path" >&2; exit 2; }
       root="$2"; shift 2 ;;
@@ -44,7 +49,6 @@ refusal="$root/.agent-runtime/gate-refusal"
 
 active=0
 transcript=""
-session=""
 errlog=""
 if [ "$hook" -eq 1 ] && [ "$seed" -eq 0 ]; then
   input="$(cat)"
@@ -109,8 +113,25 @@ if [ "$seed" -eq 0 ] && { [ -e "$root/.agent-runtime/active-target.json" ] || [ 
   python3 "$root/.lean/scripts/submodule.py" --root "$root" gate --optional || { refuse; exit 2; }
 fi
 
+# The contract a session declared through the PreToolUse guard, read from the guard's store by
+# session id (a hook payload or --session). Only a receipt for that contract can accept changed
+# controls: the author's main thread cannot record one, while an explicit --contract or a
+# receipt's own contract is text anyone may have written.
+if [ -n "$session" ]; then
+  session_contract="$(python3 "$(dirname "$helper")/contract_guard.py" --root "$root" current --session "$session" 2>/dev/null)" ||
+    session_contract=""
+fi
+# For a hook Stop that contract is the session's contract; the transcript is only a fallback,
+# because a runtime may not persist every text block.
+declared=""
+if [ "$hook" -eq 1 ] && [ -z "$contract" ] && [ -n "$session_contract" ]; then
+  declared="$session_contract"
+  contract="$declared"
+fi
 # Name any High-risk review still ahead in the same refusal, so both steps are asked for at once.
-if ! python3 "$helper" --root "$root" guard-controls; then
+guard_args=()
+[ -z "$session_contract" ] || guard_args=(--contract "$session_contract")
+if ! python3 "$helper" --root "$root" guard-controls ${guard_args[@]+"${guard_args[@]}"}; then
   pending="$(python3 "$helper" --root "$root" high-risk 2>/dev/null)" || pending=""
   [ -z "$pending" ] || { echo "After that, HIGH independent review is also required for these High-risk changes:"; printf '%s\n' "$pending"; } >&2
   refuse; exit 2
@@ -152,13 +173,6 @@ changed=1
 for prior in "$baseline" "$cache"; do
   if [ -n "$state" ] && [ -f "$prior" ] && [ "$(cat "$prior")" = "$state" ]; then changed=0; fi
 done
-# A contract declared through the PreToolUse guard is the session's contract; the
-# transcript is only a fallback, because a runtime may not persist every text block.
-declared=""
-if [ "$hook" -eq 1 ] && [ -z "$contract" ] && [ -n "$session" ]; then
-  declared="$(python3 "$(dirname "$helper")/contract_guard.py" --root "$root" current --session "$session" 2>/dev/null)" &&
-    contract="$declared"
-fi
 if [ "$hook" -eq 1 ] && [ -z "$declared" ] && [ -n "$transcript" ]; then
   if [ ! -r "$transcript" ]; then
     echo "Contract transcript unreadable: $transcript" >&2
