@@ -348,9 +348,11 @@ def simple_commands(words):
 # Shell commands that write, by a best-effort pattern over the parsed words. Reads and inspection
 # run before a contract; the Stop gate still refuses changed work that has no contract, so this
 # check only makes the contract come before the first write. Unparseable text, a command named by
-# an expansion (`eval "$cmd"`, `$tool x`), a backtick, `sudo`, `npx` and `wget` count as writes; an
-# unlisted interpreter, tool or script, a write hidden in a heredoc body, or a path hidden behind
-# `cd` is not caught.
+# an expansion (`eval "$cmd"`, `$tool x`), a backtick, a shell reading commands from stdin, `sudo`,
+# `npx` and `wget` count as writes; runners (`eval`, `sh -c`, `xargs`, `env`) are judged by the
+# command they run. An unlisted interpreter, tool or script, a write hidden in a heredoc body fed
+# to anything but a shell, or a path hidden behind `cd` is not caught, and a quoted `>` reads as a
+# redirection.
 READ_GIT = {"status", "diff", "log", "show", "ls-files", "rev-parse", "blame", "describe", "rev-list", "cat-file",
             "ls-tree", "ls-remote", "grep", "shortlog", "reflog", "for-each-ref", "merge-base", "name-rev",
             "check-ignore", "diff-tree", "diff-index", "count-objects", "symbolic-ref", "var", "version", "help"}
@@ -365,7 +367,7 @@ GIT_CHANGERS = {"-d", "-D", "-m", "-M", "-c", "-C", "-u", "-f", "-F", "-s", "-e"
 GIT_OUTPUT_OPTIONS = ("--output", "--ext-diff", "--textconv")
 WRITE_COMMANDS = WRITERS | {"rm", "rmdir", "mkdir", "chmod", "chown", "chgrp", "patch", "apply_patch", "make", "sudo",
                             "npx", "wget"}
-KEYWORDS = {"do", "then", "else", "elif", "if", "while", "until", "!", "{", "}", "coproc", "function"}
+KEYWORDS = {"do", "then", "else", "elif", "if", "while", "until", "!", "{", "}", "coproc", "function", "()"}
 SHELLS = {"sh", "bash", "zsh", "dash", "ksh"}
 RUNNERS = {"xargs", "env", "nohup", "time", "nice", "command", "builtin"}
 INSTALLERS = {"npm", "pnpm", "yarn", "pip", "pip3", "uv", "cargo", "go", "brew"}
@@ -380,7 +382,17 @@ INLINE_WRITE = re.compile(r"open\([^,)]*,\s*['\"][rbt+]*[wax]|mode\s*=\s*['\"][r
                           r"|shutil\.|\.(unlink|rmdir|mkdir|touch)\(|writeFile(Sync)?\(|fs\.(rm|unlink|rename|mkdir)")
 FILE_REDIRECTS = {">", ">>", ">|", ">>|", "&>", "&>>"}
 DEV_SINKS = {"/dev/null", "/dev/stderr", "/dev/stdout", "/dev/tty"}
-SED_WRITE = re.compile(r"(?<![a-zA-Z])[wW](?![a-zA-Z])")  # A `w` command or an `s///w` flag writes a file.
+# A `w`/`W` command writes the file that follows it: after the start, an address, `!`, `;` or `{`
+# (with or without a space before the name), or as an `s///` flag after other flags (with a space).
+SED_WRITE = re.compile(r"(?:^|[;{}!0-9$])\s*[wW](?:\s+\S|/)|[/,][gpiImMe0-9]*[wW]\s+\S")
+# Options that take the next word as their value, so it is not the command a runner runs.
+RUNNER_VALUES = {"xargs": {"-I", "-J", "-R", "-S", "-n", "-P", "-L", "-s", "-d", "-E", "-a", "--max-args", "--max-lines",
+                           "--max-procs", "--max-chars", "--delimiter", "--arg-file", "--eof", "--replace"},
+                 "env": {"-u", "-C", "--unset", "--chdir"}, "nice": {"-n", "--adjustment"},
+                 "time": {"-f", "-o", "--format", "--output"}}
+ENV_COMMAND_LINE = ("-S", "--split-string")  # env runs this value as a command line.
+SHELL_VALUED = {"-o", "+o", "-O", "+O"}  # Shell options whose next word is an option name, not a script.
+PERL_VALUED = ("-M", "-m", "-I", "-e", "-E", "-x", "-C")  # Their letters are not switches.
 # Lean scripts whose listed first argument only reads: every other call to a listed script writes,
 # an unlisted script under .lean/scripts/ writes, and None marks a script that never writes.
 LEAN_READS = {"workflow.py": {"show", "check", "context"},
@@ -456,10 +468,21 @@ def quoted_substitutions(words):
                 yield word[start + 2:end if end > start else len(word)]
 
 
-def nested_writes(words, raw, depth):
-    """A runner's command, read from every non-option word on: `xargs -I % rm %` runs rm."""
-    return any(not word.startswith("-") and command_writes(words[index:], raw, depth + 1)
-               for index, word in enumerate(words))
+def nested_writes(name, args, raw, depth):
+    """The command a runner runs, after its options and their values: `xargs -I % rm %` runs rm."""
+    if name == "command" and any(word in ("-v", "-V") for word in args):
+        return False  # A lookup, not a run.
+    takes, index = RUNNER_VALUES.get(name, set()), 0
+    while index < len(args) and args[index].startswith("-"):
+        word = args[index]
+        if word == "--":
+            index += 1
+            break
+        if name == "env" and word.split("=", 1)[0] in ENV_COMMAND_LINE:
+            line = word.split("=", 1)[1] if "=" in word else (args[index + 1] if index + 1 < len(args) else "")
+            return shell_writes(line, depth + 1)
+        index += 2 if word in takes else 1
+    return command_writes(args[index:], raw, depth + 1)
 
 
 def command_writes(words, raw, depth=0):
@@ -467,7 +490,12 @@ def command_writes(words, raw, depth=0):
     if depth > 3:
         return True
     while words and (words[0] in KEYWORDS or ("=" in words[0] and not words[0].startswith(("-", "=")))):
-        words = words[1:]  # Shell keywords and leading environment assignments.
+        # Shell keywords and leading environment assignments; `function NAME` also drops the name.
+        words = words[2:] if words[0] == "function" else words[1:]
+    while len(words) >= 2 and words[1] == "()":
+        words = words[2:]  # A POSIX `NAME() { ... }` definition: the body follows.
+        while words and words[0] in KEYWORDS:
+            words = words[1:]
     if not words:
         return False
     if words[0].startswith("$"):
@@ -482,25 +510,42 @@ def command_writes(words, raw, depth=0):
         return not positional or positional[0] not in CONTAINER_READS
     if name == "unzip":
         return not any(word in ("-l", "-t", "-Z", "-z") for word in args)
-    if name == "tar":
+    if name == "tar":  # Extract, create, append or update, as a long option or in any short cluster.
         return bool(args) and (any(word.startswith(("--extract", "--create", "--append", "--update", "--delete"))
-                                   for word in args) or bool(re.match(r"-?[a-zA-Z]*[xcru]", args[0])))
+                                   or re.fullmatch(r"-[a-zA-Z]*[xcru][a-zA-Z]*", word) for word in args)
+                               or bool(re.match(r"[a-zA-Z]*[xcru]", args[0])))
     if name == "curl":
         return any(word.startswith(("--output", "--remote-name")) or re.match(r"-[a-zA-Z]*[oO]", word) for word in args)
     if name in SHELLS:
         nested = next((args[i + 1] for i, word in enumerate(args[:-1])
                        if word.startswith("-") and not word.startswith("--") and "c" in word[1:]), None)
-        return nested is not None and shell_writes(nested, depth + 1)
+        if nested is not None:
+            return shell_writes(nested, depth + 1)
+        # Without -c or a script, or with -s, the shell runs commands from stdin, which the guard cannot see.
+        script, index = None, 0
+        while index < len(args):
+            word = args[index]
+            if word in SHELL_VALUED:
+                index += 2
+                continue
+            if not word.startswith(("-", "+")):
+                script = word
+                break
+            index += 1
+        return script is None or any("s" in word[1:] for word in args if word.startswith("-") and not word.startswith("--"))
     if name in ("eval", "exec", "source", "."):
         return shell_writes(" ".join(args), depth + 1)
     if name in RUNNERS:
-        return nested_writes(args, raw, depth)
+        return nested_writes(name, args, raw, depth)
     if name == "git":
         return git_writes(args)
     if name == "perl":
-        return any(word.startswith("--in-place") or re.match(r"-[0-9a-zA-Z]*i", word) for word in args)
+        return any(word.startswith("--in-place") or (re.match(r"-[0-9a-zA-Z]*i", word)
+                                                     and not word.startswith(PERL_VALUED)) for word in args)
     if name == "sed":
-        scripts = positional + [args[i + 1] for i, word in enumerate(args[:-1]) if word in ("-e", "--expression")]
+        # The script is the -e values, or else the first positional word; the rest are file names.
+        scripts = [args[i + 1] for i, word in enumerate(args[:-1]) if word in ("-e", "--expression")]
+        scripts = scripts or positional[:1]
         return (any(word.startswith(("--in-place", "-f", "--file")) or re.match(r"-[a-zA-Z]*i", word) for word in args)
                 or any(SED_WRITE.search(script) for script in scripts))
     if name == "find":

@@ -108,7 +108,14 @@ class ShellWriteTests(unittest.TestCase):
                         "python3 - <<'PY'\n# don't\nprint(1)\nPY", "docker ps", "docker logs x", "curl -s url",
                         "curl -sS -X POST url", "tar tf a.tgz", "unzip -l a.zip", "yarn test", "python3 -m pip list",
                         "python3 -m unittest discover", "bash -c 'echo $HOME'", "sed -n 1p work.txt", "sed 's/x/y/' f",
-                        "time grep x f", "xargs -n 1 grep x", "brew list"):
+                        "time grep x f", "xargs -n 1 grep x", "brew list",
+                        # Follow-up: sed file names, perl module flags, lookups and runner arguments are data.
+                        "sed -n '1,20p' src/w/x.py", "sed -n 1,5p w.txt", "sed -n '/^W/p' f", "sed -e 1p w",
+                        "perl -Mstrict -e 'print 1'", "perl -Ilib -ne print f", "command -v rm", "command -V make",
+                        "xargs grep -l rm", "env grep make f", "xargs -I % grep x %", "nice -n 5 grep rm f",
+                        "bash .lean/scripts/quality-gate.sh --session s", "sh ./script.sh", "tar -C d -tf a.tar",
+                        "bash -o pipefail script.sh", "xargs -J % grep x %", "env -S 'grep x f'",
+                        "sed -n '/word/p' f", "sed 's/w/x/' f"):
             self.assertFalse(contract_guard.shell_writes(command), command)
 
     def test_writes_runners_installers_and_invisible_commands_are_writes(self):
@@ -145,7 +152,19 @@ class ShellWriteTests(unittest.TestCase):
                         "sed -n '1w out' f", "sed 's/a/b/w out' f", "sed -f script.sed f",
                         "python3 -c \"import os; os.system('rm x')\"",
                         "python3 -c \"from pathlib import Path; Path('x').unlink()\"", "$cmd arg",
-                        '"$HOME/bin/rm" x', "${EDITOR} f"):
+                        '"$HOME/bin/rm" x', "${EDITOR} f",
+                        # Follow-up: shells reading commands from stdin, function bodies, tar options after -C.
+                        "bash <<'EOF'\nrm -rf x\nEOF", "echo 'rm x' | sh", "bash -s < f", "cat cmds | bash",
+                        "zsh -s", "function f { rm x; }", "function f() { touch y; }", "tar -C d -xf a.tar",
+                        "tar -v -czf out.tgz dir", "xargs -n 1 rm", "env -C /tmp rm f", "time -p rm x",
+                        "sed -e 's/a/b/' -e 'w out' f", "perl -pi -e s/a/b/ f", "perl -Mstrict -pi -e s/a/b/ f",
+                        # Review round 1 of the follow-up: POSIX function bodies, more runner value options,
+                        # env -S command lines, sed flags before w and other w addresses, perl -d, bash -o.
+                        "f() { rm x; }", "f () { rm x; }", "f(){ rm x;}", "xargs -J % rm %", "xargs -R 1 rm",
+                        "xargs -S 1 rm", "xargs --max-args 1 rm", "env --unset X rm f", "nice --adjustment 5 rm x",
+                        "time --output t.txt rm x", "env -S 'rm f'", "env --split-string 'rm f'",
+                        "sed 's/a/b/gw out' f", "sed 's/a/b/pw out' f", "sed 's/a/b/Iw out' f", "sed -n '1!w out' f",
+                        "sed -n 'w/tmp/x' f", "sed -n '\\,x,w out' f", "perl -dpi -e x f", "bash -o pipefail"):
             self.assertTrue(contract_guard.shell_writes(command), command)
 
 

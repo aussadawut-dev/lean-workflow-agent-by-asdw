@@ -29,7 +29,7 @@ python3 .lean/scripts/workflow.py tracker archive --apply
 python3 .lean/scripts/workflow.py tracker archive --id TCK001 --apply
 ```
 
-`python3 .lean/scripts/workflow.py context` prints mode, the active tracker and its next step, claims, Git state and the last gate result as JSON, to resume work after a break or context loss. Both commands run in a shell, so the contract guard requires a Task Contract first (the first line of your reply in Claude, or `declare`), even for `context` and `--dry-run`.
+`python3 .lean/scripts/workflow.py context` prints mode, the active tracker and its next step, claims, Git state and the last gate result as JSON (the gate status comes from Claude Stop hook markers, so a direct runner or Codex run reads as `NOT_RUN` or `STALE`), to resume work after a break or context loss. `context` only reads, so it runs without a Task Contract; `tracker archive`, including `--dry-run`, counts as a write for the contract guard and needs one first (the first line of your reply in Claude, or `declare`).
 
 ## Upgrade or downgrade modes
 

@@ -354,8 +354,9 @@ def check_shipped(root):
 def reviewed_controls(root, old, current, contract):
     """(reviewer, contract, state) of a PASS receipt for `contract` that reviewed the whole control change, or None.
 
-    The receipt must be for the session contract, which the author's main thread cannot record
-    (contract_guard), at HIGH depth. Its state binds the current control bytes, and its base is
+    The receipt must be for the session contract at HIGH depth. The contract guard stops the
+    author's main thread recording a receipt for the contract it has declared, not one for a
+    contract it declares later, so this is attestation-level evidence like any receipt. Its state binds the current control bytes, and its base is
     HEAD's tree when the review began, so the reviewed diff runs from base to now. Each changed
     control must start that diff at its accepted value and be visible to Git: a control change
     committed before the review began (edited again or not) or an ignored control is not
