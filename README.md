@@ -4,7 +4,9 @@ I built this because I want a coding agent to understand the work, check what it
 
 It works with **Claude Code and Codex**, with one shared set of rules and skills. Use it with your own stack.
 
-**Baseline 4.7.0** · [MIT License](LICENSE)
+**Baseline 4.8.0** · [MIT License](LICENSE)
+
+This release adds bounded worker budgets and handoff rules. See the [4.8.0 release notes](.lean/CHANGELOG.md#480--2026-10-19) for changes and upgrade notes.
 
 The idea is simple: **agree on the work → implement → test → validate → review → finish with evidence**. Use the steps the task needs. You do not have to call every skill or read every file to get started.
 
@@ -17,8 +19,9 @@ The idea is simple: **agree on the work → implement → test → validate → 
 - Three modes: keep evidence in the chat, keep a workset across sessions, or add a queue with explicit ownership.
 - Nine core skills, ten optional skills, and `standard` / `high` / `ultra` procedure intensity.
 - Gate locking to avoid overlapping runs, and history checks to avoid reusing task IDs.
+- Worker assignments with a turn budget, required tests and a handoff when the budget runs out.
 
-The template starts with unconfigured `standard` mode and `direct` execution. It contains no task history or leases. Mode, execution, model choice and review depth are separate settings.
+The template starts with unconfigured `standard` mode and `direct` execution. The portable workflow assets exclude project task history and leases. Mode, execution, model choice and review depth are separate settings.
 
 ## Quick start
 
@@ -56,6 +59,12 @@ $lean-task Fix expired queue leases; add a regression test and run the project c
 
 The agent states a Task Contract, clears up important open decisions, does the accepted work, runs tests and validation, reviews the changes, and checks whether it can finish. It keeps decisions you have already made. It comes back to you when the scope changes or an important decision needs your input.
 
+A clear implementation request accepts the scope it names, so routine work can continue. Scope planning pauses when the request is ambiguous, a material decision is open, risk is HIGH, or you asked only for a spec or analysis. Before edits, the agent states an observable check, for example:
+
+```text
+Contract: risk=MEDIUM quality=STANDARD acceptance=expired queue claims can be reclaimed and the regression test passes
+```
+
 You can also call a skill for just one part of the work:
 
 | What you want to do | Claude Code | Codex |
@@ -90,6 +99,18 @@ python3 .lean/scripts/workflow.py check
 Execution is a separate choice. `direct` means the active agent does the work. `delegated` means it acts as Controller, assigns a bounded task to a worker, then validates and integrates the result. Parallel workers need explicit user intent, independent tasks and separate file ownership.
 
 Every mode keeps the same test and review requirements. HIGH-depth review needs an independent reviewer with either execution choice. For setup and mode changes, see [getting started](docs/getting-started.md) and [tracker transitions](docs/tracker.md).
+
+## Keep worker assignments bounded
+
+The [multi-agent procedure](.lean/skills/lean-multi-agent/SKILL.md) sizes each assignment to a few files and about **50 turns**. A turn is a model request; parallel tool calls in one turn count once. Split larger assignments by component or layer before dispatch, and keep a slice that already fits whole. Choose capable model and effort settings for each assignment under the [model policy](.lean/policy/MODELS.md); spawn when required or cheaper than finishing in the active session.
+
+The Controller's brief names the allowed files, acceptance checks, required tests, dependencies and budget. Workers locate relevant lines before reading, edit the needed parts, run focused tests while iterating and run their full checks before handoff. A budget never removes required behavior tests, including a page- or integration-level test for user-visible behavior; split the slice when needed.
+
+When the budget runs out, the worker returns a consistent partial result with changed files, check status and remaining steps. The Controller sends unfinished work to a fresh worker with a new bounded brief. Resuming a spent worker is reserved for finishing its handoff report or recovering from a transient runtime error.
+
+Runtime enforcement differs. Claude roles can back the budget with `maxTurns` and `autoCompactWindow`; keep the brief's turn budget below the turn cap. Codex `spawn_agent` has no per-spawn turn cap, so its brief carries the budget. A hard cap can interrupt an edit: the Controller checks `git status` and the diff of assigned files before accepting a result, and treats a missing report as partial work.
+
+In `full` mode, a Controller holding a claim heartbeats it before dispatch and when the worker returns. A worker that may outlast the remaining lease gets its own item and claim. Expired claims need a new claim request ID; unfinished worker claims must be released or claimed again before redispatch. See [queue ownership and leases](docs/queue.md).
 
 ## Set how much detail a skill uses
 
@@ -144,6 +165,16 @@ bash .lean/scripts/quality-gate.sh --root .
 Claude uses its Stop hook under the shared auto/manual policy. Codex runs the gate explicitly, or through its lifecycle adapter once the runtime has trusted and activated it.
 
 Passing commands is one part of completion. The result also needs to meet the acceptance criteria, include the required tests and cover the final changes in review. HIGH-depth work needs a matching independent-review receipt. If a required tool or piece of evidence is missing, report the blocker.
+
+The reviewer records that receipt in `.agent-runtime/review.json` in the checkout being gated. Each worktree has its own runtime evidence; a receipt in another worktree does not satisfy its gate. The receipt must match the Task Contract and current shipping state. Later content changes require a new review; staging or committing the complete reviewed content can preserve the receipt.
+
+To validate HIGH-depth work, supply the exact Task Contract used for its review:
+
+```sh
+bash .lean/scripts/quality-gate.sh --root . --require-review --contract '<exact Task Contract>'
+```
+
+In auto mode, the Stop adapters run the shared checks. In manual mode, automatic Stops report `NOT_RUN`; explicit gate runs still execute, and the task remains unfinished until validation and required review pass. A Stop released as `UNVERIFIED` also remains blocked. See the [shared quality policy](.lean/policy/QUALITY.md).
 
 See [quality and runtime details](docs/quality-and-runtime.md) and [workflow verification commands](docs/repository-guide.md#verify-the-workflow).
 
