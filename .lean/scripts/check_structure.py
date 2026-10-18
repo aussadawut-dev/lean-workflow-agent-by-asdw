@@ -111,6 +111,18 @@ def check(root):
     dispatch = root / ".lean/skills/lean-multi-agent/SKILL.md"
     if dispatch.is_file() and re.search(r"requested model/effort\s*=\s*inherited\s*/\s*inherited", dispatch.read_text()):
         bad("dispatch example must not default to inherited model/effort")
+    # Unbounded workers grow context on every call; a held claim expires while the Controller waits.
+    # The checks bind to these exact phrases, so a rewording must keep them.
+    if dispatch.is_file():
+        dispatch_text = dispatch.read_text()
+        if "about 50 tool calls" not in dispatch_text:
+            bad("multi-agent dispatch must size each worker to a tool-call budget")
+        if "has no per-spawn turn cap" not in dispatch_text:
+            bad("multi-agent dispatch must record the Codex turn-cap gap")
+        if "missing handoff report" not in dispatch_text:
+            bad("multi-agent Controller must inspect a worker's tree and treat a missing handoff report as partial work")
+        if "heartbeat it before each dispatch" not in dispatch_text:
+            bad("multi-agent Controller must heartbeat its own claim around each dispatch")
 
     for name in REQUIRED_SKILLS:
         path = root / ".lean/skills" / name / "SKILL.md"
