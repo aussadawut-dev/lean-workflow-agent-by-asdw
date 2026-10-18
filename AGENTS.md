@@ -37,7 +37,7 @@ Explicit user instructions take precedence. The active agent owns the task unles
 ## Workflow procedures
 
 Procedures live under `.lean/skills/` (optional ones: `.lean/OPTIONAL.md`); their intensity follows `.lean/policy/SKILL-EFFORT.md` and never changes model reasoning effort.
-Use accepted scope and decisions; routine execution within approved scope needs no repeated approval. Scope changes and unresolved material decisions need the user's input before dependent work.
+Use accepted scope and decisions: a clear implementation request is accepted scope for the work it names, unless the request is ambiguous, risk is HIGH, or only a spec or analysis was asked for; routine execution within accepted scope needs no repeated approval. Material scope changes and unresolved material decisions need the user's input before dependent work.
 
 ## Policy router
 

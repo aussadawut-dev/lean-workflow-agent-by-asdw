@@ -1,6 +1,6 @@
 ---
 name: lean-scope
-description: Draft a spec for non-trivial work, get approval before implementation, and stop for approval when changes leave the agreed scope.
+description: Draft a spec for non-trivial work, continue on a clear request, wait for approval only when the request is ambiguous, a material decision is open, risk is HIGH or only a spec was asked for, and stop when changes leave the agreed scope.
 user-invocable: true
 argument-hint: "<requirement or scope amendment>"
 ---
@@ -11,7 +11,7 @@ Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity
 
 # Lean Scope
 
-Use for non-trivial implementation work or when explicitly invoked. Skip a formal spec for trivial, mechanical edits unless the user asks. Read-only inspection and drafting the proposed scope are allowed before approval; do not change product code, configuration, or other implementation files until the user approves the spec. An explicit request to implement does not by itself approve a new spec created by this skill.
+Use for non-trivial implementation work or when explicitly invoked. Skip a formal spec for trivial, mechanical edits unless the user asks. A clear implementation request approves the scope that matches it: show the draft and continue without waiting for a reply. Wait for approval before changing product code, configuration or other implementation files only when the request is ambiguous in a way that changes the work, a material decision is unresolved (use `lean-grill`), the Task Contract risk is HIGH, or the user asked for a spec or analysis only; read-only inspection and drafting are always allowed.
 
 ## Skill level
 
@@ -27,7 +27,7 @@ Higher levels add relevant detail, questions and evidence; they do not expand th
 - **high** — Add to standard: break the work into actors, user flows and individual behaviors. Specify inclusions, exclusions, business rules, dependencies and boundaries for each relevant part. Map each behavior to observable acceptance criteria and its validation. Use grill to clarify missing requirements rather than inventing them; use research where alternatives affect the scope.
 - **ultra** — Add to high: detail every material part, including relevant states/transitions, edge cases, failures, recovery, exceptions and interactions between flows/components. Check cross-part consistency and trace requirements through behavior, acceptance and validation. Define relevant invariants and rollout/migration/rollback constraints where the work needs them. Iterate with grill/research until material ambiguity is resolved or explicitly blocked/deferred. Do not turn implementation minutiae into new requirements.
 
-At high/ultra, show the user the detailed scope with confirmed decisions, assumptions, open points and exclusions clearly distinguished. More detail must narrow interpretation, not add unrequested features. Stop when acceptance is observable, material ambiguities/conflicts are resolved or explicitly identified, and every important behavior has a validation path. Preserve the approval boundary below; research findings that materially change an approved scope require matching approval before dependent work.
+At high/ultra, show the user the detailed scope with confirmed decisions, assumptions, open points and exclusions clearly distinguished. More detail must narrow interpretation, not add unrequested features. Stop when acceptance is observable, material ambiguities/conflicts are resolved or explicitly identified, and every important behavior has a validation path. Preserve the acceptance rule below; research findings that materially change an approved scope require matching approval before dependent work.
 
 ## Draft the scope
 
@@ -41,11 +41,11 @@ Write a concise draft with:
 - Constraints, dependencies, assumptions, and material open questions.
 - Likely affected components or files when repository evidence makes them clear; label uncertain locations as estimates.
 
-Show the draft to the user and ask for approval or corrections. Then pause. Do not treat silence, elapsed time, or approval of a different decision as scope approval. If the user requested analysis or a spec only, return the draft without implementing it.
+Show the draft to the user. When the request already approves it (see above), continue with the work; a later correction amends the scope. Otherwise ask for approval or corrections and pause: do not treat silence, elapsed time, or approval of a different decision as scope approval. If the user requested analysis or a spec only, return the draft without implementing it.
 
 ## Protect the approved scope
 
-After approval, record the accepted scope in the owning tracker before implementation when tracker mode requires it. Keep a simple scope ledger against the approved goal and acceptance criteria as work proceeds.
+Once the scope is accepted, by approval or by a clear request, record it in the owning tracker before implementation when tracker mode requires it. Keep a simple scope ledger against the approved goal and acceptance criteria as work proceeds.
 
 Before a proposed change, check whether it is needed for an accepted criterion and remains within the agreed behavior and constraints. Continue with routine implementation choices that fit the scope; do not interrupt for every small detail. If a necessary change would add behavior, alter acceptance, expand affected areas materially, or change a recorded decision, stop that dependent work and ask the user first. State the proposed delta, why it is needed, its impact on effort or risk, and a recommended option. Independent work that remains within scope may continue.
 

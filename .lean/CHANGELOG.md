@@ -4,6 +4,11 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
+## Unreleased
+
+- A clear implementation request approves the scope that matches it. `lean-scope` showed its draft and paused for approval on every non-trivial task, so a request that already said what to build cost one round trip; it now shows the draft and continues, and waits only when the request is ambiguous in a way that changes the work, a material decision is unresolved, the Task Contract risk is HIGH, or the user asked for a spec or analysis only. `lean-task` step 3 and the `AGENTS.md` workflow paragraph say the same. Scope protection afterwards is unchanged: a material expansion, added behavior, changed acceptance or a changed decision still stops dependent work and asks, and the `scope-stop` eval (an unresolved naming decision gets a question and no file changes) is unchanged.
+- `lean-init` and `CUSTOMIZING.md` now tell a project to list its reviewed upstream branches in PROJECT.md's `<!-- trusted-control-refs: ... -->` line, so merging a reviewed Lean release never stalls a Stop on a manual `accept-controls`; local edits to controls still need it.
+
 ## 4.5.0 — 2026-10-18
 
 - Port three reusable downstream improvements: `/lean-clean-queue old --days N` sets a positive whole-day cutoff (default 30; rejected with `all`); queue path validation checks `.agent-runtime/queue.lock`, claims and their parents without blocking unrelated runtime dependency symlinks; `model_drift.py` inspects project catalog evidence against the local Codex CLI cache without networking, credentials or writes. Keep runtime parent/lock/claim symlink protection, history and project-owned catalogs/settings. New tests cover cutoff selection, invalid options, allowed dependency links, protected claim links, cache drift and selected target routing. Distribute the new script and tests through the portable registry.
