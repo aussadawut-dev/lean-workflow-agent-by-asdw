@@ -720,6 +720,19 @@ expect_code "cap: changed controls refuse" 2
 run_raw "$dir" '{"stop_hook_active":true,"session_id":"s"}'
 expect_code "cap: an unchanged changed-control refusal is released at once" 0
 case "$out" in *UNVERIFIED*) ok "cap: control release is marked unverified" ;; *) bad "cap: control release is marked unverified (got: $out)" ;; esac
+# Changed controls that an independent HIGH-depth PASS review covers are accepted without a person.
+dir="$(fixture 'true')"
+run_raw "$dir" '{"stop_hook_active":false}'
+expect_code "drift: first use records gate controls" 0
+sed -i.bak 's/^true$/test -d ./' "$dir/.lean/PROJECT.md" && rm -f "$dir/.lean/PROJECT.md.bak"
+printf '%s' '{"session_id":"s2","tool_name":"Bash","tool_input":{"command":"python3 .lean/scripts/contract_guard.py declare --contract '"'"'Contract: risk=HIGH quality=HIGH acceptance=fixture'"'"'"}}' |
+  python3 "$repo/.lean/scripts/contract_guard.py" --root "$dir" pre-tool >/dev/null
+snapshot="$(python3 "$repo/.lean/scripts/gate_evidence.py" --root "$dir" state)"
+python3 "$repo/.lean/scripts/gate_evidence.py" --root "$dir" "record-""review" --contract 'Contract: risk=HIGH quality=HIGH acceptance=fixture' \
+  --reviewer r --evidence e --verdict PASS --state "$snapshot" >/dev/null
+run_raw "$dir" '{"stop_hook_active":false,"session_id":"s2"}'
+expect_code "drift: reviewed changed controls are accepted" 0
+case "$err" in *"PASS review"*) ok "drift: the acceptance names the review" ;; *) bad "drift: the acceptance names the review (got: $err)" ;; esac
 dir="$(fixture 'true')"
 rm "$dir/.lean/PROJECT.md"
 run_raw "$dir" '{"stop_hook_active":false,"session_id":"s"}'
