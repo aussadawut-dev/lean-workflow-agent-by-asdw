@@ -728,6 +728,8 @@ class WorkflowModeTests(unittest.TestCase):
         self.assertEqual(data["git"]["status"], "modified")
         self.assertIn("docs/", data["git"]["untracked"])
         self.assertEqual(data["gate"]["status"], "NOT_RUN")
+        # Direct runner calls leave no marker, so the report names where its status comes from.
+        self.assertIn("Claude Stop", data["gate"]["source"])
 
         markers = self.root / ".claude"
         markers.mkdir()

@@ -115,7 +115,7 @@ fi
 
 # The contract a session declared through the PreToolUse guard, read from the guard's store by
 # session id (a hook payload or --session). Only a receipt for that contract can accept changed
-# controls: the author's main thread cannot record one, while an explicit --contract or a
+# controls: the guard stops the author's main thread recording one for it, while an explicit --contract or a
 # receipt's own contract is text anyone may have written.
 if [ -n "$session" ]; then
   session_contract="$(python3 "$(dirname "$helper")/contract_guard.py" --root "$root" current --session "$session" 2>/dev/null)" ||

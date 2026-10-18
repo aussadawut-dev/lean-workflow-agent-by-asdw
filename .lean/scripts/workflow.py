@@ -827,7 +827,8 @@ def context_command(root, args):
                 }
         except OSError:
             pass  # No Git available: report git as null.
-        report["gate"] = {"status": gate_status(root)}
+        report["gate"] = {"status": gate_status(root),
+                          "source": "Claude Stop hook markers; direct runner and Codex runs leave none"}
         print(json.dumps(report, indent=2))
 
 

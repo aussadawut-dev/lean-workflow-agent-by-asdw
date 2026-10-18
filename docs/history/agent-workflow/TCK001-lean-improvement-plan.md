@@ -39,7 +39,7 @@ This tracker records the recommendations requested by the user after the convers
 
 ### TASK-01 — Review evidence and finalization
 
-Evidence: [`lean-task`](../../.lean/skills/lean-task/SKILL.md) orders semantic review (step 6) before completion/evidence and tracker synchronization (step 7). [`gate_evidence.py`](../../.lean/scripts/gate_evidence.py) `state()` hashes `git rev-parse HEAD`, the gate controls, the raw `git ls-files --stage` output and the bytes/modes/links of every Git-visible path, including untracked ones; `check_review()` compares that digest with the receipt. `docs/tracking/` is not ignored, so tracker edits are part of the state. [`test_gate_integrity.py`](../../.lean/tests/test_gate_integrity.py) (`test_high_review_is_required_and_bound_to_current_bytes_modes_and_index`) asserts that `git add` alone invalidates a PASS receipt, so this binding is intended behavior today.
+Evidence: [`lean-task`](../../../.lean/skills/lean-task/SKILL.md) orders semantic review (step 6) before completion/evidence and tracker synchronization (step 7). [`gate_evidence.py`](../../../.lean/scripts/gate_evidence.py) `state()` hashes `git rev-parse HEAD`, the gate controls, the raw `git ls-files --stage` output and the bytes/modes/links of every Git-visible path, including untracked ones; `check_review()` compares that digest with the receipt. `docs/tracking/` is not ignored, so tracker edits are part of the state. [`test_gate_integrity.py`](../../../.lean/tests/test_gate_integrity.py) (`test_high_review_is_required_and_bound_to_current_bytes_modes_and_index`) asserts that `git add` alone invalidates a PASS receipt, so this binding is intended behavior today.
 
 Static conclusion: bookkeeping edits after review, staging, or committing change the receipt state even when reviewed source bytes are unchanged. A commit changes HEAD; staging changes the index blob ids; a tracker update changes Git-visible bytes.
 
@@ -51,15 +51,15 @@ Recommended approach (to confirm with a reproduction before implementation):
 2. Move tracker synchronization that does not depend on the review verdict to before review, so the reviewer sees it.
 3. Decide the remaining post-review edit (recording the verdict and DONE status in the tracker) as an explicit TASK-01 decision: either a narrowly specified tracker-evidence exemption or a cheap re-check after that edit. Do not broadly ignore Markdown, configuration or all tracker changes.
 
-Prefer this over a staged/two-phase finalization protocol, which adds procedure for a problem the state identity causes. [`REVIEW.md`](../../.lean/policy/REVIEW.md) already states that the receipt detects stale coverage and does not prove reviewer independence, so removing HEAD and index bookkeeping from it does not weaken an existing guarantee. Keep independent validation of records and relevant Git state, and preserve independent reviewer ownership of review receipts.
+Prefer this over a staged/two-phase finalization protocol, which adds procedure for a problem the state identity causes. [`REVIEW.md`](../../../.lean/policy/REVIEW.md) already states that the receipt detects stale coverage and does not prove reviewer independence, so removing HEAD and index bookkeeping from it does not weaken an existing guarantee. Keep independent validation of records and relevant Git state, and preserve independent reviewer ownership of review receipts.
 
 Planned validation: a meaningful lifecycle case covering HIGH change → deterministic validation → independent PASS → queue completion → tracker synchronization → intended staging/commit → final gate. Include negative cases where a source, instruction or control change must invalidate prior evidence. Update the staging assertion in `test_gate_integrity.py` deliberately, as an approved behavior change. Confirm review-round limits and receipt ownership remain intact.
 
 ### TASK-02 — Contract and scope lifecycle
 
-Evidence: [`lean-scope`](../../.lean/skills/lean-scope/SKILL.md) requires approval of a newly drafted spec and says an implementation request alone does not approve it. [`contract_guard.py`](../../.lean/scripts/contract_guard.py) clears declarations on human prompts. Existing accepted scope can already be reused; preserve that behavior.
+Evidence: [`lean-scope`](../../../.lean/skills/lean-scope/SKILL.md) requires approval of a newly drafted spec and says an implementation request alone does not approve it. [`contract_guard.py`](../../../.lean/scripts/contract_guard.py) clears declarations on human prompts. Existing accepted scope can already be reused; preserve that behavior.
 
-Already addressed in the Unreleased 4.4.0 work ([changelog](../../.lean/CHANGELOG.md)): Claude's PreToolUse guard binds the contract from the first reply line through the transcript, and plain `grep`, `cat`, `head`, `tail`, `wc`, `ls` and read-only `git` subcommands run before a contract. Do not redo that work.
+Already addressed in the Unreleased 4.4.0 work ([changelog](../../../.lean/CHANGELOG.md)): Claude's PreToolUse guard binds the contract from the first reply line through the transcript, and plain `grep`, `cat`, `head`, `tail`, `wc`, `ls` and read-only `git` subcommands run before a contract. Do not redo that work.
 
 Remaining concerns:
 
@@ -73,7 +73,7 @@ Planned validation: clear request; existing accepted scope; status-only follow-u
 
 ### TASK-03 — Behavioral eval coverage
 
-Evidence: [`cases.py`](../../evals/cases.py) defines six behavior cases. The `high-review` graders check contract, reviewer dispatch (`reviewer_dispatched`), suite result and change claims; they do not assert that `.agent-runtime/review.json` holds a PASS receipt covering the final state. An agent that dispatches a reviewer and then keeps editing passes the case. The fixtures exercise small applications, with limited coverage of tracker/full closeout or continuing conversations.
+Evidence: [`cases.py`](../../../evals/cases.py) defines six behavior cases. The `high-review` graders check contract, reviewer dispatch (`reviewer_dispatched`), suite result and change claims; they do not assert that `.agent-runtime/review.json` holds a PASS receipt covering the final state. An agent that dispatches a reviewer and then keeps editing passes the case. The fixtures exercise small applications, with limited coverage of tracker/full closeout or continuing conversations.
 
 Proposed approach: add independent functional assertions for requested behavior, verify final receipt coverage and independence, and cover tracker/full finalization, follow-up messages and resume. Preserve useful existing regression-order and truthful-claim graders. Distinguish tooling unit tests, agent procedure compliance and user-visible task outcomes.
 
@@ -81,7 +81,7 @@ Planned validation: each added grader has positive and negative fixtures, includ
 
 ### TASK-04 — Cost and outcome measurement
 
-Evidence: the [Unreleased changelog](../../.lean/CHANGELOG.md) reports first-turn usage of 29,859 → 28,513 tokens for template text changes (about 4.5%). The 27% comparison also includes project-local tool/skill visibility settings. Its 16-run smoke comparisons are reported historical evidence, not measurements reproduced by this review. The maintainer already measures each release this way; what is missing is a way for others to reproduce the numbers.
+Evidence: the [Unreleased changelog](../../../.lean/CHANGELOG.md) reports first-turn usage of 29,859 → 28,513 tokens for template text changes (about 4.5%). The 27% comparison also includes project-local tool/skill visibility settings. Its 16-run smoke comparisons are reported historical evidence, not measurements reproduced by this review. The maintainer already measures each release this way; what is missing is a way for others to reproduce the numbers.
 
 Proposed approach: commit the measurement procedure as a script, using the existing eval harness where possible, and retain enough sanitized artifacts to reproduce published claims. Report correct completion, false success, blocked outcomes, total tokens, monetary cost where available, wall time, tool turns and required user exchanges, with template-only changes separated from local settings.
 
@@ -89,7 +89,7 @@ Out of scope: a new multi-arm paid study comparing the current workflow, a propo
 
 ### TASK-05 — Documentation consistency
 
-Evidence: [`CUSTOMIZING.md`](../../.lean/CUSTOMIZING.md) says "Tracker archival is not implemented", while [`workflow.py`](../../.lean/scripts/workflow.py) implements `tracker archive` and the [tracker guide](../tracker.md) documents it. [`evals/README.md`](../../evals/README.md) says Codex's Stop hook does not check the contract line, while the [Codex adapter](../../.codex/hooks/quality_gate.py) refuses changed work that has no declared contract for the session.
+Evidence: [`CUSTOMIZING.md`](../../../.lean/CUSTOMIZING.md) says "Tracker archival is not implemented", while [`workflow.py`](../../../.lean/scripts/workflow.py) implements `tracker archive` and the [tracker guide](../../tracker.md) documents it. [`evals/README.md`](../../../evals/README.md) says Codex's Stop hook does not check the contract line, while the [Codex adapter](../../../.codex/hooks/quality_gate.py) refuses changed work that has no declared contract for the session.
 
 Proposed approach: correct these two statements and inspect directly affected references. Preserve historical changelog entries as history. Prefer behavioral evidence over tests that merely pin exact prose; retain structural checks where they protect an actual discovery or authority boundary.
 
