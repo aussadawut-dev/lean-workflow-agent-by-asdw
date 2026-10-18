@@ -115,8 +115,12 @@ def check(root):
     # The checks bind to these exact phrases, so a rewording must keep them.
     if dispatch.is_file():
         dispatch_text = dispatch.read_text()
-        if "about 50 tool calls" not in dispatch_text:
-            bad("multi-agent dispatch must size each worker to a tool-call budget")
+        if "about 50 turns" not in dispatch_text:
+            bad("multi-agent dispatch must size each worker to a turn budget")
+        if "never removes required behavior tests" not in dispatch_text:
+            bad("multi-agent worker budget must keep required behavior tests in each slice")
+        if "Do not resume a worker that spent its budget" not in dispatch_text:
+            bad("multi-agent Controller must redispatch a spent worker's remainder instead of resuming it")
         if "has no per-spawn turn cap" not in dispatch_text:
             bad("multi-agent dispatch must record the Codex turn-cap gap")
         if "missing handoff report" not in dispatch_text:

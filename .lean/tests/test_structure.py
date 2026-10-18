@@ -68,8 +68,18 @@ class StructureTests(unittest.TestCase):
 
     def test_dispatch_requires_a_per_worker_budget(self):
         path = self.root / ".lean/skills/lean-multi-agent/SKILL.md"
-        path.write_text(path.read_text().replace("about 50 tool calls", "as many tool calls as needed"))
+        path.write_text(path.read_text().replace("about 50 turns", "as many turns as needed"))
         self.assertIn("budget", self.check(False).lower())
+
+    def test_budget_cannot_remove_required_behavior_tests(self):
+        path = self.root / ".lean/skills/lean-multi-agent/SKILL.md"
+        path.write_text(path.read_text().replace("never removes required behavior tests", "may trim tests"))
+        self.assertIn("behavior tests", self.check(False).lower())
+
+    def test_spent_worker_is_redispatched_not_resumed(self):
+        path = self.root / ".lean/skills/lean-multi-agent/SKILL.md"
+        path.write_text(path.read_text().replace("Do not resume a worker that spent its budget", "Resume any worker"))
+        self.assertIn("instead of resuming", self.check(False).lower())
 
     def test_codex_turn_cap_gap_stays_recorded(self):
         path = self.root / ".lean/skills/lean-multi-agent/SKILL.md"
