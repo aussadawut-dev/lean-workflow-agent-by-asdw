@@ -45,7 +45,8 @@ def validate_project_paths(root):
     Local CLI locking coordinates cooperating processes; it does not protect
     against another process replacing filesystem paths during an operation.
     """
-    for relative in (".lean/config.json", ".gitignore", ".agent-runtime", "docs/tracking", HISTORY, ".agents/queue"):
+    for relative in (".lean/config.json", ".gitignore", ".agent-runtime/queue.lock",
+                     ".agent-runtime/claims", "docs/tracking", HISTORY, ".agents/queue"):
         path = root
         for part in Path(relative).parts:
             path = path / part
@@ -409,7 +410,13 @@ def items(root):
     return result
 
 
-def clean_queue(root, selection, apply=False):
+def positive_days(value):
+    if not re.fullmatch(r"[0-9]+", value) or int(value) < 1:
+        raise argparse.ArgumentTypeError("must be a positive whole number of days")
+    return int(value)
+
+
+def clean_queue(root, selection, apply=False, days=30):
     with locked(root, read_only=not apply):
         current = config(root)
         history = queue_history(root)
@@ -419,7 +426,7 @@ def clean_queue(root, selection, apply=False):
         else:
             all_items, claims = {}, active_claims(root, cleanup=False)
             validate_claims(all_items, claims)
-        cutoff = time.time() - 30 * 86400
+        cutoff = time.time() - days * 86400
         selected, resumed, unknown = [], [], []
         for path in sorted(directory.glob("*.json")):
             item_id = path.stem
@@ -434,7 +441,7 @@ def clean_queue(root, selection, apply=False):
                 continue
             if selection == "all" or timestamp(item["completed_at"]) < cutoff:
                 selected.append(item_id)
-        report = {"selection": selection, "older_than_days": 30 if selection == "old" else None,
+        report = {"selection": selection, "older_than_days": days if selection == "old" else None,
                   "selected": selected, "resumed": resumed, "unknown_age": unknown,
                   "archived": [], "applied": apply}
         # Per-item commit: publish and sync full snapshot before removing source.
@@ -845,6 +852,7 @@ def main():
     clean_choice = clean.add_mutually_exclusive_group(required=True)
     clean_choice.add_argument("--dry-run", action="store_true")
     clean_choice.add_argument("--apply", action="store_true")
+    clean.add_argument("--days", type=positive_days, help="age cutoff for old (default 30)")
     commands.add_parser("show")
     commands.add_parser("check")
     commands.add_parser("context")
@@ -881,6 +889,8 @@ def main():
         if action == "complete":
             command.add_argument("--evidence", required=True)
     args = parser.parse_args()
+    if args.command == "clean-queue" and args.days is not None and args.selection != "old":
+        clean.error("--days applies only to old")
     try:
         if args.root is None:
             from submodule import context
@@ -897,7 +907,7 @@ def main():
         elif args.command == "downgrade":
             return downgrade(root, args.mode, args.apply, args.keep_pending)
         elif args.command == "clean-queue":
-            return clean_queue(root, args.selection, args.apply)
+            return clean_queue(root, args.selection, args.apply, args.days or 30)
         elif args.command == "show":
             print(json.dumps(config(root)))
         elif args.command == "check":

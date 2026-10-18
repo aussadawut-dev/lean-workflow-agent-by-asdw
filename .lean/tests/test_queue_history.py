@@ -87,6 +87,29 @@ class QueueHistoryTests(unittest.TestCase):
         for path in (recent, unknown, blocked):
             self.assertEqual(path.read_bytes(), before[str(path.relative_to(self.root))])
 
+    def test_old_days_option_sets_cutoff_and_default_stays_30(self):
+        old = self.done(16)
+        recent = self.done(14, 'Q0002')
+        before = self.snapshot()
+        default = json.loads(self.cli('clean-queue', 'old', '--dry-run').stdout)
+        self.assertEqual((default['older_than_days'], default['selected']), (30, []))
+        report = json.loads(self.cli('clean-queue', 'old', '--days', '15', '--dry-run').stdout)
+        self.assertEqual((report['older_than_days'], report['selected']), (15, ['Q0001']))
+        self.assertEqual(before, self.snapshot())
+        self.cli('clean-queue', 'old', '--days', '15', '--apply')
+        self.assertFalse(old.exists())
+        self.assertEqual(recent.read_bytes(), before[str(recent.relative_to(self.root))])
+        history = json.loads((self.root / '.agents/queue/history/Q0001.json').read_text())
+        self.assertEqual(history['reason'], 'old')
+
+    def test_invalid_days_and_days_with_all_are_rejected_without_changes(self):
+        self.done(40)
+        before = self.snapshot()
+        for args in (('old', '--days', '0'), ('old', '--days', '-3'), ('old', '--days', 'x'),
+                     ('old', '--days', '1.5'), ('all', '--days', '15')):
+            self.cli('clean-queue', *args, '--apply', ok=False)
+        self.assertEqual(before, self.snapshot())
+
     def test_all_keeps_original_bytes_unknown_fields_and_tracker(self):
         path = self.done()
         original = json.loads(path.read_text())

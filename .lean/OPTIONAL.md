@@ -8,7 +8,7 @@ Use `/lean-pattern <area>` to propose or maintain project standards with evidenc
 
 Use `/lean-quality-gate-mode [auto|manual]` to inspect or explicitly save shared gate automation. Missing workspace `.codex/quality-gate.json` means auto. Manual Stops report NOT_RUN; explicit gate runs and acceptance/review requirements remain. See `policy/QUALITY.md` for authorization, control drift and Codex hook trust.
 
-Queue cleanup uses `/lean-clean-queue old` (DONE older than 30 days) or `/lean-clean-queue all` (all DONE). Preview/apply are available through `clean-queue old|all --dry-run|--apply`; original records move into project-owned queue history, not deletion. Trackers and unfinished items remain. Undated legacy DONE items are skipped by old. See `policy/WORKFLOW.md`.
+Queue cleanup uses `/lean-clean-queue old [--days N]` (DONE older than N days, default 30) or `/lean-clean-queue all` (all DONE). Preview/apply are available through `clean-queue old|all [--days N] --dry-run|--apply`; original records move into project-owned queue history, not deletion. Trackers and unfinished items remain. Undated legacy DONE items are skipped by old. See `policy/WORKFLOW.md`.
 
 Model research updates use `/lean-model-update codex|claude|all`. Preview is the default; explicitly approved apply updates an optional project-owned catalog and retains an ignored local catalog lock file. Session/global settings stay under runtime control. See `policy/MODELS.md`.
 

@@ -85,6 +85,34 @@ class WorkflowModeTests(unittest.TestCase):
                 path.write_text(path.read_text().replace("[ ]", "[x]"))
                 self.run_cli("check")
 
+    def test_unrelated_runtime_dependency_symlink_does_not_block_queue_operations(self):
+        self.run_cli("configure", "full")
+        self.tracker_doc()
+        self.item("Q0001", ["area:api"])
+        with tempfile.TemporaryDirectory() as external:
+            target = Path(external) / "preserve.txt"
+            target.write_text("preserve")
+            tools = self.root / ".agent-runtime/tools"
+            tools.mkdir()
+            link = tools / "node_modules"
+            link.symlink_to(external, target_is_directory=True)
+            self.run_cli("configure", "full")
+            self.run_cli("check")
+            self.run_cli("queue", "claim", "--id", "Q0001", "--agent", "worker")
+            self.assertTrue(link.is_symlink())
+            self.assertEqual(target.read_text(), "preserve")
+
+    def test_symlinked_claim_file_is_rejected_without_touching_external_data(self):
+        self.run_cli("configure", "full")
+        with tempfile.TemporaryDirectory() as external:
+            target = Path(external) / "claim.json"
+            target.write_text("preserve")
+            claims = self.root / ".agent-runtime/claims"
+            claims.mkdir()
+            (claims / "Q0001.json").symlink_to(target)
+            self.run_cli("queue", "list", success=False)
+            self.assertEqual(target.read_text(), "preserve")
+
     def test_symlinked_runtime_and_lock_are_rejected(self):
         self.run_cli("configure", "standard")
         with tempfile.TemporaryDirectory() as external:
