@@ -4,7 +4,7 @@ Versions follow `MAJOR.MINOR.PATCH`. MAJOR changes workflow rules, or moves file
 install depends on. MINOR adds rules or files, and covers making an existing rule hold where it
 was being bypassed -- the rule did not change, its enforcement did. PATCH clarifies wording.
 
-## Unreleased
+## 4.8.0 — 2026-10-19
 
 - `lean-multi-agent` sizes each worker assignment to a budget of a few files and about 50 tool calls, and splits a larger slice by component or layer before dispatch. A replay of one real workset (TCK303, Opus Controller, Sonnet workers, six runs) traced most token spend to workers of 63–98 requests whose context grew about 3k tokens per call to 190k–308k; one worker used 19.1M tokens, more than two Controller runs together. A quadratic fit of those workers estimates about 35% fewer worker tokens at a 40-call split, while workers already near 40 calls cost more when split, so a slice that fits stays whole. Where the runtime caps a role, the budget is backed by it (Claude agent `maxTurns` and `autoCompactWindow`); Codex `spawn_agent` has no per-spawn turn cap, so there the brief carries the budget; the structure check keeps that gap recorded. A worker that reaches its budget hands back a consistent partial result with the remaining steps. A hard cap can instead cut a worker off mid-edit, so the Controller now inspects `git status` and the diff of a worker's assigned files before accepting its result, treats a missing handoff report as partial work, and releases or claims again any item the worker held before redispatch.
 - The worker brief now asks for located reads (line numbers first, then those ranges), edits instead of whole-file rewrites, tests for changed files while iterating and the full checks once before handoff.
@@ -14,6 +14,7 @@ was being bypassed -- the rule did not change, its enforcement did. PATCH clarif
   - The budget never removes required behavior tests. The budgeted runs wrote about 18% fewer new tests than 4.4.0 and about 40% fewer than fully delegated runs. The tests they dropped were page-level and call-chat parity tests of the largest UI slice. The brief now names each slice's required tests, including a page- or integration-level test for user-visible behavior, and the slice is split rather than those tests dropped.
   - A worker that spent its budget is not resumed to continue the work. One resumed worker reached 72 requests, because resuming keeps the whole context. The remainder goes to a new slice with a fresh brief; a resume only finishes a handoff report or recovers from a transient runtime error.
 - `check-structure.sh` rejects a multi-agent skill that drops the turn budget, the required-test rule, the no-resume rule, the Codex turn-cap gap, the Controller's worker-tree check or the Controller heartbeat.
+- Refresh the root README to explain worker budgets and partial handoffs, accepted scope and Task Contracts, checkout-local review receipts, and the shared auto/manual gate policy.
 
 ### Upgrade notes
 
