@@ -21,6 +21,14 @@ Spawn only when required or cheaper. Required: delegated execution, HIGH indepen
 
 Size each delegated task, reviewers included, by this table and pass the chosen model and effort on every spawn whose tool accepts them. Omitted settings inherit the session defaults, which are often heavier than delegated work. Inherit the session setting only when it already matches the row or the tool cannot set it, and record that reason. Projects may map the rows to concrete models in AGENTS.md Project additions or `.lean/model-catalog.json`. The active session's own settings stay with the user: use them when the runtime cannot change them, and do not interrupt routine work to switch them. Check actual model/effort options before dispatch. Use supported effort at or above the starting point when useful, or assess the available setting against the quality floor. `CHEAP` favors economical capable options, `BALANCED` uses the normal starting point, and `EXPENSIVE` allows justified optional spend. None removes tests, validation or required review; report an unmet floor rather than lowering it.
 
+## Spawn context and records
+
+Choose model and effort for the assigned work, not by copying the parent settings. Pass both explicitly when the tool accepts them, even when they match the parent. Keep project model mappings task-sized; do not replace every subagent default with the economical model, since normal and complex work still need their sized choices.
+
+Check the current spawn tool's context and override rules before dispatch. When a Codex tool requires a fresh context to override model or effort, use `fork_turns: "none"` and supply a self-contained brief with the contract, accepted scope, allowed files, dependencies, checks and handoff requirements. Do not assume every Codex runtime has the same fork restriction. A full-history fork is appropriate only when the inherited context is needed and its supported model/effort satisfy the task; record why. Independent HIGH review always starts fresh under `REVIEW.md`.
+
+Record the concrete requested model and effort, context mode and selection reason for every dispatch; never use bare `inherited/inherited`. If the tool cannot set a value, record the known parent/default value and the limitation, or `unavailable` when unknown. Report backend settings only from runtime metadata; absent metadata stays `unavailable`, even when explicit requested settings were accepted.
+
 ## Independent review
 
 `HIGH` review uses an independent context with the Task Contract and diff, without author reasoning, under `REVIEW.md`. Choose the least costly capable reviewer; a stronger model is not required. Escalate only for useful boundary analysis or demonstrated reasoning limits. Report missing independence.
@@ -35,7 +43,8 @@ A wording-only diff may use an economical capable available reviewer model at it
   a supported runtime control; do not edit the shared subagent definition for one task.
 - Codex: follow the session settings for the main agent. For workers and independent reviews, use a
   subagent or fresh session; when the spawn tool supports model and reasoning effort, set both by
-  the starting point. Use the available defaults only when the tool cannot set them, and record that.
+  the starting point. Apply the context and override rules above; use the available defaults only
+  when the tool cannot set them, and record that.
 - Never claim to have changed the main session or a subagent setting unless the runtime confirms it.
   If a desired setting is unavailable, use a capable available option. If none can meet the floor,
   report `BLOCKED` with the limitation. Recommend a user-controlled session change only when the

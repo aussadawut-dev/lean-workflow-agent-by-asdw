@@ -6,6 +6,31 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
+## 4.9.0 — 2026-10-20
+
+**Token highlight:** - · **Compared with:** -
+
+- Require explicit task-sized model and effort settings whenever the spawn tool supports them, including when they match the parent.
+- Check runtime-specific context rules before dispatch. When Codex model or effort overrides require fresh context, use `fork_turns: "none"` with a self-contained brief. Full-history forks need a recorded context requirement and suitable settings; independent HIGH review always starts fresh.
+- Record context mode and concrete requested settings separately from runtime-reported settings. Replace bare `inherited/inherited` records with known values and limitations; use `unavailable` for metadata the runtime does not expose.
+- Keep model choices portable and task-sized. This release does not change main-session settings or set every subagent to an economical default.
+
+**Upgrade:** update `AGENTS.md`, `MODELS.md` and `lean-multi-agent` together. Preserve project model mappings and check the current spawn tool's override capabilities. No configuration or record migration is needed; the new dispatch format applies to future assignments. No new token benchmark was run.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+- ส่ง model และ effort ตามขนาดงานอย่างชัดเจนเมื่อเครื่องมือรองรับ แม้จะตรงกับค่าของ agent ต้นทาง
+- ตรวจข้อจำกัดเรื่องบริบทของ runtime ก่อน dispatch หาก Codex ต้องเริ่มบริบทใหม่เพื่อเปลี่ยน model หรือ effort ให้ใช้ `fork_turns: "none"` พร้อม brief ที่มีข้อมูลครบ การ fork ประวัติทั้งหมดต้องมีเหตุผลและ settings ที่เหมาะกับงาน ส่วน independent HIGH review ต้องเริ่มบริบทใหม่เสมอ
+- บันทึก context mode และค่าที่ร้องขอแยกจากค่าที่ runtime รายงาน แทน `inherited/inherited` ด้วยค่าที่ทราบและข้อจำกัด หาก runtime ไม่เปิดเผยข้อมูลให้ระบุ `unavailable`
+- คงการเลือกโมเดลตามขนาดงานและความสามารถของ runtime รุ่นนี้ไม่เปลี่ยน settings ของ session หลักหรือกำหนดให้ agent ลูกทุกตัวใช้โมเดลประหยัด
+
+**เมื่ออัปเกรด:** อัปเดต `AGENTS.md`, `MODELS.md` และ `lean-multi-agent` พร้อมกัน เก็บ model mappings ของโปรเจกต์และตรวจความสามารถในการ override ของเครื่องมือที่ใช้ ไม่ต้องย้าย configuration หรือ records รูปแบบ dispatch ใหม่ใช้กับงานที่ส่งหลังอัปเกรด และไม่มีการวัด token ชุดใหม่
+
+</details>
+
 ## 4.8.1 — 2026-10-19
 
 **Token highlight:** - · **Compared with:** -

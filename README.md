@@ -4,9 +4,9 @@ I built this because I want a coding agent to understand the work, check what it
 
 It works with **Claude Code and Codex**, with one shared set of rules and skills. Use it with your own stack.
 
-**Baseline 4.8.1** · [MIT License](LICENSE)
+**Baseline 4.9.0** · [MIT License](LICENSE)
 
-This release makes the release history easier to read, with collapsed Thai translations and clearly labeled token comparisons. See the [4.8.1 release notes](.lean/CHANGELOG.md#481--2026-10-19) for changes and upgrade notes.
+This release makes subagent model, effort and context choices explicit, with runtime-aware fork rules and honest dispatch records. See the [4.9.0 release notes](.lean/CHANGELOG.md#490--2026-10-20) for changes and upgrade notes.
 
 The idea is simple: **agree on the work → implement → test → validate → review → finish with evidence**. Use the steps the task needs. You do not have to call every skill or read every file to get started.
 
