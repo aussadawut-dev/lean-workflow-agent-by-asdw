@@ -4,9 +4,9 @@ I built this because I want a coding agent to understand the work, check what it
 
 It works with **Claude Code and Codex**, with one shared set of rules and skills. Use it with your own stack.
 
-**Baseline 4.11.0** · [MIT License](LICENSE)
+**Baseline 4.12.0** · [MIT License](LICENSE)
 
-This release expands `/lean-pattern` and `/lean-audit` with stack-appropriate repository structure/module boundaries and per-locale i18n, grammar and terminology standards—setting early baselines on new projects and inspecting/asking through `/lean-grill` before remediating existing codebases. See the [4.11.0 release notes](.lean/CHANGELOG.md#4110--2026-10-22) for changes and upgrade notes.
+This release adds `auto_fixloop` and `manual_fixloop` gate modes with 3-attempt Stop retry parity across Claude and Codex, and connects accepted project standards (`mandatory` vs `recommended` clean-as-you-code rules) into context selection, review, `/lean-pattern` and `/lean-audit`. See the [4.12.0 release notes](.lean/CHANGELOG.md#4120--2026-10-22) for changes and upgrade notes.
 
 The idea is simple: **agree on the work → implement → test → validate → review → finish with evidence**. Use the steps the task needs. You do not have to call every skill or read every file to get started.
 

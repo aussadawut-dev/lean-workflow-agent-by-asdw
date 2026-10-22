@@ -6,6 +6,29 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
+## 4.12.0 — 2026-10-22
+
+**Token highlight:** - · **Compared with:** -
+
+- Add `auto_fixloop` and `manual_fixloop` gate modes in `.lean/scripts/gate_mode.py` alongside `auto` and `manual`: `auto_fixloop` runs the shared Quality Gate automatically on Stop and auto-loops over actionable code, test and lint failures until the gate passes without asking between rounds; `manual_fixloop` skips automatic Stops (`NOT_RUN`), always requires user authorization before starting a full gate run, and then auto-loops until the gate passes—stopping only for genuine requirement/design questions or missing environment tools.
+- Align Stop hook retry caps across both providers: Codex's `.codex/hooks/quality_gate.py` now enforces the same three-attempt continuation cap (`max_refusals = 3`) and immediate unchanged-refusal `UNVERIFIED` release as Claude's Stop adapter.
+- Connect accepted project standards (`docs/standards/` or `record_root`) directly into context selection (`CONTEXT.md`), review (`REVIEW.md`, `lean-review`, `.lean/roles/reviewer.md`), `/lean-pattern` and `/lean-audit`, enforcing `mandatory` standards on lines/behavior introduced or modified by a diff while keeping `recommended` standards and untouched legacy code non-blocking unless explicitly promoted.
+
+**Upgrade:** update `AGENTS.md`, `.lean/README.md`, `.lean/CUSTOMIZING.md`, `.lean/policy/CONTEXT.md`, `.lean/policy/QUALITY.md`, `.lean/policy/RECOVERY.md`, `.lean/policy/REVIEW.md`, `.lean/roles/reviewer.md`, `.lean/scripts/gate_mode.py`, `.lean/scripts/quality-gate.sh`, `.lean/scripts/contract_guard.py`, `.claude/hooks/session-start.sh`, `.codex/hooks/quality_gate.py`, and the shared `lean-gate`, `lean-review`, `lean-pattern` and `lean-audit` skills together. Existing `.codex/quality-gate.json` files (`{"auto": true|false}`) remain valid without migration.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+- เพิ่มโหมด Gate `auto_fixloop` และ `manual_fixloop` ใน `.lean/scripts/gate_mode.py` ควบคู่กับ `auto` และ `manual` เดิม: `auto_fixloop` รัน Quality Gate อัตโนมัติใน Stop hook และวนแก้ทุกปัญหาที่แก้ได้ (code/test/lint) จนผ่านโดยไม่หยุดถามระหว่างรอบ ส่วน `manual_fixloop` ข้ามการรันอัตโนมัติใน Stop hook (`NOT_RUN`) และต้องขออนุญาตผู้ใช้ก่อนเริ่มรัน full gate เสมอ แต่เมื่อเริ่มรันแล้วจะวนแก้ปัญหาและรันซ้ำจนผ่านโดยไม่ถามซ้ำ (หยุดถามเฉพาะเมื่อมีคำถามเชิง requirement/design จริงๆ หรือขาดเครื่องมือในสภาพแวดล้อม)
+- ปรับเพดานการวนซ้ำใน Stop hook ของทั้งสอง provider ให้เท่ากัน: `.codex/hooks/quality_gate.py` ของ Codex รองรับการบล็อกเพื่อวนแก้สูงสุด 3 รอบ (`max_refusals = 3`) และปล่อยหลุด `UNVERIFIED` ทันทีเมื่อสถานะและสาเหตุซ้ำเดิมโดยไม่มีการแก้ไข เหมือนกับฝั่ง Claude
+- เชื่อมโยงมาตรฐานของโปรเจกต์ที่อนุมัติแล้ว (`accepted` project standards) เข้ากับการเลือกบริบท (`CONTEXT.md`), การรีวิว (`REVIEW.md`, `lean-review`, `.lean/roles/reviewer.md`), `/lean-pattern` และ `/lean-audit` โดยบังคับใช้กฎระดับ `mandatory` เฉพาะจุดที่เพิ่มหรือแก้ไขใน diff ปัจจุบัน (clean-as-you-code) และคงกฎ `recommended` หรือโค้ดเก่าที่ไม่ได้แตะไว้ไม่ให้บล็อกงาน ยกเว้นระบุไว้ในขอบเขตงานอย่างชัดเจน
+
+**เมื่ออัปเกรด:** อัปเดต `AGENTS.md`, `.lean/README.md`, `.lean/CUSTOMIZING.md`, `.lean/policy/CONTEXT.md`, `.lean/policy/QUALITY.md`, `.lean/policy/RECOVERY.md`, `.lean/policy/REVIEW.md`, `.lean/roles/reviewer.md`, `.lean/scripts/gate_mode.py`, `.lean/scripts/quality-gate.sh`, `.lean/scripts/contract_guard.py`, `.claude/hooks/session-start.sh`, `.codex/hooks/quality_gate.py` และสกิล `lean-gate`, `lean-review`, `lean-pattern`, `lean-audit` พร้อมกัน ไฟล์ `.codex/quality-gate.json` เดิม (`{"auto": true|false}`) ยังคงใช้งานได้ทันทีโดยไม่ต้องแปลงข้อมูล
+
+</details>
+
 ## 4.11.0 — 2026-10-22
 
 **Token highlight:** - · **Compared with:** -
