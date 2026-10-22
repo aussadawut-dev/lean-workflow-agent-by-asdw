@@ -13,8 +13,7 @@ config="$root/.lean/config.json"
 policy="$(python3 "$(dirname "$0")/../../.lean/scripts/gate_mode.py" --root "$root" --check-auto)"
 status=$?
 case "$status" in
-  0) ;;
-  3) printf '%s\n' "$policy" ;;
+  0|3) [ -z "$policy" ] || printf '%s\n' "$policy" ;;
   *) exit 2 ;;
 esac
 

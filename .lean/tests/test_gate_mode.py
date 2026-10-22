@@ -65,34 +65,49 @@ class GateModeTests(unittest.TestCase):
         self.assertEqual(self.marker.read_text(), "ran")
 
     def test_cli_round_trip_and_invalid_arguments_preserve_policy(self):
-        for mode in ("manual", "auto"):
+        expected = {
+            "manual": {"auto": False},
+            "auto": {"auto": True},
+            "auto_fixloop": {"auto": True, "fixloop": True},
+            "manual_fixloop": {"auto": False, "fixloop": True},
+        }
+        for mode, payload in expected.items():
             self.assertEqual(self.mode(mode).returncode, 0)
-            self.assertEqual(json.loads(self.config.read_text()), {"auto": mode == "auto"})
+            self.assertEqual(json.loads(self.config.read_text()), payload)
             self.assertEqual(json.loads(self.mode().stdout), {"mode": mode, "configured": True})
+        self.config.write_text(json.dumps({"auto": True, "fixloop": False}))
+        self.assertEqual(json.loads(self.mode().stdout), {"mode": "auto", "configured": True})
         original = self.config.read_bytes()
-        for args in (("bad",), ("manual", "extra")):
+        for args in (("bad",), ("manual", "extra"), ("auto_fixloop", "--policy"), ("manual_fixloop", "--check-auto")):
             self.assertEqual(self.mode(*args).returncode, 2)
             self.assertEqual(self.config.read_bytes(), original)
 
-    def test_manual_stops_never_run_or_claim_pass(self):
-        self.auto(False)
-        for result in (self.codex(), self.claude()):
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("NOT_RUN", result.stdout + result.stderr)
-            self.assertNotIn("checks passed", result.stdout + result.stderr)
-        self.assertFalse(self.marker.exists())
-        self.assertFalse((self.root / ".agent-runtime/gate-controls.json").exists())
+    def test_manual_and_manual_fixloop_stops_never_run_or_claim_pass(self):
+        for mode in ("manual", "manual_fixloop"):
+            self.assertEqual(self.mode(mode).returncode, 0)
+            for result in (self.codex(), self.claude()):
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("NOT_RUN", result.stdout + result.stderr)
+                self.assertNotIn("checks passed", result.stdout + result.stderr)
+                if mode == "manual_fixloop":
+                    self.assertIn("auto-loop", result.stdout + result.stderr)
+                    self.assertIn("user authorization", result.stdout + result.stderr)
+            self.assertFalse(self.marker.exists())
+            self.assertFalse((self.root / ".agent-runtime/gate-controls.json").exists())
 
     def test_codex_session_start_announces_policy_without_checks(self):
-        for auto in (False, True):
-            self.auto(auto)
+        for mode, auto_flag in (("manual", False), ("auto", True), ("auto_fixloop", True), ("manual_fixloop", False)):
+            self.assertEqual(self.mode(mode).returncode, 0)
             result = self.codex("session-start")
             self.assertEqual(result.returncode, 0, result.stderr)
             context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
-            self.assertIn(f"auto={str(auto).lower()}", context)
+            self.assertIn(f"auto={str(auto_flag).lower()}", context)
+            if mode.endswith("_fixloop"):
+                self.assertIn(f"mode={mode}", context)
+                self.assertIn("auto-loop", context)
             self.assertFalse(self.marker.exists())
 
-    def test_claude_session_start_preserves_quiet_auto_and_announces_manual(self):
+    def test_claude_session_start_preserves_quiet_auto_and_announces_manual_and_fixloop(self):
         (self.root / ".lean/config.json").write_text('{"mode":"standard","configured":true}')
         env = dict(os.environ, CLAUDE_PROJECT_DIR=str(self.root))
         script = str(self.root / ".claude/hooks/session-start.sh")
@@ -103,7 +118,28 @@ class GateModeTests(unittest.TestCase):
         manual = subprocess.run(["bash", script], text=True, capture_output=True, env=env)
         self.assertEqual(manual.returncode, 0, manual.stderr)
         self.assertIn("NOT_RUN", manual.stdout)
+        for mode in ("auto_fixloop", "manual_fixloop"):
+            self.assertEqual(self.mode(mode).returncode, 0)
+            out = subprocess.run(["bash", script], text=True, capture_output=True, env=env)
+            self.assertEqual(out.returncode, 0, out.stderr)
+            self.assertIn(f"mode={mode}", out.stdout)
+            self.assertIn("auto-loop", out.stdout)
         self.assertFalse(self.marker.exists())
+
+    def test_auto_fixloop_runs_checks_and_emits_fixloop_failure_guidance(self):
+        self.assertEqual(self.mode("auto_fixloop").returncode, 0)
+        self.assertEqual(self.claude().returncode, 0)
+        self.assertEqual(self.codex().returncode, 0)
+        self.assertEqual(self.marker.read_text(), "ranran")
+        self.project.write_text("<!-- gate:start -->\n```sh\nfalse\n```\n<!-- gate:end -->\n")
+        subprocess.run(["python3", str(self.root / ".lean/scripts/gate_evidence.py"), "--root", str(self.root),
+                        "accept-controls", "--reason", "Fixture selects failing gate"], check=True)
+        claude_fail = self.claude()
+        self.assertIn("Fixloop mode is active", self.refusal(claude_fail) or "")
+        codex_fail = json.loads(self.codex().stdout)
+        self.assertEqual(codex_fail["decision"], "block")
+        self.assertIn("fixloop active", codex_fail["reason"])
+        self.assertIn("Fixloop mode is active", codex_fail["reason"])
 
     def test_codex_auto_stop_uses_default_and_runs_checks(self):
         result = self.codex()
@@ -130,7 +166,8 @@ class GateModeTests(unittest.TestCase):
                          ["--root", str(self.root.resolve()), "--contract", contract, "--require-review"])
 
     def test_invalid_policy_blocks_cli_and_explicit_runs(self):
-        for text in ('{"auto":"false"}', '{"auto":0}', '[]', '{}', '{bad', '{"auto":true,"auto":false}'):
+        for text in ('{"auto":"false"}', '{"auto":0}', '{"auto":true,"fixloop":"yes"}', '{"auto":true,"extra":1}',
+                     '{"fixloop":true}', '[]', '{}', '{bad', '{"auto":true,"auto":false}'):
             self.config.write_text(text)
             for result in (self.mode(), self.mode("manual"), self.codex("run")):
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
@@ -161,12 +198,29 @@ class GateModeTests(unittest.TestCase):
 
     def test_failure_never_turns_into_a_pass_on_continuation(self):
         self.project.write_text("<!-- gate:start -->\n```sh\nfalse\n```\n<!-- gate:end -->\n")
-        first = json.loads(self.codex().stdout)
-        self.assertEqual(first["decision"], "block")
+        for index in range(3):
+            attempt = json.loads(self.codex(payload={"stop_hook_active": index > 0}).stdout)
+            self.assertEqual(attempt["decision"], "block")
         continued = json.loads(self.codex(payload={"stop_hook_active": True}).stdout)
         self.assertIn("UNVERIFIED", continued["systemMessage"])
         self.assertNotIn("decision", continued)
         self.assertEqual(self.codex("run").returncode, 2)
+
+    def test_codex_unchanged_refusal_blocks_once_then_releases_unverified_until_change(self):
+        (self.root / ".gitignore").write_text(".agent-runtime/\ngate-runs\n")
+        self.project.write_text("<!-- gate:start -->\n```sh\nfalse\n```\n<!-- gate:end -->\n")
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+        subprocess.run(["git", "-C", str(self.root), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(self.root), "-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid",
+                        "commit", "-qm", "fixture"], check=True)
+        first = json.loads(self.codex(payload={"stop_hook_active": False, "session_id": "s1"}).stdout)
+        self.assertEqual(first["decision"], "block")
+        repeated = json.loads(self.codex(payload={"stop_hook_active": True, "session_id": "s1"}).stdout)
+        self.assertIn("UNVERIFIED", repeated["systemMessage"])
+        self.assertNotIn("decision", repeated)
+        (self.root / "work.txt").write_text("changed\n")
+        after_change = json.loads(self.codex(payload={"stop_hook_active": True, "session_id": "s1"}).stdout)
+        self.assertEqual(after_change["decision"], "block")
 
     def test_shared_lock_blocks_all_explicit_entrypoints(self):
         self.auto(False)

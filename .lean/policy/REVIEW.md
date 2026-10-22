@@ -33,6 +33,7 @@ This receipt detects stale coverage. Its identity and findings are attestations;
 ## Reviewer rules
 
 - Review the diff and its direct dependencies; do not rebuild full context.
+- Check the diff against applicable `accepted` project standards and bounded `ACCEPTED_EXCEPTION` records routed from `.lean/PROJECT.md` (or `record_root` for a submodule) for the touched areas and signals, ignoring `proposed` or `deprecated` rules. Enforce `mandatory` rules (`REWORK`) only on violations introduced or modified by the diff (clean-as-you-code), leaving pre-existing violations on unchanged lines as non-blocking notes. Keep `recommended` rules non-blocking unless the Task Contract or accepted scope explicitly promotes them (`quality=HIGH` sets review depth, not rule strength). Ground per-locale language findings in concrete accepted rule text (glossary terms, compound/domain term precedence, placeholder parity, or prohibited register/particle patterns), never stylistic preference.
 - Report concrete findings: location, problem, severity, fix.
 - No praise, no style nits unless they change meaning.
 - Verdict is `PASS` or `REWORK`.

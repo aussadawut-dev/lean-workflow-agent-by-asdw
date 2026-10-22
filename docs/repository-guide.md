@@ -53,7 +53,7 @@ lean-workflow-agent-by-asdw/
 ├── .codex/                        Codex lifecycle integration
 │   ├── hooks.json                 Definitions requiring runtime trust
 │   ├── hooks/                     SessionStart and Stop adapters
-│   └── quality-gate.json          Optional local auto/manual preference
+│   └── quality-gate.json          Optional local gate mode preference (auto|manual|auto_fixloop|manual_fixloop)
 └── .github/
     ├── workflows/lean-workflow.yml Workflow self-checks in CI
     └── pull_request_template.md   PR Result Contract

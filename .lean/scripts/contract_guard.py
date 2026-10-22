@@ -402,9 +402,10 @@ LEAN_READS = {"workflow.py": {"show", "check", "context"},
               "submodule.py": {"context", "gate", "show", "status"},
               "takeover.py": {"inventory", "preview", "check", "status"},
               "update_workflow.py": {"preview", "check", "status", "plan"},
-              "gate_mode.py": {"show", "status", "--check-auto"}, "model_drift.py": None, "check_structure.py": None,
+              "model_drift.py": None, "check_structure.py": None,
               "gate_lock.py": None, "shared_assets.py": None}
-LEAN_FLAG_WRITES = {"clean_repo.py": {"--apply"}, "skill_effort.py": {"standard", "high", "ultra", "reset"}}
+LEAN_FLAG_WRITES = {"clean_repo.py": {"--apply"}, "skill_effort.py": {"standard", "high", "ultra", "reset"},
+                    "gate_mode.py": {"auto", "manual", "auto_fixloop", "manual_fixloop"}}
 
 
 def git_writes(args):

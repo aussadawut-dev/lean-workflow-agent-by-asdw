@@ -1,5 +1,6 @@
 """Codex lifecycle adapter for the shared Lean gate; hook trust remains user-owned."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -7,9 +8,11 @@ import sys
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / ".lean/scripts"))
-from gate_mode import policy, read_auto
+from gate_mode import policy, read_mode
 from gate_evidence import check_review, state
 import contract_guard
+
+MAX_REFUSALS = 3
 
 
 def current_review_contract(root):
@@ -34,7 +37,7 @@ def main():
     args = parser.parse_args()
     try:
         root = args.root.resolve(strict=True)
-        auto, _ = read_auto(root)
+        mode, auto, fixloop, _ = read_mode(root)
         payload = json.load(sys.stdin) if args.event == "stop" else {}
         if not isinstance(payload, dict) or type(payload.get("stop_hook_active", False)) is not bool:
             raise ValueError("hook input must be an object with a boolean stop_hook_active")
@@ -46,6 +49,7 @@ def main():
         print(json.dumps({"systemMessage": message}))
         return 0
     if args.event == "session-start":
+        clear_session_refusals(root)
         session = payload_session(sys.stdin)
         if session:
             try:
@@ -55,10 +59,10 @@ def main():
                     contract_guard.baseline(root, session, state(root))
             except (OSError, ValueError, subprocess.CalledProcessError):
                 pass  # No baseline: the Stop treats any uncommitted change as this session's work.
-        print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": policy(auto)}}))
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": policy(mode)}}))
         return 0
     if args.event == "stop" and not auto:
-        print(json.dumps({"systemMessage": policy(auto)}))
+        print(json.dumps({"systemMessage": policy(mode)}))
         return 0
     command = ["bash", str(root / ".lean/scripts/quality-gate.sh"), "--root", str(root)]
     contract = args.contract
@@ -70,10 +74,11 @@ def main():
         try:
             contract = contract_guard.current(root, session)
             if not contract and changed_since_baseline(root, session):
-                return refuse(payload, "Changed work has no declared Task Contract for this session.\n"
-                              + contract_guard.HELP)
+                return refuse(root, payload, "Changed work has no declared Task Contract for this session.\n"
+                              + contract_guard.HELP, session=session, is_contract=True, fixloop=fixloop)
         except (OSError, ValueError, subprocess.CalledProcessError) as error:
-            return refuse(payload, f"Task Contract state unreadable: {error}")
+            return refuse(root, payload, f"Task Contract state unreadable: {error}",
+                          session=session, is_contract=True, fixloop=fixloop)
     if args.event == "stop" and not contract:
         reviewed = current_review_contract(root)
         contract = reviewed
@@ -89,6 +94,7 @@ def main():
         sys.stderr.write(result.stderr)
         return result.returncode
     if result.returncode == 0:
+        clear_refusals(root)
         if session:
             try:
                 contract_guard.baseline(root, session, state(root))
@@ -96,7 +102,27 @@ def main():
                 pass
         print(json.dumps({"systemMessage": "Quality Gate checks passed; acceptance and required semantic review remain separate."}))
         return 0
-    return refuse(payload, (result.stderr + result.stdout)[-12000:])
+    return refuse(root, payload, (result.stderr + result.stdout)[-12000:],
+                  session=session, contract=contract or "", fixloop=fixloop)
+
+
+def clear_refusals(root):
+    for name in ("codex-gate-failed", "codex-gate-refusal"):
+        try:
+            (root / ".agent-runtime" / name).unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def clear_session_refusals(root):
+    runtime = root / ".agent-runtime"
+    try:
+        (runtime / "codex-gate-refusal").unlink(missing_ok=True)
+        failed = runtime / "codex-gate-failed"
+        if failed.is_file() and failed.read_text().startswith("c"):
+            failed.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def payload_session(stream):
@@ -118,11 +144,43 @@ def changed_since_baseline(root, session):
     return dirty.returncode != 0 or bool(dirty.stdout.strip())
 
 
-def refuse(payload, detail):
-    """Block a fresh Stop once; a continued Stop is released UNVERIFIED, never as a pass."""
-    message = "Quality Gate UNVERIFIED. Report BLOCKED; do not declare DONE.\n" + detail
-    response = {"systemMessage": message} if payload.get("stop_hook_active") else {"decision": "block", "reason": message}
-    print(json.dumps(response))
+def refuse(root, payload, detail, session="", contract="", is_contract=False, fixloop=False):
+    """Block up to MAX_REFUSALS attempts; release unchanged or capped continued Stops UNVERIFIED."""
+    runtime = root / ".agent-runtime"
+    failed = runtime / "codex-gate-failed"
+    refusal = runtime / "codex-gate-refusal"
+    count = 0
+    try:
+        if not runtime.is_symlink():
+            runtime.mkdir(exist_ok=True)
+            if payload.get("stop_hook_active") and failed.is_file():
+                raw = failed.read_text().strip().lstrip("c")
+                count = int(raw) if raw.isdigit() else 0
+            count += 1
+            failed.write_text(f"{'c' if is_contract else ''}{count}")
+            if not is_contract and session:
+                try:
+                    current = state(root)
+                except (OSError, ValueError, subprocess.CalledProcessError):
+                    current = ""
+                if current:
+                    reason = hashlib.sha256(detail.encode()).hexdigest()
+                    fingerprint = f"{session} {current} {reason} {contract}"
+                    if refusal.is_file() and refusal.read_text() == fingerprint:
+                        print(json.dumps({"systemMessage": "Codex Quality Gate refused again with nothing changed since the last refusal; Stop released UNVERIFIED. The work is not DONE; see that refusal."}))
+                        return 0
+                    refusal.write_text(fingerprint)
+    except (OSError, ValueError, subprocess.CalledProcessError):
+        count = count or (MAX_REFUSALS + 1 if payload.get("stop_hook_active") else 1)
+    if count > MAX_REFUSALS:
+        print(json.dumps({"systemMessage": f"Codex Quality Gate still refused after {MAX_REFUSALS} attempts; Stop released UNVERIFIED. The work is not DONE; see the last gate refusal.\n{detail}"}))
+        return 0
+    if fixloop:
+        header = ("Quality Gate UNVERIFIED (fixloop active: fix actionable failures and re-run until the gate passes; "
+                  "stop only for a genuine question or missing tool; do not declare DONE).\n")
+    else:
+        header = "Quality Gate UNVERIFIED. Report BLOCKED; do not declare DONE.\n"
+    print(json.dumps({"decision": "block", "reason": header + detail}))
     return 0
 
 

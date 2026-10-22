@@ -4,9 +4,9 @@ I built this because I want a coding agent to understand the work, check what it
 
 It works with **Claude Code and Codex**, with one shared set of rules and skills. Use it with your own stack.
 
-**Baseline 4.11.0** · [MIT License](LICENSE)
+**Baseline 4.12.0** · [MIT License](LICENSE)
 
-This release expands `/lean-pattern` and `/lean-audit` with stack-appropriate repository structure/module boundaries and per-locale i18n, grammar and terminology standards—setting early baselines on new projects and inspecting/asking through `/lean-grill` before remediating existing codebases. See the [4.11.0 release notes](.lean/CHANGELOG.md#4110--2026-10-22) for changes and upgrade notes.
+This release adds `auto_fixloop` and `manual_fixloop` gate modes with 3-attempt Stop retry parity across Claude and Codex, and connects accepted project standards (`mandatory` vs `recommended` clean-as-you-code rules) into context selection, review, `/lean-pattern` and `/lean-audit`. See the [4.12.0 release notes](.lean/CHANGELOG.md#4120--2026-10-22) for changes and upgrade notes.
 
 The idea is simple: **agree on the work → implement → test → validate → review → finish with evidence**. Use the steps the task needs. You do not have to call every skill or read every file to get started.
 
@@ -174,7 +174,7 @@ To validate HIGH-depth work, supply the exact Task Contract used for its review:
 bash .lean/scripts/quality-gate.sh --root . --require-review --contract '<exact Task Contract>'
 ```
 
-In auto mode, the Stop adapters run the shared checks. In manual mode, automatic Stops report `NOT_RUN`; explicit gate runs still execute, and the task remains unfinished until validation and required review pass. A Stop released as `UNVERIFIED` also remains blocked. See the [shared quality policy](.lean/policy/QUALITY.md).
+In `auto` or `auto_fixloop` mode, the Stop adapters run the shared checks. In `manual` or `manual_fixloop` mode, automatic Stops report `NOT_RUN` and starting the full gate requires user authorization; explicit gate runs still execute, and the task remains unfinished until validation and required review pass. In `auto_fixloop` and `manual_fixloop`, once the gate runs, the agent auto-loops over actionable failures until the gate passes without asking between rounds, stopping only for genuine questions or missing tools. A Stop released as `UNVERIFIED` also remains blocked. See the [shared quality policy](.lean/policy/QUALITY.md).
 
 See [quality and runtime details](docs/quality-and-runtime.md) and [workflow verification commands](docs/repository-guide.md#verify-the-workflow).
 
