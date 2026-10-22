@@ -6,11 +6,11 @@ Use a trusted Lean checkout to migrate another repository's workflow and documen
 
 ```text
 # Claude Code
-/lean-takeover-workflow "/path/to/target"
-/lean-takeover-workflow "/path/to/target" --preview
+/lean-takeover "/path/to/target"
+/lean-takeover "/path/to/target" --preview
 
 # Codex
-$lean-takeover-workflow "/path/to/target" --preview
+$lean-takeover "/path/to/target" --preview
 ```
 
 The default audits the target and prepares a concrete plan/diff, then applies after matching approval. `--preview` stops at the proposal and leaves the target intact. Continue an accepted plan with `--apply <plan-id>` using its external session. Missing approval or changed revisions need a new or refreshed proposal. A plan ID alone is not approval.
@@ -37,7 +37,7 @@ The plan merges settings, gitignore, application gates/CI and project extensions
 
 ## Apply and recovery
 
-The [shared procedure](../.lean/skills/lean-takeover-workflow/SKILL.md) owns interpretation and approval. Its [tool interface](../.lean/skills/lean-takeover-workflow/references/tooling.md) records inventory, decisions, rule mappings, exact writes and source/target fingerprints in a private session outside both repositories.
+The [shared procedure](../.lean/skills/lean-takeover/SKILL.md) owns interpretation and approval. Its [tool interface](../.lean/skills/lean-takeover/references/tooling.md) records inventory, decisions, rule mappings, exact writes and source/target fingerprints in a private session outside both repositories.
 
 Portable source files come from `.lean/assets.json`, so nearby source-project extensions are excluded. Keep the private session path for recovery and do not publish it.
 

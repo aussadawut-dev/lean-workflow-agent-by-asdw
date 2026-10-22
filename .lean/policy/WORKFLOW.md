@@ -32,7 +32,7 @@ Task Contract -> Context -> Decide when needed -> Work -> Test -> Validate -> Re
 
 ## Queue cleanup
 
-Use `/lean-clean-queue old` for DONE items completed strictly over 30 days ago, or `/lean-clean-queue all`
+Use `/lean-prune queue old` for DONE items completed strictly over 30 days ago, or `/lean-prune queue all`
 for every DONE item. Only explicit cleanup requests authorize apply; cleanup never runs merely
 because a task finishes or a mode changes. The CLI is `clean-queue old|all --dry-run|--apply`.
 Preview is read-only; apply locks and rechecks data. READY/BLOCKED records and trackers remain.
@@ -83,7 +83,7 @@ Trivial tasks use the one-word contract and skip formal review. They still need 
 ## Execution modes
 
 - `DIRECT` — default when configuration `execution` is `direct`.
-- `DELEGATED` — Controller assigns bounded work to one worker when `execution` is `delegated`; follow `/lean-multi-agent`. Missing required delegation reports BLOCKED.
+- `DELEGATED` — Controller assigns bounded work to one worker when `execution` is `delegated`; follow `/lean-agents`. Missing required delegation reports BLOCKED.
 - `SEQUENCE` — only for real dependencies between steps.
 - `PARALLEL` — only for genuinely independent work.
 

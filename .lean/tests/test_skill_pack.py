@@ -7,9 +7,9 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-EXTRAS = {"lean-clean-queue", "lean-clean-repo", "lean-compress", "lean-model-update",
-          "lean-takeover-workflow", "lean-use-submodule", "lean-update-workflow",
-          "lean-pattern", "lean-audit", "lean-quality-gate-mode"}
+EXTRAS = {"lean-prune", "lean-compress", "lean-catalog",
+          "lean-takeover", "lean-target", "lean-update",
+          "lean-pattern", "lean-audit"}
 
 
 class SkillPackTests(unittest.TestCase):
@@ -76,7 +76,7 @@ class SkillPackTests(unittest.TestCase):
 
     def test_previous_seven_skill_pack_can_be_completed_or_disabled(self):
         for tree in (".agents/skills", ".claude/skills"):
-            for name in EXTRAS - {"lean-pattern", "lean-audit", "lean-quality-gate-mode"}:
+            for name in EXTRAS - {"lean-pattern", "lean-audit"}:
                 (self.root / tree / name).symlink_to(f"../../.lean/skills/{name}")
         self.assertTrue(json.loads(self.run_pack("status").stdout)["partial"])
         self.assertEqual(self.run_pack("enable").returncode, 0)
@@ -97,7 +97,7 @@ class SkillPackTests(unittest.TestCase):
         self.assertEqual(self.run_pack("disable").returncode, 0)
         self.assertEqual(self.run_pack("disable").returncode, 0)
         self.assertFalse(json.loads(self.run_pack("status").stdout)["enabled"])
-        self.assertTrue((self.root / ".lean/skills/lean-clean-repo/SKILL.md").is_file())
+        self.assertTrue((self.root / ".lean/skills/lean-prune/SKILL.md").is_file())
         for name in ("lean-pattern", "lean-audit"):
             self.assertEqual((self.root / ".lean/skills" / name / "SKILL.md").read_bytes(),
                              (ROOT / ".lean/skills" / name / "SKILL.md").read_bytes())

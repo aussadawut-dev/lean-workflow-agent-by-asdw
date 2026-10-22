@@ -1,5 +1,5 @@
 ---
-name: lean-use-submodule
+name: lean-target
 description: Add or reuse a remote application repository as a Lean submodule, keeping workflow and work records out of it.
 user-invocable: true
 argument-hint: "<remote url>"
@@ -9,9 +9,9 @@ Input: `$ARGUMENTS` means the explicit invocation arguments, or the current user
 
 Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity; keep model reasoning effort separate.
 
-# Lean Use Submodule
+# Lean Target
 
-Use `/lean-use-submodule <remote url>` from the Lean repository root. Lean is the superproject; the application is `targets/<repository-name>`. This is not installing Lean into the application.
+Use `/lean-target <remote url>` from the Lean repository root. Lean is the superproject; the application is `targets/<repository-name>`. This is not installing Lean into the application.
 
 1. Read the Lean contract and run `python3 .lean/scripts/submodule.py use --dry-run -- "<remote url>"`. Use the supplied URL as one argument with proper shell quoting (or an argument array); never interpolate it into shell code. The preview reports paths and Git staging. A direct request to use this remote authorizes adding/reusing it and selecting it; do not ask again for routine setup. Stop on a name/path collision, conflicting registration, symlink boundary or pending `.gitmodules` changes. Do not move existing checkouts or discard work. Do not put tokens/passwords in URLs.
 2. Run the same command with `--apply`. Only the selected submodule may be initialized. Existing attached branches and pending application changes are preserved. Attach a clean detached checkout at its pinned commit: use the default branch when it points there, otherwise create `codex/lean-<name>` at that commit. Do not advance to the remote's latest commit or reset an existing branch. If branch selection fails, preserve the partial checkout, explain the failure, choose a branch with the user when material, and rerun. Do not remove Git metadata to force a retry.

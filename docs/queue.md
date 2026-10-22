@@ -31,11 +31,11 @@ Completion rechecks dependencies and requires nonblank evidence. The CLI can che
 
 ## Clean completed queue items
 
-Enable the optional skill pack first. In Claude, use the commands below; in Codex, use `$lean-clean-queue` with the same arguments:
+Enable the optional skill pack first. In Claude, use the commands below; in Codex, use `$lean-prune` with the same arguments:
 
 ```text
-/lean-clean-queue old
-/lean-clean-queue all
+/lean-prune queue old
+/lean-prune queue all
 ```
 
 | Selection | What gets archived | What stays |
@@ -45,7 +45,7 @@ Enable the optional skill pack first. In Claude, use the commands below; in Code
 
 Cleanup archives queue items and keeps their full history. Trackers stay where they are. The skill previews the selection and applies the requested cleanup using that authorization. Add `--preview` to inspect it without applying.
 
-If discovery is unavailable, read the [shared procedure](../.lean/skills/lean-clean-queue/SKILL.md), or use the CLI:
+If discovery is unavailable, read the [shared procedure](../.lean/skills/lean-prune/SKILL.md), or use the CLI:
 
 ```sh
 python3 .lean/scripts/workflow.py clean-queue old --dry-run

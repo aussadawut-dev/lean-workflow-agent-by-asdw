@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.dont_write_bytecode = True
-from shared_assets import REQUIRED_SKILLS, EXTRA_SKILLS, USER_COMMANDS, declared_links, verify_link
+from shared_assets import REQUIRED_SKILLS, EXTRA_SKILLS, RETIRED_SKILLS, USER_COMMANDS, declared_links, verify_link
 
 
 def check(root):
@@ -108,7 +108,7 @@ def check(root):
         bad("model policy must require sized model/effort on every spawn")
     if models.is_file() and "Spawn only when required or cheaper." not in models.read_text():
         bad("model policy must keep work in the active session when a spawn is not cheaper")
-    dispatch = root / ".lean/skills/lean-multi-agent/SKILL.md"
+    dispatch = root / ".lean/skills/lean-agents/SKILL.md"
     if dispatch.is_file() and re.search(r"requested model/effort\s*=\s*inherited\s*/\s*inherited", dispatch.read_text()):
         bad("dispatch example must not default to inherited model/effort")
     # Unbounded workers grow context on every call; a held claim expires while the Controller waits.
@@ -141,11 +141,25 @@ def check(root):
             bad(f"missing command argument hint: {path.relative_to(root)}")
         if fields.get("disable-model-invocation") == "true":
             bad(f"workflow skill must remain available to the agent: {path.relative_to(root)}")
+    skills_dir = root / ".lean/skills"
+    if skills_dir.is_dir():
+        for entry in sorted(skills_dir.iterdir()):
+            if entry.name not in REQUIRED_SKILLS:
+                bad(f"unregistered or retired canonical skill: {entry.relative_to(root)}")
     # Local extensions may remain ordinary provider-specific skills.
     for tree in (".claude/skills", ".agents/skills"):
-        for path in sorted((root / tree).glob("*/SKILL.md")):
-            if path.parent.name not in REQUIRED_SKILLS:
-                validate_frontmatter(path, path.parent.name, bad)
+        tree_dir = root / tree
+        if not tree_dir.is_dir():
+            continue
+        for entry in sorted(tree_dir.iterdir()):
+            if entry.name in REQUIRED_SKILLS:
+                continue
+            if entry.name in RETIRED_SKILLS or entry.name == "clean-queue" or (entry.is_symlink() and not entry.exists()):
+                bad(f"unregistered or retired discovery link: {entry.relative_to(root)}")
+                continue
+            skill = entry / "SKILL.md"
+            if skill.is_file():
+                validate_frontmatter(skill, entry.name, bad)
     reviewer = root / ".claude/agents/reviewer.md"
     if reviewer.is_file() and "../../.lean/roles/reviewer.md" not in reviewer.read_text():
         bad("reviewer must route to the shared role")
