@@ -230,6 +230,12 @@ class ContextSelectionContractTests(unittest.TestCase):
         effort = self.read(".lean/policy/SKILL-EFFORT.md")
         self.assertIn("does not activate additional skills", effort)
 
+    def test_standards_routes_load_by_affected_boundary_or_locale_signals(self):
+        context = self.read(".lean/policy/CONTEXT.md")
+        self.assertIn("routes to accepted project standards", context)
+        self.assertIn("module-boundary and dependency-direction rules", context)
+        self.assertIn("user-facing copy or locale files", context)
+
 
 class SkillLevelContractTests(unittest.TestCase):
     """Pin agent instruction boundaries; these do not execute or grade an LLM."""
@@ -288,6 +294,11 @@ class SkillLevelContractTests(unittest.TestCase):
         init_text = self.text("lean-init")
         pattern_text = self.text("lean-pattern")
         audit_text = self.text("lean-audit")
+        review_policy = (ROOT / ".lean/policy/REVIEW.md").read_text()
+        reviewer_role = (ROOT / ".lean/roles/reviewer.md").read_text()
+        review_skill = self.text("lean-review")
+        standard_template = (ROOT / ".lean/templates/project-standard.md").read_text()
+        audit_scenarios = (ROOT / ".lean/skills/lean-audit/references/scenarios.md").read_text()
         self.assertIn("/lean-pattern", init_text)
         self.assertIn("early baseline", pattern_text)
         self.assertIn("module boundaries", pattern_text)
@@ -295,12 +306,33 @@ class SkillLevelContractTests(unittest.TestCase):
         self.assertIn("hardcoded user-facing strings", pattern_text)
         self.assertIn("grammar and natural phrasing", pattern_text)
         self.assertIn("terminology/glossary", pattern_text)
+        self.assertIn("compound/domain term precedence", pattern_text)
+        self.assertIn("accept-controls", pattern_text)
+        self.assertIn("ratchet/baseline", pattern_text)
         self.assertIn("existing repositories", pattern_text.lower())
+        self.assertIn("compound/domain terms overriding general glossary entries", standard_template)
+        self.assertIn("deterministic gate-eligible checks", standard_template)
+        self.assertIn("ratchet/baseline", standard_template)
+        for review_doc in (review_policy, reviewer_role, review_skill):
+            self.assertIn("accepted", review_doc)
+            self.assertIn("introduced or modified by the diff", review_doc)
+            self.assertIn("recommended", review_doc)
+        self.assertIn("ACCEPTED_EXCEPTION", review_policy)
+        self.assertIn("compound/domain term precedence", review_policy)
+        self.assertIn("ACCEPTED_EXCEPTION", reviewer_role)
+        self.assertIn("concrete accepted glossary/rule criteria", reviewer_role)
         self.assertIn("module boundary", audit_text)
         self.assertIn("hardcoded user-facing strings", audit_text)
         self.assertIn("grammar and natural phrasing", audit_text)
         self.assertIn("terminology/glossary", audit_text)
         self.assertIn("lean-grill", audit_text)
+        self.assertIn("two-track handoff", audit_text)
+        self.assertIn("never self-grant exceptions", audit_text)
+        self.assertIn("do not pass `scenarios.md`", audit_scenarios)
+        self.assertIn("blinding leaks", audit_scenarios)
+        self.assertIn("Legacy boundary contract", audit_scenarios)
+        self.assertIn("Domain term vs glossary", audit_scenarios)
+        self.assertIn("Mandatory i18n deviation", audit_scenarios)
 
 
 if __name__ == "__main__":

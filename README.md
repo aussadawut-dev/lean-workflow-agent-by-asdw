@@ -174,7 +174,7 @@ To validate HIGH-depth work, supply the exact Task Contract used for its review:
 bash .lean/scripts/quality-gate.sh --root . --require-review --contract '<exact Task Contract>'
 ```
 
-In auto mode, the Stop adapters run the shared checks. In manual mode, automatic Stops report `NOT_RUN`; explicit gate runs still execute, and the task remains unfinished until validation and required review pass. A Stop released as `UNVERIFIED` also remains blocked. See the [shared quality policy](.lean/policy/QUALITY.md).
+In `auto` or `auto_fixloop` mode, the Stop adapters run the shared checks. In `manual` or `manual_fixloop` mode, automatic Stops report `NOT_RUN` and starting the full gate requires user authorization; explicit gate runs still execute, and the task remains unfinished until validation and required review pass. In `auto_fixloop` and `manual_fixloop`, once the gate runs, the agent auto-loops over actionable failures until the gate passes without asking between rounds, stopping only for genuine questions or missing tools. A Stop released as `UNVERIFIED` also remains blocked. See the [shared quality policy](.lean/policy/QUALITY.md).
 
 See [quality and runtime details](docs/quality-and-runtime.md) and [workflow verification commands](docs/repository-guide.md#verify-the-workflow).
 

@@ -28,20 +28,49 @@ def unique_keys(pairs):
     return result
 
 
-def read_auto(root):
+MODES = ("auto", "manual", "auto_fixloop", "manual_fixloop")
+
+
+def read_mode(root):
     path = safe_path(root, ".codex/quality-gate.json")
     if not path.exists():
-        return True, False
+        return "auto", True, False, False
     config = json.loads(path.read_text(), object_pairs_hook=unique_keys)
-    if not isinstance(config, dict) or set(config) != {"auto"} or type(config["auto"]) is not bool:
-        raise ValueError("gate policy must contain only an auto JSON boolean")
-    return config["auto"], True
+    if (not isinstance(config, dict) or "auto" not in config or not set(config) <= {"auto", "fixloop"}
+            or type(config["auto"]) is not bool or type(config.get("fixloop", False)) is not bool):
+        raise ValueError("gate policy must contain only auto (and optional fixloop) JSON booleans")
+    auto = config["auto"]
+    fixloop = config.get("fixloop", False)
+    mode = ("auto" if auto else "manual") + ("_fixloop" if fixloop else "")
+    return mode, auto, fixloop, True
 
 
-def policy(auto):
-    if auto:
+def read_auto(root):
+    _, auto, _, configured = read_mode(root)
+    return auto, configured
+
+
+def policy(mode):
+    if isinstance(mode, bool):
+        mode = "auto" if mode else "manual"
+    if mode == "auto":
         return ("Lean Quality Gate auto=true: run the shared gate at work completion without asking. "
                 "DONE still requires acceptance, current validation and required semantic review.")
+    if mode == "auto_fixloop":
+        return ("Lean Quality Gate mode=auto_fixloop (auto=true, fixloop=true): run the shared gate at work "
+                "completion without asking. If any gate check fails, auto-loop: fix all actionable code, test "
+                "and lint failures and re-run the gate until it passes without asking the user, stopping only "
+                "for genuine requirement/design questions or missing environment tools. DONE still requires "
+                "acceptance, current validation and required semantic review.")
+    if mode == "manual_fixloop":
+        return ("Lean Quality Gate mode=manual_fixloop (auto=false, fixloop=true): automatic validation NOT_RUN. "
+                "Run focused checks; always get user authorization (reuse matching approval for this workset or "
+                "batch) before starting the full gate: bash .lean/scripts/quality-gate.sh --root . with "
+                "--contract and --require-review when required. Once authorized, if any gate check fails, "
+                "auto-loop: fix all actionable code, test and lint failures and re-run the gate until it passes "
+                "without asking again between rounds, stopping only for genuine requirement/design questions or "
+                "missing environment tools. Deferred validation is not a pass: stay VALIDATING/BLOCKED until the "
+                "gate and required review cover the shipping state.")
     return ("Lean Quality Gate auto=false: automatic validation NOT_RUN. Run focused checks; get user "
             "authorization (reuse matching approval for this workset or batch) before the full gate: "
             "bash .lean/scripts/quality-gate.sh --root . with --contract and --require-review when required. "
@@ -49,19 +78,24 @@ def policy(auto):
             "cover the shipping state.")
 
 
-def write_auto(root, auto):
+def write_mode(root, mode):
+    if mode not in MODES:
+        raise ValueError(f"unsupported gate mode: {mode}")
+    auto = mode.startswith("auto")
+    fixloop = mode.endswith("_fixloop")
+    payload = {"auto": auto, "fixloop": True} if fixloop else {"auto": auto}
     runtime = safe_path(root, ".agent-runtime")
     runtime.mkdir(exist_ok=True)
     with safe_path(root, ".agent-runtime/gate-mode.lock").open("a+") as stream:
         fcntl.flock(stream, fcntl.LOCK_EX)
-        read_auto(root)  # Invalid settings require explicit investigation, not silent repair.
+        read_mode(root)  # Invalid settings require explicit investigation, not silent repair.
         path = safe_path(root, ".codex/quality-gate.json")
         path.parent.mkdir(exist_ok=True)
         temporary = None
         try:
             with tempfile.NamedTemporaryFile("w", dir=path.parent, delete=False) as output:
                 temporary = Path(output.name)
-                json.dump({"auto": auto}, output, indent=2)
+                json.dump(payload, output, indent=2)
                 output.write("\n")
                 output.flush()
                 os.fsync(output.fileno())
@@ -71,30 +105,39 @@ def write_auto(root, auto):
                 temporary.unlink(missing_ok=True)
 
 
+def write_auto(root, auto):
+    write_mode(root, "auto" if auto else "manual")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
-    parser.add_argument("mode", nargs="?", choices=("auto", "manual"))
+    parser.add_argument("mode", nargs="?", choices=MODES)
     output = parser.add_mutually_exclusive_group()
     output.add_argument("--check-auto", action="store_true", help=argparse.SUPPRESS)
+    output.add_argument("--fixloop", action="store_true", help=argparse.SUPPRESS)
     output.add_argument("--policy", action="store_true", help="print policy context without checks")
     args = parser.parse_args()
-    if args.mode and (args.check_auto or args.policy):
+    if args.mode and (args.check_auto or args.fixloop or args.policy):
         parser.error("inspection flags cannot set a mode")
     try:
         root = args.root.resolve(strict=True)
-        auto, configured = read_auto(root)
+        mode, auto, fixloop, configured = read_mode(root)
         if args.mode:
-            write_auto(root, args.mode == "auto")
-            auto, configured = read_auto(root)
+            write_mode(root, args.mode)
+            mode, auto, fixloop, configured = read_mode(root)
         if args.policy:
-            print(policy(auto))
+            print(policy(mode))
+        elif args.fixloop:
+            return 0 if fixloop else 1
         elif args.check_auto:
             if not auto:
-                print(policy(auto))
+                print(policy(mode))
                 return 3
+            if fixloop:
+                print(policy(mode))
         else:
-            print(json.dumps({"mode": "auto" if auto else "manual", "configured": configured}))
+            print(json.dumps({"mode": mode, "configured": configured}))
         return 0
     except (OSError, ValueError) as error:
         print(f"Gate policy invalid/unavailable: {error}; validation NOT_RUN.", file=sys.stderr)

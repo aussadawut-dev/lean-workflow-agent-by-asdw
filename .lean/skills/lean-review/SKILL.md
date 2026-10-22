@@ -16,7 +16,7 @@ Scope: $ARGUMENTS (default: uncommitted changes)
 1. Read `.lean/policy/REVIEW.md`.
 2. Confirm deterministic validation already passed. If it has not run, run the Quality Gate commands from `.lean/PROJECT.md` first.
 3. Determine depth: the deeper of risk and quality floor from the Task Contract. If there is no contract, infer risk per `.lean/policy/CONTRACTS.md`.
-4. Review:
+4. Review against the Task Contract and applicable `accepted` project standards/exceptions routed from `.lean/PROJECT.md` / `record_root` (blocking only on `mandatory` violations introduced or modified by the diff, keeping `recommended` rules non-blocking unless explicitly promoted):
    - `LOW` — self-check against acceptance criteria.
    - `MEDIUM` — focused diff review yourself.
    - `HIGH` — use an independent reviewer: Claude's `reviewer` subagent, or a Codex subagent or
