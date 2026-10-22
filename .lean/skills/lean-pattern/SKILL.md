@@ -13,7 +13,15 @@ Apply `.lean/policy/SKILL-EFFORT.md` and state the effective intensity. This opt
 
 Read PROJECT and the relevant existing standards, accepted decisions and source. For a submodule, resolve `python3 .lean/scripts/submodule.py context`: inspect code in `project_root`, keep project standards and findings in `record_root`, and use shared procedures/templates from `workflow_root`. Reuse existing document locations and keep PROJECT a short map linking to them. In tracker/full mode use the owning workset; in standard mode a proposal may remain in the conversation until saving is requested or included in approved scope.
 
-Bound the work to the requested area. Identify the actual stack, constraints and existing conventions. Select applicable topics, such as repository/module boundaries, code conventions, UX flows, UI components/tokens, accessibility, i18n, API contracts, data, security/privacy, tests, performance/reliability or operations. These are prompts for selection, not a required catalog. Do not prescribe an application stack, universal folder tree or design system, or manufacture standards for absent areas.
+Bound the work to the requested area. Identify the actual stack, constraints and existing conventions, distinguishing greenfield/early baseline setup from existing repositories:
+
+- **Greenfield or early-stage projects:** establish an early baseline up front so subsequent features follow one convention without large rework.
+- **Existing repositories:** inspect current layouts, call paths and copy first, separate working conventions from defects, and ask through `lean-grill` before proposing disruptive structural moves or terminology rewrites.
+
+Select applicable topics, such as repository/module boundaries, code conventions, UX flows, UI components/tokens, accessibility, i18n, API contracts, data, security/privacy, tests, performance/reliability or operations. These are prompts for selection, not a required catalog. Do not prescribe an application stack, universal folder tree or design system, or manufacture standards for absent areas:
+
+- **Repository structure and module boundaries:** define stack-appropriate directory roles, module boundaries, dependency direction (which layers or features may import each other), and standard homes for tests, schemas/types, configurations and locale assets based on the project's actual stack rather than a single universal folder tree.
+- **i18n and per-locale language standards:** when the project has user-facing copy or multiple locales, cover both technical i18n hygiene (no hardcoded user-facing strings, locale key parity across supported languages, and interpolation/pluralization instead of string concatenation across variables) and per-locale linguistic quality (correct grammar and natural phrasing for each language rather than literal word-for-word translation, shared terminology/glossary consistency across screens, and consistent tone/politeness level).
 
 ## Propose standards
 

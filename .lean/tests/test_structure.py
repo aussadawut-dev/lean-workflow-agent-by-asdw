@@ -284,6 +284,24 @@ class SkillLevelContractTests(unittest.TestCase):
         self.assertIn("research does not authorize a prototype, dependency installation or external write", text)
         self.assertIn("claim-level evidence for decisive differences", text)
 
+    def test_pattern_and_audit_cover_repo_structure_i18n_grammar_and_legacy_grill(self):
+        init_text = self.text("lean-init")
+        pattern_text = self.text("lean-pattern")
+        audit_text = self.text("lean-audit")
+        self.assertIn("/lean-pattern", init_text)
+        self.assertIn("early baseline", pattern_text)
+        self.assertIn("module boundaries", pattern_text)
+        self.assertIn("dependency direction", pattern_text)
+        self.assertIn("hardcoded user-facing strings", pattern_text)
+        self.assertIn("grammar and natural phrasing", pattern_text)
+        self.assertIn("terminology/glossary", pattern_text)
+        self.assertIn("existing repositories", pattern_text.lower())
+        self.assertIn("module boundary", audit_text)
+        self.assertIn("hardcoded user-facing strings", audit_text)
+        self.assertIn("grammar and natural phrasing", audit_text)
+        self.assertIn("terminology/glossary", audit_text)
+        self.assertIn("lean-grill", audit_text)
+
 
 if __name__ == "__main__":
     unittest.main()
