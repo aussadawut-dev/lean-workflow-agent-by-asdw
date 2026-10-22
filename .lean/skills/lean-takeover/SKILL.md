@@ -1,5 +1,5 @@
 ---
-name: lean-takeover-workflow
+name: lean-takeover
 description: Audit an existing repository's agent workflow and migrate its rules and documents into Lean with an approved, recoverable plan.
 user-invocable: true
 argument-hint: '"<target path>" [--preview | --apply <plan-id>]'
@@ -9,11 +9,11 @@ Input: `$ARGUMENTS` means the explicit invocation arguments, or the current user
 
 Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity; keep model reasoning effort separate.
 
-# Lean Takeover Workflow
+# Lean Takeover
 
 Replace the target's active workflow with a coherent Lean baseline while preserving project requirements, accepted decisions, unfinished work and history. `$ARGUMENTS` selects the target; it does not authorize changing another repository, publishing, running arbitrary discovered hooks, or modifying global runtime settings. Follow the active agent's accepted scope and Lean contract. Applying a takeover is HIGH risk and needs independent review.
 
-Default invocation audits, grills and prepares a concrete plan/diff; apply after matching user approval in the same conversation. `--preview` stops at the proposal. `--apply <plan-id>` reuses an existing approved plan and session; locate its recorded directory, verify its identity, and do not regenerate or silently approve a different plan. If no matching approval exists, show the concrete proposal first. A slash invocation is Claude syntax; Codex uses `$lean-takeover-workflow` with the same arguments. Creating this skill does not install it globally.
+Default invocation audits, grills and prepares a concrete plan/diff; apply after matching user approval in the same conversation. `--preview` stops at the proposal. `--apply <plan-id>` reuses an existing approved plan and session; locate its recorded directory, verify its identity, and do not regenerate or silently approve a different plan. If no matching approval exists, show the concrete proposal first. A slash invocation is Claude syntax; Codex uses `$lean-takeover` with the same arguments. Creating this skill does not install it globally.
 
 ## Audit and understand intent
 

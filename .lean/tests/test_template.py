@@ -56,7 +56,7 @@ class TemplateSmokeTests(unittest.TestCase):
             subprocess.run(["python3", str(source / ".lean/scripts/skill_pack.py"), "enable"],
                            check=True, capture_output=True)
             for tree in (".agents/skills", ".claude/skills"):
-                self.assertEqual(len(lean_discovery(source, tree)), 19)
+                self.assertEqual(len(lean_discovery(source, tree)), 17)
             target = Path(directory) / "target"
             target.mkdir()
             bootstrap(target, source_root=source)

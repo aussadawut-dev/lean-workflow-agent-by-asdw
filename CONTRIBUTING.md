@@ -2,7 +2,7 @@
 
 Thanks for taking a look. This repository is the workflow template, and changes can reach projects that copy it. Keep changes portable, clear and backed by evidence.
 
-Start with `AGENTS.md` and `.lean/README.md`. When instructions change, update the canonical contract and shared procedures together. Skill bodies live in `.lean/skills/`. Preserve the nine core discovery links and the ten optional skills' registration. Keep actual trackers, queue items, credentials and runtime state out of the template.
+Start with `AGENTS.md` and `.lean/README.md`. When instructions change, update the canonical contract and shared procedures together. Skill bodies live in `.lean/skills/`. Preserve the nine core discovery links and the eight optional skills' registration. Keep actual trackers, queue items, credentials and runtime state out of the template.
 
 ## Check the change
 

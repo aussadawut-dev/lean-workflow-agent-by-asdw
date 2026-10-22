@@ -20,7 +20,7 @@ def check(root, cache_path, max_cache_days=14):
     drift, notes = [], []
     for provider, runtime, version, model_id in model_catalog.validate(catalog):
         drift.append(f'evidence older than {model_catalog.MAX_AGE_DAYS} days: {provider}/{model_id} '
-                     f'({runtime} {version}); run /lean-model-update {provider}')
+                     f'({runtime} {version}); run /lean-catalog {provider}')
     cache_file = Path(cache_path)
     if not cache_file.is_file():
         notes.append(f'Codex model cache not found at {cache_file}; Codex models not compared')
@@ -63,7 +63,7 @@ def check(root, cache_path, max_cache_days=14):
     if ranks:
         for slug in sorted(visible - {entry['id'] for entry in catalogued}):
             if live[slug].get('priority', 10**6) < max(ranks):
-                drift.append(f'Codex lists {slug} ranked above catalogued models; run /lean-model-update codex')
+                drift.append(f'Codex lists {slug} ranked above catalogued models; run /lean-catalog codex')
     agents = root / 'AGENTS.md'
     if agents.is_file():
         for slug in sorted(set(re.findall(r'`(gpt-[a-z0-9.\-]+)`', agents.read_text()))):

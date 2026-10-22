@@ -59,7 +59,7 @@ class StructureTests(unittest.TestCase):
         self.assertIn("session", self.check(False).lower())
 
     def test_dispatch_example_cannot_default_to_inherited_settings(self):
-        path = self.root / ".lean/skills/lean-multi-agent/SKILL.md"
+        path = self.root / ".lean/skills/lean-agents/SKILL.md"
         content = path.read_text()
         start = content.index("requested model/effort=")
         end = content.index(" |", start)
@@ -67,32 +67,32 @@ class StructureTests(unittest.TestCase):
         self.assertIn("inherited", self.check(False).lower())
 
     def test_dispatch_requires_a_per_worker_budget(self):
-        path = self.root / ".lean/skills/lean-multi-agent/SKILL.md"
+        path = self.root / ".lean/skills/lean-agents/SKILL.md"
         path.write_text(path.read_text().replace("about 50 turns", "as many turns as needed"))
         self.assertIn("budget", self.check(False).lower())
 
     def test_budget_cannot_remove_required_behavior_tests(self):
-        path = self.root / ".lean/skills/lean-multi-agent/SKILL.md"
+        path = self.root / ".lean/skills/lean-agents/SKILL.md"
         path.write_text(path.read_text().replace("never removes required behavior tests", "may trim tests"))
         self.assertIn("behavior tests", self.check(False).lower())
 
     def test_spent_worker_is_redispatched_not_resumed(self):
-        path = self.root / ".lean/skills/lean-multi-agent/SKILL.md"
+        path = self.root / ".lean/skills/lean-agents/SKILL.md"
         path.write_text(path.read_text().replace("Do not resume a worker that spent its budget", "Resume any worker"))
         self.assertIn("instead of resuming", self.check(False).lower())
 
     def test_codex_turn_cap_gap_stays_recorded(self):
-        path = self.root / ".lean/skills/lean-multi-agent/SKILL.md"
+        path = self.root / ".lean/skills/lean-agents/SKILL.md"
         path.write_text(path.read_text().replace("has no per-spawn turn cap", "is capped"))
         self.assertIn("codex", self.check(False).lower())
 
     def test_controller_checks_a_worker_tree_before_accepting_it(self):
-        path = self.root / ".lean/skills/lean-multi-agent/SKILL.md"
+        path = self.root / ".lean/skills/lean-agents/SKILL.md"
         path.write_text(path.read_text().replace("missing handoff report", "short handoff report"))
         self.assertIn("handoff", self.check(False).lower())
 
     def test_controller_keeps_its_own_claim_alive_while_workers_run(self):
-        path = self.root / ".lean/skills/lean-multi-agent/SKILL.md"
+        path = self.root / ".lean/skills/lean-agents/SKILL.md"
         path.write_text(path.read_text().replace("heartbeat it before each dispatch", "leave it"))
         self.assertIn("heartbeat", self.check(False).lower())
 
@@ -151,6 +151,17 @@ class StructureTests(unittest.TestCase):
             (path / "SKILL.md").write_text("---\nname: project-helper\ndescription: Project task\n---\n")
         self.check()
 
+    def test_retired_or_dangling_skill_slots_are_rejected(self):
+        dangling = self.root / ".claude/skills/lean-multi-agent"
+        dangling.symlink_to("../../.lean/skills/lean-multi-agent")
+        self.assertIn("discovery link", self.check(False))
+        dangling.unlink()
+        retired_dir = self.root / ".lean/skills/lean-clean-repo"
+        retired_dir.mkdir()
+        self.assertIn("canonical skill", self.check(False))
+        retired_dir.rmdir()
+        self.check()
+
     def test_empty_description_is_rejected(self):
         path = self.root / ".lean/skills/lean-task/SKILL.md"
         lines = ["description: " if line.startswith("description:") else line for line in path.read_text().splitlines()]
@@ -158,7 +169,7 @@ class StructureTests(unittest.TestCase):
         self.check(False)
 
     def test_core_procedures_cannot_be_hidden(self):
-        for name in ("lean-scope", "lean-research", "lean-grill", "lean-review", "lean-gate", "lean-multi-agent"):
+        for name in ("lean-scope", "lean-research", "lean-grill", "lean-review", "lean-gate", "lean-agents", "lean-effort"):
             with self.subTest(name=name):
                 path = self.root / ".lean/skills" / name / "SKILL.md"
                 original = path.read_text()
@@ -167,7 +178,7 @@ class StructureTests(unittest.TestCase):
                 path.write_text(original)
 
     def test_user_commands_cannot_be_hidden_or_lose_argument_hints(self):
-        for name in ("lean-init", "lean-task", "lean-model-update", "lean-compress", "lean-clean-queue", "lean-takeover-workflow", "lean-use-submodule"):
+        for name in ("lean-init", "lean-task", "lean-catalog", "lean-compress", "lean-prune", "lean-takeover", "lean-target", "lean-update"):
             with self.subTest(name=name):
                 path = self.root / ".lean/skills" / name / "SKILL.md"
                 original = path.read_text()

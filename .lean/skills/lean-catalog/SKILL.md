@@ -1,5 +1,5 @@
 ---
-name: lean-model-update
+name: lean-catalog
 description: Propose refreshed Codex/Claude model metadata for the catalog; apply only an explicitly authorized proposal. Never switches session models or global runtime configuration.
 user-invocable: true
 argument-hint: "[codex|claude|all]"
@@ -9,9 +9,9 @@ Input: `$ARGUMENTS` means the explicit invocation arguments, or the current user
 
 Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity; keep model reasoning effort separate.
 
-# Lean Model Update
+# Lean Catalog
 
-Read AGENTS, PROJECT and `workflow.py show`. Use the accepted scope; `/lean-scope` drafts new scope only if none matches. Default provider is the active agent's provider; ask if that cannot be determined. `/lean-model-update all` covers both providers. A request to refresh produces a proposal, not permission to apply it or switch a model.
+Read AGENTS, PROJECT and `workflow.py show`. Use the accepted scope; `/lean-scope` drafts new scope only if none matches. Default provider is the active agent's provider; ask if that cannot be determined. `/lean-catalog all` covers both providers. A request to refresh produces a proposal, not permission to apply it or switch a model.
 
 For a quick offline inspection of an existing catalog, use `python3 .lean/scripts/model_drift.py`; see [catalog format](references/catalog.md#offline-drift-inspection) for inputs, limits and exit codes. This does not refresh evidence or authorize apply.
 
