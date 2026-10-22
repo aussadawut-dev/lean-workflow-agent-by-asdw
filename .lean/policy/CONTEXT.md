@@ -22,7 +22,7 @@ Keep PROJECT.md a short map of project facts, commands, risks and documentation 
 
 Start with the user's goal, accepted scope and known target paths. Read the relevant instructions, then the closest useful area guide and source. For an unfamiliar cross-area task, a broader initial read may be necessary; narrow subsequent reads once the affected areas are known. Missing or stale routes require targeted file/reference searches, not loading every document or assuming the requirement does not exist.
 
-Choose by affected behavior; follow dependencies across area boundaries. For a style-only web change, start with applicable UI rules, component and styles. When a form change affects payload, validation, error handling or access, expand to the API contract/schema and permission rules that govern it. Read database or operational documents only when an affected dependency requires them. Folder names are starting points, not an allowlist.
+Choose by affected behavior; follow dependencies across area boundaries. For a style-only web change, start with applicable UI rules, component and styles. When a form change affects payload, validation, error handling or access, expand to the API contract/schema and permission rules that govern it. Read database or operational documents only when an affected dependency requires them. When `.lean/PROJECT.md` (or `record_root` for a submodule) routes to accepted project standards, load only the standard routes matching affected behavior or signals—such as module-boundary and dependency-direction rules when adding, moving or importing across modules, and i18n or locale glossary rules when adding or changing user-facing copy or locale files. Folder names are starting points, not an allowlist.
 
 ## Select procedures
 
