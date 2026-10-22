@@ -6,6 +6,33 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
+## Unreleased
+
+**Token highlight:** - · **Compared with:** -
+
+**Gate highlight:** this repository's Quality Gate took about **71–79% less wall time** than 4.12.0 on one 8-core machine: a median of 40.3 s versus 195.1 s over three interleaved direct runs of each version under heavy background load, and versus 141.0 s for 4.12.0 earlier the same day under lighter load. Timings, method and the downstream token baseline behind the wording changes are kept in `docs/history/measurements/2026-10-22-gate-speed.md` in the source repository.
+
+- Run `.lean/tests/test-hooks.sh` as five concurrent parts, each in its own subshell and scratch directory. The same 110 cases still run once each and print in the same order. Failed case names are listed again after the totals, where a gate's 40-line output tail still shows them, and a part that stops early counts as a failure.
+- Add `--shards N` to `.lean/tests/run_tests.py` to split each test file's tests across up to N processes, and run a named `*.sh` suite with bash in the same pool. After the failure output it repeats every failing test or case name, so a gate's output tail names them all. This repository's gate now runs `test-hooks.sh` and `test_gate_integrity.py` together with `--shards 6`, after its quicker checks.
+- Remove instructions that cost Claude extra round trips: `CLAUDE.md` and `AGENTS.md` say the imported files are already loaded, and `AGENTS.md` limits `declare` in Claude to a turn whose first tool call writes, to replacing a bound contract and to recovering from a denied write; Codex still declares first. In the downstream baseline, 75 of 163 `declare` calls came later in a turn whose written contract line the guard could already bind.
+
+**Upgrade:** update `AGENTS.md`, `CLAUDE.md`, `.lean/tests/test-hooks.sh`, `.lean/tests/run_tests.py` and `.lean/tests/test_run_tests.py` together. Gates that call `.lean/tests/test-hooks.sh` get the concurrent parts without changes. To shard more of a gate, replace lines such as `python3 -m unittest discover -s .lean/tests -p 'test_gate_integrity.py'` with `python3 .lean/tests/run_tests.py --shards 6 test-hooks.sh test_gate_integrity.py`; that edits a protected gate control, so record its approval or HIGH review as usual. No configuration, record or queue migration is needed.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+**ผลด้านเวลา gate:** Quality Gate ของ repository นี้ใช้เวลาน้อยลงประมาณ **71–79%** เทียบกับ 4.12.0 บนเครื่อง 8 core เครื่องเดียว: ค่ามัธยฐาน 40.3 วินาที เทียบกับ 195.1 วินาที จากการรันตรงแบบสลับกันรุ่นละสามรอบขณะเครื่องมีโหลดหนัก และเทียบกับ 141.0 วินาทีของ 4.12.0 ที่วัดก่อนหน้าในวันเดียวกันขณะโหลดเบากว่า เวลาดิบ วิธีวัด และ baseline ด้าน token จากโปรเจกต์ downstream ที่ใช้ประกอบการแก้ข้อความ เก็บไว้ที่ `docs/history/measurements/2026-10-22-gate-speed.md` ใน source repository
+
+- รัน `.lean/tests/test-hooks.sh` เป็นห้าส่วนพร้อมกัน แต่ละส่วนอยู่ใน subshell และ scratch directory ของตัวเอง ทั้ง 110 case ยังรันครั้งเดียวและพิมพ์ตามลำดับเดิม ชื่อ case ที่ล้มเหลวจะแสดงซ้ำหลังบรรทัดสรุป ซึ่งยังอยู่ใน 40 บรรทัดท้ายที่ gate แสดง ส่วนที่หยุดกลางทางนับเป็นความล้มเหลว
+- เพิ่ม `--shards N` ใน `.lean/tests/run_tests.py` เพื่อแบ่ง test ของแต่ละไฟล์ไปรันได้สูงสุด N process และรัน suite `*.sh` ที่ระบุชื่อด้วย bash ใน pool เดียวกัน หลังผลที่ล้มเหลวจะพิมพ์ชื่อ test หรือ case ที่ล้มทั้งหมดซ้ำอีกรอบ ท้าย output ของ gate จึงแสดงครบ gate ของ repository นี้จึงรัน `test-hooks.sh` กับ `test_gate_integrity.py` พร้อมกันด้วย `--shards 6` หลังจากตรวจข้อที่เร็วกว่าเสร็จแล้ว
+- ตัดคำสั่งที่ทำให้ Claude ต้องเรียก tool เพิ่มโดยไม่จำเป็น: `CLAUDE.md` และ `AGENTS.md` ระบุว่าไฟล์ที่ import โหลดอยู่แล้ว และ `AGENTS.md` ให้ Claude ใช้ `declare` เฉพาะใน turn ที่ tool call แรกเป็นการเขียน ตอนแทนที่ contract ที่ผูกไว้แล้ว และหลังโดนปฏิเสธการเขียน ส่วน Codex ยัง declare ก่อนเหมือนเดิม ใน baseline ของ downstream มี `declare` 75 จาก 163 ครั้งที่เกิดภายหลังใน turn ซึ่ง guard ผูก contract line ที่เขียนไว้ได้อยู่แล้ว
+
+**เมื่ออัปเกรด:** อัปเดต `AGENTS.md`, `CLAUDE.md`, `.lean/tests/test-hooks.sh`, `.lean/tests/run_tests.py` และ `.lean/tests/test_run_tests.py` พร้อมกัน gate ที่เรียก `.lean/tests/test-hooks.sh` จะได้การรันแบบขนานทันทีโดยไม่ต้องแก้ ถ้าต้องการแบ่ง shard เพิ่ม ให้แทนบรรทัดอย่าง `python3 -m unittest discover -s .lean/tests -p 'test_gate_integrity.py'` ด้วย `python3 .lean/tests/run_tests.py --shards 6 test-hooks.sh test_gate_integrity.py` ซึ่งเป็นการแก้ gate control ที่ถูกป้องกัน จึงต้องบันทึกการอนุมัติหรือ HIGH review ตามปกติ ไม่ต้องย้าย configuration, records หรือ queue
+
+</details>
+
 ## 4.12.0 — 2026-10-22
 
 **Token highlight:** - · **Compared with:** -

@@ -38,7 +38,7 @@ Install ShellCheck through your environment's package manager, for example `brew
 
 ## Test coverage
 
-`.lean/tests/test-hooks.sh` runs Quality Gate and SessionStart tests in temporary repositories. It covers opt-in caches, baseline seeding, continued refusals, contract provenance and command failure classification. A missing command is an environment problem; an available command that fails remains a command failure, including a wrapper returning another program's 127.
+`.lean/tests/test-hooks.sh` runs Quality Gate and SessionStart tests in temporary repositories. It covers opt-in caches, baseline seeding, continued refusals, contract provenance and command failure classification. A missing command is an environment problem; an available command that fails remains a command failure, including a wrapper returning another program's 127. Its cases form parts that run at the same time, each in its own subshell and scratch directory, and failed case names are listed again at the end.
 
 Run the full Python suite with:
 
@@ -48,7 +48,7 @@ python3 -m unittest discover -s .lean/tests -p 'test_*.py'
 
 Agent behavior evals (real sessions in a template copy, paid and opt-in) live in [`evals/`](../evals/README.md). CI runs only their grader tests and fixture dry-run.
 
-`python3 .lean/tests/run_tests.py` runs the same files, one process per file and several at once (`-j` sets the count, default one per CPU). Total time is close to the slowest file, and it prints each file's time, so the slowest files are easy to spot. CI uses it.
+`python3 .lean/tests/run_tests.py` runs the same files, one process per file and several at once (`-j` sets the count, default one per CPU). Total time is close to the slowest file, and it prints each file's time, so the slowest files are easy to spot. CI uses it. `--shards N` also splits each file's tests across up to N processes, and a named `*.sh` suite such as `test-hooks.sh` runs with bash in the same pool; this repository's Quality Gate runs its two slowest suites that way. After the failure output it repeats every failing test or case name, so a gate's output tail names them all.
 
 It covers modes, claims, canonical routing and discovery links. `test_e2e.py` walks standard → tracker → full → standard, including completion, cleanup and downgrade guards. `test_guards.py` checks checklist variants, single-line tracker text and whitespace-padded agent IDs. `python3 .lean/scripts/workflow.py check` validates the current mode.
 
