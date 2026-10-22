@@ -6,6 +6,31 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
+## 4.10.0 — 2026-10-22
+
+**Token highlight:** - · **Compared with:** -
+
+- Shorten skill names to single-word `lean-<name>` commands for faster autocomplete: `lean-multi-agent` $\rightarrow$ `lean-agents`, `lean-skill-effort` $\rightarrow$ `lean-effort`, `lean-update-workflow` $\rightarrow$ `lean-update`, `lean-takeover-workflow` $\rightarrow$ `lean-takeover`, `lean-use-submodule` $\rightarrow$ `lean-target`, and `lean-model-update` $\rightarrow$ `lean-catalog`.
+- Consolidate `lean-clean-queue` and `lean-clean-repo` into a single reworked `/lean-prune` skill (`queue [all|old] [--days N] [--dry-run|--apply]` and `repo [scope]`).
+- Remove the unused `lean-quality-gate-mode` skill while keeping `gate_mode.py` and `QUALITY.md` intact. Keep nine core skills discovered by default and eight optional skills behind `skill_pack.py` so per-turn system-prompt overhead does not increase.
+- Allow `takeover.py` and `shared_assets.py` to recognize, retire and roll back previous v4 skill slots and discovery links during upgrades, while `check_structure.py` rejects retired or dangling skill slots.
+
+**Upgrade:** update the shared skills, `.lean/assets.json`, both discovery link trees (`.claude/skills/` and `.agents/skills/`), scripts, policies and guides together, and remove retired v4 skill directories and discovery symlinks. Existing `.lean/skill-effort.json` overrides that name old skill identifiers should be updated to the new names (`lean-agents`, `lean-effort`, `lean-prune`, `lean-catalog`, `lean-takeover`, `lean-target`, `lean-update`). No task record or queue migration is needed.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+- ย่อชื่อสกิลเป็นคำเดียวในรูปแบบ `lean-<name>` เพื่อเรียกใช้งานและพิมพ์ต่อท้ายได้ไวขึ้น: `lean-multi-agent` $\rightarrow$ `lean-agents`, `lean-skill-effort` $\rightarrow$ `lean-effort`, `lean-update-workflow` $\rightarrow$ `lean-update`, `lean-takeover-workflow` $\rightarrow$ `lean-takeover`, `lean-use-submodule` $\rightarrow$ `lean-target`, และ `lean-model-update` $\rightarrow$ `lean-catalog`
+- ยุบรวม `lean-clean-queue` และ `lean-clean-repo` เข้าเป็นสกิล `/lean-prune` ตัวเดียว (`queue [all|old] [--days N] [--dry-run|--apply]` และ `repo [scope]`)
+- ถอดสกิล `lean-quality-gate-mode` ที่ไม่ได้ใช้งานออก โดยคง `gate_mode.py` และ `QUALITY.md` ไว้ คงจำนวน 9 core skills ตามค่าเริ่มต้น และ 8 optional skills ผ่าน `skill_pack.py` เพื่อไม่เพิ่มภาระ system prompt token ต่อ turn
+- รองรับการตรวจสอบ ลบ และ rollback ช่องสกิลรุ่น v4 เดิมใน `takeover.py` กับ `shared_assets.py` ระหว่างการอัปเกรด และให้ `check_structure.py` ปฏิเสธช่องสกิลที่เลิกใช้หรือลิงก์ค้าง
+
+**เมื่ออัปเกรด:** อัปเดต shared skills, `.lean/assets.json`, discovery links ทั้งสองฝั่ง (`.claude/skills/` และ `.agents/skills/`), สคริปต์, นโยบาย และเอกสารพร้อมกัน พร้อมลบโฟลเดอร์สกิลและ symlinks ชื่อเดิมออก หากมี `.lean/skill-effort.json` ที่ตั้งค่าเฉพาะสกิลด้วยชื่อเดิม ให้เปลี่ยนเป็นชื่อใหม่ ไม่ต้องย้ายข้อมูลบันทึกงานหรือคิว
+
+</details>
+
 ## 4.9.0 — 2026-10-20
 
 **Token highlight:** - · **Compared with:** -
