@@ -50,11 +50,11 @@ Discovery makes a skill available. Accepted scope and execution routing still de
 
 ## Project standards and conformance audits
 
-Use `lean-pattern` when you want research and accepted decisions turned into project standards. Choose the relevant area: repository boundaries, UX/UI, accessibility, i18n, API/data, security, testing or operations.
+Use `lean-pattern` when you want research and accepted decisions turned into project standards. Choose the relevant area: repository structure and module boundaries, UX/UI, accessibility, i18n and per-locale language quality (grammar, natural phrasing, terminology/glossary and tone), API/data, security, testing or operations. On new projects, define these baselines early after `/lean-init` so feature work stays consistent without large rework; on existing repositories, inspect current conventions first and resolve material trade-offs through `lean-grill` before proposing disruptive changes.
 
 It keeps suitable existing conventions and proposes changes with a clear use case, mandatory/recommended strength, verification and approval. Use the [standard record format](../.lean/templates/project-standard.md) in existing project documents. Keep PROJECT as a short map. New research stays a proposal until accepted; migration has its own scope. Recommended rules stay advisory unless accepted scope makes them mandatory.
 
-Use `lean-audit` to check an area against accepted scope, standards and exceptions, including existing code beyond the current diff. The [finding format](../.lean/templates/audit-finding.md) separates confirmed deviations, accepted exceptions, open decisions, missing verification and suggestions.
+Use `lean-audit` to check an area against accepted scope, standards and exceptions, including existing code beyond the current diff (such as module boundary violations, hardcoded user-facing strings, missing locale keys, unnatural literal translations, or inconsistent terminology/grammar across languages). The [finding format](../.lean/templates/audit-finding.md) separates confirmed deviations, accepted exceptions, open decisions, missing verification and suggestions.
 
 If a difference might be intentional, inspect decisions and history first. Use Grill before a fix that could change important behavior. State what was sampled and what runtime evidence is missing. Static reading cannot prove how a screen looks or how a live system behaves. A missing baseline is a gap to resolve.
 
