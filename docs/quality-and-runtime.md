@@ -46,13 +46,13 @@ All shared gate entry points hold a lock for that checkout while checks run. A b
 
 Pre-existing or out-of-scope failures, missing tools, and unavailable required reviewers/workers stay BLOCKED with evidence. Workflow self-tests alone cannot establish application correctness.
 
-## Auto and manual mode
+## Auto, manual and fixloop modes
 
-Inspect the setting with `python3 .lean/scripts/gate_mode.py`. Add `auto` or `manual` to save an explicit choice. See [.lean/policy/QUALITY.md](../.lean/policy/QUALITY.md) for gate automation rules.
+Inspect the setting with `python3 .lean/scripts/gate_mode.py`. Add `auto`, `manual`, `auto_fixloop` or `manual_fixloop` to save an explicit choice. See [.lean/policy/QUALITY.md](../.lean/policy/QUALITY.md) for gate automation rules.
 
-Workspace-owned `.codex/quality-gate.json` stores the preference. Missing settings mean auto. Preferences survive upgrades and are excluded from releases. Both providers read the setting, including for a selected submodule target.
+Workspace-owned `.codex/quality-gate.json` stores the preference. Missing settings mean `auto`. Preferences survive upgrades and are excluded from releases. Both providers read the setting, including for a selected submodule target.
 
-Manual mode skips automatic full checks and reports NOT_RUN. Focused checks can continue. A full run at completion needs applicable user authorization, reusing matching workset/batch approval. Until validation and review cover the final work, keep VALIDATING/BLOCKED.
+`manual` and `manual_fixloop` skip automatic full checks on Stop and report NOT_RUN. Focused checks can continue. Starting a full gate run always needs applicable user authorization, reusing matching workset/batch approval or an explicit `/lean-gate` invocation. In `auto_fixloop` and `manual_fixloop`, once the full gate runs, any check failure triggers an automatic fix loop over actionable code, test and lint failures until the gate passes without asking between rounds—stopping only for genuine requirement/design questions or missing environment tools. Both Claude and Codex Stop adapters block up to three attempts (`max_refusals=3`) while state changes and release immediately as UNVERIFIED on an unchanged refusal in the same session. Until validation and review cover the final work, keep VALIDATING/BLOCKED.
 
 Explicit entry points include the shared runner, `python3 .codex/hooks/quality_gate.py run`, and `CLAUDE_GATE_FORCE=1 .claude/hooks/quality-gate.sh`. For HIGH work, supply the exact `--contract` and `--require-review`. Automatic Codex Stops can reuse only a receipt verified against the current state; they cannot establish acceptance or contract provenance for a new task.
 

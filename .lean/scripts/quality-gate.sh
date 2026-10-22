@@ -246,6 +246,10 @@ while IFS= read -r cmd; do
       echo "Quality Gate could not run: $cmd"
       printf '%s\n' "$output" | tail -n 40
       echo "'$first' is not available in this environment, so this check never ran. That is a missing tool, not a failure your change caused. Do not edit code, the gate, or the tests to get past it: report BLOCKED, name the gate command that could not run and the tool it needs, say the change is unverified by that command, and do not declare DONE."
+    elif python3 "$(dirname "$helper")/gate_mode.py" --root "$root" --fixloop >/dev/null 2>&1; then
+      echo "Quality Gate failed: $cmd"
+      printf '%s\n' "$output" | tail -n 40
+      echo "Fixloop mode is active: fix all actionable code, test and lint failures and re-run the Quality Gate until it passes without asking the user, stopping only for a genuine requirement/design question. Do not declare DONE until the gate passes."
     else
       echo "Quality Gate failed: $cmd"
       printf '%s\n' "$output" | tail -n 40
