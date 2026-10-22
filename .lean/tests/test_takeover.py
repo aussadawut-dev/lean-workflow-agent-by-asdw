@@ -1134,6 +1134,70 @@ class TakeoverTests(unittest.TestCase):
                  for p in self.root.rglob("*") if p.is_file() and ".git" not in p.parts and ".agent-runtime" not in p.parts}
         self.assertEqual(after, original)
 
+    def test_v4_skill_retirement_upgrade_and_rollback(self):
+        from shared_assets import V4_CORE_LINKS, V4_SKILLS
+        v4_source = self.base / "v4-baseline"
+        v4_source.mkdir()
+        for name in (".lean/skills", ".claude/skills", ".agents/skills"):
+            (v4_source / name).mkdir(parents=True)
+        (v4_source / "AGENTS.md").write_text("Lean Workflow Baseline 4.8.0\n## Project additions\n")
+        v4_files = ["AGENTS.md", ".lean/assets.json"]
+        for name in V4_SKILLS:
+            skill_dir = v4_source / ".lean/skills" / name
+            skill_dir.mkdir(parents=True)
+            (skill_dir / "SKILL.md").write_text(f"---\nname: {name}\ndescription: v4 skill\n---\n")
+            v4_files.append(f".lean/skills/{name}/SKILL.md")
+        for rel, target in V4_CORE_LINKS.items():
+            (v4_source / rel).symlink_to(target, target_is_directory=True)
+        TOOL.save(v4_source / ".lean/assets.json", {"schema": 2, "files": v4_files, "links": V4_CORE_LINKS})
+        self.assertIn(".claude/skills/lean-multi-agent", TOOL.portable_files(v4_source))
+
+        self.shared_baseline()
+        retired_skill = self.root / ".lean/skills/lean-multi-agent"
+        retired_skill.mkdir(parents=True)
+        (retired_skill / "SKILL.md").write_text("Old multi-agent skill\n")
+        retired_link = self.root / ".claude/skills/lean-multi-agent"
+        retired_link.parent.mkdir(parents=True, exist_ok=True)
+        retired_link.symlink_to("../../.lean/skills/lean-multi-agent", target_is_directory=True)
+        retired_dir = self.root / ".agents/skills/lean-model-update"
+        retired_dir.mkdir(parents=True)
+        (retired_dir / "SKILL.md").write_text("Old model update directory\n")
+        before_dir = TOOL.fingerprint(retired_dir)
+
+        manifest = self.init()
+        self.assertEqual(manifest["files"][".claude/skills/lean-multi-agent"]["status"], "unread")
+        self.assertEqual(manifest["files"][".agents/skills/lean-model-update"]["status"], "unread")
+        for name, entry in list(manifest["files"].items()):
+            if entry["status"] == "unread":
+                TOOL.coverage(self.session, manifest, self.root, name, "cover", entry["before"]["sha256"])
+        TOOL.draft(self.session, manifest, self.root, self.source)
+        plan = TOOL.load(self.session / "plan.json")
+        plan.update(unresolved=[], acceptance=["Retire v4 skill slots cleanly and recover on rollback"])
+        plan["rule_map"] = [{"source": "AGENTS.md", "rule": "preserve business rules",
+                             "destination": "AGENTS.md Project additions", "reason": "fixture rule"}]
+        for retired_path in (".lean/skills/lean-multi-agent/SKILL.md",
+                             ".claude/skills/lean-multi-agent",
+                             ".agents/skills/lean-model-update"):
+            plan["operations"].append({"path": retired_path, "before": manifest["files"][retired_path]["before"],
+                                       "content": None, "reason": "retire v4 skill"})
+        paths = {op["path"] for op in plan["operations"]}
+        plan["dispositions"] = [{"path": name,
+                                 "action": "retire" if name.endswith(("lean-multi-agent/SKILL.md", "lean-multi-agent", "lean-model-update"))
+                                 else ("replace" if name in paths else "keep"),
+                                 "reason": "v4 upgrade"}
+                                for name, entry in manifest["files"].items() if entry["status"] == "read"]
+        TOOL.save(self.session / "plan.json", plan)
+        receipt = self.seal_ready(manifest, "accepted v4 upgrade")
+        self.assertEqual(self.apply(manifest, receipt)["status"], "APPLIED")
+        self.assertFalse(retired_link.exists() or retired_link.is_symlink())
+        self.assertFalse(retired_dir.exists() or retired_dir.is_symlink())
+        self.assertFalse((retired_skill / "SKILL.md").exists())
+        self.assertTrue((self.root / ".claude/skills/lean-agents").is_symlink())
+        self.assertEqual(TOOL.rollback(self.session, manifest, self.root)["status"], "ROLLED_BACK")
+        self.assertTrue(retired_link.is_symlink())
+        self.assertEqual(TOOL.fingerprint(retired_dir), before_dir)
+        self.assertEqual((retired_skill / "SKILL.md").read_text(), "Old multi-agent skill\n")
+
 
 if __name__ == "__main__":
     unittest.main()

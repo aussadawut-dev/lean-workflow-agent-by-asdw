@@ -4,9 +4,9 @@ I built this because I want a coding agent to understand the work, check what it
 
 It works with **Claude Code and Codex**, with one shared set of rules and skills. Use it with your own stack.
 
-**Baseline 4.9.0** · [MIT License](LICENSE)
+**Baseline 4.10.0** · [MIT License](LICENSE)
 
-This release makes subagent model, effort and context choices explicit, with runtime-aware fork rules and honest dispatch records. See the [4.9.0 release notes](.lean/CHANGELOG.md#490--2026-10-20) for changes and upgrade notes.
+This release shortens skill names to single-word `lean-<name>` commands, consolidates queue and repository cleanup into `/lean-prune`, and keeps nine core skills and eight optional skills without extra system-prompt overhead. See the [4.10.0 release notes](.lean/CHANGELOG.md#4100--2026-10-22) for changes and upgrade notes.
 
 The idea is simple: **agree on the work → implement → test → validate → review → finish with evidence**. Use the steps the task needs. You do not have to call every skill or read every file to get started.
 
@@ -17,7 +17,7 @@ The idea is simple: **agree on the work → implement → test → validate → 
 - Meaningful tests for behavior changes. For bugs, a regression test that fails before the fix and passes afterward.
 - Review at the depth the work needs, followed by a Quality Gate using your project's checks.
 - Three modes: keep evidence in the chat, keep a workset across sessions, or add a queue with explicit ownership.
-- Nine core skills, ten optional skills, and `standard` / `high` / `ultra` procedure intensity.
+- Nine core skills, eight optional skills, and `standard` / `high` / `ultra` procedure intensity.
 - Gate locking to avoid overlapping runs, and history checks to avoid reusing task IDs.
 - Worker assignments with a turn budget, required tests and a handoff when the budget runs out.
 
@@ -74,7 +74,7 @@ You can also call a skill for just one part of the work:
 | Find gaps in a plan before coding | `/lean-grill <plan>` | `$lean-grill <plan>` |
 | Review the current changes | `/lean-review` | `$lean-review` |
 | Check whether the task can finish | `/lean-gate` | `$lean-gate` |
-| Delegate a bounded task | `/lean-multi-agent <task>` | `$lean-multi-agent <task>` |
+| Delegate a bounded task | `/lean-agents <task>` | `$lean-agents <task>` |
 
 Claude uses `/skill-name`. Codex uses `$skill-name` or its skill picker. Both read the same canonical skills. See the [full command guide](docs/skills.md).
 
@@ -102,7 +102,7 @@ Every mode keeps the same test and review requirements. HIGH-depth review needs 
 
 ## Keep worker assignments bounded
 
-The [multi-agent procedure](.lean/skills/lean-multi-agent/SKILL.md) sizes each assignment to a few files and about **50 turns**. A turn is a model request; parallel tool calls in one turn count once. Split larger assignments by component or layer before dispatch, and keep a slice that already fits whole. Choose capable model and effort settings for each assignment under the [model policy](.lean/policy/MODELS.md); spawn when required or cheaper than finishing in the active session.
+The [multi-agent procedure](.lean/skills/lean-agents/SKILL.md) sizes each assignment to a few files and about **50 turns**. A turn is a model request; parallel tool calls in one turn count once. Split larger assignments by component or layer before dispatch, and keep a slice that already fits whole. Choose capable model and effort settings for each assignment under the [model policy](.lean/policy/MODELS.md); spawn when required or cheaper than finishing in the active session.
 
 The Controller's brief names the allowed files, acceptance checks, required tests, dependencies and budget. Workers locate relevant lines before reading, edit the needed parts, run focused tests while iterating and run their full checks before handoff. A budget never removes required behavior tests, including a page- or integration-level test for user-visible behavior; split the slice when needed.
 
@@ -120,17 +120,17 @@ This setting is separate from model reasoning effort, task quality, workflow mod
 
 | What you want to do | Claude Code | Codex |
 |---|---|---|
-| See saved settings | `/lean-skill-effort` | `$lean-skill-effort` |
-| Set a default for all skills | `/lean-skill-effort high` | `$lean-skill-effort high` |
-| Set research separately | `/lean-skill-effort ultra lean-research` | `$lean-skill-effort ultra lean-research` |
-| Reset research to the default | `/lean-skill-effort reset lean-research` | `$lean-skill-effort reset lean-research` |
-| Reset everything to standard | `/lean-skill-effort reset` | `$lean-skill-effort reset` |
+| See saved settings | `/lean-effort` | `$lean-effort` |
+| Set a default for all skills | `/lean-effort high` | `$lean-effort high` |
+| Set research separately | `/lean-effort ultra lean-research` | `$lean-effort ultra lean-research` |
+| Reset research to the default | `/lean-effort reset lean-research` | `$lean-effort reset lean-research` |
+| Reset everything to standard | `/lean-effort reset` | `$lean-effort reset` |
 
 For just one task, say “use scope high and research ultra for this task.” That choice stays with the task. Saved preferences go in optional `.lean/skill-effort.json`. Setting a global level clears individual overrides; resetting one skill restores inheritance. See [settings and CLI examples](docs/skills.md#optional-skill-levels).
 
 ## Enable optional skills
 
-The nine core skills are ready by default. To expose the ten optional skills, run these commands from the repository root, then reload your runtime's skills:
+The nine core skills are ready by default. To expose the eight optional skills, run these commands from the repository root, then reload your runtime's skills:
 
 ```sh
 python3 .lean/scripts/skill_pack.py enable
@@ -143,14 +143,14 @@ A few useful starting points after enabling them:
 
 | What you want to do | Claude Code | Codex |
 |---|---|---|
-| Preview a workflow update | `/lean-update-workflow` | `$lean-update-workflow` |
-| Preview repository cleanup | `/lean-clean-repo` | `$lean-clean-repo` |
+| Preview a workflow update | `/lean-update` | `$lean-update` |
+| Preview repository cleanup | `/lean-prune repo` | `$lean-prune repo` |
 | Preview shorter workflow prose | `/lean-compress workflow --preview` | `$lean-compress workflow --preview` |
-| Add an application submodule | `/lean-use-submodule <remote url>` | `$lean-use-submodule <remote url>` |
+| Add an application submodule | `/lean-target <remote url>` | `$lean-target <remote url>` |
 
-The pack also covers project standards, audits, gate mode, model research, queue cleanup and workflow takeover. Updates, repository cleanup and prose compression start with a preview. Applying them follows the accepted scope and each procedure's approval rules.
+The pack also covers project standards, audits, model research, queue cleanup and workflow takeover. Updates, repository cleanup and prose compression start with a preview. Applying them follows the accepted scope and each procedure's approval rules.
 
-See [all 19 skills](docs/skills.md#core-and-optional-commands) and the [maintenance guide](docs/maintenance.md).
+See [all 17 skills](docs/skills.md#core-and-optional-commands) and the [maintenance guide](docs/maintenance.md).
 
 ## Before calling a task done
 

@@ -6,7 +6,7 @@ Run the CLI examples from the repository root.
 
 ## One shared contract
 
-[AGENTS.md](../AGENTS.md) holds the shared rules. [CLAUDE.md](../CLAUDE.md) imports it. Both runtimes discover nine core skills through symlinks, with ten more available through the optional pack.
+[AGENTS.md](../AGENTS.md) holds the shared rules. [CLAUDE.md](../CLAUDE.md) imports it. Both runtimes discover nine core skills through symlinks, with eight more available through the optional pack.
 
 The active agent owns the task unless the project records a different Controller. It needs evidence before reporting DONE, must keep the quality level you requested, and should spend extra effort only when it has a useful reason. Project additions have their own sections so upgrades can preserve them.
 
@@ -48,7 +48,7 @@ Pre-existing or out-of-scope failures, missing tools, and unavailable required r
 
 ## Auto and manual mode
 
-Inspect the setting with `python3 .lean/scripts/gate_mode.py`. Add `auto` or `manual` to save an explicit choice. The optional `lean-quality-gate-mode` skill uses the same CLI.
+Inspect the setting with `python3 .lean/scripts/gate_mode.py`. Add `auto` or `manual` to save an explicit choice. See [.lean/policy/QUALITY.md](../.lean/policy/QUALITY.md) for gate automation rules.
 
 Workspace-owned `.codex/quality-gate.json` stores the preference. Missing settings mean auto. Preferences survive upgrades and are excluded from releases. Both providers read the setting, including for a selected submodule target.
 

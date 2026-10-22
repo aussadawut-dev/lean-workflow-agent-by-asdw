@@ -9,15 +9,15 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / '.lean/scripts'))
-from shared_assets import declared_links
+from shared_assets import RETIRED_SKILLS, V4_CORE_LINKS, V4_SKILLS, V4_SKILL_LINKS, declared_links
 
 
 class SharedAssetsTests(unittest.TestCase):
     def test_previous_core_and_full_registries_remain_readable(self):
-        registry = json.loads((ROOT / '.lean/assets.json').read_text())
-        old_files = [name for name in registry['files'] if 'skill-effort' not in name and 'skill_effort' not in name
+        v4_files = [f'.lean/skills/{name}/SKILL.md' for name in V4_SKILLS] + ['AGENTS.md', '.lean/assets.json']
+        old_files = [name for name in v4_files if 'skill-effort' not in name and 'skill_effort' not in name
                      and name not in ('.lean/skills/lean-pattern/SKILL.md', '.lean/skills/lean-audit/SKILL.md', '.lean/skills/lean-quality-gate-mode/SKILL.md')]
-        old_core = {path: target for path, target in registry['links'].items() if not path.endswith('/lean-skill-effort')}
+        old_core = {path: target for path, target in V4_CORE_LINKS.items() if not path.endswith('/lean-skill-effort')}
         self.assertEqual(declared_links({'schema': 2, 'files': old_files, 'links': old_core}), old_core)
         extras = ('lean-clean-queue', 'lean-clean-repo', 'lean-compress', 'lean-model-update',
                   'lean-takeover-workflow', 'lean-use-submodule', 'lean-update-workflow')
@@ -26,13 +26,13 @@ class SharedAssetsTests(unittest.TestCase):
             old_full.update({f'{tree}/{name}': f'../../.lean/skills/{name}' for name in extras})
         self.assertEqual(declared_links({'schema': 2, 'files': old_files, 'links': old_full}), old_full)
         with self.assertRaises(ValueError):
-            declared_links({'schema': 2, 'files': old_files, 'links': registry['links']})
+            declared_links({'schema': 2, 'files': old_files, 'links': V4_CORE_LINKS})
 
     def test_previous_nine_core_and_seven_optional_registry_remains_readable(self):
-        registry = json.loads((ROOT / '.lean/assets.json').read_text())
-        previous_files = [name for name in registry['files']
+        v4_files = [f'.lean/skills/{name}/SKILL.md' for name in V4_SKILLS] + ['AGENTS.md', '.lean/assets.json']
+        previous_files = [name for name in v4_files
                           if name not in ('.lean/skills/lean-pattern/SKILL.md', '.lean/skills/lean-audit/SKILL.md', '.lean/skills/lean-quality-gate-mode/SKILL.md')]
-        core = registry['links']
+        core = V4_CORE_LINKS
         full = dict(core)
         for tree in ('.agents/skills', '.claude/skills'):
             for name in ('lean-clean-queue', 'lean-clean-repo', 'lean-compress', 'lean-model-update',
@@ -56,24 +56,27 @@ class SharedAssetsTests(unittest.TestCase):
             self.assertIn('argument-hint:', content, path)
 
     def test_previous_pattern_audit_generation_remains_readable(self):
-        registry = json.loads((ROOT / '.lean/assets.json').read_text())
-        files = [name for name in registry['files'] if name != '.lean/skills/lean-quality-gate-mode/SKILL.md']
-        full = dict(registry['links'])
+        v4_files = [f'.lean/skills/{name}/SKILL.md' for name in V4_SKILLS] + ['AGENTS.md', '.lean/assets.json']
+        files = [name for name in v4_files if name != '.lean/skills/lean-quality-gate-mode/SKILL.md']
+        full = dict(V4_CORE_LINKS)
         extras = ('lean-clean-queue', 'lean-clean-repo', 'lean-compress', 'lean-model-update',
                   'lean-takeover-workflow', 'lean-use-submodule', 'lean-update-workflow', 'lean-pattern', 'lean-audit')
         for tree in ('.agents/skills', '.claude/skills'):
             full.update({f'{tree}/{name}': f'../../.lean/skills/{name}' for name in extras})
-        for links in (registry['links'], full):
+        for links in (V4_CORE_LINKS, full):
             self.assertEqual(declared_links({'schema': 2, 'files': files, 'links': links}), links)
+        for links in (V4_CORE_LINKS, V4_SKILL_LINKS):
+            self.assertEqual(declared_links({'schema': 2, 'files': v4_files, 'links': links}), links)
 
     def test_discovery_uses_one_source_and_resources(self):
         names = sorted(p.name for p in (ROOT / ".lean/skills").iterdir())
-        self.assertEqual(len(names), 19)
+        self.assertEqual(len(names), 17)
         self.assertTrue(all(name.startswith("lean-") for name in names), names)
-        self.assertIn("lean-clean-queue", names)
+        self.assertIn("lean-prune", names)
         for tree in (".claude/skills", ".agents/skills"):
-            old = ROOT / tree / "clean-queue"
-            self.assertFalse(old.exists() or old.is_symlink(), old)
+            for retired in ("clean-queue", *sorted(RETIRED_SKILLS)):
+                old = ROOT / tree / retired
+                self.assertFalse(old.exists() or old.is_symlink(), old)
         declared = json.loads((ROOT / ".lean/assets.json").read_text())["links"]
         for name in names:
             canonical = ROOT / ".lean/skills" / name

@@ -1,6 +1,6 @@
 # Agent policy router
 
-Lean Workflow Baseline 4.9.0. See `CHANGELOG.md` for changes and migration steps.
+Lean Workflow Baseline 4.10.0. See `CHANGELOG.md` for changes and migration steps.
 
 Operating rules and their self-checks; not application structure, and no stack or primary provider is prescribed. `AGENTS.md` is canonical and `CLAUDE.md` imports it. Procedures live in `.lean/skills/`; `.claude/skills/` and `.agents/skills/` hold the core discovery symlinks and any enabled extras.
 
@@ -16,7 +16,7 @@ Direct execution is the portable default; delegated uses the Controller/worker p
 
 ## Optional skills and ownership
 
-Nine core skills are discovered by default; `python3 .lean/scripts/skill_pack.py enable` adds the ten optional ones (`status`/`disable` inspect or reverse; reload runtime skills after). Details: `OPTIONAL.md`.
+Nine core skills are discovered by default; `python3 .lean/scripts/skill_pack.py enable` adds the eight optional ones (`status`/`disable` inspect or reverse; reload runtime skills after). Details: `OPTIONAL.md`.
 
 Project-owned: `PROJECT.md`, `config.json`, optional `skill-effort.json`. Workflow-owned, upgraded together: `policy/`, shared skills and discovery links, `templates/`, `scripts/`, `tests/`. Preserve project additions and local extensions on upgrade (`CUSTOMIZING.md`); retain `LICENSE`.
 
@@ -38,4 +38,4 @@ Do not load every policy or workflow internal by default. Trivial work still nee
 
 ## Procedure intensity
 
-`/lean-skill-effort [standard|high|ultra|reset] [lean-skill-name]` inspects (no arguments, read-only) or explicitly saves shared procedure intensity; missing settings mean standard. `policy/SKILL-EFFORT.md` defines precedence, record-root settings and boundaries. All discovered Lean procedures are user-invocable; optional discovery stays opt-in.
+`/lean-effort [standard|high|ultra|reset] [lean-skill-name]` inspects (no arguments, read-only) or explicitly saves shared procedure intensity; missing settings mean standard. `policy/SKILL-EFFORT.md` defines precedence, record-root settings and boundaries. All discovered Lean procedures are user-invocable; optional discovery stays opt-in.

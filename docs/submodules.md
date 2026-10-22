@@ -4,7 +4,7 @@
 
 Run the CLI examples from the Lean repository root.
 
-Use a submodule when you want application code in its own repository and Lean's workflow files outside it. After enabling optional skills, run `/lean-use-submodule <remote url>` in Claude or `$lean-use-submodule <remote url>` in Codex. It adds or reuses the application under `targets/<repository-name>`.
+Use a submodule when you want application code in its own repository and Lean's workflow files outside it. After enabling optional skills, run `/lean-target <remote url>` in Claude or `$lean-target <remote url>` in Codex. It adds or reuses the application under `targets/<repository-name>`.
 
 Lean keeps `.gitmodules`, the gitlink and all workflow/project records. The command installs no agent workflow files in the application.
 

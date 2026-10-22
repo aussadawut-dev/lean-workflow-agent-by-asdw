@@ -17,7 +17,7 @@ Lean uses Bash, Python 3.9+ standard-library tools, JSON and Markdown. It has no
 | `.lean/scripts/gate_evidence.py` | Binds review receipts to shipping state and records already approved control changes. |
 | `.lean/scripts/gate_lock.py` | Keeps shared gate runs separate within one checkout; busy gates report NOT_RUN. |
 | `.lean/scripts/skill_effort.py` | Saves optional procedure preferences and routes active targets to their record roots. |
-| `.lean/scripts/skill_pack.py` | Exposes nine core skills by default and ten optional skills when enabled. |
+| `.lean/scripts/skill_pack.py` | Exposes nine core skills by default and eight optional skills when enabled. |
 | `.lean/scripts/submodule.py` | Adds/reuses remote application submodules under `targets/` and separates code from target records. |
 | `.lean/scripts/clean_repo.py` | Inventories files and applies exact cleanup plans with external snapshots and journaled recovery. |
 | `.lean/scripts/takeover.py` | Inventories a separate target and binds approved edits to read coverage and source fingerprints. |

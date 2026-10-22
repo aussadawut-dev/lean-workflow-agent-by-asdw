@@ -28,16 +28,16 @@ Run preservation checks and the project gate before reviewing the actual diff. H
 
 ## Update installed Lean files
 
-Use `/lean-update-workflow [--ref <tag|branch|commit>]` to preview an upgrade from the upstream stable tag. The [shared skill](../.lean/skills/lean-update-workflow/SKILL.md) pins the commit, checks exact changes, preserves project data and customizations, and uses external staging/snapshots for approved apply and recovery.
+Use `/lean-update [--ref <tag|branch|commit>]` to preview an upgrade from the upstream stable tag. The [shared skill](../.lean/skills/lean-update/SKILL.md) pins the commit, checks exact changes, preserves project data and customizations, and uses external staging/snapshots for approved apply and recovery.
 
 Older or incompatible releases block writes. Project-owned `.lean/upstream.json` keeps the source information. The procedure does not commit, push or change global configuration.
 
 ## Clean a repository
 
-Use `/lean-clean-repo` to audit clutter and obsolete source, tests, dependencies, docs, assets, config, scripts and workflow files. Preview is the default. The [skill](../.lean/skills/lean-clean-repo/SKILL.md) shows exact removals/reference edits, evidence, impact and checks before applying with matching approval. A lack of references alone cannot establish that a file is unused. Uncertain and protected candidates stay in place.
+Use `/lean-prune repo` to audit clutter and obsolete source, tests, dependencies, docs, assets, config, scripts and workflow files (or `/lean-prune queue <old|all>` for completed queue items). Preview is the default for repository cleanup. The [skill](../.lean/skills/lean-prune/SKILL.md) shows exact removals/reference edits, evidence, impact and checks before applying with matching approval. A lack of references alone cannot establish that a file is unused. Uncertain and protected candidates stay in place.
 
 The [helper](../.lean/scripts/clean_repo.py) inventories without writes and applies only a fingerprinted plan. It saves original bytes/modes in a private external recovery session, preserves Git's index, and blocks dirty/staged work, symlinks, nested repositories, protected state, drift and new descendants.
 
 Untracked work stays unless explicitly proposed with verified regeneration evidence; ordinary Python cache and OS debris are recognized. Stop repository writers for apply/restore. Partial batches are journaled and recoverable. Restore refuses later edits. There is no automatic backup purge, commit or push.
 
-`apply <plan-id>` uses the presented session; `restore <session-path>` performs guarded recovery. Keep the session path. See the [tool and proposal format](../.lean/skills/lean-clean-repo/references/tooling.md). APPLIED still needs project checks and required review before DONE. Installing the skill does not authorize repository cleanup.
+`repo apply <plan-id>` uses the presented session; `repo restore <session-path>` performs guarded recovery. Keep the session path. See the [tool and proposal format](../.lean/skills/lean-prune/references/tooling.md). APPLIED still needs project checks and required review before DONE. Installing the skill does not authorize repository cleanup.

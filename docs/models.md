@@ -79,13 +79,13 @@ For a reasoning limit, raise one supported effort level first if the model remai
 
 ## Refresh model research without switching models
 
-After enabling optional skills, use `/lean-model-update codex`, `/lean-model-update claude` or `/lean-model-update all`; in Codex, use `$lean-model-update` with the same arguments.
+After enabling optional skills, use `/lean-catalog codex`, `/lean-catalog claude` or `/lean-catalog all`; in Codex, use `$lean-catalog` with the same arguments.
 
 The procedure follows scope → research → grill → preview, checking official docs and exposed runtime choices. It returns a diff and proposal hash by default. Apply needs an explicitly authorized proposal, then the usual task/review/gate checks. It keeps session models, global configuration, billing permissions and the reviewer definition unchanged.
 
 Optional project-owned `.lean/model-catalog.json` stores model/alias IDs, runtime version, efforts, lifecycle, source URLs/dates and observed availability. Evidence older than 30 days for the selected provider blocks preview/apply. Other retained providers remain visible as stale. Missing catalog leaves ordinary model selection unchanged; the template ships no live catalog.
 
-The offline CLI reads researched JSON candidates. It does not fetch models or run inference. Read the [catalog format](../.lean/skills/lean-model-update/references/catalog.md) before preparing a candidate. Refreshing a provider replaces its complete model list, so review removals and aliases too.
+The offline CLI reads researched JSON candidates. It does not fetch models or run inference. Read the [catalog format](../.lean/skills/lean-catalog/references/catalog.md) before preparing a candidate. Refreshing a provider replaces its complete model list, so review removals and aliases too.
 
 ```sh
 python3 .lean/scripts/model_catalog.py check

@@ -60,6 +60,6 @@ Classify failure first: fix implementation, context, tools or permissions at the
 
 ## Project catalog refresh
 
-Use `/lean-model-update codex|claude|all` only when requested; enable its optional maintenance discovery if needed. Research and preview a versioned project-owned catalog, then apply only accepted changes. This never changes session/global settings, reviewer definitions or billing authorization.
+Use `/lean-catalog codex|claude|all` only when requested; enable its optional maintenance discovery if needed. Research and preview a versioned project-owned catalog, then apply only accepted changes. This never changes session/global settings, reviewer definitions or billing authorization.
 
 Consult optional `.lean/model-catalog.json` alongside current runtime options. A missing catalog changes nothing. Stale, retired or unknown-availability entries require rechecking; preserve explicit model choices and report unavailable ones. Provider IDs/prices belong to evidence, not portable rules. Distinguish requested settings, observed availability and reported backend settings. Premium evidence, budget, independence and quality requirements still apply.

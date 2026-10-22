@@ -1,11 +1,11 @@
 ---
-name: lean-skill-effort
+name: lean-effort
 description: Inspect or set Lean procedure intensity (standard|high|ultra), globally or per skill; separate from model reasoning effort.
 user-invocable: true
 argument-hint: "[standard|high|ultra|reset] [lean-skill-name]"
 ---
 
-# Lean Skill Effort
+# Lean Effort
 
 Read `.lean/policy/SKILL-EFFORT.md`. This command controls thoroughness of task-specific procedures: scope definition, research breadth and accuracy, review coverage, and completion evidence.
 
@@ -13,9 +13,9 @@ No arguments: run `python3 .lean/scripts/skill_effort.py` and report saved level
 
 Examples:
 
-- `/lean-skill-effort high`: high procedure intensity for all Lean skills.
-- `/lean-skill-effort ultra lean-research`: deeper and broader research for that skill.
-- `/lean-skill-effort reset lean-research`: research inherits the saved default.
-- `/lean-skill-effort reset`: all skills return to standard defaults.
+- `/lean-effort high`: high procedure intensity for all Lean skills.
+- `/lean-effort ultra lean-research`: deeper and broader research for that skill.
+- `/lean-effort reset lean-research`: research inherits the saved default.
+- `/lean-effort reset`: all skills return to standard defaults.
 
 The CLI resolves the active target's record root; pass `--root <record-root>` only for an explicit override. Inspect without arguments is read-only and never creates settings/runtime state. Settings are project-owned and are not release assets. Read updated settings on subsequent invocations. Task-specific natural-language selections override saved levels for that work without changing repository defaults. Never map these levels to model `medium/high/max` or rewrite skill frontmatter. Existing tests, review and completion requirements apply at every level.

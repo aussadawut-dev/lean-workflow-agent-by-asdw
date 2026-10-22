@@ -24,7 +24,7 @@ import uuid
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.dont_write_bytecode = True
-from shared_assets import SKILL_LINKS, declared_links, link_leaf, verify_link
+from shared_assets import ALL_KNOWN_SKILL_LINKS, RETIRED_SKILL_LINKS, SKILL_LINKS, declared_links, link_leaf, verify_link
 
 
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build",
@@ -120,10 +120,10 @@ def relative_path(relative):
 
 def target_path(root, relative):
     relative_path(relative)
-    if relative in SKILL_LINKS:
-        path = link_leaf(root, relative)
+    if relative in ALL_KNOWN_SKILL_LINKS:
+        path = link_leaf(root, relative, allow_retired=True)
         if path.is_symlink():
-            verify_link(root, relative, require_target=False)
+            verify_link(root, relative, require_target=False, allow_retired=True)
         elif path.exists() and not path.is_dir():
             fail(f"discovery slot is not a directory: {relative}")
         return path
@@ -139,7 +139,7 @@ def target_path(root, relative):
 
 
 def skill_slot(path):
-    return "/".join(path.parts[-3:]) in SKILL_LINKS
+    return "/".join(path.parts[-3:]) in ALL_KNOWN_SKILL_LINKS
 
 
 def tree_content(path):
@@ -181,7 +181,7 @@ def tree_fingerprint(data, mode):
 
 def fingerprint(path):
     if path.is_symlink():
-        if not skill_slot(path) or os.readlink(path) != SKILL_LINKS["/".join(path.parts[-3:])]:
+        if not skill_slot(path) or os.readlink(path) != ALL_KNOWN_SKILL_LINKS["/".join(path.parts[-3:])]:
             fail(f"symlink boundary: {path}")
         return {"sha256": digest(os.readlink(path).encode()), "mode": 0o777, "link": os.readlink(path)}
     if not path.exists():
@@ -226,7 +226,12 @@ def write_operation(path, operation):
         path.symlink_to(operation["link"], target_is_directory=True)
         sync_directory(path.parent)
     elif operation["content"] is None:
-        remove_file(path)
+        if path.is_dir() and not path.is_symlink() and skill_slot(path):
+            tree_content(path)
+            shutil.rmtree(path)
+            sync_directory(path.parent)
+        else:
+            remove_file(path)
     else:
         atomic(path, operation["content"].encode(), operation["mode"])
 
@@ -284,7 +289,7 @@ def inventory(root):
             path = base / name
             relative = path.relative_to(root).as_posix()
             reason = None
-            if relative in SKILL_LINKS:
+            if relative in ALL_KNOWN_SKILL_LINKS:
                 directories.remove(name)
                 try:
                     location = target_path(root, relative)
@@ -305,7 +310,7 @@ def inventory(root):
         for name in files:
             path = base / name
             relative = path.relative_to(root).as_posix()
-            if relative in SKILL_LINKS and path.is_symlink():
+            if relative in ALL_KNOWN_SKILL_LINKS and path.is_symlink():
                 try:
                     location = target_path(root, relative)
                     entries[relative] = {"status": "unread", "before": fingerprint(location), "size": len(snapshot_data(location))}
@@ -335,8 +340,8 @@ def session_path(value, root=None):
         for child in path.rglob("*"):
             if child.is_symlink():
                 relative = child.relative_to(path).as_posix()
-                if relative.startswith("staging/") and relative[8:] in SKILL_LINKS:
-                    verify_link(path / "staging", relative[8:], require_target=False)
+                if relative.startswith("staging/") and relative[8:] in ALL_KNOWN_SKILL_LINKS:
+                    verify_link(path / "staging", relative[8:], require_target=False, allow_retired=True)
                 else:
                     fail("session contains a symlink")
     return path
@@ -436,10 +441,10 @@ def portable_files(source):
         fail("invalid portable asset registry")
     links = declared_links(registry)
     if registry["schema"] == 1 and any(
-            any(name.startswith(slot + "/") for slot in SKILL_LINKS) for name in names):
+            any(name.startswith(slot + "/") for slot in ALL_KNOWN_SKILL_LINKS) for name in names):
         fail("legacy provider skill baseline must be upgraded to schema 2 before drafting")
     for name in links:
-        verify_link(source, name)
+        verify_link(source, name, allow_retired=True)
     for name in names:
         relative_path(name)
         if (name in {".lean/PROJECT.md", ".lean/config.json", ".lean/model-catalog.json", ".lean/upstream.json", ".lean/skill-effort.json", ".codex/quality-gate.json"}
@@ -466,10 +471,10 @@ def draft(session, manifest, root, baseline):
     for name in portable_files(source):
         path = target_path(source, name)
         sources[name] = fingerprint(path)
-        if name in SKILL_LINKS:
+        if name in ALL_KNOWN_SKILL_LINKS:
             before = fingerprint(target_path(root, name))
             if before != sources[name]:
-                plan["operations"].append({"path": name, "before": before, "link": SKILL_LINKS[name],
+                plan["operations"].append({"path": name, "before": before, "link": ALL_KNOWN_SKILL_LINKS[name],
                                            "reason": "install shared Lean skill discovery link"})
             continue
         content = path.read_text()
@@ -696,6 +701,8 @@ def validate_plan(manifest, plan):
             continue
         if name in SKILL_LINKS:
             fail("discovery slot operations must install the declared link")
+        if name in RETIRED_SKILL_LINKS and op.get("content") is not None:
+            fail("retired discovery slot operations may only delete the retired slot")
         if "content" not in op or (op["content"] is not None and not isinstance(op["content"], str)):
             fail("operation content must be UTF-8 text or null for deletion")
         if op["content"] is not None and (type(op.get("mode")) is not int or not 0 <= op["mode"] <= 0o777):
@@ -797,7 +804,7 @@ def stage(session, manifest, root):
                                  "data": base64.b64encode(snapshot_data(original)).decode()})
         for op in plan["operations"]:
             path = target_path(temporary, op["path"])
-            if after_state(op) is None and not path.exists():
+            if after_state(op) is None and not path.exists() and not path.is_symlink():
                 continue
             write_operation(path, op)
         names = {name for name, item in manifest["files"].items() if item["status"] == "read"}
@@ -917,7 +924,13 @@ def restore_data(snapshot):
 
 def remove_file(path):
     path.unlink()
-    directory = os.open(path.parent, os.O_RDONLY)
+    parent = path.parent
+    while (parent.is_dir() and not parent.is_symlink() and not any(parent.iterdir())
+           and any(ancestor.name == "skills" and ancestor.parent.name == ".lean" for ancestor in parent.parents)):
+        grand = parent.parent
+        parent.rmdir()
+        parent = grand
+    directory = os.open(parent, os.O_RDONLY)
     try:
         os.fsync(directory)
     finally:

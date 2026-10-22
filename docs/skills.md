@@ -8,7 +8,7 @@ Run the CLI examples from the repository root.
 
 For everyday work, start with `lean-task`. It brings in scope, research, important decisions, implementation, review and completion checks as the task needs them. You can call any discovered skill yourself too. You do not need to walk through every step manually.
 
-Nine core skills are available by default. Enable the optional pack to discover the other ten, then reload your runtime's skills.
+Nine core skills are available by default. Enable the optional pack to discover the other eight, then reload your runtime's skills.
 
 | What you want to do | Pack | Claude Code | Codex |
 |---|---|---|---|
@@ -19,18 +19,16 @@ Nine core skills are available by default. Enable the optional pack to discover 
 | Find gaps in a requirement or plan | Core | `/lean-grill <requirement or plan>` | `$lean-grill` with the same arguments |
 | Review changes | Core | `/lean-review [diff or scope]` | `$lean-review` with the same arguments |
 | Check completion | Core | `/lean-gate [task or workset]` | `$lean-gate` with the same arguments |
-| Coordinate delegated work | Core | `/lean-multi-agent <bounded task>` | `$lean-multi-agent` with the same arguments |
-| Set procedure intensity | Core | `/lean-skill-effort [standard\|high\|ultra\|reset] [lean-skill-name]` | `$lean-skill-effort` with the same arguments |
-| Inspect or set gate automation | Optional | `/lean-quality-gate-mode [auto\|manual]` | `$lean-quality-gate-mode` with the same arguments |
+| Coordinate delegated work | Core | `/lean-agents <bounded task>` | `$lean-agents` with the same arguments |
+| Set procedure intensity | Core | `/lean-effort [standard\|high\|ultra\|reset] [lean-skill-name]` | `$lean-effort` with the same arguments |
 | Define project standards | Optional | `/lean-pattern <area>` | `$lean-pattern <area>` |
 | Audit accepted scope and standards | Optional | `/lean-audit <area and baseline>` | `$lean-audit` with the same arguments |
-| Research a model catalog update | Optional | `/lean-model-update [codex\|claude\|all]` | `$lean-model-update` with the same arguments |
+| Research a model catalog update | Optional | `/lean-catalog [codex\|claude\|all]` | `$lean-catalog` with the same arguments |
 | Shorten workflow prose | Optional | `/lean-compress [workflow\|PATH...] [--preview\|--apply]` | `$lean-compress` with the same arguments |
-| Add an application submodule | Optional | `/lean-use-submodule <remote url>` | `$lean-use-submodule <remote url>` |
-| Migrate an existing workflow | Optional | `/lean-takeover-workflow "<target path>" [--preview\|--apply <plan-id>]` | `$lean-takeover-workflow` with the same arguments |
-| Archive completed queue items | Optional | `/lean-clean-queue <old\|all> [--preview]` | `$lean-clean-queue` with the same arguments |
-| Update installed Lean files | Optional | `/lean-update-workflow [--ref <ref>]` | `$lean-update-workflow` with the same arguments |
-| Audit and clean repository files | Optional | `/lean-clean-repo [--path <path>]` | `$lean-clean-repo` with the same arguments |
+| Add an application submodule | Optional | `/lean-target <remote url>` | `$lean-target <remote url>` |
+| Migrate an existing workflow | Optional | `/lean-takeover "<target path>" [--preview\|--apply <plan-id>]` | `$lean-takeover` with the same arguments |
+| Archive completed queue items or clean repository files | Optional | `/lean-prune queue <old\|all> [--days N] [--preview]` or `/lean-prune repo [--path <path>]` | `$lean-prune` with the same arguments |
+| Update installed Lean files | Optional | `/lean-update [--ref <ref>]` | `$lean-update` with the same arguments |
 
 For example:
 
@@ -38,17 +36,17 @@ For example:
 # Claude Code
 /lean-task Add a regression test and fix the queue lease bug
 /lean-compress workflow --preview
-/lean-clean-queue old --preview
+/lean-prune queue old --preview
 
 # Codex
 $lean-task Add a regression test and fix the queue lease bug
 $lean-compress workflow --preview
-$lean-clean-queue old --preview
+$lean-prune queue old --preview
 ```
 
 In Codex, use `$skill-name` or the runtime's skill picker. Keep implicit invocation enabled so the agent can use the shared procedures when needed. Examples using `/name` elsewhere are Claude syntax. There is no need to install deprecated custom prompts or copy skills into a global directory.
 
-Discovery makes a skill available. Accepted scope and execution routing still decide what the agent may do. Model research and compression preview by default; applying their proposals follows their approval checks. Queue cleanup with `old` or `all` authorizes archiving the selected DONE items, while `--preview` only shows them. With no selection, the agent asks which set you want. Skills do not grant extra permissions, paid usage or Git publishing.
+Discovery makes a skill available. Accepted scope and execution routing still decide what the agent may do. Model research, repository cleanup and compression preview by default; applying their proposals follows their approval checks. Queue archival with `queue old` or `queue all` authorizes archiving the selected DONE items, while `--preview` only shows them. With no selection, the agent asks which target (`queue` or `repo`) you want. Skills do not grant extra permissions, paid usage or Git publishing.
 
 ## Project standards and conformance audits
 
@@ -71,7 +69,7 @@ $lean-audit settings forms against accepted UX and i18n standards
 
 Every Lean procedure supports `standard`, `high` and `ultra`. Standard is the default. Higher levels add relevant detail to that skill's procedure under [.lean/policy/SKILL-EFFORT.md](../.lean/policy/SKILL-EFFORT.md).
 
-For one task, say “use scope high, grill ultra and research high for this task.” To save preferences, use `lean-skill-effort`. No arguments just shows the settings.
+For one task, say “use scope high, grill ultra and research high for this task.” To save preferences, use `lean-effort`. No arguments just shows the settings.
 
 The order is: latest explicit choice for the task → saved skill override → saved default → `standard`. Setting a global level clears individual overrides. Resetting one skill restores inheritance; resetting all removes the settings file. Invalid settings are reported rather than silently repaired.
 

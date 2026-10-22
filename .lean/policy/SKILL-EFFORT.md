@@ -1,6 +1,6 @@
 # Skill procedure intensity
 
-`/lean-skill-effort` controls how thoroughly Lean procedures perform their particular jobs. Skill effort means procedure intensity, not model reasoning effort. Both Codex and Claude use this policy and the same repository settings.
+`/lean-effort` controls how thoroughly Lean procedures perform their particular jobs. Skill effort means procedure intensity, not model reasoning effort. Both Codex and Claude use this policy and the same repository settings.
 
 ## Selection
 

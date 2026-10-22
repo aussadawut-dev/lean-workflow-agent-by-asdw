@@ -4,7 +4,7 @@ Project-owned facts and routes. Keep this map short; read the linked reference o
 
 ## Purpose
 
-Lean Workflow Baseline 4.9.0: a portable Claude/Codex workflow template. This repository contains workflow files, no application code or Web/API/Database areas.
+Lean Workflow Baseline 4.10.0: a portable Claude/Codex workflow template. This repository contains workflow files, no application code or Web/API/Database areas.
 
 ## Architecture
 
