@@ -6,6 +6,29 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
+## 4.11.0 — 2026-10-22
+
+**Token highlight:** - · **Compared with:** -
+
+- Expand `/lean-pattern` and `/lean-audit` with concrete guidance for stack-appropriate repository structure, module boundaries and dependency direction without prescribing a single universal folder tree.
+- Add technical and per-locale linguistic i18n standards and audit checks: no hardcoded user-facing strings, locale key parity, interpolation/pluralization instead of string concatenation across variables, grammatical accuracy and natural phrasing per language rather than literal word-for-word translation, shared terminology/glossary consistency, and consistent tone/politeness level.
+- Distinguish greenfield/early-stage setup from existing repositories: `/lean-init` and `/lean-pattern` guide new projects to define baselines early to avoid large rework, while `/lean-pattern` and `/lean-audit` inspect existing codebases first and route uncertain structural moves or terminology/copy changes through `/lean-grill` before remediation.
+
+**Upgrade:** update `AGENTS.md`, `.lean/README.md`, `.lean/OPTIONAL.md`, `docs/skills.md`, and the shared `lean-init`, `lean-pattern` and `lean-audit` skills together. No configuration, task record or queue migration is needed.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+- ขยายความสามารถของ `/lean-pattern` และ `/lean-audit` ให้รองรับการกำหนดและตรวจสอบโครงสร้างโฟลเดอร์ตาม stack จริง ขอบเขตโมดูล (module boundaries) และทิศทางการ import (dependency direction) โดยไม่บังคับโครงสร้างโฟลเดอร์ตายตัวแบบเดียวทุกโปรเจกต์
+- เพิ่มเกณฑ์มาตรฐานและการตรวจสอบด้าน i18n และคุณภาพภาษาในแต่ละภาษา: ห้ามฝังข้อความที่ผู้ใช้เห็นไว้ในโค้ด (hardcoded user-facing strings), ความครบถ้วนของ key ทุกภาษา, การใช้ interpolation/pluralization แทนการต่อ string ข้ามตัวแปร, ความถูกต้องตามหลักไวยากรณ์และสำนวนที่เป็นธรรมชาติของแต่ละภาษาแทนการแปลตรงตัวแบบคำต่อคำ, ความสม่ำเสมอของคลังคำศัพท์ (terminology/glossary), และระดับภาษา/ความสุภาพที่สอดคล้องกัน
+- แยกแนวทางระหว่างโปรเจกต์เริ่มใหม่กับโปรเจกต์เดิมที่มีโค้ดอยู่แล้ว: `/lean-init` และ `/lean-pattern` ช่วยวางมาตรฐานตั้งแต่ช่วงเริ่มต้นเพื่อลดงานรื้อแก้ภายหลัง ส่วนโปรเจกต์เดิมจะใช้ `/lean-pattern` และ `/lean-audit` ตรวจสภาพจริงก่อนและส่งประเด็นที่อาจกระทบโครงสร้างหรือความหมายไปถามผ่าน `/lean-grill` ก่อนลงมือแก้ไข
+
+**เมื่ออัปเกรด:** อัปเดต `AGENTS.md`, `.lean/README.md`, `.lean/OPTIONAL.md`, `docs/skills.md` และสกิล `lean-init`, `lean-pattern`, `lean-audit` พร้อมกัน ไม่ต้องย้ายข้อมูลตั้งค่า บันทึกงาน หรือคิว
+
+</details>
+
 ## 4.10.0 — 2026-10-22
 
 **Token highlight:** - · **Compared with:** -
