@@ -34,6 +34,8 @@ def main():
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument("--contract")
     parser.add_argument("--require-review", action="store_true")
+    # Opt-in, as Claude's Stop command opts in: reuse a pass recorded for the same shipping state.
+    parser.add_argument("--cache-tree", action="store_true")
     args = parser.parse_args()
     try:
         root = args.root.resolve(strict=True)
@@ -65,6 +67,8 @@ def main():
         print(json.dumps({"systemMessage": policy(mode)}))
         return 0
     command = ["bash", str(root / ".lean/scripts/quality-gate.sh"), "--root", str(root)]
+    if args.cache_tree:
+        command.append("--cache-tree")
     contract = args.contract
     reviewed = None
     session = payload.get("session_id") if isinstance(payload.get("session_id"), str) else ""

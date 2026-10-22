@@ -13,7 +13,7 @@ Lean uses Bash, Python 3.9+ standard-library tools, JSON and Markdown. It has no
 | `AGENTS.md` / `CLAUDE.md` | Shared contract and Claude import. The active agent owns the task unless project rules say otherwise. |
 | `.lean/policy/` | Portable workflow rules, updated together with the workflow. |
 | `.lean/PROJECT.md` / `config.json` | Project-owned facts, gate, mode and execution settings. |
-| `.lean/scripts/quality-gate.sh` | Runs PROJECT checks directly for Codex and through provider adapters. Direct calls always run. |
+| `.lean/scripts/quality-gate.sh` | Runs PROJECT checks directly for Codex and through provider adapters. Direct calls run every check unless `--cache-tree` finds a pass recorded for the same state. |
 | `.lean/scripts/gate_evidence.py` | Binds review receipts to shipping state and records already approved control changes. |
 | `.lean/scripts/gate_lock.py` | Keeps shared gate runs separate within one checkout; busy gates report NOT_RUN. |
 | `.lean/scripts/skill_effort.py` | Saves optional procedure preferences and routes active targets to their record roots. |

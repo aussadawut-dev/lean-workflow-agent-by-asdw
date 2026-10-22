@@ -41,6 +41,18 @@ Single runs of each gate line. Before run A came early in the day and before run
 
 The hook suite alone, run back to back in the same load window: 83.4 s before and 33.8 s after, with the same 110 `ok` lines in the same order.
 
+## Stop after a passing run
+
+Measured later the same day in a scratch clone holding the pass-reuse change. Each sample edits an untracked file, runs `bash .lean/scripts/quality-gate.sh --root . --cache-tree`, then runs the Stop command exactly as `.claude/settings.json` or `.codex/hooks.json` configures it. The comparison runs the direct gate without `--cache-tree`, which records nothing, as every direct run did before this change.
+
+| Stop | Runs (s) | Median (s) |
+|---|---|---:|
+| Claude, after a `--cache-tree` pass on the same state | 0.50, 0.59, 0.53 | 0.53 |
+| Codex, after a `--cache-tree` pass on the same state | 0.46, 0.56 | 0.51 |
+| Claude, with no recorded pass | 51.54, 49.05 | 50.3 |
+
+The direct `--cache-tree` runs themselves took 42.2 to 47.0 s (median 43.8 s). A `/lean-gate` run followed by a Stop on the unchanged state therefore takes about 44 s instead of about 94 s.
+
 ## Measured during analysis, not shipped
 
 Running every gate command at once, without splitting the two suites, took a median of 81.8 s against 141.0 s for the sequential gate (three runs each, earlier the same day). Splitting the suites and running every command at once took 39.5 s. A runner that runs independent gate lines concurrently would need protected runner changes and is left for later.
