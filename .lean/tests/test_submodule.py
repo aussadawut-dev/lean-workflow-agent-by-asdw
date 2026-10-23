@@ -185,7 +185,10 @@ class SubmoduleTests(unittest.TestCase):
         context = self.install()
         self.cli("gate", success=False)  # Empty target checks must not count as a pass.
         self.gate_file(context, "test -f app.txt && test ! -d .lean")
-        self.cli("gate")
+        result = self.cli("gate")
+        self.assertIn("Target Quality Gate: check 1 started", result.stderr)
+        self.assertIn("Target Quality Gate: check 1 passed", result.stderr)
+        self.assertNotIn("Target Quality Gate: check", self.cli("gate", "--quiet").stderr)
         self.gate_file(context, "false")
         self.assertIn("Target Quality Gate failed", self.cli("gate", success=False).stderr)
 

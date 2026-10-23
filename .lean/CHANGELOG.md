@@ -6,6 +6,29 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
+## Unreleased
+
+**Token highlight:** - · **Compared with:** -
+
+- Show Quality Gate progress. A direct run of the shared runner prints each numbered check when it starts and with its elapsed time when it passes, a target gate numbers its checks, and `python3 .codex/hooks/quality_gate.py run` streams that output as it arrives. This adds two short lines per check to a direct run; pass the new `--quiet` flag to omit them. Claude and Codex Stops always run quietly, so a refusal shows the model only its failure and its fingerprint does not change with check times.
+- Build the template smoke fixtures from the release asset registry (`.lean/assets.json`), `.gitignore`, Claude settings and the project provider slots, so host target records, runtime data, local notes and undeclared skill resources stay out of downstream fixtures.
+- State the Codex side of the 4.14.0 mid-turn rule: Codex transcripts carry no queue records, so every Codex prompt clears the Task Contract. A new test covers a Codex prompt whose payload carries its own transcript.
+
+**Upgrade:** update `.lean/scripts/quality-gate.sh`, `.lean/scripts/submodule.py`, `.codex/hooks/quality_gate.py`, `.lean/policy/CONTRACTS.md` and the tests together; the runner and the Codex adapter are protected gate controls. No configuration or record migration is needed.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+- แสดงความคืบหน้าของ Quality Gate เมื่อรัน runner กลางโดยตรง จะพิมพ์หมายเลข check ตอนเริ่ม และพิมพ์เวลาที่ใช้ตอนผ่าน gate ของ target ก็ใส่หมายเลข check เช่นกัน และ `python3 .codex/hooks/quality_gate.py run` จะแสดงผลทันทีที่ได้ ไม่ต้องรอจนจบ การรันตรงจึงมีข้อความเพิ่ม check ละ 2 บรรทัดสั้นๆ ถ้าไม่ต้องการให้ใส่ flag ใหม่ `--quiet` ส่วน Stop ของ Claude และ Codex รันแบบเงียบเสมอ เมื่อ refuse model จึงเห็นเฉพาะ check ที่ fail และ fingerprint ของ refusal ไม่เปลี่ยนตามเวลาที่ check ใช้
+- สร้าง smoke fixture ของ template จาก asset registry ของ release (`.lean/assets.json`), `.gitignore`, Claude settings และช่อง provider ของโปรเจกต์ ทำให้ records ของ target ฝั่ง host, ข้อมูล runtime, โน้ตส่วนตัว และไฟล์ของ skill ที่ไม่ได้ประกาศไว้ ไม่หลุดเข้า fixture ของโปรเจกต์ปลายทาง
+- ระบุฝั่ง Codex ของกฎ mid-turn ใน 4.14.0 ให้ชัด: transcript ของ Codex ไม่มี record คิว ทุก prompt ของ Codex จึงล้าง Task Contract และมี test ใหม่ครอบกรณีที่ payload ของ Codex ส่ง transcript มาด้วย
+
+**เมื่ออัปเกรด:** อัปเดต `.lean/scripts/quality-gate.sh`, `.lean/scripts/submodule.py`, `.codex/hooks/quality_gate.py`, `.lean/policy/CONTRACTS.md` และ test ที่เกี่ยวข้องพร้อมกัน โดย runner และ Codex adapter เป็น gate control ที่ถูกป้องกัน ไม่ต้องย้าย configuration หรือ records
+
+</details>
+
 ## 4.14.0 — 2026-10-23
 
 **Token highlight:** - · **Compared with:** -
