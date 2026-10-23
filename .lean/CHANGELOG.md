@@ -6,6 +6,25 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
+## 4.14.0 — 2026-10-23
+
+**Token highlight:** - · **Compared with:** -
+
+- Keep the Task Contract when a Claude prompt arrives while the agent is still working. Such a prompt is queued in the transcript and delivered mid-turn, but the `UserPromptSubmit` hook cleared the contract, and the transcript binder then fell back to the turn's first contract line, dropping any contract declared since. During the 4.13.0 work this forced three extra `declare` calls and one control-drift gate refusal. `contract_guard.py` now keeps the contract when the transcript shows that prompt's queue record and no turn end, person's prompt or interrupt since the binding; any doubt still clears it, and Codex is unchanged.
+
+**Upgrade:** update `AGENTS.md`, `.lean/policy/CONTRACTS.md`, `.lean/policy/QUALITY.md`, `.lean/scripts/contract_guard.py` and `.lean/tests/test_contract_guard.py` together; the guard is a protected gate control. No configuration or record migration is needed.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+- คง Task Contract ไว้เมื่อมี prompt ของ Claude เข้ามาขณะ agent ยังทำงานอยู่ prompt แบบนี้ถูกบันทึกใน transcript เป็นคิวและส่งเข้ามากลาง turn แต่ hook `UserPromptSubmit` เดิมล้าง contract ทิ้ง แล้วตัวผูก contract จาก transcript ก็ย้อนกลับไปใช้ contract บรรทัดแรกของ turn ทำให้ contract ที่ declare ใหม่หลังจากนั้นหายไป ระหว่างทำ 4.13.0 เหตุนี้ทำให้ต้อง `declare` เพิ่ม 3 ครั้ง และ gate refuse เรื่อง control drift 1 ครั้ง ตอนนี้ `contract_guard.py` จะคง contract ไว้เมื่อ transcript มี record คิวของ prompt นั้น และไม่มีการจบ turn, prompt ใหม่จากคน หรือการ interrupt หลังจากผูก contract ถ้าไม่แน่ใจยังล้างเหมือนเดิม ส่วน Codex ไม่เปลี่ยน
+
+**เมื่ออัปเกรด:** อัปเดต `AGENTS.md`, `.lean/policy/CONTRACTS.md`, `.lean/policy/QUALITY.md`, `.lean/scripts/contract_guard.py` และ `.lean/tests/test_contract_guard.py` พร้อมกัน โดย guard เป็น gate control ที่ถูกป้องกัน ไม่ต้องย้าย configuration หรือ records
+
+</details>
+
 ## 4.13.0 — 2026-10-23
 
 **Token highlight:** - · **Compared with:** -

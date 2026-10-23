@@ -203,6 +203,86 @@ class HookFixture(unittest.TestCase):
 
 
 
+class MidTurnPromptTests(HookFixture):
+    """A Claude prompt typed while the agent still works continues the task; any other prompt starts one."""
+
+    WRITES = {"claude": ("Edit", {"file_path": "x.py"}), "codex": ("apply_patch", {"command": "*** Begin Patch"})}
+
+    def declare(self, provider="claude", session="s1"):
+        declared = self.tool(provider, "Bash", session, command=f"{DECLARE} <<'EOF'\n{BLOCK}\nEOF")
+        self.assertEqual(declared.returncode, 0, declared.stderr)
+
+    def transcript(self, *entries):
+        path = self.root / ".git/transcript.jsonl"
+        path.write_text("".join(json.dumps(entry) + "\n" for entry in entries))
+        return str(path)
+
+    @staticmethod
+    def at(offset):
+        """An ISO timestamp `offset` seconds from now, as Claude transcripts record it."""
+        return time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime(time.time() + offset))
+
+    def submit(self, text, transcript=None, provider="claude", session="s1"):
+        payload = {"session_id": session, "prompt": text}
+        if transcript:
+            payload["transcript_path"] = transcript
+        result = self.hook(provider, "UserPromptSubmit", payload)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def can_write(self, provider="claude", session="s1"):
+        name, tool_input = self.WRITES[provider]
+        return self.tool(provider, name, session, **tool_input).returncode == 0
+
+    def queued(self, text, offset=1):
+        return {"type": "queue-operation", "operation": "enqueue", "timestamp": self.at(offset), "content": text}
+
+    def test_a_prompt_queued_while_the_agent_works_keeps_the_contract(self):
+        self.declare()
+        self.submit("status?", self.transcript(self.queued("status?")))
+        self.assertTrue(self.can_write(), "a status question sent mid-turn dropped the bound contract")
+
+    def test_a_prompt_after_the_turn_ended_clears_the_contract(self):
+        self.declare()
+        for end in ("turn_duration", "stop_hook_summary"):
+            with self.subTest(end=end):
+                self.declare()
+                path = self.transcript(self.queued("next"), {"type": "system", "subtype": end, "timestamp": self.at(2)})
+                self.submit("next", path)
+                self.assertFalse(self.can_write())
+
+    def test_a_human_or_interrupt_entry_after_binding_clears_the_contract(self):
+        for text in ("next task", "[Request interrupted by user]"):
+            with self.subTest(text=text):
+                self.declare()
+                path = self.transcript(self.queued("next"), {"type": "user", "timestamp": self.at(2),
+                                                             "message": {"role": "user", "content": text}})
+                self.submit("next", path)
+                self.assertFalse(self.can_write())
+
+    def test_a_prompt_without_its_queue_record_clears_the_contract(self):
+        self.declare()
+        path = self.transcript(self.queued("something else"),
+                               {"type": "assistant", "timestamp": self.at(1),
+                                "message": {"content": [{"type": "text", "text": "working"}]}})
+        self.submit("new task", path)
+        self.assertFalse(self.can_write())
+
+    def test_a_queue_record_from_an_earlier_turn_does_not_keep_the_contract(self):
+        path = self.transcript(self.queued("again", -120), {"type": "system", "subtype": "turn_duration",
+                                                             "timestamp": self.at(-60)})
+        self.declare()
+        self.submit("again", path)
+        self.assertFalse(self.can_write())
+
+    def test_without_a_readable_transcript_every_prompt_still_clears(self):
+        for provider, transcript in (("claude", None), ("claude", "/nonexistent/t.jsonl"), ("codex", None)):
+            with self.subTest(provider=provider, transcript=transcript):
+                session = f"{provider}-{transcript}"
+                self.declare(provider, session)
+                self.submit("status?", transcript, provider, session)
+                self.assertFalse(self.can_write(provider, session))
+
+
 class GuardHookTests(HookFixture):
     def test_both_providers_deny_writes_until_declared_then_reset_on_a_person_prompt(self):
         for provider, write, shell in (("claude", ("Edit", {"file_path": "x.py"}), "Bash"),
