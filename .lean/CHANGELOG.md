@@ -6,6 +6,29 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
+## Unreleased
+
+**Token highlight:** - · **Compared with:** -
+
+- Show Quality Gate progress. A direct run of the shared runner prints each numbered check when it starts and with its elapsed time when it passes, a target gate numbers its checks, and `python3 .codex/hooks/quality_gate.py run` streams that output as it arrives. This adds two short lines per check to a direct run; pass the new `--quiet` flag to omit them. Claude and Codex Stops always run quietly, so a refusal shows the model only its failure and its fingerprint does not change with check times.
+- Build the template smoke fixtures from the release asset registry (`.lean/assets.json`), `.gitignore`, Claude settings and the project provider slots, so host target records, runtime data, local notes and undeclared skill resources stay out of downstream fixtures.
+- Make the 4.14.0 mid-turn rule work in Claude Code. A live run in Claude Code 2.1.309 showed that Claude runs `UserPromptSubmit` for a prompt typed mid-turn before it writes that prompt's queue record, so 4.14.0 never found one and still cleared the contract. The guard now keeps the contract while the transcript shows the turn still running: no `turn_duration`, person's prompt or interrupt since the binding. A Stop that blocks writes only `stop_hook_summary` and the turn goes on, so it no longer ends the turn. In a live nested session, `ping` typed during a 40-second tool call kept the declared contract, and the next prompt after the turn cleared it. Codex transcripts have no Claude entries, so every Codex prompt still clears the contract; a unit test and a live two-turn `codex exec` run (codex-cli 0.163.0) confirm it.
+
+**Upgrade:** update `.lean/scripts/contract_guard.py`, `.lean/scripts/quality-gate.sh`, `.lean/scripts/submodule.py`, `.codex/hooks/quality_gate.py`, `.lean/policy/CONTRACTS.md` and the tests together; the guard, the runner and the Codex adapter are protected gate controls. No configuration or record migration is needed.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+- แสดงความคืบหน้าของ Quality Gate เมื่อรัน runner กลางโดยตรง จะพิมพ์หมายเลข check ตอนเริ่ม และพิมพ์เวลาที่ใช้ตอนผ่าน gate ของ target ก็ใส่หมายเลข check เช่นกัน และ `python3 .codex/hooks/quality_gate.py run` จะแสดงผลทันทีที่ได้ ไม่ต้องรอจนจบ การรันตรงจึงมีข้อความเพิ่ม check ละ 2 บรรทัดสั้นๆ ถ้าไม่ต้องการให้ใส่ flag ใหม่ `--quiet` ส่วน Stop ของ Claude และ Codex รันแบบเงียบเสมอ เมื่อ refuse model จึงเห็นเฉพาะ check ที่ fail และ fingerprint ของ refusal ไม่เปลี่ยนตามเวลาที่ check ใช้
+- สร้าง smoke fixture ของ template จาก asset registry ของ release (`.lean/assets.json`), `.gitignore`, Claude settings และช่อง provider ของโปรเจกต์ ทำให้ records ของ target ฝั่ง host, ข้อมูล runtime, โน้ตส่วนตัว และไฟล์ของ skill ที่ไม่ได้ประกาศไว้ ไม่หลุดเข้า fixture ของโปรเจกต์ปลายทาง
+- ทำให้กฎ mid-turn ของ 4.14.0 ใช้ได้จริงใน Claude Code จากการทดสอบจริงบน Claude Code 2.1.309 พบว่า Claude รัน `UserPromptSubmit` ของ prompt ที่พิมพ์ระหว่าง turn ก่อนจะเขียน record คิวของ prompt นั้น 4.14.0 จึงหา record ไม่เจอและยังล้าง contract อยู่ ตอนนี้ guard จะคง contract ไว้ตราบที่ transcript แสดงว่า turn ยังไม่จบ คือไม่มี `turn_duration`, prompt ใหม่จากคน หรือการ interrupt หลังผูก contract ส่วน Stop ที่ถูกบล็อกจะเขียนแค่ `stop_hook_summary` แล้ว turn ยังดำเนินต่อ จึงไม่นับเป็นการจบ turn อีก ในการทดสอบกับ session ซ้อนจริง พิมพ์ `ping` ระหว่างคำสั่งที่ใช้เวลา 40 วินาทีแล้ว contract ที่ declare ไว้ยังอยู่ และ prompt ถัดไปหลังจบ turn ล้าง contract ตามที่ควร ส่วน transcript ของ Codex ไม่มี entry แบบ Claude ทุก prompt ของ Codex จึงยังล้าง contract เหมือนเดิม ยืนยันด้วย unit test และการรัน `codex exec` 2 turn จริง (codex-cli 0.163.0)
+
+**เมื่ออัปเกรด:** อัปเดต `.lean/scripts/contract_guard.py`, `.lean/scripts/quality-gate.sh`, `.lean/scripts/submodule.py`, `.codex/hooks/quality_gate.py`, `.lean/policy/CONTRACTS.md` และ test ที่เกี่ยวข้องพร้อมกัน โดย guard, runner และ Codex adapter เป็น gate control ที่ถูกป้องกัน ไม่ต้องย้าย configuration หรือ records
+
+</details>
+
 ## 4.14.0 — 2026-10-23
 
 **Token highlight:** - · **Compared with:** -

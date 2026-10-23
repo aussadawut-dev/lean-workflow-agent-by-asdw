@@ -12,7 +12,9 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def bootstrap(root, source_root=ROOT):
     listing = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"], cwd=source_root)
-    declared = json.loads((source_root / ".lean/assets.json").read_text())["links"]
+    registry = json.loads((source_root / ".lean/assets.json").read_text())
+    declared = registry["links"]
+    portable = set(registry["files"]) | set(declared) | {".gitignore", ".claude/settings.json"}
     for name in set(listing.decode().split("\0")):
         source = source_root / name
         # A working-tree move can leave retired index entries beneath a link.
@@ -22,7 +24,8 @@ def bootstrap(root, source_root=ROOT):
         if (source.is_symlink() and name.startswith((".agents/skills/", ".claude/skills/")) and name not in declared
                 and (source_root / ".lean/skills" / Path(name).name).is_dir()):
             continue  # Local Lean opt-in is not the distributable template default; project skill links stay.
-        reusable = name.startswith((".lean/", ".claude/", ".agents/skills/")) or name in ("AGENTS.md", "CLAUDE.md", ".gitignore", ".codex/hooks.json", ".codex/hooks/quality_gate.py")
+        reusable = name in portable or name.startswith((".agents/skills/", ".claude/skills/",
+                                                        ".claude/agents/", ".claude/commands/", ".claude/rules/"))
         project_owned = name in (".lean/config.json", ".lean/PROJECT.md", ".lean/model-catalog.json")
         if reusable and not project_owned and source.is_symlink():
             destination = root / name
@@ -48,6 +51,26 @@ def lean_discovery(root, tree):
 
 
 class TemplateSmokeTests(unittest.TestCase):
+    def test_bootstrap_excludes_host_records_and_undeclared_resources(self):
+        with tempfile.TemporaryDirectory(prefix="lean host isolation ") as directory:
+            source = Path(directory) / "source"
+            source.mkdir()
+            bootstrap(source)
+            private = (".lean/targets/client/docs/private.txt", ".lean/.agent-runtime/private.txt",
+                       ".lean/local-notes.txt", ".lean/skills/lean-task/host-secret.txt")
+            for name in private:
+                path = source / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("host-only data\n")
+            target = Path(directory) / "target"
+            target.mkdir()
+            bootstrap(target, source_root=source)
+            for name in private:
+                self.assertFalse((target / name).exists(), name)
+            registry = json.loads((source / ".lean/assets.json").read_text())
+            for name in registry["files"]:
+                self.assertTrue((target / name).is_file(), name)
+
     def test_local_optional_activation_does_not_change_starter_discovery(self):
         with tempfile.TemporaryDirectory(prefix="lean enabled source ") as directory:
             source = Path(directory) / "source"

@@ -59,3 +59,11 @@ APPLIED means writes finished. Semantic completion still needs acceptance, valid
 ## Context selection evaluation
 
 When changing context selection, use the [routing scenarios](../.lean/skills/lean-task/references/context-scenarios.md). Record actual reads separately from expected results. Static instruction tests cannot measure agent behavior, application correctness or token savings.
+
+## Fixture inputs and validation progress
+
+Smoke fixtures use the release asset registry, `.gitignore`, Claude settings and explicit project provider extension slots. They exclude host target records, runtime data, local notes and undeclared canonical skill resources. This keeps downstream fixture cost proportional to the portable workflow.
+
+A direct gate run reports each numbered check on stderr when it starts and with its elapsed time when it passes; target gates number their checks the same way. Explicit Codex runs stream that output. Claude and Codex Stops pass `--quiet`, because no one watches a Stop live: a refusal shows only its failure, and its fingerprint never changes with check times. Pass `--quiet` to a direct run to omit the lines. Successful captured check output remains suppressed.
+
+Use focused regressions while editing and run the required full Python suite on frozen source before review. Reuse those results in the review evidence instead of rerunning unchanged focused suites. The final project gate remains required; no pass cache may bypass application, environment, dependency, control or review validation.

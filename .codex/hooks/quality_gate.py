@@ -67,6 +67,8 @@ def main():
         print(json.dumps({"systemMessage": policy(mode)}))
         return 0
     command = ["bash", str(root / ".lean/scripts/quality-gate.sh"), "--root", str(root)]
+    if args.event == "stop":
+        command.append("--quiet")  # No one watches a Stop live, and check times must not change its refusal.
     if args.cache_tree:
         command.append("--cache-tree")
     contract = args.contract
@@ -92,11 +94,9 @@ def main():
         command.extend(["--session", session])  # The runner reads that session's declared contract itself.
     if args.require_review or reviewed:
         command.append("--require-review")
-    result = subprocess.run(command, text=True, capture_output=True, cwd=root)
     if args.event == "run":
-        sys.stdout.write(result.stdout)
-        sys.stderr.write(result.stderr)
-        return result.returncode
+        return subprocess.run(command, cwd=root).returncode
+    result = subprocess.run(command, text=True, capture_output=True, cwd=root)
     if result.returncode == 0:
         clear_refusals(root)
         if session:

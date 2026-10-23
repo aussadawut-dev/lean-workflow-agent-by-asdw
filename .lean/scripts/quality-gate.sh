@@ -11,6 +11,7 @@ hook=0
 seed=0
 cache_tree=0
 require_review=0
+quiet=0
 contract=""
 session=""  # From the hook payload, or --session for a direct run.
 session_contract=""  # Resolved from the guard's store by session id; never taken from the command line.
@@ -22,6 +23,7 @@ while [ "$#" -gt 0 ]; do
     --seed) seed=1; shift ;;
     --cache-tree) cache_tree=1; shift ;;
     --require-review) require_review=1; shift ;;
+    --quiet) quiet=1; shift ;;
     --contract)
       [ "$#" -ge 2 ] || { echo "--contract requires a line" >&2; exit 2; }
       contract="$2"; shift 2 ;;
@@ -35,6 +37,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 [ "$seed" -eq 0 ] || [ "$hook" -eq 1 ] || { echo "--seed requires --claude-hook" >&2; exit 2; }
+[ "$hook" -eq 0 ] || quiet=1  # No one watches a Stop hook live.
 root="$(cd "$root" && pwd)" || exit 2
 lock_helper="$(dirname "$helper")/gate_lock.py"
 if ! python3 "$lock_helper" --check "$root"; then
@@ -63,6 +66,12 @@ if [ "$hook" -eq 1 ] && [ "$seed" -eq 0 ]; then
   exec 3>&2 2>"$errlog"
   trap 'cat "$errlog" >&3; rm -f "$errlog"' EXIT
 fi
+
+# Progress is diagnostic only: Stop hooks and --quiet runs omit it, so a refusal carries only its failure.
+progress() {
+  [ "$quiet" -eq 0 ] || return 0
+  printf 'Quality Gate: %s\n' "$1" >&2
+}
 
 # Record a refusal; $1 is "c" for a contract refusal, empty for a gate failure.
 # A continuation adds to the count; a fresh Stop starts it at 1. A contract
@@ -113,7 +122,11 @@ gate_refused() {
 # Application checks must run before the Lean cache can skip its own checks.
 # Target state (including untracked files) is separate from the superproject.
 if [ "$seed" -eq 0 ] && { [ -e "$root/.agent-runtime/active-target.json" ] || [ -L "$root/.agent-runtime/active-target.json" ]; }; then
-  python3 "$root/.lean/scripts/submodule.py" --root "$root" gate --optional || { refuse; exit 2; }
+  progress "target checks started"
+  target=(gate --optional)
+  [ "$quiet" -eq 0 ] || target+=(--quiet)
+  python3 "$root/.lean/scripts/submodule.py" --root "$root" "${target[@]}" || { refuse; exit 2; }
+  progress "target checks passed"
 fi
 
 # The contract a session declared through the PreToolUse guard, read from the guard's store by
@@ -234,9 +247,17 @@ if [ "$cache_tree" -eq 1 ] && [ -n "$pass_state" ] && [ ! -f "$failed" ] && [ -f
   exit 0
 fi
 
+check_number=0
 while IFS= read -r cmd; do
-  output="$(bash -c "$cmd" 2>&1)" && continue
-  status=$?
+  check_number=$((check_number + 1))
+  progress "check $check_number started"
+  started=$SECONDS
+  if output="$(bash -c "$cmd" 2>&1)"; then
+    progress "check $check_number passed ($((SECONDS - started))s)"
+    continue
+  else
+    status=$?
+  fi
 
   # 127 identifies a missing tool only when its plain command name cannot
   # resolve. Wrappers, paths and shell fragments retain the failure verdict.

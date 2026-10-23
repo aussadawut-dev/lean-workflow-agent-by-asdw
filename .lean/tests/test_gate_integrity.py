@@ -706,6 +706,36 @@ class TrustedControlRefTests(unittest.TestCase):
     def history(self):
         return json.loads((self.root / ".agent-runtime/gate-controls.json").read_text())["history"]
 
+    def test_manual_codex_streams_progress_without_success_output(self):
+        import select
+        self.project.write_text(self.project.read_text().replace("true", "echo hidden-check-output; while [ ! -f release ]; do sleep 0.05; done"))
+        self.commit("slow check")
+        self.upstream()
+        process = subprocess.Popen(["python3", str(self.root / ".codex/hooks/quality_gate.py"),
+                                    "run", "--root", str(self.root)], cwd=self.root,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            import time
+            deadline = time.monotonic() + 5
+            progress = b""
+            while b"Quality Gate: check 1 started" not in progress and time.monotonic() < deadline:
+                ready, _, _ = select.select([process.stderr], [], [], max(0, deadline - time.monotonic()))
+                if not ready:
+                    break
+                chunk = os.read(process.stderr.fileno(), 4096)
+                if not chunk:
+                    break
+                progress += chunk
+            self.assertIn(b"Quality Gate: check 1 started", progress,
+                          "progress must arrive while the check is still running")
+            self.assertIsNone(process.poll())
+        finally:
+            (self.root / "release").touch()
+            out, err = process.communicate(timeout=15)
+        self.assertEqual(process.returncode, 0, err)
+        self.assertNotIn("hidden-check-output", out + err)
+        self.assertIn("Quality Gate: check 1 passed", err)
+
     def test_reviewed_control_drift_is_accepted_for_both_providers(self):
         helper = ["python3", str(self.root / ".lean/scripts/gate_evidence.py"), "--root", str(self.root)]
         guard = ["python3", str(self.root / ".lean/scripts/contract_guard.py"), "--root", str(self.root), "pre-tool"]
@@ -997,6 +1027,72 @@ class PassReuseTests(unittest.TestCase):
                 result = stop({"session_id": session})
                 self.assertEqual(result.returncode, 2, "a recorded pass let a HIGH contract skip its review receipt")
                 self.assertEqual(self.count(), before)
+
+
+class GateProgressTests(unittest.TestCase):
+    """Direct runs number each check with its elapsed time; Stops run quietly so a refusal stays the same."""
+
+    git, direct, claude_stop, codex_stop, transcript = (PassReuseTests.git, PassReuseTests.direct,
+                                                         PassReuseTests.claude_stop, PassReuseTests.codex_stop,
+                                                         PassReuseTests.transcript)
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="lean gate progress ")
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        for name in (".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py",
+                     ".lean/scripts/gate_mode.py", ".lean/scripts/contract_guard.py", ".claude/hooks/quality-gate.sh",
+                     ".claude/hooks/session-start.sh", ".codex/hooks/quality_gate.py", ".gitignore"):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / name, path)
+        # Ignored flags slow the first check and fail the second without changing the shipping state.
+        self.slow = self.root / ".agent-runtime/slow"
+        self.flag = self.root / ".agent-runtime/pass"
+        (self.root / ".lean/PROJECT.md").write_text(
+            "<!-- gate:start -->\n```sh\nif [ -f .agent-runtime/slow ]; then sleep 2.2; fi\n"
+            "test -f .agent-runtime/pass\n```\n<!-- gate:end -->\n")
+        (self.root / ".claude/settings.json").write_text("{}")
+        self.git("init", "-q")
+        self.git("add", "-A")
+        self.git("commit", "-qm", "init")
+        self.flag.parent.mkdir(exist_ok=True)
+        self.flag.write_text("")
+        self.first = self.direct()  # First use records the gate controls.
+        self.assertEqual(self.first.returncode, 0, self.first.stderr)
+        (self.root / "work.txt").write_text("change\n")
+
+    def test_a_direct_run_numbers_each_check_with_its_elapsed_time(self):
+        for line in ("Quality Gate: check 1 started", "Quality Gate: check 1 passed (",
+                     "Quality Gate: check 2 started", "Quality Gate: check 2 passed ("):
+            self.assertIn(line, self.first.stderr)
+        quiet = self.direct("--quiet")
+        self.assertEqual(quiet.returncode, 0, quiet.stderr)
+        self.assertNotIn("Quality Gate: check", quiet.stderr)
+
+    def test_a_claude_stop_refusal_carries_only_the_failure(self):
+        self.flag.unlink()
+        result = self.claude_stop(self.transcript("Contract: risk=LOW quality=STANDARD acceptance=checks pass"))
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("test -f .agent-runtime/pass", result.stderr)
+        self.assertNotIn("Quality Gate: check", result.stderr)
+
+    def test_a_codex_stop_refusal_is_unchanged_when_only_check_times_differ(self):
+        guard = ["python3", str(self.root / ".lean/scripts/contract_guard.py"), "--root", str(self.root), "pre-tool"]
+        declare = ("python3 .lean/scripts/contract_guard.py declare "
+                   "--contract 'Contract: risk=LOW quality=STANDARD acceptance=checks pass'")
+        bound = subprocess.run(guard, input=json.dumps({"session_id": "codex", "tool_name": "Bash",
+                                                        "tool_input": {"command": declare}}),
+                               text=True, capture_output=True)
+        self.assertEqual(bound.returncode, 0, bound.stderr)
+        self.flag.unlink()
+        first = self.codex_stop({"session_id": "codex", "stop_hook_active": False})
+        self.assertEqual(first.returncode, 2, first.stdout + first.stderr)
+        self.assertNotIn("Quality Gate: check", first.stderr)
+        self.slow.write_text("")  # The passing check now takes over two seconds; nothing else changes.
+        again = self.codex_stop({"session_id": "codex", "stop_hook_active": True})
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertIn("refused again with nothing changed", again.stdout)
 
 
 if __name__ == "__main__":
