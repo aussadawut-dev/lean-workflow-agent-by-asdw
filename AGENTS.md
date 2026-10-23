@@ -1,8 +1,8 @@
 # Agent Instructions
 
-Lean Workflow Baseline 4.12.0. This file is the canonical contract for all coding agents.
+Lean Workflow Baseline 4.13.0. This file is the canonical contract for all coding agents.
 
-**Before any task, read this file and `.lean/README.md`.**
+**Before any task, read this file and `.lean/README.md`.** In Claude, both are already loaded through the `CLAUDE.md` imports; do not read them again.
 Explicit user instructions take precedence. The active agent owns the task unless the project records a different Controller or primary agent. No provider owns the workflow by default. Keep shared rules here; `CLAUDE.md` imports them.
 
 ## Core rules
@@ -10,7 +10,7 @@ Explicit user instructions take precedence. The active agent owns the task unles
 - Before changing files, write one contract line as the first line of your reply, before any preamble, plan or tool call (or start a field block there):
   `Contract: risk=<LOW|MEDIUM|HIGH> quality=<STANDARD|HIGH|VERY_HIGH> acceptance=<observable check>`
   For a trivial task: `Contract: trivial (<reason>)`. Infer values; do not ask the user. Risk rules and the block form: `.lean/policy/CONTRACTS.md`.
-  Hooks deny only write tools and writing shell commands until the contract is bound; reads and inspection run first. Claude's guard reads the contract from that first line once the reply is saved, which can wait for the first tool result. When the turn's first tool call writes, or the guard cannot read a transcript (Codex), first run `python3 .lean/scripts/contract_guard.py declare --contract '<one line>'` as a command of its own. Each new user prompt clears it.
+  Hooks deny only write tools and writing shell commands until the contract is bound; reads and inspection run first. Claude's guard reads the contract from that first line once the reply is saved, which can wait for the first tool result, so in Claude run `declare` only when the turn's first tool call writes, to replace a bound contract, or after a write was denied. Where the guard cannot read a transcript (Codex), first run `python3 .lean/scripts/contract_guard.py declare --contract '<one line>'` as a command of its own. Each new user prompt clears it.
 - Use the smallest sufficient context: impact-based context selection in `.lean/policy/CONTEXT.md`. Do not read workflow internals (`.claude/hooks/`, `.lean/policy/`) unless the task needs them.
 - Behavior changes require meaningful tests.
 - Bug fixes require a regression test. Run it before the fix and show it fails, then show it passes after.

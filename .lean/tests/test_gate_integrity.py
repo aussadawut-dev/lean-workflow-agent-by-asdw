@@ -846,5 +846,158 @@ class TrustedControlRefTests(unittest.TestCase):
         self.assertNotIn("trusted-control-refs", result.stderr)
 
 
+class PassReuseTests(unittest.TestCase):
+    """A pass recorded with --cache-tree, direct or Stop, is reused by either provider's Stop on that state."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="lean pass reuse ")
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        for name in (".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py",
+                     ".lean/scripts/gate_mode.py", ".lean/scripts/contract_guard.py", ".claude/hooks/quality-gate.sh",
+                     ".claude/hooks/session-start.sh", ".codex/hooks/quality_gate.py", ".gitignore"):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / name, path)
+        # Every check run appends to an ignored file, and an ignored flag decides pass or fail, so
+        # neither counting runs nor failing a check changes the shipping state.
+        self.runs = self.root / ".agent-runtime/check-runs"
+        self.flag = self.root / ".agent-runtime/pass"
+        (self.root / ".lean/PROJECT.md").write_text(
+            "<!-- gate:start -->\n```sh\nprintf 'run\\n' >> .agent-runtime/check-runs; test -f .agent-runtime/pass\n"
+            "```\n<!-- gate:end -->\n")
+        (self.root / ".claude/settings.json").write_text("{}")
+        self.git("init", "-q")
+        self.git("add", "-A")
+        self.git("commit", "-qm", "init")
+        self.flag.parent.mkdir(exist_ok=True)
+        self.flag.write_text("")
+        self.assertEqual(self.direct().returncode, 0)  # First use records the gate controls.
+        (self.root / "work.txt").write_text("change\n")
+
+    def git(self, *args):
+        return subprocess.run(["git", "-C", str(self.root), "-c", "user.name=test", "-c", "user.email=test@example.invalid",
+                               *args], check=True, text=True, capture_output=True).stdout.strip()
+
+    def count(self):
+        return self.runs.read_text().count("run\n") if self.runs.exists() else 0
+
+    def direct(self, *args):
+        return subprocess.run(["bash", str(self.root / ".lean/scripts/quality-gate.sh"), "--root", str(self.root), *args],
+                              text=True, capture_output=True)
+
+    def claude_stop(self, payload=None):
+        """The Stop command exactly as the shipped Claude settings configure it."""
+        command = json.loads((ROOT / ".claude/settings.json").read_text())["hooks"]["Stop"][0]["hooks"][0]["command"]
+        env = dict(os.environ, CLAUDE_PROJECT_DIR=str(self.root))
+        env.pop("CLAUDE_GATE_FORCE", None)
+        return stop_refusal(subprocess.run(["bash", "-c", command], input=json.dumps(payload or {}), text=True,
+                                           capture_output=True, env=env))
+
+    def codex_stop(self, payload=None):
+        """The Stop command exactly as the shipped Codex hooks configure it, run inside the checkout."""
+        command = json.loads((ROOT / ".codex/hooks.json").read_text())["hooks"]["Stop"][0]["hooks"][0]["command"]
+        return stop_refusal(subprocess.run(["bash", "-c", command], cwd=self.root, input=json.dumps(payload or {}),
+                                           text=True, capture_output=True))
+
+    def test_a_direct_pass_is_reused_by_both_providers_stops(self):
+        for name, stop in (("claude", self.claude_stop), ("codex", self.codex_stop)):
+            with self.subTest(adapter=name):
+                (self.root / "work.txt").write_text(f"change for {name}\n")
+                before = self.count()
+                self.assertEqual(self.direct("--cache-tree").returncode, 0)
+                self.assertEqual(self.count(), before + 1)
+                result = stop()
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(self.count(), before + 1, "the Stop reran checks a direct run had passed")
+                (self.root / "work.txt").write_text(f"changed again for {name}\n")
+                self.assertEqual(stop().returncode, 0)
+                self.assertEqual(self.count(), before + 2, "a changed state must run the checks again")
+
+    def test_one_providers_stop_pass_is_reused_by_the_other(self):
+        for first, second in ((self.claude_stop, self.codex_stop), (self.codex_stop, self.claude_stop)):
+            with self.subTest(first=first.__name__):
+                (self.root / "work.txt").write_text(f"change before {first.__name__}\n")
+                before = self.count()
+                self.assertEqual(first().returncode, 0)
+                self.assertEqual(second().returncode, 0)
+                self.assertEqual(self.count(), before + 1)
+
+    def test_runs_without_the_opt_in_always_execute(self):
+        self.assertEqual(self.direct("--cache-tree").returncode, 0)
+        before = self.count()
+        self.assertEqual(self.direct().returncode, 0)
+        adapter = ["python3", str(self.root / ".codex/hooks/quality_gate.py")]
+        explicit = subprocess.run(adapter + ["run", "--root", str(self.root)], input="{}", text=True, capture_output=True)
+        self.assertEqual(explicit.returncode, 0, explicit.stderr)
+        # A project that drops --cache-tree from its Codex Stop command gets a full run, as with Claude.
+        plain = stop_refusal(subprocess.run(adapter + ["stop", "--root", str(self.root)], input="{}", text=True,
+                                            capture_output=True))
+        self.assertEqual(plain.returncode, 0, plain.stdout + plain.stderr)
+        self.assertEqual(self.count(), before + 3)
+
+    def test_a_failing_run_drops_the_recorded_pass(self):
+        self.assertEqual(self.direct("--cache-tree").returncode, 0)
+        cache = self.root / ".claude/.gate-cache"
+        self.assertTrue(cache.is_file())
+        self.flag.unlink()  # The check now fails although the shipping state is unchanged.
+        self.assertEqual(self.direct().returncode, 2)
+        self.assertFalse(cache.exists())
+        for name, stop in (("claude", self.claude_stop), ("codex", self.codex_stop)):
+            with self.subTest(adapter=name):
+                self.assertEqual(stop().returncode, 2, "a Stop reused a pass after the same state failed")
+
+    def transcript(self, text):
+        """A Claude transcript whose current reply opens with `text`, kept out of the shipping state."""
+        self.transcripts = getattr(self, "transcripts", 0) + 1
+        path = self.root / f".agent-runtime/transcript-{self.transcripts}.jsonl"
+        path.write_text(json.dumps({"type": "assistant", "message": {"content": [{"type": "text", "text": text}]}}) + "\n")
+        return {"transcript_path": str(path), "stop_hook_active": False}
+
+    def test_a_direct_pass_does_not_excuse_a_missing_contract_line(self):
+        # A direct run never reads the transcript, so its pass may skip the commands but not the
+        # Claude Stop's contract check, which backs up the guard for writes it did not catch.
+        self.assertEqual(self.direct("--cache-tree").returncode, 0)
+        result = self.claude_stop(self.transcript("Done."))
+        self.assertEqual(result.returncode, 2, "a direct pass excused changed work with no contract line")
+
+    def test_a_stop_that_settles_the_contract_keeps_the_pass_for_follow_ups(self):
+        self.assertEqual(self.direct("--cache-tree").returncode, 0)
+        before = self.count()
+        settled = self.claude_stop(self.transcript("Contract: risk=LOW quality=STANDARD acceptance=checks pass"))
+        self.assertEqual(settled.returncode, 0, settled.stdout + settled.stderr)
+        self.assertEqual(self.count(), before, "the Stop reran checks a direct run had passed")
+        follow_up = self.claude_stop(self.transcript("Here is the answer."))
+        self.assertEqual(follow_up.returncode, 0, "a chat-only turn on a settled state needs no new contract")
+
+    def test_a_direct_run_cannot_record_a_pass_over_an_unreviewed_high_risk_change(self):
+        project = self.root / ".lean/PROJECT.md"
+        project.write_text(project.read_text() + "\n## High-risk areas\n\n- `secure/`: auth boundary.\n")
+        self.git("add", "-A")
+        self.git("commit", "-qm", "areas")
+        (self.root / "secure").mkdir()
+        (self.root / "secure/auth.py").write_text("x = 1\n")
+        result = self.direct("--cache-tree")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("High-risk", result.stderr)
+        self.assertFalse((self.root / ".claude/.gate-cache").exists())
+
+    def test_a_reused_pass_still_requires_the_high_review(self):
+        guard = ["python3", str(self.root / ".lean/scripts/contract_guard.py"), "--root", str(self.root), "pre-tool"]
+        declare = f"python3 .lean/scripts/contract_guard.py declare --contract '{CONTRACT}'"
+        for name, stop in (("claude", self.claude_stop), ("codex", self.codex_stop)):
+            with self.subTest(adapter=name):
+                session = f"{name}-high"
+                bound = subprocess.run(guard, input=json.dumps({"session_id": session, "tool_name": "Bash",
+                                                                "tool_input": {"command": declare}}),
+                                       text=True, capture_output=True)
+                self.assertEqual(bound.returncode, 0, bound.stderr)
+                self.assertEqual(self.direct("--cache-tree").returncode, 0)
+                before = self.count()
+                result = stop({"session_id": session})
+                self.assertEqual(result.returncode, 2, "a recorded pass let a HIGH contract skip its review receipt")
+                self.assertEqual(self.count(), before)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/quality_gate.py\" stop",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/quality_gate.py\" stop --cache-tree",
             "timeout": 600,
             "statusMessage": "Checking Lean Quality Gate policy"
           }

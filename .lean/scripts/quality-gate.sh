@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Project checks; --claude-hook adds transcript checks and local state.
-# Cache is opt-in (--cache-tree) for checks depending only on Git-visible files.
+# Cache is opt-in (--cache-tree) for checks depending only on Git-visible files: a pass made
+# with it, direct or Stop, is reused by a later --cache-tree run on the same shipping state.
 # Refusals never become passes. Local receipts catch drift, not hostile writers.
 
 set -u
@@ -72,6 +73,9 @@ fi
 # unverified, keeps the refusal marker and never writes a cache or receipt.
 max_refusals=3
 refuse() {
+  # Any run that refuses for a reason other than the contract drops the recorded pass, so no
+  # later --cache-tree run reuses a state this one could not pass.
+  [ "${1:-}" = "c" ] || [ "$seed" -eq 1 ] || rm -f "$cache"
   [ "$hook" -eq 1 ] && [ "$seed" -eq 0 ] || return 0
   local n=0
   if [ "$active" -eq 1 ]; then
@@ -79,7 +83,6 @@ refuse() {
     n="${n#c}"
     case "$n" in ''|*[!0-9]*) n=0 ;; esac
   fi
-  [ "${1:-}" = "c" ] || rm -f "$cache"
   n=$((n + 1))
   printf '%s' "${1:-}$n" > "$failed"
   # This session has already been shown this exact refusal (same reason, shipping state and
@@ -154,6 +157,12 @@ state=""
 if [ "$hook" -eq 1 ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   state="$(python3 "$helper" --root "$root" gate-state)" || { refuse; exit 2; }
 fi
+# The state a pass is recorded under. A direct --cache-tree run fingerprints it only for that
+# record: it never compares with the session baseline, so the High-risk floor still covers it.
+pass_state="$state"
+if [ "$hook" -eq 0 ] && [ "$cache_tree" -eq 1 ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  pass_state="$(python3 "$helper" --root "$root" gate-state)" || { refuse; exit 2; }
+fi
 
 # SessionStart records a change baseline, never a passing cache.
 if [ "$seed" -eq 1 ]; then
@@ -215,9 +224,13 @@ check_receipt() {
 }
 
 # Only a real passing run can be cached; contracts and HIGH review are checked first.
-if [ "$cache_tree" -eq 1 ] && [ "$hook" -eq 1 ] && [ -n "$state" ] && [ ! -f "$failed" ] &&
-   [ -f "$cache" ] && [ "$(cat "$cache")" = "$state" ]; then
+# A direct run's record is marked: it never read the transcript, so it can skip the commands but
+# never makes changed work count as unchanged for the contract check above.
+if [ "$cache_tree" -eq 1 ] && [ -n "$pass_state" ] && [ ! -f "$failed" ] && [ -f "$cache" ] &&
+   { [ "$(cat "$cache")" = "$pass_state" ] || [ "$(cat "$cache")" = "direct $pass_state" ]; }; then
   check_receipt
+  # This Stop has now checked the contract for that state, so the record stands as a Stop's pass.
+  [ "$hook" -eq 0 ] || printf '%s' "$pass_state" > "$cache"
   exit 0
 fi
 
@@ -261,6 +274,11 @@ while IFS= read -r cmd; do
 done <<< "$commands"
 
 check_receipt
-[ "$hook" -eq 0 ] || rm -f "$failed" "$refusal"
-[ -n "$state" ] && printf '%s' "$state" > "$cache"
+# A pass ends any standing refusal; a run that fingerprinted the state records the pass.
+if [ "$hook" -eq 1 ] || [ -n "$pass_state" ]; then rm -f "$failed" "$refusal"; fi
+if [ -n "$pass_state" ]; then
+  record="$pass_state"
+  [ "$hook" -eq 1 ] || record="direct $pass_state"
+  mkdir -p "$root/.claude" && printf '%s' "$record" > "$cache"
+fi
 exit 0

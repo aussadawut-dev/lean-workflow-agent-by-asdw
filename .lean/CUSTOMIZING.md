@@ -2,7 +2,7 @@
 
 ## Current authority
 
-Baseline 4.12.0 uses `AGENTS.md` as the shared canonical contract. `CLAUDE.md` is a runtime entrypoint. The active agent leads unless project additions record a different Controller or primary agent. No provider-specific ownership, product stack or model shortlist is imposed.
+Baseline 4.13.0 uses `AGENTS.md` as the shared canonical contract. `CLAUDE.md` is a runtime entrypoint. The active agent leads unless project additions record a different Controller or primary agent. No provider-specific ownership, product stack or model shortlist is imposed.
 
 Keep project facts, commands and gates in PROJECT; keep mode/execution in config and optional procedure preferences in `.lean/skill-effort.json`; keep accepted scope and work records in the project's chosen tracking system. Project overrides go below the contract's Project additions marker. Record local workflow extensions in project-owned documentation (an existing LOCAL-EXTENSIONS file may serve this purpose). Do not edit portable policy per project without tracking that delta.
 
@@ -20,7 +20,7 @@ The schema-2 release registry declares ordinary files separately from `links`: c
 
 Shared skills retain Claude's `user-invocable` and `argument-hint` metadata; Codex discovery ignores those extensions. All discovered Lean procedures are user-invocable; optional maintenance discovery stays opt-in. `$ARGUMENTS` means invocation arguments, or the current user task when substitution is unavailable. The bundled Codex skill-creator quick validator has a narrower frontmatter allowlist; actual Codex discovery and Lean's metadata checks validate this shared format.
 
-Call `bash .lean/scripts/quality-gate.sh --root <workflow_root>` for direct validation. It always runs defined checks and selected-target gates, without reading stdin or using Claude caches. `.claude/hooks/quality-gate.sh` connects Claude's Stop event and respects shared auto/manual policy; `.codex/hooks.json` and its adapter provide Codex lifecycle integration after runtime trust. Provider adapters skip automatic checks in manual mode and report NOT_RUN. Seeding records a baseline, not validation; passing caches require explicit `--cache-tree`. See policy/QUALITY.md for transcript checks, local control acceptance and review receipts. Runtime permissions stay in their own settings.
+Call `bash .lean/scripts/quality-gate.sh --root <workflow_root>` for direct validation. It runs defined checks and selected-target gates without reading stdin; only with `--cache-tree` does it record a pass for the shipping state or reuse one recorded for that unchanged state. `.claude/hooks/quality-gate.sh` connects Claude's Stop event and respects shared auto/manual policy; `.codex/hooks.json` and its adapter provide Codex lifecycle integration after runtime trust. Provider adapters skip automatic checks in manual mode and report NOT_RUN. Seeding records a baseline, not validation; passing caches require explicit `--cache-tree`. See policy/QUALITY.md for transcript checks, local control acceptance and review receipts. Runtime permissions stay in their own settings.
 
 Use `/lean-update` for a reviewed upgrade from the upstream stable tag, or `--ref` for a deliberate branch/commit. It preserves local changes and uses the existing takeover recovery journal after reconciliation. Keep optional `.lean/upstream.json` as project-owned provenance; never import it from upstream. A source older than the installation or incompatible with the installed asset schema blocks writes.
 
