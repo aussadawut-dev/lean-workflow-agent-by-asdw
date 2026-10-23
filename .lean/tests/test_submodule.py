@@ -199,6 +199,10 @@ class SubmoduleTests(unittest.TestCase):
         gate = self.root / ".lean/scripts/quality-gate.sh"
         result = self.command("bash", gate, "--root", self.root)
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Target Quality Gate: check 1 passed", result.stderr)
+        quiet = self.command("bash", gate, "--root", self.root, "--quiet")
+        self.assertEqual(quiet.returncode, 0, quiet.stderr)
+        self.assertNotIn("Quality Gate: check", quiet.stderr)
         (Path(context["project_root"]) / "blocked.txt").write_text("must gate")
         result = self.command("bash", gate, "--root", self.root)
         self.assertEqual(result.returncode, 2, result.stderr)
@@ -213,6 +217,7 @@ class SubmoduleTests(unittest.TestCase):
         result = self.hook()
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("Target Quality Gate failed", result.stderr)
+        self.assertNotIn("Quality Gate: check", result.stdout + result.stderr)  # A Stop runs the target quietly.
         (Path(context["project_root"]) / "blocked.txt").unlink()
         self.assertEqual(self.hook().returncode, 0)
 
