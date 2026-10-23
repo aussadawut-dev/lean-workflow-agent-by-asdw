@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Tests for .claude/hooks/*.sh. Each case runs in a throwaway git repo.
+# The cases form parts that run at the same time, each in its own subshell with
+# its own scratch directory, so a case may rely only on earlier cases in its part.
 # Usage: .lean/tests/test-hooks.sh
 
 set -u
@@ -7,8 +9,9 @@ set -u
 repo="$(cd "$(dirname "$0")/../.." && pwd)"
 gate="$repo/.claude/hooks/quality-gate.sh"
 session="$repo/.claude/hooks/session-start.sh"
-work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+base="$(mktemp -d)"
+trap 'rm -rf "$base"' EXIT
+work=""  # The running part's scratch directory, set when the part starts.
 
 pass=0
 fail=0
@@ -72,6 +75,42 @@ expect_code() {
   if [ "$code" -eq "$2" ]; then ok "$1"; else bad "$1 (exit $code, want $2)"; fi
 }
 
+contract_case() { # <name> <want> <transcript body>
+  local d t
+  d="$(fixture 'true')"
+  echo change > "$d/file.txt"
+  t="$work/transcript.$RANDOM.jsonl"
+  printf '%s\n' "$3" > "$t"
+  run_gate "$d" "{\"stop_hook_active\":false,\"transcript_path\":\"$t\"}"
+  expect_code "$1" "$2"
+}
+
+# A fixture whose PROJECT.md names High-risk areas; prints the repo path.
+risky_fixture() {
+  local d
+  d="$(fixture 'true')"
+  # shellcheck disable=SC2016 # literal Markdown backticks
+  printf '\n## High-risk areas\n\n- `secure/`: auth boundary.\n- `deploy/*.yml`: production config.\n\n## Other\n\n- `not/listed/`\n' >> "$d/.lean/PROJECT.md"
+  git -C "$d" -c user.name=t -c user.email=t@t commit -qam areas
+  echo "$d"
+}
+
+evidence() { python3 "$repo/.lean/scripts/gate_evidence.py" --root "$dir" "$@"; }
+
+run_raw() { # <dir> <stdin json>; no fixture control acceptance
+  err="$(printf '%s' "$2" | CLAUDE_PROJECT_DIR="$1" bash "$gate" 2>&1 >"$work/stdout")"
+  code=$?
+  out="$(cat "$work/stdout")"
+  blocked_as_refusal
+}
+
+# Transcript entries shared by the contract and risk parts.
+human='{"type":"user","message":{"content":"please change file"}}'
+said='{"type":"assistant","message":{"content":[{"type":"text","text":"Contract: risk=LOW quality=STANDARD acceptance=tests pass"}]}}'
+edit='{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","input":{}}]}}'
+
+# Gate runs, refusals, seeding and the cache.
+gate_basics() {
 # 1. No PROJECT.md
 dir="$(mktemp -d "$work/empty.XXXX")"
 run_gate "$dir" '{}'
@@ -180,7 +219,11 @@ echo other > "$dir/file.txt"
 run_gate "$dir" '{}'
 runs="$(wc -l < "$counter" | tr -d ' ')"
 if [ "$runs" = "2" ]; then ok "gate: change re-runs"; else bad "gate: change re-runs (ran $runs times)"; fi
+}
 
+# What the gate state covers, and the session hook.
+gate_state() {
+counter="$work/count"
 # 12. Stops at the first failing command
 : > "$counter"
 dir="$(fixture 'false' "echo run >> '$counter'")"
@@ -336,7 +379,10 @@ sed -i.bak "s|echo run >> |echo edited >> |" "$dir/.lean/PROJECT.md"
 run_gate "$dir" '{}'
 runs="$(wc -l < "$counter" | tr -d ' ')"
 if [ "$runs" = "2" ]; then ok "gate: the gate commands are part of the state"; else bad "gate: the gate commands are part of the state (ran $runs of 2)"; fi
+}
 
+# Refusal guards and how failures are classified.
+gate_failures() {
 # 24. Two guards keep a refusal from being skipped, and each is pinned on its
 # own. First: while a refusal stands, seeding writes no cache at all.
 dir="$(fixture 'false')"
@@ -544,18 +590,10 @@ printf AB > "$dir/a"
 printf C > "$dir/b"
 run_gate "$dir" '{}'
 expect_code "gate: redistributed untracked bytes rerun and fail" 2
-
+}
 
 # Contract line enforcement. The transcript is JSONL; only assistant entries count.
-contract_case() { # <name> <want> <transcript body>
-  local d t
-  d="$(fixture 'true')"
-  echo change > "$d/file.txt"
-  t="$work/transcript.$RANDOM.jsonl"
-  printf '%s\n' "$3" > "$t"
-  run_gate "$d" "{\"stop_hook_active\":false,\"transcript_path\":\"$t\"}"
-  expect_code "$1" "$2"
-}
+contract_cases() {
 contract_case "contract: real assistant Contract line passes" 0 \
   '{"type":"assistant","message":{"content":[{"type":"text","text":"Contract: risk=LOW quality=STANDARD acceptance=tests pass\nDone"}]}}'
 contract_case "contract: trivial form passes" 0 \
@@ -616,9 +654,6 @@ expect_code "contract: missing transcript_path is not checked" 0
 
 # Runtime-injected user entries are not human turns: skill bodies, Stop hook
 # feedback, background task notifications and compaction summaries.
-human='{"type":"user","message":{"content":"please change file"}}'
-said='{"type":"assistant","message":{"content":[{"type":"text","text":"Contract: risk=LOW quality=STANDARD acceptance=tests pass"}]}}'
-edit='{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","input":{}}]}}'
 contract_case "contract: a loaded skill body does not end the turn" 0 "$human
 $said
 {\"type\":\"user\",\"isMeta\":true,\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Base directory for this skill: x\"}]}}
@@ -639,16 +674,10 @@ contract_case "contract: a new human prompt still needs a new contract" 2 "$huma
 $said
 {\"type\":\"user\",\"message\":{\"content\":\"now change it again\"}}
 $edit"
+}
 
 # High-risk areas in PROJECT.md set a review floor that a low contract cannot lower.
-risky_fixture() {
-  local d
-  d="$(fixture 'true')"
-  # shellcheck disable=SC2016 # literal Markdown backticks
-  printf '\n## High-risk areas\n\n- `secure/`: auth boundary.\n- `deploy/*.yml`: production config.\n\n## Other\n\n- `not/listed/`\n' >> "$d/.lean/PROJECT.md"
-  git -C "$d" -c user.name=t -c user.email=t@t commit -qam areas
-  echo "$d"
-}
+risk_cases() {
 low="Contract: risk=LOW quality=STANDARD acceptance=tests pass"
 t="$work/t-low.jsonl"; printf '%s\n' "$said" > "$t"
 dir="$(risky_fixture)"
@@ -659,7 +688,6 @@ case "$err" in
   *"High-risk areas changed"*"secure/auth.py"*) ok "risk: refusal names the high-risk path" ;;
   *) bad "risk: refusal names the high-risk path (got: $err)" ;;
 esac
-evidence() { python3 "$repo/.lean/scripts/gate_evidence.py" --root "$dir" "$@"; }
 evidence record-review --contract "$low" --reviewer independent --evidence 'round 1, no findings' \
   --verdict PASS --state "$(evidence state)" >/dev/null
 run_gate "$dir" "{\"stop_hook_active\":false,\"transcript_path\":\"$t\"}"
@@ -705,12 +733,6 @@ expect_code "risk: a nested Lean root still sees tracked high-risk edits" 2
 
 # Every hook refusal after input parsing counts toward the cap, including
 # protected-control drift and an undefined gate.
-run_raw() { # <dir> <stdin json>; no fixture control acceptance
-  err="$(printf '%s' "$2" | CLAUDE_PROJECT_DIR="$1" bash "$gate" 2>&1 >"$work/stdout")"
-  code=$?
-  out="$(cat "$work/stdout")"
-  blocked_as_refusal
-}
 dir="$(fixture 'true')"
 run_raw "$dir" '{"stop_hook_active":false}'
 expect_code "cap: first use records gate controls" 0
@@ -743,6 +765,43 @@ dir="$(fixture 'true')"
 rm "$dir/.lean/PROJECT.md"
 CLAUDE_PROJECT_DIR="$dir" bash "$gate" --seed </dev/null
 if [ ! -f "$dir/.claude/.gate-failed" ]; then ok "cap: seed never records a refusal"; else bad "cap: seed never records a refusal"; fi
+}
 
-echo "$pass passed, $fail failed"
-[ "$fail" -eq 0 ]
+# Each part runs in a background subshell, so its counters, variables and scratch
+# directory stay its own; the parts print in order once all of them have finished.
+parts="gate_basics gate_state gate_failures contract_cases risk_cases"
+run_part() { # <part function>
+  work="$(mktemp -d "$base/$1.XXXX")" || exit 1
+  "$1"
+  echo "$pass $fail" > "$base/$1.result"
+}
+for part in $parts; do
+  run_part "$part" > "$base/$part.out" 2>&1 &
+done
+wait
+
+# A part that stops early (an unset variable under set -u, say) leaves no result
+# and counts as a failure. Failed names repeat at the end, where a gate's output
+# tail still shows them.
+total_pass=0
+total_fail=0
+: > "$base/failed"
+for part in $parts; do
+  cat "$base/$part.out"
+  grep '^FAIL ' "$base/$part.out" >> "$base/failed"
+  if [ -f "$base/$part.result" ]; then
+    read -r part_pass part_fail < "$base/$part.result"
+    total_pass=$((total_pass + part_pass))
+    total_fail=$((total_fail + part_fail))
+  else
+    echo "FAIL $part stopped before its last case" | tee -a "$base/failed"
+    total_fail=$((total_fail + 1))
+  fi
+done
+
+echo "$total_pass passed, $total_fail failed"
+if [ "$total_fail" -ne 0 ]; then
+  echo "Failed cases:"
+  cat "$base/failed"
+fi
+[ "$total_fail" -eq 0 ]

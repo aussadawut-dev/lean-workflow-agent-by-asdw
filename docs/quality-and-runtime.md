@@ -26,7 +26,7 @@ Review rounds are bounded. After a second REWORK, one final repair/review pass m
 
 ## Quality Gates and completion
 
-Your gate commands live in [.lean/PROJECT.md](../.lean/PROJECT.md). Both providers use the shared auto/manual policy. In auto mode, Claude Stop and a trusted, activated Codex Stop adapter run the checks. Direct calls to the shared runner always execute:
+Your gate commands live in [.lean/PROJECT.md](../.lean/PROJECT.md). Both providers use the shared auto/manual policy. In auto mode, Claude Stop and a trusted, activated Codex Stop adapter run the checks. Direct calls to the shared runner execute the checks:
 
 ```sh
 bash .lean/scripts/quality-gate.sh --root .
@@ -34,9 +34,9 @@ bash .lean/scripts/quality-gate.sh --root .
 
 Checks rerun by default, including continued Stops after failure. A missing or empty gate blocks completion with setup guidance. SessionStart records a change baseline; it does not validate the project.
 
-`--cache-tree` is an opt-in cache for checks whose inputs are entirely visible to Git. This repository uses it for Claude Stop. Unchanged state can reuse a PASS while contract and required review checks still run. Changed files or a previous refusal trigger fresh validation.
+`--cache-tree` is an opt-in cache for checks whose inputs are entirely visible to Git. This repository uses it for both providers' Stop commands and for `/lean-gate`. A pass made with it, by a direct run or either Stop, is recorded for the shipping state, and a later `--cache-tree` run or Stop on that unchanged state reuses it while contract and required review checks still run. Changed files or a standing refusal trigger fresh validation, and any refusal other than a contract refusal drops the recorded pass.
 
-Changes to tools, environment or ignored dependencies need a fresh direct run. Downstream projects whose checks depend on those inputs should remove `--cache-tree` from their Stop command. For HIGH-depth work, include `--require-review --contract '<exact contract line>'` when validating and checking the receipt together.
+Changes to tools, environment or ignored dependencies need a fresh direct run. Downstream projects whose checks depend on those inputs should remove `--cache-tree` from their Stop commands in `.claude/settings.json` and `.codex/hooks.json`. For HIGH-depth work, include `--require-review --contract '<exact contract line>'` when validating and checking the receipt together.
 
 The Claude adapter checks contract provenance when transcript metadata is available. HIGH-review receipts bind the reported review to the contract and current shipping state. Local hashes detect gate-control changes until matching prior user approval is recorded or an independent HIGH-depth PASS review covers them. Controls that equal a trusted upstream ref listed in PROJECT.md (`<!-- trusted-control-refs: ... -->`), for example after merging a reviewed release branch, are accepted automatically; local edits still need approval or an independent HIGH-depth PASS review that covers them. See [.lean/policy/QUALITY.md](../.lean/policy/QUALITY.md) for exact commands and limits.
 

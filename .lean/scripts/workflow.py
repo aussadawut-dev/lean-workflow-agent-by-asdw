@@ -733,7 +733,7 @@ def queue_command(root, args):
 
 
 def gate_status(root):
-    """Last Claude-hook gate result as the runner's markers record it, never a fresh validation."""
+    """Last recorded gate result (a Claude Stop or any --cache-tree run) from the runner's markers, never a fresh validation."""
     failed, cache = root / ".claude/.gate-failed", root / ".claude/.gate-cache"
     if failed.is_file():
         # A "c" marker is a contract refusal, which says nothing about the checks.
@@ -747,7 +747,7 @@ def gate_status(root):
     except (ImportError, OSError, ValueError, subprocess.CalledProcessError):
         return "UNKNOWN"
     # A cached PASS covers only the state it recorded; any later change makes it stale.
-    return "PASS" if cache.read_text().strip() == current else "STALE"
+    return "PASS" if cache.read_text().strip().removeprefix("direct ") == current else "STALE"
 
 
 def context_command(root, args):
@@ -828,7 +828,7 @@ def context_command(root, args):
         except OSError:
             pass  # No Git available: report git as null.
         report["gate"] = {"status": gate_status(root),
-                          "source": "Claude Stop hook markers; direct runner and Codex runs leave none"}
+                          "source": "Claude Stop markers and passes recorded by --cache-tree runs; other direct and Codex runs leave none"}
         print(json.dumps(report, indent=2))
 
 

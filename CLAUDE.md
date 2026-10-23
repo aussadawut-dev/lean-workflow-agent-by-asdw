@@ -1,6 +1,6 @@
 # Claude Instructions
 
-Read and follow the shared canonical contract in `AGENTS.md` and `.lean/README.md` before work. Follow the relevant tracker when the configured mode uses one. The active agent is the Controller unless project additions record a different owner; explicit user instructions take precedence.
+Follow the shared canonical contract in `AGENTS.md` and `.lean/README.md`; the imports below already load both, so do not read them again. Follow the relevant tracker when the configured mode uses one. The active agent is the Controller unless project additions record a different owner; explicit user instructions take precedence.
 
 @AGENTS.md
 
