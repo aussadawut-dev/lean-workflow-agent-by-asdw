@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Lean Workflow Baseline 4.13.0. This file is the canonical contract for all coding agents.
+Lean Workflow Baseline 4.14.0. This file is the canonical contract for all coding agents.
 
 **Before any task, read this file and `.lean/README.md`.** In Claude, both are already loaded through the `CLAUDE.md` imports; do not read them again.
 Explicit user instructions take precedence. The active agent owns the task unless the project records a different Controller or primary agent. No provider owns the workflow by default. Keep shared rules here; `CLAUDE.md` imports them.
