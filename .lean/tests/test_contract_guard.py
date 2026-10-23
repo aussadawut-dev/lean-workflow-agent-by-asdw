@@ -282,6 +282,17 @@ class MidTurnPromptTests(HookFixture):
                 self.submit("status?", transcript, provider, session)
                 self.assertFalse(self.can_write(provider, session))
 
+    def test_a_codex_prompt_with_its_own_transcript_still_clears(self):
+        # Codex rollouts carry no queue records or Claude turn ends, so every Codex prompt starts a task.
+        path = self.transcript(
+            {"timestamp": self.at(-5), "type": "session_meta", "payload": {"id": "c1"}},
+            {"timestamp": self.at(1), "type": "event_msg", "payload": {"type": "task_started"}},
+            {"timestamp": self.at(1), "type": "response_item",
+             "payload": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "status?"}]}})
+        self.declare("codex", "codex-rollout")
+        self.submit("status?", path, "codex", "codex-rollout")
+        self.assertFalse(self.can_write("codex", "codex-rollout"))
+
 
 class GuardHookTests(HookFixture):
     def test_both_providers_deny_writes_until_declared_then_reset_on_a_person_prompt(self):
