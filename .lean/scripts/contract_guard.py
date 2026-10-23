@@ -3,10 +3,12 @@
 
 The PreToolUse hook binds a session's contract from the first line of its reply
 (read from the Claude transcript) or from a `declare` shell command, and denies
-write-capable tools until one exists; a person's prompt clears it. These records catch
+write-capable tools until one exists; a person's prompt clears it, except a Claude prompt typed
+while the agent is still working. These records catch
 mistakes; they are not a security boundary.
 """
 import argparse
+from datetime import datetime
 import fcntl
 import json
 import os
@@ -38,7 +40,8 @@ DECLARE = re.compile(r"\s*(?:cd\s+(?:\"[^\"$`\\]*\"|'[^']*'|[\w./~-]+)\s*&&\s*)?
 SINGLE = re.compile(r"\s+--contract\s+'(?P<text>[^'\n]*)'\s*\Z")
 HEREDOC = re.compile(r"\s*<<-?\s*(?P<quote>['\"])(?P<word>\w+)(?P=quote)\s*\Z")
 # Runtime-injected turns (task notices, agent hand-backs, hook feedback), sometimes wrapped in a
-# system reminder, continue the current task; only a person's prompt clears the declaration.
+# system reminder, continue the current task; only a person's prompt clears the declaration
+# (a Claude prompt typed mid-turn continues it too; see still_working).
 RUNTIME_PROMPTS = ("<task-notification>", "<agent-message", "<cross-session-message", "<system-reminder>",
                    "[SYSTEM NOTIFICATION", "Stop hook feedback:")
 MAX_SESSIONS = 64
@@ -48,7 +51,8 @@ HELP = ("Write the Task Contract as the first line of your reply, before any too
         "(or the guard cannot read a transcript, as in Codex), declare it first in a command of its own:\n"
         "python3 .lean/scripts/contract_guard.py declare --contract 'Contract: risk=LOW quality=STANDARD "
         "acceptance=<observable check>'\n"
-        "(or a quoted heredoc with the block form). A new user prompt clears the declaration.")
+        "(or a quoted heredoc with the block form). A new user prompt clears the declaration; in Claude,\n"
+        "one typed while the agent is still working keeps it.")
 TRANSCRIPT_WAIT = 1.0  # Seconds to re-read a transcript whose current reply may not be flushed yet.
 TRANSCRIPT_TAIL = 4_000_000  # Bytes read from the end of a transcript; the current turn is near the end.
 
@@ -703,8 +707,67 @@ def records_own_receipt(command, declared, cwd=None, depth=0):
     return any(value == declared or "$" in value or "`" in value or value in OPERATORS for value in values)
 
 
+TURN_ENDS = ("turn_duration", "stop_hook_summary")
+
+
+def moment(entry):
+    """A transcript entry's timestamp in epoch seconds, or None when it has none."""
+    try:
+        return datetime.fromisoformat(str(entry.get("timestamp")).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def still_working(path, text, since):
+    """Whether a Claude transcript shows `text` queued during the turn whose contract was bound at `since`.
+
+    A prompt typed while the agent works is recorded as a queue operation and delivered mid-turn,
+    with no user entry of its own. A finished turn leaves a turn-end entry, and a person's prompt or
+    an interrupt leaves a user entry, so either one after the binding means a new task. Any doubt
+    (no transcript, no queue record, an entry without a time) counts as a new task.
+    """
+    if not isinstance(path, str) or not path or not isinstance(text, str) or not isinstance(since, (int, float)):
+        return False
+    try:
+        with open(path, "rb") as source:
+            source.seek(0, os.SEEK_END)
+            size = source.tell()
+            source.seek(max(0, size - TRANSCRIPT_TAIL))
+            data = source.read().decode("utf-8", errors="replace")
+    except OSError:
+        return False
+    lines = data.splitlines()
+    if size > TRANSCRIPT_TAIL:
+        lines = lines[1:]  # The first line may be cut.
+    queued = False
+    for line in lines:
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(entry, dict) or entry.get("isSidechain"):
+            continue
+        boundary = entry.get("type") == "system" and entry.get("subtype") in TURN_ENDS
+        if entry.get("type") == "user" and not entry.get("isMeta"):
+            message = entry.get("message") if isinstance(entry.get("message"), dict) else {}
+            words = text_of(message.get("content"))
+            boundary = bool(words and words.strip() and not words.lstrip().startswith(RUNTIME_PROMPTS))
+        if boundary:
+            when = moment(entry)
+            if when is None or when >= since:
+                return False
+            queued = False  # A queue record before that boundary belongs to an earlier turn.
+        elif entry.get("type") == "queue-operation" and entry.get("content") == text:
+            queued = True
+    return queued
+
+
 def prompt(root, payload):
-    """A person's prompt starts a new task; runtime-injected prompts continue the current one."""
+    """A person's prompt starts a new task; runtime-injected prompts continue the current one.
+
+    So does a Claude prompt typed while the agent is still working: the contract bound in that turn
+    stands, and the agent declares again only if the prompt changes the task (see still_working).
+    """
     session = session_of(payload)
     text = payload.get("prompt")
     if isinstance(text, str) and text.lstrip().startswith(RUNTIME_PROMPTS):
@@ -712,6 +775,8 @@ def prompt(root, payload):
     with Store(root) as store:
         record = store.sessions.get(session)
         if record and "contract" in record:
+            if still_working(payload.get("transcript_path"), text, record.get("at")):
+                return
             for name in ("contract", "meta", "model"):
                 record.pop(name, None)
             store.save()
