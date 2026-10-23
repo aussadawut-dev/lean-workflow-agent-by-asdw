@@ -1,0 +1,12 @@
+{
+  "os": "Darwin",
+  "os_release": "27.0.0",
+  "architecture": "arm64",
+  "logical_cpus": 8,
+  "python": "3.14.3",
+  "node": "v24.15.0",
+  "docker_server": "29.1.3",
+  "scheduling": "No overlapping benchmark versions or deployment builds. Unrelated host workloads remain present. Full suite maxWorkers=1.",
+  "pnpm_launcher": "9.15.9",
+  "pnpm_application": "12.6.0 (verified in application cwd; packageManager dispatch)"
+}

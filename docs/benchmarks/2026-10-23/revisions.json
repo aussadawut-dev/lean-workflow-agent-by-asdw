@@ -1,0 +1,8 @@
+{
+  "baseline_revision": "6525301363f0fd6da90e75c118e3641dee2b0528",
+  "current_base_revision": "668fa81dac6d1c9dc2870bb24d6f353cfe21cbb0",
+  "app_revision": "592a15eba686ef2955cf5d3874c82df0baf8a2f4",
+  "scope": "Versioned workflow snapshot excluding experimental target registration and evidence; dirty workflow files retained.",
+  "v4.7.0_archive_sha256": "b1aa5d19ddfe754aa8614de4ce06c4265e13621d9ea2cc85afd667c749e9a49f",
+  "current-dirty_archive_sha256": "c1b432026377ce957df71c4e00a8b914de90dc8c94be2d15f5061b28a766ff62"
+}

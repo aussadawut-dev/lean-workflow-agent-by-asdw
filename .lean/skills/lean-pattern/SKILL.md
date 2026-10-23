@@ -7,39 +7,39 @@ argument-hint: "<project area or standard to define/update>"
 
 # Lean Pattern
 
-Apply `.lean/policy/SKILL-EFFORT.md` and state the effective intensity. This optional procedure uses existing research, scope and Grill; it adds no gate or automatic audit.
+Apply `.lean/policy/SKILL-EFFORT.md` and state the effective intensity. Define standards shared across tasks; use scope for one feature. This optional procedure adds no gate or automatic audit.
 
 ## Establish context
 
-Read PROJECT and the relevant existing standards, accepted decisions and source. For a submodule, resolve `python3 .lean/scripts/submodule.py context`: inspect code in `project_root`, keep project standards and findings in `record_root`, and use shared procedures/templates from `workflow_root`. Reuse existing document locations and keep PROJECT a short map linking to them. In tracker/full mode use the owning workset; in standard mode a proposal may remain in the conversation until saving is requested or included in approved scope.
+Bound the requested area. Read PROJECT, applicable standards/decisions and relevant source under `.lean/policy/CONTEXT.md`. For submodules, resolve `python3 .lean/scripts/submodule.py context`: code in `project_root`, project records in `record_root`, shared tools/templates in `workflow_root`. Reuse document locations and the owning tracker in tracker/full; standard proposals may stay in conversation until saving is authorized. Keep PROJECT a short map.
 
-Bound the work to the requested area. Identify the actual stack, constraints and existing conventions, distinguishing greenfield/early baseline setup from existing repositories:
+Establish an early baseline on new projects. On existing repositories inspect layouts, call paths and copy before proposing disruptive structure or terminology changes; resolve material trade-offs through `lean-grill`. Observed consistency alone proves neither acceptance nor suitability.
 
-- **Greenfield or early-stage projects:** establish an early baseline up front so subsequent features follow one convention without large rework.
-- **Existing repositories:** inspect current layouts, call paths and copy first, separate working conventions from defects, and ask through `lean-grill` before proposing disruptive structural moves or terminology rewrites.
+Select relevant topics, not a mandatory catalog or universal stack/layout:
 
-Select applicable topics, such as repository/module boundaries, code conventions, UX flows, UI components/tokens, accessibility, i18n, API contracts, data, security/privacy, tests, performance/reliability or operations. These are prompts for selection, not a required catalog. Do not prescribe an application stack, universal folder tree or design system, or manufacture standards for absent areas:
-
-- **Repository structure and module boundaries:** define stack-appropriate directory roles, module boundaries, dependency direction (which layers or features may import each other), and standard homes for tests, schemas/types, configurations and locale assets based on the project's actual stack rather than a single universal folder tree.
-- **i18n and per-locale language standards:** when the project has user-facing copy or multiple locales, cover both technical i18n hygiene (no hardcoded user-facing strings, locale key parity across supported languages, and interpolation/pluralization instead of string concatenation across variables) and per-locale linguistic quality (correct grammar and natural phrasing for each language rather than literal word-for-word translation, shared terminology/glossary consistency across screens, compound/domain term precedence over general single-word UI glossaries so domain/legal/tax terms are not corrupted by literal single-word replacements, and consistent tone/politeness level).
+- **Repository structure and module boundaries:** directory roles, dependency direction and homes for tests, schemas/types, configuration and locales, based on the actual stack.
+- **i18n and language:** no hardcoded user-facing strings; locale key parity; interpolation/pluralization rather than variable concatenation; per-locale grammar and natural phrasing, terminology/glossary, tone/politeness and compound/domain term precedence over general single-word glossaries.
+- Other requested areas may include UX/UI, accessibility, API/data, security, tests, reliability or operations. Do not invent standards for absent areas.
 
 ## Propose standards
 
-1. Distinguish observed conventions from accepted requirements. Reuse valid decisions and evidence; consistency alone does not prove a convention was approved or is suitable.
-2. Use `lean-research` when meaningful alternatives or missing evidence could change the recommendation. For a best-practice request, research authoritative sources appropriate to the stack and supported versions. Compare keeping the current approach with relevant alternatives, including migration/maintenance cost. Record source/version or date and uncertainty; do not browse again merely to restate an unchanged accepted choice.
-3. Describe rules using [the project-standard format](../../templates/project-standard.md), adapting it to existing project documentation. Each needs a stable ID, observable rule, applicability, mandatory/recommended strength, rationale, evidence, verification and decision status. Include accepted exceptions and their limits. Keep rules small enough to audit; avoid vague claims such as "use good UX."
-   `recommended` is advisory and does not block work. An explicit accepted scope/decision may promote a rule to mandatory for its stated area; record that change and approval rather than silently escalating a recommendation.
-4. Use `lean-grill` for material conflicts or unresolved choices, including differences that may preserve intentional behavior. Search decisions and relevant history before asking. Do not infer intent from unusual code alone. Resolve only the affected choice; continue independent analysis.
-5. Present the proposed delta and its effect on existing work. New or changed standards and exceptions remain `proposed` until matching approval. Reuse prior approval without asking again. Record acceptance with its reference and version; retain superseded decisions as `deprecated` with a replacement link where applicable. Do not rewrite old acceptance evidence or silently apply a new standard retroactively; make any migration scope explicit through `lean-scope`.
+1. Reuse accepted decisions. Research only meaningful alternatives or evidence gaps; best-practice requests need authoritative, stack/version-appropriate sources. Compare the current approach and migration/maintenance costs. Record sources, dates/versions and uncertainty; do not repeat unchanged research.
+2. Adapt [the project-standard format](../../templates/project-standard.md): stable ID, observable rule, applicability, mandatory/recommended strength, rationale, evidence, verification, decision status and bounded exceptions. `recommended` is advisory; promotion to mandatory needs explicit accepted scope/decision.
+3. Search decisions/history before Grill for material conflicts, uncertain intent or unresolved choices. Do not infer intent from unusual code; continue independently settled work while answers are pending.
+4. Show the delta and its effect. New/changed rules and exceptions stay `proposed` until matching approval. Record acceptance reference/version; keep superseded decisions `deprecated` with replacement links. Do not rewrite historical acceptance or apply new standards retroactively; migrations need explicit scope.
 
 ## Handoff
 
-Report the selected area, standards kept/proposed/changed, evidence, accepted exceptions, open decisions and validation paths. Save approved records only within authorized scope and route them from PROJECT when needed. Standards and decisions are project-owned; templates contain no project approvals. Do not create application fixes, backlog items or publication actions from recommendations without matching authorization. Approved remediation follows `lean-scope` / `lean-task`; `lean-audit` can check the accepted baseline when requested. When an accepted `mandatory` standard has a fast deterministic check (such as module-boundary imports or locale key/placeholder parity), propose wiring it into `.lean/PROJECT.md` gate markers via `/lean-scope` and `accept-controls`—using a ratchet/baseline or changed-scope filter on existing repositories so legacy violations do not break unrelated gates, and never placing `recommended` rules in a pass/fail gate or editing gate controls silently. Existing review, gate and project gate-mode requirements remain in force.
+Report area, kept/proposed/changed standards, evidence, exceptions, open choices and verification. Save only authorized records; templates contain no project approvals. Recommendations authorize no fixes, backlog or publication. Approved remediation uses `lean-scope` / `lean-task`; requested baseline inspection uses `lean-audit`.
+
+For fast deterministic checks of accepted `mandatory` rules, propose PROJECT gate integration through `/lean-scope` and `accept-controls`. On existing repositories use a ratchet/baseline or changed-scope filter. Never gate `recommended` rules or silently edit controls; existing review/gate-mode rules apply.
+
+Use delta context on feedback: reread changed rules and affected dependencies, retaining valid decisions/evidence. Stop when the bounded proposal has observable verification and each material choice is accepted or explicitly pending; do not add unrelated categories.
 
 ## Intensity
 
-- **standard:** bounded rules and evidence for the selected area, with explicit applicability and decisions.
-- **high:** trace relevant dependencies and failure cases; check that each rule has a usable verification path and exceptions do not conflict.
-- **ultra:** challenge consequential assumptions across affected areas, migration/recovery implications and contradictory evidence. Stop at the agreed boundary; do not add categories or research quotas just for intensity.
+- **standard:** bounded rules, evidence, applicability and decisions.
+- **high:** trace dependencies/failures and verify usable checks and compatible exceptions.
+- **ultra:** challenge consequential cross-area assumptions, migration/recovery and contradictory evidence within scope; no category or research quotas.
 
 $ARGUMENTS

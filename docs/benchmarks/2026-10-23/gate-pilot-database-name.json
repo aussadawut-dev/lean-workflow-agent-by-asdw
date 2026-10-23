@@ -1,0 +1,35 @@
+{
+  "method": "Identical application checkout; sequential version groups, two uncached runs each; lint, single-worker full tests, build; dependencies and initial build prepared before measurement. Common PROJECT gate replaces repository self-tests in isolated fixtures. Measures gate wrapper plus app workload; not target routing. First measured run is not a cold dependency-install run. Machine has unrelated background activity; recorded load is a limitation.",
+  "runs": [
+    {
+      "version": "v4.7.0",
+      "repeat": 1,
+      "seconds": 687.673,
+      "exit_code": 2,
+      "child_cpu_seconds": 751.703,
+      "load_average_start": [
+        8.0859375,
+        10.306640625,
+        11.80322265625
+      ],
+      "cache_tree": false,
+      "log": "gate-pilot-database-name.log"
+    }
+  ],
+  "components": [
+    {
+      "version": "v4.7.0",
+      "repeat": 1,
+      "phase": "lint",
+      "seconds": 17.526,
+      "exit_code": 0
+    },
+    {
+      "version": "v4.7.0",
+      "repeat": 1,
+      "phase": "test",
+      "seconds": 669.712,
+      "exit_code": 1
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+Contract: risk=LOW quality=STANDARD acceptance=Identify the stale Gmail OAuth grant race and a regression scenario from the assigned source, without edits or external calls.
+Task: Investigate the callback race when workspace Gmail client settings or sender change while the OAuth exchange awaits. Explain whether stale credentials can be saved, identify the exact checks/methods involved, and propose a bounded regression test and minimal fix. Do not implement it.
+Ownership: read-only; allowed source files listed in this packet. No file writes, network calls, credentials or parent conversation are required.
+Budget: one bounded investigation; locate symbols first, read only these files; return findings with paths, reproduction sequence, regression acceptance and unresolved dependencies. Worker handoff is evidence for the Controller, not whole-task DONE.
+Execution: standard/direct controller; hypothetical fresh worker input only, no model session is launched.
+Project: Casetodian pnpm/TypeScript workspace; API modules under packages/server/src/modules; Vitest tests. Required source is pinned to the same application revision for both arms.
+Check proposed for a future implementation: pnpm run test --maxWorkers=1 packages/server/src/gmail-oauth.test.ts. This context-counting experiment does not execute the worker task.

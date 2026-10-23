@@ -1,0 +1,27 @@
+[v4.7.0 / lint]
+i18n catalog policy PASS: 5976 Thai keys; bounded English pilot; literal exceptions checked
+Keycloak locale export PASS: 8 files; native placeholders and FTL retained
+backend architecture ok
+
+[v4.7.0 / test]
+ Test Files  656 passed | 5 skipped (661)
+      Tests  10265 passed | 53 skipped (10318)
+   Start at  22:11:03
+   Duration  1009.76s (tests 46%, environment 23%, import 19%, setup 7%, transform 5%)
+
+[v4.7.0 / build]
+✓ built in 853ms
+
+[current-dirty / lint]
+i18n catalog policy PASS: 5976 Thai keys; bounded English pilot; literal exceptions checked
+Keycloak locale export PASS: 8 files; native placeholders and FTL retained
+backend architecture ok
+
+[current-dirty / test]
+ Test Files  656 passed | 5 skipped (661)
+      Tests  10266 passed | 52 skipped (10318)
+   Start at  22:29:47
+   Duration  796.10s (tests 46%, environment 25%, import 18%, setup 7%, transform 4%)
+
+[current-dirty / build]
+✓ built in 961ms

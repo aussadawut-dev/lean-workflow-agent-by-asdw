@@ -1,0 +1,18 @@
+{
+  "submodule_removed": true,
+  "target_records_removed": true,
+  "experiment_containers_removed": true,
+  "experiment_network_removed": true,
+  "experiment_image_tags_removed": true,
+  "private_runtime_removed": true,
+  "anonymous_database_volumes_removed": true,
+  "shared_build_caches_preserved": true,
+  "source_status_unchanged": true,
+  "source_status": "",
+  "retained_script_sha256": {
+    "timed_check.py": "619e6c8d0761198558d560b91fb9c68dceb6b181fcedb5dbd558a9a641b71d69",
+    "measure_overhead.py": "3a3745cea01b906a20513de51b371e57c8d84f1bd13193fa24fa5cef82b0c1b8",
+    "deploy_experiment.py": "b4ffea44ce5d2163e0ce86a2f348290ab23818eb64e06e5ff43c3087b94f99fe",
+    "cleanup_experiment.py": "7124957790e634bea1681fde5e33e8133d0b2df71de8ad2eebce7be08cde18c7"
+  }
+}

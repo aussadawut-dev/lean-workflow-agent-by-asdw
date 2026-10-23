@@ -1,0 +1,20 @@
+[
+  {
+    "path": ".lean/scripts/quality-gate.sh",
+    "identical": false,
+    "old_sha256": "ee1bbd7d8c8ec684486dff3c4cafda73acc2f455cd06bceea3ce145405f778e5",
+    "current_sha256": "d0c052f7124772c878419ba1cc161ba4b685591200312ed22bdade5f37240143"
+  },
+  {
+    "path": ".lean/scripts/gate_evidence.py",
+    "identical": true,
+    "old_sha256": "ebe9b2ae86db551fe1a103b26f03d52e3bcfb1b79162a0138fd53a8b3cdb5579",
+    "current_sha256": "ebe9b2ae86db551fe1a103b26f03d52e3bcfb1b79162a0138fd53a8b3cdb5579"
+  },
+  {
+    "path": ".lean/scripts/submodule.py",
+    "identical": false,
+    "old_sha256": "5ed01ca9a192445bdfd1306e71dbcc479bc2227955d5947bd3b58c074f7fab24",
+    "current_sha256": "65a28a24b879cd3d9906b537e3a518d0aba6122640b7d1cb423744484cf2f3c9"
+  }
+]

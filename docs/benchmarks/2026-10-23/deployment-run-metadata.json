@@ -1,0 +1,21 @@
+{
+  "plan": "local-deployment-plan.md",
+  "plan_sha256": "4d7a093217278a71696feb06831a12bc2fa3f42f6d2aa80dad672ad2a4f8ba6c",
+  "recorded_before_service_deployment_utc": "2026-10-23T15:54:12Z",
+  "authorization": "User requested local deploy/rollback, authorized self-managed test credentials and environment, sequential versions, and experimental submodule cleanup after retained results.",
+  "executor_sha256": "b4ffea44ce5d2163e0ce86a2f348290ab23818eb64e06e5ff43c3087b94f99fe",
+  "attempt_records": "deployment-results.json",
+  "artifact_records": "deployment-artifacts.json",
+  "configuration_references": {
+    "normal": ".agent-runtime/benchmark-20261023/deploy.env",
+    "failure_injection": ".agent-runtime/benchmark-20261023/deploy-bad.env",
+    "database": "Dedicated lean-benchmark-db-20261023 container, casetodian_benchmark database; no source database connection."
+  },
+  "secret_policy": "Only names and private paths retained; generated values are removed with private runtime. No source .env in images.",
+  "timing_scope": "Per-attempt elapsed time covers service replacement and verification after the pre-mutation attempt record; artifact builds and plan preparation are excluded.",
+  "interpretation": "A common mechanical deployment plan is exercised for both labels. Lean 4.7.0 has no lean-playbook. This does not evaluate autonomous agent deployment behavior or compare two deployment implementations.",
+  "initial_executor_sha256": "bef480308accb31210231f088eae686c1e62624bdaa21b20fc81b922f94a2b80",
+  "resume": "Retain already built pinned images, migrated isolated database and sentinel; retry only deployment after correcting the internal-only port-publishing preflight. Failed pilot retained separately.",
+  "network_design": "Internal backend/DB; web has separate ingress bridge and loopback binding. Backend readiness uses internal HTTP; web uses host HTTP.",
+  "configuration_preflight": "Required synthetic KEYCLOAK_API_AUDIENCE added after the 503 configuration failure; authorization assertions and application code unchanged."
+}

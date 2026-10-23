@@ -1,0 +1,22 @@
+[
+  {
+    "version": "v4.7.0",
+    "action": "deploy-A",
+    "release": {
+      "release": "A",
+      "revision": "7f76ac426784c3665e891a192cfd00d88af1af98",
+      "runtime_image": "sha256:ed6f1b6675b9d538c4726d2e35fc5c4f63d0505f020f4e0805df5da83bbd6367",
+      "web_image": "sha256:8b2b160e6e391bbc67b5ec96e4a2c3af2af94e0f96b03565094cb8ef6e5482d1",
+      "backend_sha256": "80d589c610da50cf5e4d0b64995a58d9fc134e5f8e699cb4f65285a662c6e735",
+      "web_sha256": "a0ce860adc970a6fe89e7418f011106b8ea09e4ae25f52f09fa22c58e8accd0e",
+      "smoke_asset": "/assets/index-CIH27t70.js",
+      "smoke_asset_sha256": "5aef8aef4a36ba22492138c3297ecc312c87d49abd8c5843f9a89868bf1568c4"
+    },
+    "recovery_image": "sha256:ed6f1b6675b9d538c4726d2e35fc5c4f63d0505f020f4e0805df5da83bbd6367",
+    "start_utc": "2026-10-23T15:57:46Z",
+    "outcome": "failed-infrastructure-preflight",
+    "failure_injection": false,
+    "failure": "Docker internal-only network leaves published ports empty, confirmed by a separate explicit-port HTTP probe.",
+    "application_container_state": "running"
+  }
+]

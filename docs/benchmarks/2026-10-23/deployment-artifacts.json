@@ -1,0 +1,22 @@
+[
+  {
+    "release": "A",
+    "revision": "7f76ac426784c3665e891a192cfd00d88af1af98",
+    "runtime_image": "sha256:ed6f1b6675b9d538c4726d2e35fc5c4f63d0505f020f4e0805df5da83bbd6367",
+    "web_image": "sha256:8b2b160e6e391bbc67b5ec96e4a2c3af2af94e0f96b03565094cb8ef6e5482d1",
+    "backend_sha256": "80d589c610da50cf5e4d0b64995a58d9fc134e5f8e699cb4f65285a662c6e735",
+    "web_sha256": "a0ce860adc970a6fe89e7418f011106b8ea09e4ae25f52f09fa22c58e8accd0e",
+    "smoke_asset": "/assets/index-CIH27t70.js",
+    "smoke_asset_sha256": "5aef8aef4a36ba22492138c3297ecc312c87d49abd8c5843f9a89868bf1568c4"
+  },
+  {
+    "release": "B",
+    "revision": "592a15eba686ef2955cf5d3874c82df0baf8a2f4",
+    "runtime_image": "sha256:0cfb70477130cc765f640576e3bb42c85ace3ad7344d4b71b65c2bf173bc95c4",
+    "web_image": "sha256:2fa8c1f897296817bc1f635ae10a69d2cbb2679d26260e394c8a8330ca601aa2",
+    "backend_sha256": "3b41c13be0e48a6be8c580848acaebf1299006b3425af760c33be3419194d70b",
+    "web_sha256": "32d777c0592ecd9604e1460c7dd8ce8a4e96b8656686e658d74d16cc24fb0125",
+    "smoke_asset": "/assets/index-CdmyCDDW.js",
+    "smoke_asset_sha256": "a6f20b58cd831dead7f8c5a099acc64081a1c20de52055d2a341b5d2359bcf60"
+  }
+]

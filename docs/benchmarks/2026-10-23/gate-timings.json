@@ -1,0 +1,77 @@
+{
+  "method": "Identical application checkout; sequential versions, one full uncached gate each; lint, single-worker full tests, build; dependencies and initial build prepared before measurement. Common PROJECT gate replaces repository self-tests in isolated fixtures. Measures gate wrapper plus app workload; not target routing. Shared host and fixed order limit causal conclusions; repeated synthetic overhead/cache checks are separate.",
+  "runs": [
+    {
+      "version": "v4.7.0",
+      "repeat": 1,
+      "seconds": 1215.147,
+      "exit_code": 0,
+      "child_cpu_seconds": 1081.317,
+      "load_average_start": [
+        7.1611328125,
+        7.36572265625,
+        8.71533203125
+      ],
+      "cache_tree": false,
+      "log": "gate-v4.7.0-1.log"
+    },
+    {
+      "version": "current-dirty",
+      "repeat": 1,
+      "seconds": 914.858,
+      "exit_code": 0,
+      "child_cpu_seconds": 944.232,
+      "load_average_start": [
+        6.466796875,
+        9.64794921875,
+        11.0810546875
+      ],
+      "cache_tree": false,
+      "log": "gate-current-dirty-1.log"
+    }
+  ],
+  "components": [
+    {
+      "version": "v4.7.0",
+      "repeat": 1,
+      "phase": "lint",
+      "seconds": 104.712,
+      "exit_code": 0
+    },
+    {
+      "version": "v4.7.0",
+      "repeat": 1,
+      "phase": "test",
+      "seconds": 1011.428,
+      "exit_code": 0
+    },
+    {
+      "version": "v4.7.0",
+      "repeat": 1,
+      "phase": "build",
+      "seconds": 98.26,
+      "exit_code": 0
+    },
+    {
+      "version": "current-dirty",
+      "repeat": 1,
+      "phase": "lint",
+      "seconds": 15.034,
+      "exit_code": 0
+    },
+    {
+      "version": "current-dirty",
+      "repeat": 1,
+      "phase": "test",
+      "seconds": 796.858,
+      "exit_code": 0
+    },
+    {
+      "version": "current-dirty",
+      "repeat": 1,
+      "phase": "build",
+      "seconds": 102.55,
+      "exit_code": 0
+    }
+  ]
+}

@@ -1,0 +1,677 @@
+[
+  {
+    "path": ".claude/agents/reviewer.md",
+    "sha256": "1c385b37782215678c462e3213a7f8a40a55d500bf543115300710d114e3f4ad",
+    "bytes": 300
+  },
+  {
+    "path": ".claude/hooks/quality-gate.sh",
+    "sha256": "b2224e95093a470230d63c667918f1039cf3feabdc8f5404f6b39d7c69b52dd7",
+    "bytes": 1536
+  },
+  {
+    "path": ".claude/hooks/session-start.sh",
+    "sha256": "30626be315fce7282e11f408dd8042503131807e36a0afd06e0f019fb58831cf",
+    "bytes": 1899
+  },
+  {
+    "path": ".claude/settings.json",
+    "sha256": "e92515e1ec19c01740cdbf13df807c5fe9178bc40fb35fbbd9160219ec453070",
+    "bytes": 1211
+  },
+  {
+    "path": ".codex/hooks/quality_gate.py",
+    "sha256": "ffba116c177a842230cdc1da5af459cdd027a2c8106ad0bf6138e79d4c3aa26d",
+    "bytes": 9091
+  },
+  {
+    "path": ".codex/hooks.json",
+    "sha256": "d8fdcf3cce3a6d3e8a00ffb69f6748214d3e330f86cac791e9bbd9a61124fb66",
+    "bytes": 1232
+  },
+  {
+    "path": ".codex/quality-gate.json",
+    "sha256": "b229782ef7121ebcdfe7abb8d40c5d225b4888a000cef44e47d6806532ea7f0b",
+    "bytes": 38
+  },
+  {
+    "path": ".github/pull_request_template.md",
+    "sha256": "c3668ccb11dbd5a6e066ee44b89b4186fbda755e0d1c07129c0537d9a5dfc4cb",
+    "bytes": 682
+  },
+  {
+    "path": ".github/workflows/lean-workflow.yml",
+    "sha256": "4c6d5a74f5757b934f1340f1e381dcc3ccf22d960feaeeff27d4d80900160d85",
+    "bytes": 2008
+  },
+  {
+    "path": ".gitignore",
+    "sha256": "e3b5c17e4d79a58aecfe07dfaafcdae5a554d44ffef6d7a647baa1009130d39d",
+    "bytes": 372
+  },
+  {
+    "path": ".lean/CHANGELOG.md",
+    "sha256": "b2a1bc690bbc0c25017c2ea23528a87ffa66e8b68e6abc963460a1278021bb66",
+    "bytes": 98583
+  },
+  {
+    "path": ".lean/CUSTOMIZING.md",
+    "sha256": "5af7168955f1ff54775afa920a6373cf8d3caa62c2f76610a7df156025cbffda",
+    "bytes": 14403
+  },
+  {
+    "path": ".lean/LICENSE",
+    "sha256": "0c9f58e13615633c392ceaeee4567a5ba3352287b153c21751fe853a5effde2e",
+    "bytes": 1078
+  },
+  {
+    "path": ".lean/OPTIONAL.md",
+    "sha256": "b1c6296c6bb3b28eaa6d39b10e102a6c689bfca004567693bd2ad9e7b79ea291",
+    "bytes": 5789
+  },
+  {
+    "path": ".lean/PROJECT.md",
+    "sha256": "a0667899b1b3651716d94d88c238c2e2b6d77dd7d36be43552d6e38458dbc0d5",
+    "bytes": 4066
+  },
+  {
+    "path": ".lean/README.md",
+    "sha256": "4b22a2e1edeb1069125cd1c35ad8a99ed7e552aa5b3dd4dbaac672dd70ce3299",
+    "bytes": 3084
+  },
+  {
+    "path": ".lean/assets.json",
+    "sha256": "698589a4258800685ad2a9669d3b58333f33b18e39e401373002bd294063a621",
+    "bytes": 4795
+  },
+  {
+    "path": ".lean/config.json",
+    "sha256": "d2b54635d77ce1d5b92931df7c3934470580ab16e0a694623ce768242b26b0e1",
+    "bytes": 73
+  },
+  {
+    "path": ".lean/policy/CONTEXT.md",
+    "sha256": "e8e4008b935240ddf514109dcedbce229798a76bdabb4c354dbcf8cd363da68c",
+    "bytes": 4341
+  },
+  {
+    "path": ".lean/policy/CONTRACTS.md",
+    "sha256": "b8fb5659e1e9f2d753de198a475a1b181f769995fef352162cfc35199c96ff17",
+    "bytes": 5634
+  },
+  {
+    "path": ".lean/policy/MODELS.md",
+    "sha256": "c37257daa6196703ce0905049a1d2fff1b328bfd31b10f6c307c33a14d0926f8",
+    "bytes": 8254
+  },
+  {
+    "path": ".lean/policy/QUALITY.md",
+    "sha256": "1b0efbee36a105dba69d2d973f98336be1c7634ec77e369e352883660b0e7655",
+    "bytes": 11564
+  },
+  {
+    "path": ".lean/policy/RECOVERY.md",
+    "sha256": "fab6acc761c7f89ad92cee27abe1cacb8d74df7d398c9625730542b69ea1f4cf",
+    "bytes": 1251
+  },
+  {
+    "path": ".lean/policy/REVIEW.md",
+    "sha256": "2a7675357f4b41d82c46f7bd58040fdf9d27694b5383defc657388ed3c5c610b",
+    "bytes": 4740
+  },
+  {
+    "path": ".lean/policy/SKILL-EFFORT.md",
+    "sha256": "960c18207da5bf5ad1cd86cb4dca401f622cbe857df711ca433ffdb4329e4989",
+    "bytes": 4942
+  },
+  {
+    "path": ".lean/policy/TESTING.md",
+    "sha256": "9bf9e13e295f35355fb2e9d40374ce82f4317425d666f1a3643d17bebeee1ee2",
+    "bytes": 666
+  },
+  {
+    "path": ".lean/policy/TOOLS.md",
+    "sha256": "c68f3aeabc96f9458a50e1d93536501f1c39227ce8c53d6896e897f3a514583d",
+    "bytes": 1022
+  },
+  {
+    "path": ".lean/policy/WORKFLOW.md",
+    "sha256": "a3a9dcee1265bb609cf7a2cef331efdab86b39d262008cc9b478c2514e0ac901",
+    "bytes": 7550
+  },
+  {
+    "path": ".lean/roles/reviewer.md",
+    "sha256": "d17c6bd3b51fb3f9f00dc9b06cc60a7a101c2b2d88e69e5024f37315d68384fa",
+    "bytes": 2226
+  },
+  {
+    "path": ".lean/scripts/check-structure.sh",
+    "sha256": "35671b9d5f6e8225f5185fcfcf10aa6ba69c51b8284c5ea2c9d8f83fe34e90fa",
+    "bytes": 5537
+  },
+  {
+    "path": ".lean/scripts/check_structure.py",
+    "sha256": "3539cd5c2451ba5621728dcda87434aac4eead5f0b7a907c9b2436d0040629d4",
+    "bytes": 10076
+  },
+  {
+    "path": ".lean/scripts/clean_repo.py",
+    "sha256": "4bae94724cde27c2b980525150591b1f208fbe8c4b364a5dd7f8937ab26f8432",
+    "bytes": 21340
+  },
+  {
+    "path": ".lean/scripts/contract_guard.py",
+    "sha256": "5858d2a0b17c14b97af080e29b02f3fbce7180528e1ed738926e94a63366c275",
+    "bytes": 44608
+  },
+  {
+    "path": ".lean/scripts/gate_evidence.py",
+    "sha256": "ebe9b2ae86db551fe1a103b26f03d52e3bcfb1b79162a0138fd53a8b3cdb5579",
+    "bytes": 26592
+  },
+  {
+    "path": ".lean/scripts/gate_lock.py",
+    "sha256": "64ab9be0ef59ff2f77d5ac71144895fa9408bb75159a0341234a40662d856f88",
+    "bytes": 2176
+  },
+  {
+    "path": ".lean/scripts/gate_mode.py",
+    "sha256": "d210eb89036b74e5ad408446bf3ed0d07988c3256b1e26efb0aa2da8f2a916da",
+    "bytes": 6536
+  },
+  {
+    "path": ".lean/scripts/model_catalog.py",
+    "sha256": "d19ccc429e5ab40d5f4bf67fdc68526abe118fd32e454d17b4fefbb2b924f45d",
+    "bytes": 10650
+  },
+  {
+    "path": ".lean/scripts/model_drift.py",
+    "sha256": "dd7fb86418e662b90c92543f6ba0d25c89ed0ac60156983fda2895c5f66e19b7",
+    "bytes": 4690
+  },
+  {
+    "path": ".lean/scripts/quality-gate.sh",
+    "sha256": "d0c052f7124772c878419ba1cc161ba4b685591200312ed22bdade5f37240143",
+    "bytes": 13971
+  },
+  {
+    "path": ".lean/scripts/shared_assets.py",
+    "sha256": "89f9be786273094ae264364762d8bc1f73a8f71abc008ab14cb86652c9faad1a",
+    "bytes": 6541
+  },
+  {
+    "path": ".lean/scripts/skill_effort.py",
+    "sha256": "42f972d6f3cd2cba08f0ccc2074125811bcc036216a8b14ffc8edd77c3f6f8a9",
+    "bytes": 4292
+  },
+  {
+    "path": ".lean/scripts/skill_pack.py",
+    "sha256": "317185e84486f18c8d18c05433f704cf6cb7b41c206d22b5b9dd4531a7ae26f9",
+    "bytes": 2567
+  },
+  {
+    "path": ".lean/scripts/submodule.py",
+    "sha256": "65a28a24b879cd3d9906b537e3a518d0aba6122640b7d1cb423744484cf2f3c9",
+    "bytes": 16323
+  },
+  {
+    "path": ".lean/scripts/takeover.py",
+    "sha256": "bbc06ec6103f8b75c9fb95128cb90bc5d6090a14b8e8ea30d6fbf207ccda2a80",
+    "bytes": 55244
+  },
+  {
+    "path": ".lean/scripts/update_workflow.py",
+    "sha256": "75bd21ce089777f64962fe264dc45feaa0ef870d962c53f2e8a95692466afce4",
+    "bytes": 6951
+  },
+  {
+    "path": ".lean/scripts/workflow.py",
+    "sha256": "d52914204a63a2a285b0407ae880060b4a11233095c58c4241eb4464536ae281",
+    "bytes": 43537
+  },
+  {
+    "path": ".lean/skills/lean-agents/SKILL.md",
+    "sha256": "2179b5a2504afb7626963cee071a693f99c75b34280cbe9f510e8f71247300f1",
+    "bytes": 8009
+  },
+  {
+    "path": ".lean/skills/lean-audit/SKILL.md",
+    "sha256": "83aa0e258a114f7b2f3c6c26cd1c78e5d25c4fb97d51152c29e89a5247082c8a",
+    "bytes": 5168
+  },
+  {
+    "path": ".lean/skills/lean-audit/references/scenarios.md",
+    "sha256": "8617c2cf71bf86f44123798ad67a6fbe052a0e1ab4cb31440f6da1a6ab2b53b2",
+    "bytes": 2869
+  },
+  {
+    "path": ".lean/skills/lean-catalog/SKILL.md",
+    "sha256": "f71d52fd5503ee643de342a0555c26b2cfdb756fe8f63df04816eaa800e4c44c",
+    "bytes": 3656
+  },
+  {
+    "path": ".lean/skills/lean-catalog/references/catalog.md",
+    "sha256": "2b19fc0b9ac6fb82e920b66c8ba25b8486e6e7f3f4d8089917cec7d6645e0e07",
+    "bytes": 4941
+  },
+  {
+    "path": ".lean/skills/lean-compress/SKILL.md",
+    "sha256": "62e9eb1c0bcf4cf4e323062fab5be267754023fc5520d6305065657eb99204a6",
+    "bytes": 5701
+  },
+  {
+    "path": ".lean/skills/lean-effort/SKILL.md",
+    "sha256": "5c95f2055c437b34e98350b6d5ee3298cec667a58232d2c396dbb2c6a3b884ea",
+    "bytes": 1690
+  },
+  {
+    "path": ".lean/skills/lean-gate/SKILL.md",
+    "sha256": "f5c3ae34386cbd845c46f168650cbfb9a32a536118113e8bca70c6b31fa11484",
+    "bytes": 2728
+  },
+  {
+    "path": ".lean/skills/lean-grill/SKILL.md",
+    "sha256": "85482c1dbd10339bce4ffe74766e60943ab7218a184efd263f377b3bfd9a6ad6",
+    "bytes": 6796
+  },
+  {
+    "path": ".lean/skills/lean-init/SKILL.md",
+    "sha256": "ce35d12617d36403d46634efa122e81158201f6fc33514717120542be31ad539",
+    "bytes": 4972
+  },
+  {
+    "path": ".lean/skills/lean-pattern/SKILL.md",
+    "sha256": "1adcdede543683109d23da744fbfebb5bac3c3ee056a34fa0cd97418ac3da252",
+    "bytes": 4380
+  },
+  {
+    "path": ".lean/skills/lean-playbook/SKILL.md",
+    "sha256": "374c43b91ce1433e47daf7adf7b2e08edec1dded1c1f6e5464b58d02726fd2aa",
+    "bytes": 8295
+  },
+  {
+    "path": ".lean/skills/lean-prune/SKILL.md",
+    "sha256": "6d02bc7e268f163b5bfb42b08909ca7ddc910a72bbb6ccb2d3fee4e314ad0f18",
+    "bytes": 4437
+  },
+  {
+    "path": ".lean/skills/lean-prune/references/tooling.md",
+    "sha256": "f48d643cd2fa6558b1b0b1b4039dbef50b24ecfd52feb94292cc8895d5b95b48",
+    "bytes": 4255
+  },
+  {
+    "path": ".lean/skills/lean-research/SKILL.md",
+    "sha256": "eb1fe1bf1c7b9206cf358d4497b27888a52db24ea3fe3f0179a038e89881e2de",
+    "bytes": 6910
+  },
+  {
+    "path": ".lean/skills/lean-review/SKILL.md",
+    "sha256": "78f6ec050f8dd0e2900e276edfcef1a7aae46477ec30c18fdfb5fb8c5c864b59",
+    "bytes": 2747
+  },
+  {
+    "path": ".lean/skills/lean-scope/SKILL.md",
+    "sha256": "7a33517cf76120224702de42651e9eee0794df85b197a646003e499f9bb7b91e",
+    "bytes": 7078
+  },
+  {
+    "path": ".lean/skills/lean-takeover/SKILL.md",
+    "sha256": "84da60bfc777c68d41940774febc64dc1922dd85740ea20511d7ad65d6096050",
+    "bytes": 7904
+  },
+  {
+    "path": ".lean/skills/lean-takeover/references/tooling.md",
+    "sha256": "b4ab10af6f413e72132b1f4dffb8e8b8d9c2c3ae16f91ffec020d8356e3e9b53",
+    "bytes": 15350
+  },
+  {
+    "path": ".lean/skills/lean-target/SKILL.md",
+    "sha256": "a01588b0e4fea74c0f3cdeb1cabe684c190543f4ae568526d8c20ead42f47ea4",
+    "bytes": 3621
+  },
+  {
+    "path": ".lean/skills/lean-task/SKILL.md",
+    "sha256": "b4ebbf85aa952c13c20245338ed5400969c2f1a5a4cbd6cbf8aa385166455adf",
+    "bytes": 3313
+  },
+  {
+    "path": ".lean/skills/lean-task/references/context-scenarios.md",
+    "sha256": "9313b84f579a6073ba50ee90be920f849ca9e71ea7e56fee664e3ed55c0dbd7b",
+    "bytes": 3807
+  },
+  {
+    "path": ".lean/skills/lean-update/SKILL.md",
+    "sha256": "7e4ffea45343dcffeb980743d35a9468da078c0a9ac4f174b5f61fb48939dc33",
+    "bytes": 4258
+  },
+  {
+    "path": ".lean/skills/lean-update/references/tooling.md",
+    "sha256": "4fc537ebfdf4c822c5f67691d38b10a28bf8c5703373bce3390f448b8377e6be",
+    "bytes": 3572
+  },
+  {
+    "path": ".lean/templates/audit-finding.md",
+    "sha256": "ede76f869a000407d88b10642c45f73967ef59b2a56c70cd3a4dceb35acb08e4",
+    "bytes": 1888
+  },
+  {
+    "path": ".lean/templates/deployment-playbook.md",
+    "sha256": "111eddf8bbda73b5853ed55dfae0bee9f69828b68fc6634b261256569cb1748a",
+    "bytes": 2400
+  },
+  {
+    "path": ".lean/templates/deployment-release.md",
+    "sha256": "d264769134d2f3d6817b5da5ec24d5e6087b48ca91da4a5f3cc9d8cc1f46800a",
+    "bytes": 1389
+  },
+  {
+    "path": ".lean/templates/project-standard.md",
+    "sha256": "02f1ae087e6083f42f52d59461c7fa597fc827f384de8aa3eafe551760fc869c",
+    "bytes": 1574
+  },
+  {
+    "path": ".lean/templates/queue-item.json",
+    "sha256": "f53810aceeeec79ec5f365abeed3052b4a2ad0cf1be0dcaecc09b688fa7ca31f",
+    "bytes": 174
+  },
+  {
+    "path": ".lean/templates/takeover-plan.json",
+    "sha256": "743f3b3e7b381cf8e8b6bdc940bc2ff6249b93bc06a5039023993b146adab07e",
+    "bytes": 327
+  },
+  {
+    "path": ".lean/templates/tracker.md",
+    "sha256": "ef3e284c5de58bfe3f76f90bebc626d6e39f4ebbd8b2d28522fe208e258e3c96",
+    "bytes": 608
+  },
+  {
+    "path": ".lean/tests/run_tests.py",
+    "sha256": "6f874a69f3afb1e121509f2273f15bbc85b133e7cafb5a0826bbb3020afc54e5",
+    "bytes": 4906
+  },
+  {
+    "path": ".lean/tests/test-hooks.sh",
+    "sha256": "7990e5efc478ffa9f16e52cbfbb2c9ab7accd38b641b2158666b94c66f3bf996",
+    "bytes": 37388
+  },
+  {
+    "path": ".lean/tests/test_clean_repo.py",
+    "sha256": "18cc536009af2401daf54dc8a293893d7d08a6bd4b766af9ab2ef7588ab0c5c7",
+    "bytes": 16513
+  },
+  {
+    "path": ".lean/tests/test_contract_guard.py",
+    "sha256": "b7165a945f571aaedfbe32500fd5cfec456a58231198b5c280225d11b91c965d",
+    "bytes": 52505
+  },
+  {
+    "path": ".lean/tests/test_downgrade.py",
+    "sha256": "2b3aa26082071867831f5a363a8c94d4bef57635a17c9a520b1dae03b175aec9",
+    "bytes": 13108
+  },
+  {
+    "path": ".lean/tests/test_e2e.py",
+    "sha256": "d4fcc8273860849a2c1ce05b90b0eece680e0bfa1fa855cf2636504ab0a50f46",
+    "bytes": 5749
+  },
+  {
+    "path": ".lean/tests/test_gate_integrity.py",
+    "sha256": "62ef43c34b1b9467b3665e768a7d46dd67693839072d6f3f487157203fdffc89",
+    "bytes": 67279
+  },
+  {
+    "path": ".lean/tests/test_gate_lock.py",
+    "sha256": "82a230641c7b1816572eea66f6c6dbbfcaecac4d6a28d3e738cb7e0e1239893a",
+    "bytes": 6554
+  },
+  {
+    "path": ".lean/tests/test_gate_mode.py",
+    "sha256": "a287a2c05a84c1ffd160bdb16aec278c6ce5c06829a6bd83683754678b32f58a",
+    "bytes": 16936
+  },
+  {
+    "path": ".lean/tests/test_guards.py",
+    "sha256": "1399425fb878e637e6615e67864cdb0a8bf1c3b7360156ee360ea9420b453fd6",
+    "bytes": 5525
+  },
+  {
+    "path": ".lean/tests/test_model_catalog.py",
+    "sha256": "c164be612261f06cde2f945c1503b9521c7815f92e9e4107a2bfc8c7e1194560",
+    "bytes": 15347
+  },
+  {
+    "path": ".lean/tests/test_model_drift.py",
+    "sha256": "b114315594d7ffb018762b4e63fbef7ace462682ce62c2240e0674e16cdb2a3e",
+    "bytes": 7968
+  },
+  {
+    "path": ".lean/tests/test_modes.py",
+    "sha256": "b61c97b4d0e858fc594d43af39910769da887b023e5429e7115769651c636e60",
+    "bytes": 40694
+  },
+  {
+    "path": ".lean/tests/test_queue_history.py",
+    "sha256": "0034e93504b007ec5db4f36305eaa4a40f67df4eea72023a69f7ef5e418473e0",
+    "bytes": 16509
+  },
+  {
+    "path": ".lean/tests/test_run_tests.py",
+    "sha256": "942af5367dc38af12f466ab3698ff2abde0512c85350b235c6c0c93a965ba20e",
+    "bytes": 8343
+  },
+  {
+    "path": ".lean/tests/test_shared_assets.py",
+    "sha256": "5b40dcb23279173e00613708d25aa231c1d6be1fc44969261c03a468c0c41e46",
+    "bytes": 11724
+  },
+  {
+    "path": ".lean/tests/test_skill_effort.py",
+    "sha256": "1bc9617078e902b9fef911d88f485c8440bcf27d0c9e08437dd5ebfea86f420a",
+    "bytes": 5607
+  },
+  {
+    "path": ".lean/tests/test_skill_pack.py",
+    "sha256": "30c87487a2f02f0b95f7f40771fd240fea13dc1688bb879f02368676995fed90",
+    "bytes": 8688
+  },
+  {
+    "path": ".lean/tests/test_structure.py",
+    "sha256": "4dc6673ad3dc0b78747004187d79cded4af7c544810a353c1ef536c8bb173de3",
+    "bytes": 18784
+  },
+  {
+    "path": ".lean/tests/test_submodule.py",
+    "sha256": "51f2501974d2a8aa696db71fd4c61895565681c9015cdefefa5f6abb0400eb05",
+    "bytes": 20142
+  },
+  {
+    "path": ".lean/tests/test_takeover.py",
+    "sha256": "790d8fc5dd5147a3fef2b8a5a8eb3c6f2bae94094e9bb4ea291ba3e3f5098190",
+    "bytes": 73379
+  },
+  {
+    "path": ".lean/tests/test_template.py",
+    "sha256": "bdf94808df88f5e81bac75511694fbcdfd352971b1afe28a38739a3ac05a9cb8",
+    "bytes": 13694
+  },
+  {
+    "path": ".lean/tests/test_update_workflow.py",
+    "sha256": "ac7df225839729cbe3df2c3bda24a41b5e7e55c508cee8a43b57f4a0e952130e",
+    "bytes": 10766
+  },
+  {
+    "path": "AGENTS.md",
+    "sha256": "cc58fa7d4cbb6de7fbe9728818b565bdf31725b37102784542dc738ce365c2aa",
+    "bytes": 7115
+  },
+  {
+    "path": "CLAUDE.md",
+    "sha256": "a9b77a93a2936b192acb9e3ef2230bacee203e61f66aae163ad19351ceb4beb7",
+    "bytes": 659
+  },
+  {
+    "path": "CONTRIBUTING.md",
+    "sha256": "58c8a00376afea1060c8ee3637f3937757d39fe0c7a2cd4c0523680ab2830e5e",
+    "bytes": 2356
+  },
+  {
+    "path": "LICENSE",
+    "sha256": "0c9f58e13615633c392ceaeee4567a5ba3352287b153c21751fe853a5effde2e",
+    "bytes": 1078
+  },
+  {
+    "path": "README.md",
+    "sha256": "7e6a3e34ec3546a93ceb3828b5677932dadcd9dd9e6770e82d71901cc25ddfa7",
+    "bytes": 14346
+  },
+  {
+    "path": "docs/getting-started.md",
+    "sha256": "3f807d8be65e83821beee997f64f095e003a27204c2bdbf3bd3a518b618c4a9c",
+    "bytes": 4225
+  },
+  {
+    "path": "docs/history/agent-workflow/TCK001-lean-improvement-plan.md",
+    "sha256": "003db164c20561fb68c1a5428a15acf5a92ad9201e6d9eb58a6d9b53bc06a3c8",
+    "bytes": 21029
+  },
+  {
+    "path": "docs/history/measurements/2026-10-22-gate-speed.md",
+    "sha256": "28206654e6aa54a59d84c778d9355a9948be693b42462d1193d0ea8ee4122fbb",
+    "bytes": 6517
+  },
+  {
+    "path": "docs/maintenance.md",
+    "sha256": "c9e704df227bc2118f91dac0f272794613219b1240a4d9b2c0b4dde551eaa1b6",
+    "bytes": 4888
+  },
+  {
+    "path": "docs/models.md",
+    "sha256": "800e9d0c5a38f803cff897eba758a032db01179fc9e63b42ce267edf6de4a890",
+    "bytes": 8094
+  },
+  {
+    "path": "docs/quality-and-runtime.md",
+    "sha256": "8792b93030ccee980042fee7623f24dbd30eca6cfb733eb27dcd0860d30eec87",
+    "bytes": 8021
+  },
+  {
+    "path": "docs/queue.md",
+    "sha256": "e052368c145d75ffa587df545ab694ab914ab61b4253e95f7389af0faff28ab1",
+    "bytes": 5277
+  },
+  {
+    "path": "docs/repository-guide.md",
+    "sha256": "9f35069ba0f5e74b984b5d928f3c0f645fd6f9bab34dffe22f8c819289acebbf",
+    "bytes": 5497
+  },
+  {
+    "path": "docs/skills.md",
+    "sha256": "b3e16a7872331eaa297aecf8d6e659eb522adfd46e64bc22b2076de2eb1b80f5",
+    "bytes": 11811
+  },
+  {
+    "path": "docs/spawn.md",
+    "sha256": "514fc0ea17766c23a564339b0baefaaa7ce75838e556910dabdc97765ab6b58e",
+    "bytes": 6269
+  },
+  {
+    "path": "docs/submodules.md",
+    "sha256": "f4b18f2356f6e7a1be0bf01988555bd08080843fd3a38ab7c3e3ebb9004362fe",
+    "bytes": 2490
+  },
+  {
+    "path": "docs/takeover-workflow.md",
+    "sha256": "a01e5793f17a9540f8c93104a24c4eaa651efc9a40fb96d25fbb44e949e64e08",
+    "bytes": 4264
+  },
+  {
+    "path": "docs/tracker.md",
+    "sha256": "5cc42028dfb6a4d47d6688285e6324c5b859f71e295676185d5e0232088445d0",
+    "bytes": 3833
+  },
+  {
+    "path": "docs/workflow-development.md",
+    "sha256": "8021afd01907cb1aa4d575735371e3805e2bc897078e54fce80f6666b99e882c",
+    "bytes": 8997
+  },
+  {
+    "path": "docs/workflow-overview.md",
+    "sha256": "003ccf945231cb6a71fa19872417f93e266c0714eef6b0795902e835cd1fd9d3",
+    "bytes": 3379
+  },
+  {
+    "path": "evals/README.md",
+    "sha256": "ae583790c6b1ac05ca69a82c452315e3569f17b88e860e9dc40bfa9e5063adb1",
+    "bytes": 8971
+  },
+  {
+    "path": "evals/cases.py",
+    "sha256": "08eacde2ac3842097b83b62a2092fe6ff2b0e22fd523736a138becdf43ef54d3",
+    "bytes": 20726
+  },
+  {
+    "path": "evals/harness.py",
+    "sha256": "340e0804b13754d626f3b721629afa8b24a5554a8f77ec4b34f0dee7c0d94ed4",
+    "bytes": 19410
+  },
+  {
+    "path": "evals/measure.py",
+    "sha256": "0250d300de1253e7e8622075bb47cd2a92d84e102de014f1fa4d9659f77fe657",
+    "bytes": 12769
+  },
+  {
+    "path": "evals/measurements/README.md",
+    "sha256": "032a66446f66867dc7d52adf1041ee668e62867e814bdf8bc75e29d396cd6050",
+    "bytes": 2074
+  },
+  {
+    "path": "evals/measurements/synthetic-baseline-1.json",
+    "sha256": "3da78fd8ef5517354d2dcf506e10b9a4af386ac3dced18fec7bd594ba4f7073c",
+    "bytes": 334
+  },
+  {
+    "path": "evals/measurements/synthetic-baseline-2.json",
+    "sha256": "75f0aa3a4830362d184bd940b39fcd3b5e489e43bb24e35ca4a4aa26d0333c1b",
+    "bytes": 340
+  },
+  {
+    "path": "evals/measurements/synthetic-local-1.json",
+    "sha256": "0e3d3a4872251913e2046a99b0327efb4b09500595f5e6597fb6773f5eecd02f",
+    "bytes": 336
+  },
+  {
+    "path": "evals/measurements/synthetic-trimmed-1.json",
+    "sha256": "ee1b5608a5ecce9ccca3e49a69375e9eac7f7f8f700c8d48c736f9194d6e0dc3",
+    "bytes": 332
+  },
+  {
+    "path": "evals/measurements/synthetic-trimmed-2.json",
+    "sha256": "fe248496f778a256ddc04ba7511bac7870de27375da88bdd8b4e4332f0e7cdaa",
+    "bytes": 332
+  },
+  {
+    "path": "evals/run_evals.py",
+    "sha256": "371754d2819f7d79b044856aa7fadda424517d8362a01362acdc1b3d4ecf5f4d",
+    "bytes": 8185
+  },
+  {
+    "path": "evals/test_harness.py",
+    "sha256": "db47e1474c781c9372d4ca50556c4ec121f3f89ea93acaa4d09bb40802338d5c",
+    "bytes": 42663
+  },
+  {
+    "path": "evals/test_measure.py",
+    "sha256": "ce773d5a13beee8e3f116677c1500d66b245dcb4e0e0ac32c428c9464c7345ce",
+    "bytes": 8581
+  },
+  {
+    "path": "tools/check_commit_attribution.py",
+    "sha256": "12a41cc353cccda0c6c9d9383e4a24108b0b23a2202f65be150a423f671503d9",
+    "bytes": 1867
+  },
+  {
+    "path": "tools/test_check_commit_attribution.py",
+    "sha256": "748f8f6291ad4bd1ac193fa25a264e21115ef9a5a22a08d850e87d17f198d683",
+    "bytes": 2680
+  }
+]

@@ -29,7 +29,7 @@ git init
 
 Open the project in Claude Code and run `/lean-init`, or use `$lean-init` in Codex. It reads real project facts, records your mode and execution choice, and helps fill `.lean/PROJECT.md`.
 
-Both runtimes discover skills through links to `.lean/skills/`. Nine core skills are enabled by default. Run `python3 .lean/scripts/skill_pack.py enable` to expose the eight optional skills, then reload the runtime's skill list. `disable` removes only the optional discovery links. See [.lean/OPTIONAL.md](../.lean/OPTIONAL.md).
+Both runtimes discover skills through links to `.lean/skills/`. Nine core skills are enabled by default. Run `python3 .lean/scripts/skill_pack.py enable` to expose the nine optional skills, then reload the runtime's skill list. `disable` removes only the optional discovery links. See [.lean/OPTIONAL.md](../.lean/OPTIONAL.md).
 
 Edit skills at their canonical source. Adding a Lean skill also means registering its files and assigning it to core or optional discovery. If your runtime cannot discover a skill, ask the agent to read its `SKILL.md` and follow the procedure. Other agents can use `AGENTS.md` and the shared procedures manually; native integrations are supplied for Claude and Codex.
 

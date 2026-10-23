@@ -7,39 +7,48 @@ argument-hint: "<area and accepted scope/standards to audit>"
 
 # Lean Audit
 
-Apply `.lean/policy/SKILL-EFFORT.md` and state the effective intensity. This optional procedure reports findings; it adds no gate, scheduled audit or automatic remediation.
+Apply `.lean/policy/SKILL-EFFORT.md` and state the effective intensity. Inspect an existing area against accepted requirements; shipping-diff review belongs to `lean-review`. This procedure adds no gate, scheduled audit or automatic remediation.
 
 ## Bound the audit
 
-Read PROJECT, the requested scope/acceptance, applicable standards and accepted exceptions. Resolve submodule roots with `python3 .lean/scripts/submodule.py context` when applicable: inspect source and run relevant safe checks in `project_root`, keep authorized project records in `record_root`, and use procedures/templates in `workflow_root`. Reuse the owning tracker in tracker/full mode; in standard mode report in the conversation unless saving is requested or approved. Do not create a second workset or queue items merely to audit.
+Read PROJECT, requested scope, applicable standards and accepted exceptions under `.lean/policy/CONTEXT.md`. For submodules resolve `python3 .lean/scripts/submodule.py context`: code/checks in `project_root`, records in `record_root`, shared resources in `workflow_root`. Reuse the owning tracker in tracker/full; otherwise report in conversation unless saving is authorized. Create no extra workset or queue items.
 
-State the area, exclusions, baseline IDs/versions and source revision or working-tree state. Respect more specific accepted exceptions within their limits. If accepted documents conflict and precedence is unclear, send the affected decision to `lean-grill` rather than inventing precedence. Audit other independently settled areas meanwhile.
-
-If no accepted baseline exists, report that gap. `lean-pattern` may propose one, but newly researched best practices are recommendations, not retroactive requirements. Missing acceptance evidence is a verification gap; it is not by itself proof the implementation is wrong.
+State area, exclusions, baseline IDs/versions and inspected revision/working state. More specific accepted exceptions apply within their limits. Conflicting baselines with unclear precedence need Grill; continue independently settled areas. Without an accepted baseline, report the gap: `lean-pattern` may propose one, but new best practices are not retroactive requirements or proof of a defect.
 
 ## Gather and classify evidence
 
-1. Trace each applicable requirement to implementation and available tests/runtime evidence. Inspect relevant dependencies rather than assuming folder boundaries define behavior. Use existing checks appropriate to the area; report unrun checks and follow project gate-mode/authorization rules for a full gate. An audit does not authorize destructive checks, production writes or a new test infrastructure.
-2. Verify findings against actual source and behavior where possible. Separate observed behavior from inference. Static code cannot establish visual fidelity, keyboard usability or a live integration result; use relevant runtime evidence or mark those claims unverified. Report sampling boundaries and never generalize a sample into a whole-system pass.
-   - **Repository structure and boundaries:** check directory placement, module boundary and dependency direction rules, and misplaced or duplicate files against the accepted stack baseline. On legacy layouts where moving files could break imports, builds or intentional boundaries, do not reorganize silently; mark `NEEDS_DECISION` and ask via `lean-grill` before remediation.
-   - **i18n and per-locale language quality:** inspect both technical i18n (hardcoded user-facing strings, missing/orphan locale keys, and string concatenation that breaks word order or pluralization) and linguistic quality per locale (correct grammar and natural phrasing rather than literal word-for-word translation, terminology/glossary consistency across views, and consistent tone/politeness level). On existing projects where mixed terminology, legacy phrasing or locale choices may be intentional or changing copy could alter UX meaning, mark `NEEDS_DECISION` and ask through `lean-grill` before editing translations or code.
-3. Classify each result: `CONFORMS`, `DEVIATION`, `ACCEPTED_EXCEPTION`, `NEEDS_DECISION`, `UNVERIFIED`, or `IMPROVEMENT`. A `DEVIATION` needs an applicable accepted requirement and conflicting evidence. A suggested new best practice is `IMPROVEMENT`. An exception needs its approval reference and applicable limits.
-   Respect rule strength: an unmet `recommended` rule is `IMPROVEMENT` and does not block work. Only an accepted scope/decision that explicitly makes it mandatory can make nonconformance blocking. Do not elevate strength because a recommendation looks important; report a concrete independent mandatory violation separately with its own evidence.
-4. When a difference may be intentional, first inspect relevant decisions, tests, comments and history. If intent remains uncertain and changing it could alter behavior, contracts or an accepted decision, mark `NEEDS_DECISION` and use `lean-grill` before remediation. Present the evidence, consequences and options without attributing motives. Do not ask again about a valid accepted exception. Continue independent audit work while the affected decision is pending.
-5. Use [the audit-finding format](../../templates/audit-finding.md): requirement, location, observed evidence, impact/priority, confidence or uncertainty, proposed action, dependencies and verification. Merge duplicate symptoms that have the same root cause while retaining affected locations. Do not inflate findings with unsupported style preferences.
+1. Trace applicable requirements through relevant source/dependencies and available tests/runtime evidence. Use existing safe checks and respect gate-mode authorization. No destructive checks, production writes or new test infrastructure are authorized. Static code cannot establish visual, keyboard or live-integration behavior: mark missing verification explicitly and disclose sampling.
+2. Select checks by baseline and area:
+   - **Structure:** placement, module boundary, dependency direction and duplicates. Legacy moves affecting imports/builds/entrypoints need `NEEDS_DECISION` and `lean-grill` before remediation.
+   - **i18n:** hardcoded user-facing strings, missing/orphan keys, placeholder parity, concatenation/pluralization, per-locale grammar and natural phrasing, terminology/glossary and tone. Uncertain legacy/domain wording or UX meaning needs Grill before edits.
+3. Classify with evidence:
+
+   | Result | Condition |
+   |---|---|
+   | `CONFORMS` | Applicable requirement verified within stated coverage |
+   | `DEVIATION` | Accepted applicable requirement conflicts with evidence |
+   | `ACCEPTED_EXCEPTION` | Matching approval reference and bounded applicability |
+   | `NEEDS_DECISION` | Material intent/precedence remains unresolved |
+   | `UNVERIFIED` | Required evidence unavailable |
+   | `IMPROVEMENT` | New recommendation or unmet advisory rule |
+
+   Unmet `recommended` rules are nonblocking `IMPROVEMENT` unless explicitly promoted by accepted scope/decision. Importance alone never promotes them; report independent mandatory violations separately.
+4. Before questioning uncertain differences, inspect decisions, tests, comments and relevant history. Reuse valid exceptions; do not attribute motives. Grill consequential unresolved behavior/contracts before remediation. Use [the finding format](../../templates/audit-finding.md): requirement, location, evidence, impact/priority, uncertainty, action/dependencies and verification. Merge symptoms sharing a root cause while retaining locations; avoid unsupported style findings.
 
 ## Report and handoff
 
-Report the baseline and inspected state, coverage (including sampling/exclusions), findings by priority, accepted exceptions, pending Grill decisions and evidence gaps. A clean result means only that no deviations were found in the stated coverage. Audit classifications are not `lean-review` verdicts, review receipts, gate passes or task completion evidence for unperformed checks.
+Report baseline/state, coverage/sampling, findings by priority, exceptions, pending decisions and unrun checks. No deviations means only none found within coverage; classifications are not review verdicts/receipts, gate passes or evidence of unperformed work.
 
-Recommend bounded remediation groups and their acceptance checks. Do not edit application code, change the standards to hide findings, create a backlog or mark tasks DONE merely from the audit. After `/lean-grill` resolves `NEEDS_DECISION` items, use a two-track handoff: (1) approved standard, compound/domain glossary precedence or bounded `ACCEPTED_EXCEPTION` record updates in `record_root` (requiring explicit user approval from Grill—never self-grant exceptions or weaken `mandatory` to `recommended` to hide findings), and (2) code remediation batches routed through `/lean-scope` / `/lean-task`, tests, review and gate and separated by risk (`LOW`/`MEDIUM` copy/locale fixes vs `HIGH` boundary/entrypoint refactors). Record resolved decisions/exceptions in the existing project records so later audits can reuse them. Audit output itself remains subject to the normal workflow's applicable completion requirements.
+Recommend bounded remediation and checks without editing code, hiding findings through changed standards, creating backlog or declaring fixes complete. After Grill, use a two-track handoff: (1) explicitly user-approved standard, compound/domain term precedence or bounded exception records in `record_root` (never self-grant exceptions or weaken mandatory rules to hide findings); (2) authorized remediation through `lean-scope` / `lean-task`, tests, review and gate, separating LOW/MEDIUM copy fixes from HIGH boundary/entrypoint refactors. Preserve resolved decisions in existing records.
+
+Use delta context for re-audits: retain valid baseline/evidence, inspect changed paths and affected dependencies; refresh runtime evidence when facts may have changed. Stop when each requested requirement is evidenced or explicitly unverified/pending and coverage limits are clear. Normal completion rules still apply to the audit itself.
 
 ## Intensity
 
-- **standard:** trace the selected baseline through a bounded area; report supported findings and coverage limits.
-- **high:** follow relevant callers, dependencies and failure paths; cross-check evidence and proposed remediation dependencies.
-- **ultra:** challenge consequential assumptions and cross-area invariants, seek contradictory evidence and identify migration/recovery risks within the selected scope. Depth never turns missing evidence into a pass or expands the audit automatically.
+- **standard:** trace the bounded baseline and report findings/limits.
+- **high:** follow callers, dependencies, failure paths and remediation interactions.
+- **ultra:** challenge consequential cross-area invariants, contradictory evidence and migration/recovery within scope; no automatic expansion or unsupported passes.
 
-For behavioral evaluation of this skill, use [the scenario guide](references/scenarios.md); do not load or run it during ordinary audits. Actual agent trials complement packaging tests and do not prove universal runtime compliance.
+For skill evaluation only, use [the scenario guide](references/scenarios.md). Do not load/run it during ordinary audits. Instruction tests do not prove agent behavior.
 
 $ARGUMENTS
