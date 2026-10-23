@@ -16,7 +16,7 @@ Direct execution is the portable default; delegated uses the Controller/worker p
 
 ## Optional skills and ownership
 
-Nine core skills are discovered by default; `python3 .lean/scripts/skill_pack.py enable` adds the eight optional ones (`status`/`disable` inspect or reverse; reload runtime skills after). Details: `OPTIONAL.md`.
+Nine core skills are discovered by default; `python3 .lean/scripts/skill_pack.py enable` adds the nine optional ones (`status`/`disable` inspect or reverse; reload runtime skills after). Details: `OPTIONAL.md`.
 
 Project-owned: `PROJECT.md`, `config.json`, optional `skill-effort.json`. Workflow-owned, upgraded together: `policy/`, shared skills and discovery links, `templates/`, `scripts/`, `tests/`. Preserve project additions and local extensions on upgrade (`CUSTOMIZING.md`); retain `LICENSE`.
 

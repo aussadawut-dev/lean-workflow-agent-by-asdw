@@ -19,4 +19,6 @@ For an active submodule target, run `python3 .lean/scripts/submodule.py context`
 6. Record actual documentation routes. Tracker/full mode creates tracking support guides/templates; full also creates a queue guide. Preserve existing project documents and retain the workflow LICENSE/notice when importing into an existing project.
 7. Run `python3 .lean/scripts/workflow.py check`. Report chosen mode/execution, changed facts and remaining undefined fields. When repository structure/module boundaries or user-facing i18n/language conventions remain undefined, note that `/lean-pattern` (in the optional skill pack) can set an early baseline before feature work grows, or pair with `/lean-audit` and `/lean-grill` on an existing repository to inspect and confirm before changing conventions. Do not create application tasks or queue items merely to initialize the workflow.
 
+When the project has an actual deployment target, mention that the optional `/lean-playbook` can prepare its deployment, backup and rollback plan. Offer enabling the optional pack if needed; do not enable it, create a playbook or start a deployment merely because onboarding discovered a target. Projects without deployment need no playbook.
+
 $ARGUMENTS

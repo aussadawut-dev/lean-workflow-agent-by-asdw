@@ -1,0 +1,22 @@
+{
+  "initial_build": {
+    "exit_code": 0,
+    "seconds": 163.274
+  },
+  "initial_full_test_failure": {
+    "files_passed": 655,
+    "files_failed": 1,
+    "files_skipped": 5,
+    "tests_passed": 10264,
+    "tests_failed": 1,
+    "tests_skipped": 53,
+    "cause": "Isolated database base name did not match the existing casetodian*_test guard."
+  },
+  "fix": "Rename only the dedicated experiment database to casetodian_benchmark; application code and safety guards unchanged.",
+  "focused_regression": {
+    "command": "pnpm run test --maxWorkers=1 packages/db/src/kanban.test.ts",
+    "exit_code": 0,
+    "files_passed": 1,
+    "tests_passed": 7
+  }
+}

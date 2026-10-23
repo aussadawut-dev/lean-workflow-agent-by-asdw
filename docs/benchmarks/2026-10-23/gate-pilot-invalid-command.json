@@ -1,0 +1,19 @@
+{
+  "method": "Identical application checkout; sequential version groups, two uncached runs each; lint, single-worker full tests, build; dependencies and initial build prepared before measurement; no cold dependency-install claim. Common PROJECT gate replaces repository self-test commands in isolated fixtures. This measures gate wrapper plus application workload; it does not measure target routing.",
+  "runs": [
+    {
+      "version": "v4.7.0",
+      "repeat": 1,
+      "seconds": 65.322,
+      "exit_code": 2,
+      "child_cpu_seconds": 59.128,
+      "load_average_start": [
+        10.1650390625,
+        10.05126953125,
+        11.8935546875
+      ],
+      "cache_tree": false,
+      "log": "gate-pilot-invalid-command.log"
+    }
+  ]
+}

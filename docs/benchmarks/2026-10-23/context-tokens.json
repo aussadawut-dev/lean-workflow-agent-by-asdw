@@ -1,0 +1,348 @@
+{
+  "measurement": "Sum of per-file encoded text token counts; excludes model/system prompts, tool traffic, message wrappers, target application context and actual runtime usage. Missing deployment files indicate unavailable feature, not zero-cost deployment.",
+  "tiktoken_version": "0.12.0",
+  "encodings": {
+    "o200k_base": {
+      "v4.7.0": {
+        "startup-required": {
+          "tokens": 2030,
+          "files": [
+            {
+              "path": "AGENTS.md",
+              "tokens": 1319
+            },
+            {
+              "path": ".lean/README.md",
+              "tokens": 711
+            }
+          ],
+          "missing": []
+        },
+        "task-fixed-read-set": {
+          "tokens": 10186,
+          "files": [
+            {
+              "path": "AGENTS.md",
+              "tokens": 1319
+            },
+            {
+              "path": ".lean/README.md",
+              "tokens": 711
+            },
+            {
+              "path": ".lean/skills/lean-task/SKILL.md",
+              "tokens": 686
+            },
+            {
+              "path": ".lean/skills/lean-scope/SKILL.md",
+              "tokens": 1335
+            },
+            {
+              "path": ".lean/skills/lean-review/SKILL.md",
+              "tokens": 565
+            },
+            {
+              "path": ".lean/skills/lean-gate/SKILL.md",
+              "tokens": 445
+            },
+            {
+              "path": ".lean/policy/CONTEXT.md",
+              "tokens": 751
+            },
+            {
+              "path": ".lean/policy/CONTRACTS.md",
+              "tokens": 1338
+            },
+            {
+              "path": ".lean/policy/TESTING.md",
+              "tokens": 146
+            },
+            {
+              "path": ".lean/policy/REVIEW.md",
+              "tokens": 854
+            },
+            {
+              "path": ".lean/policy/QUALITY.md",
+              "tokens": 2036
+            }
+          ],
+          "missing": []
+        },
+        "deployment-optional": {
+          "tokens": 0,
+          "files": [],
+          "missing": [
+            ".lean/skills/lean-playbook/SKILL.md",
+            ".lean/templates/deployment-playbook.md",
+            ".lean/templates/deployment-release.md"
+          ]
+        },
+        "all-skill-documents-inventory": {
+          "tokens": 26664,
+          "file_count": 27,
+          "interpretation": "Inventory size only, not expected automatic context."
+        }
+      },
+      "current-dirty": {
+        "startup-required": {
+          "tokens": 2213,
+          "files": [
+            {
+              "path": "AGENTS.md",
+              "tokens": 1504
+            },
+            {
+              "path": ".lean/README.md",
+              "tokens": 709
+            }
+          ],
+          "missing": []
+        },
+        "task-fixed-read-set": {
+          "tokens": 11146,
+          "files": [
+            {
+              "path": "AGENTS.md",
+              "tokens": 1504
+            },
+            {
+              "path": ".lean/README.md",
+              "tokens": 709
+            },
+            {
+              "path": ".lean/skills/lean-task/SKILL.md",
+              "tokens": 685
+            },
+            {
+              "path": ".lean/skills/lean-scope/SKILL.md",
+              "tokens": 1335
+            },
+            {
+              "path": ".lean/skills/lean-review/SKILL.md",
+              "tokens": 617
+            },
+            {
+              "path": ".lean/skills/lean-gate/SKILL.md",
+              "tokens": 578
+            },
+            {
+              "path": ".lean/policy/CONTEXT.md",
+              "tokens": 823
+            },
+            {
+              "path": ".lean/policy/CONTRACTS.md",
+              "tokens": 1390
+            },
+            {
+              "path": ".lean/policy/TESTING.md",
+              "tokens": 146
+            },
+            {
+              "path": ".lean/policy/REVIEW.md",
+              "tokens": 1017
+            },
+            {
+              "path": ".lean/policy/QUALITY.md",
+              "tokens": 2342
+            }
+          ],
+          "missing": []
+        },
+        "deployment-optional": {
+          "tokens": 2185,
+          "files": [
+            {
+              "path": ".lean/skills/lean-playbook/SKILL.md",
+              "tokens": 1471
+            },
+            {
+              "path": ".lean/templates/deployment-playbook.md",
+              "tokens": 451
+            },
+            {
+              "path": ".lean/templates/deployment-release.md",
+              "tokens": 263
+            }
+          ],
+          "missing": []
+        },
+        "all-skill-documents-inventory": {
+          "tokens": 26784,
+          "file_count": 26,
+          "interpretation": "Inventory size only, not expected automatic context."
+        }
+      }
+    },
+    "cl100k_base": {
+      "v4.7.0": {
+        "startup-required": {
+          "tokens": 2027,
+          "files": [
+            {
+              "path": "AGENTS.md",
+              "tokens": 1317
+            },
+            {
+              "path": ".lean/README.md",
+              "tokens": 710
+            }
+          ],
+          "missing": []
+        },
+        "task-fixed-read-set": {
+          "tokens": 10194,
+          "files": [
+            {
+              "path": "AGENTS.md",
+              "tokens": 1317
+            },
+            {
+              "path": ".lean/README.md",
+              "tokens": 710
+            },
+            {
+              "path": ".lean/skills/lean-task/SKILL.md",
+              "tokens": 684
+            },
+            {
+              "path": ".lean/skills/lean-scope/SKILL.md",
+              "tokens": 1339
+            },
+            {
+              "path": ".lean/skills/lean-review/SKILL.md",
+              "tokens": 565
+            },
+            {
+              "path": ".lean/skills/lean-gate/SKILL.md",
+              "tokens": 446
+            },
+            {
+              "path": ".lean/policy/CONTEXT.md",
+              "tokens": 752
+            },
+            {
+              "path": ".lean/policy/CONTRACTS.md",
+              "tokens": 1340
+            },
+            {
+              "path": ".lean/policy/TESTING.md",
+              "tokens": 146
+            },
+            {
+              "path": ".lean/policy/REVIEW.md",
+              "tokens": 858
+            },
+            {
+              "path": ".lean/policy/QUALITY.md",
+              "tokens": 2037
+            }
+          ],
+          "missing": []
+        },
+        "deployment-optional": {
+          "tokens": 0,
+          "files": [],
+          "missing": [
+            ".lean/skills/lean-playbook/SKILL.md",
+            ".lean/templates/deployment-playbook.md",
+            ".lean/templates/deployment-release.md"
+          ]
+        },
+        "all-skill-documents-inventory": {
+          "tokens": 26705,
+          "file_count": 27,
+          "interpretation": "Inventory size only, not expected automatic context."
+        }
+      },
+      "current-dirty": {
+        "startup-required": {
+          "tokens": 2211,
+          "files": [
+            {
+              "path": "AGENTS.md",
+              "tokens": 1503
+            },
+            {
+              "path": ".lean/README.md",
+              "tokens": 708
+            }
+          ],
+          "missing": []
+        },
+        "task-fixed-read-set": {
+          "tokens": 11153,
+          "files": [
+            {
+              "path": "AGENTS.md",
+              "tokens": 1503
+            },
+            {
+              "path": ".lean/README.md",
+              "tokens": 708
+            },
+            {
+              "path": ".lean/skills/lean-task/SKILL.md",
+              "tokens": 684
+            },
+            {
+              "path": ".lean/skills/lean-scope/SKILL.md",
+              "tokens": 1339
+            },
+            {
+              "path": ".lean/skills/lean-review/SKILL.md",
+              "tokens": 616
+            },
+            {
+              "path": ".lean/skills/lean-gate/SKILL.md",
+              "tokens": 580
+            },
+            {
+              "path": ".lean/policy/CONTEXT.md",
+              "tokens": 824
+            },
+            {
+              "path": ".lean/policy/CONTRACTS.md",
+              "tokens": 1393
+            },
+            {
+              "path": ".lean/policy/TESTING.md",
+              "tokens": 146
+            },
+            {
+              "path": ".lean/policy/REVIEW.md",
+              "tokens": 1017
+            },
+            {
+              "path": ".lean/policy/QUALITY.md",
+              "tokens": 2343
+            }
+          ],
+          "missing": []
+        },
+        "deployment-optional": {
+          "tokens": 2172,
+          "files": [
+            {
+              "path": ".lean/skills/lean-playbook/SKILL.md",
+              "tokens": 1459
+            },
+            {
+              "path": ".lean/templates/deployment-playbook.md",
+              "tokens": 450
+            },
+            {
+              "path": ".lean/templates/deployment-release.md",
+              "tokens": 263
+            }
+          ],
+          "missing": []
+        },
+        "all-skill-documents-inventory": {
+          "tokens": 26803,
+          "file_count": 26,
+          "interpretation": "Inventory size only, not expected automatic context."
+        }
+      }
+    }
+  }
+}

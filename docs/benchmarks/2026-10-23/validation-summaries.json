@@ -1,0 +1,27 @@
+{
+  "application_suite": {
+    "v4.7.0": {
+      "files_passed": 656,
+      "files_skipped": 5,
+      "tests_passed": 10265,
+      "tests_skipped": 53,
+      "total_files": 661,
+      "total_tests": 10318
+    },
+    "current-dirty": {
+      "files_passed": 656,
+      "files_skipped": 5,
+      "tests_passed": 10266,
+      "tests_skipped": 52,
+      "total_files": 661,
+      "total_tests": 10318
+    }
+  },
+  "skip_policy": "Existing opt-in live AI/network suites, S3 live tests and container-smoke tests remain disabled by upstream test guards; no test or guard was removed or weakened. Local deployment smoke is a separate experiment, not an assertion that every optional integration was tested.",
+  "conditional_skip_difference": {
+    "location": "packages/server/src/auto-assign.race.test.ts:195",
+    "condition": "The test calls ctx.skip() when its fixture project is not first by name, then id, within the workspace. Generated fixture names/ids can change this branch.",
+    "evidence": "This is the sole runtime ctx.skip() found among test sources; the other guards are fixed opt-in environment guards. Consistent with the observed one-test difference; individual passed-test names were not captured by the default reporter.",
+    "limitation": "Full-gate observations are not an exact matched test-outcome sample and are not sufficient for a causal speedup claim."
+  }
+}

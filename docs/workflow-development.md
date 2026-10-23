@@ -17,7 +17,7 @@ Lean uses Bash, Python 3.9+ standard-library tools, JSON and Markdown. It has no
 | `.lean/scripts/gate_evidence.py` | Binds review receipts to shipping state and records already approved control changes. |
 | `.lean/scripts/gate_lock.py` | Keeps shared gate runs separate within one checkout; busy gates report NOT_RUN. |
 | `.lean/scripts/skill_effort.py` | Saves optional procedure preferences and routes active targets to their record roots. |
-| `.lean/scripts/skill_pack.py` | Exposes nine core skills by default and eight optional skills when enabled. |
+| `.lean/scripts/skill_pack.py` | Exposes nine core skills by default and nine optional skills when enabled. |
 | `.lean/scripts/submodule.py` | Adds/reuses remote application submodules under `targets/` and separates code from target records. |
 | `.lean/scripts/clean_repo.py` | Inventories files and applies exact cleanup plans with external snapshots and journaled recovery. |
 | `.lean/scripts/takeover.py` | Inventories a separate target and binds approved edits to read coverage and source fingerprints. |
@@ -67,3 +67,21 @@ Smoke fixtures use the release asset registry, `.gitignore`, Claude settings and
 A direct gate run reports each numbered check on stderr when it starts and with its elapsed time when it passes; target gates number their checks the same way. Explicit Codex runs stream that output. Claude and Codex Stops pass `--quiet`, because no one watches a Stop live: a refusal shows only its failure, and its fingerprint never changes with check times. Pass `--quiet` to a direct run to omit the lines. Successful captured check output remains suppressed.
 
 Use focused regressions while editing and run the required full Python suite on frozen source before review. Reuse those results in the review evidence instead of rerunning unchanged focused suites. The final project gate remains required; no pass cache may bypass application, environment, dependency, control or review validation.
+
+## Optional skill routing cases
+
+For optional-skill changes, rehearse only affected cases with raw project fixtures and the selected skill; do not preload this assessment table into an evaluator. Collect actual reads/actions before scoring. Reuse the setup/evidence rules above; instruction-contract tests alone do not establish these outcomes or measured token savings.
+
+| Case | Expected boundary after observing the trace |
+|---|---|
+| Pattern: accepted i18n rule, requested tone clarification | Read the rule and affected copy; reuse accepted glossary, research only a real gap; proposal grants no migration |
+| Audit: advisory violation and unknown keyboard behavior | Nonblocking IMPROVEMENT and UNVERIFIED respectively; no invented defect, exception or fix |
+| Prune: queue old preview | Queue dry-run only; no repository scan/tooling read, archive or timestamp inference |
+| Catalog: fresh source evidence but changed proposal base | Recheck evidence relevance/age; fresh preview and matching approval before apply; no model switch |
+| Compress: one prose target with a parser consumer | Read target fully and relevant canonical/parser rules; retain protected bytes; no unrelated scripts or global audit |
+| Compress: workflow prose selection | Inventory paths, fully read selected prose and affected consumers; disclose unread areas without claiming exhaustive coverage |
+| Takeover: resume after one workflow file changed | Reuse valid coverage; fully read changed revision, refresh invalidated plan/staging/approval; never skip required full-read attestations |
+| Target: branch attachment failed after checkout | Inspect partial state; preserve checkout/metadata and pinned commit, resolve material branch choice before retry |
+| Update: same version with a local customization | Compare contents and relevant dependencies; preserve custom rule, no-update only if reconciliation/provenance also unchanged |
+
+Check unchanged approval, root separation, recovery, required review and gate boundaries in every case. A short read trace is not a pass if it omits a required dependency. Record gaps and avoid extrapolating one trial to all future sessions.

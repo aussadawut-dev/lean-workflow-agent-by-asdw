@@ -17,7 +17,7 @@ The idea is simple: **agree on the work → implement → test → validate → 
 - Meaningful tests for behavior changes. For bugs, a regression test that fails before the fix and passes afterward.
 - Review at the depth the work needs, followed by a Quality Gate using your project's checks.
 - Three modes: keep evidence in the chat, keep a workset across sessions, or add a queue with explicit ownership.
-- Nine core skills, eight optional skills, and `standard` / `high` / `ultra` procedure intensity.
+- Nine core skills, nine optional skills, and `standard` / `high` / `ultra` procedure intensity.
 - Gate locking to avoid overlapping runs, and history checks to avoid reusing task IDs.
 - Worker assignments with a turn budget, required tests and a handoff when the budget runs out.
 
@@ -130,7 +130,7 @@ For just one task, say “use scope high and research ultra for this task.” Th
 
 ## Enable optional skills
 
-The nine core skills are ready by default. To expose the eight optional skills, run these commands from the repository root, then reload your runtime's skills:
+The nine core skills are ready by default. To expose the nine optional skills, run these commands from the repository root, then reload your runtime's skills:
 
 ```sh
 python3 .lean/scripts/skill_pack.py enable
@@ -147,10 +147,11 @@ A few useful starting points after enabling them:
 | Preview repository cleanup | `/lean-prune repo` | `$lean-prune repo` |
 | Preview shorter workflow prose | `/lean-compress workflow --preview` | `$lean-compress workflow --preview` |
 | Add an application submodule | `/lean-target <remote url>` | `$lean-target <remote url>` |
+| Prepare deployment and rollback plans | `/lean-playbook` | `$lean-playbook` |
 
-The pack also covers project standards, audits, model research, queue cleanup and workflow takeover. Updates, repository cleanup and prose compression start with a preview. Applying them follows the accepted scope and each procedure's approval rules.
+The pack also covers project standards, audits, model research, queue cleanup and workflow takeover. Updates, repository cleanup and prose compression start with a preview. Applying them follows the accepted scope and each procedure's approval rules. Playbook preparation writes project plans; `check` inspects readiness, while explicit `deploy` or `rollback` requests execute the resolved plan. See [deployment and rollback](docs/skills.md#deployment-and-rollback-playbooks).
 
-See [all 17 skills](docs/skills.md#core-and-optional-commands) and the [maintenance guide](docs/maintenance.md).
+See [all 18 skills](docs/skills.md#core-and-optional-commands) and the [maintenance guide](docs/maintenance.md).
 
 ## Before calling a task done
 

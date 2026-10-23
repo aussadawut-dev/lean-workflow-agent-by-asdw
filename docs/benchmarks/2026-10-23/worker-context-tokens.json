@@ -1,0 +1,347 @@
+{
+  "kind": "Offline worker input-context count; no worker dispatched and no real worker token usage measured. Same brief and same pinned application source in both arms. No inherited conversation. Counts sum per-file texts without message wrappers.",
+  "task": "Read-only investigation of Gmail callback stale-configuration race",
+  "application_revision": "7f76ac426784c3665e891a192cfd00d88af1af98",
+  "task_brief_sha256": "2451b8cf5bb29a3f4275d9b4fb04a6e6ffb0bb9a730d9f4c1eb0ea0826df6729",
+  "source_files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "b19c5008830d5e10ccf3180492699d7185163002fb6e699f7ba999eecf0aca46"
+    },
+    {
+      "path": "packages/server/src/modules/connectors/gmail-oauth.usecases.ts",
+      "sha256": "6767046cfb810aedd7f9f56fb484b3b1ff6029eaa8a78118c0297d085b3f504a"
+    },
+    {
+      "path": "packages/server/src/modules/connectors/gmail-oauth.repository.ts",
+      "sha256": "bff1d348b630eb1883dc31d64bd6cf445cdc00a6362a8b8a9bef686e46b4f97d"
+    },
+    {
+      "path": "packages/server/src/gmail-oauth.test.ts",
+      "sha256": "8f4a01af7a30b01273a7d7ff20ec61ad520147b553feb2f6a449800fe39640ad"
+    }
+  ],
+  "skill_mapping": {
+    "v4.7.0": "lean-multi-agent",
+    "current-dirty": "lean-agents"
+  },
+  "encodings": {
+    "o200k_base": {
+      "v4.7.0": {
+        "handoff-and-app-source-only": 4176,
+        "fresh-worker-bounded-instructions": {
+          "tokens": 6438,
+          "files": [
+            {
+              "path": "worker-task.txt",
+              "tokens": 248
+            },
+            {
+              "path": "app/AGENTS.md",
+              "tokens": 270
+            },
+            {
+              "path": "app/packages/server/src/modules/connectors/gmail-oauth.usecases.ts",
+              "tokens": 1974
+            },
+            {
+              "path": "app/packages/server/src/modules/connectors/gmail-oauth.repository.ts",
+              "tokens": 155
+            },
+            {
+              "path": "app/packages/server/src/gmail-oauth.test.ts",
+              "tokens": 1529
+            },
+            {
+              "path": "AGENTS.md",
+              "tokens": 1319
+            },
+            {
+              "path": ".lean/README.md",
+              "tokens": 711
+            },
+            {
+              "path": ".lean/skills/lean-multi-agent/SKILL.md#Worker-and-checkout-boundary",
+              "tokens": 232
+            }
+          ]
+        },
+        "fresh-worker-full-delegation-skill": {
+          "tokens": 7192,
+          "files": [
+            {
+              "path": "worker-task.txt",
+              "tokens": 248
+            },
+            {
+              "path": "app/AGENTS.md",
+              "tokens": 270
+            },
+            {
+              "path": "app/packages/server/src/modules/connectors/gmail-oauth.usecases.ts",
+              "tokens": 1974
+            },
+            {
+              "path": "app/packages/server/src/modules/connectors/gmail-oauth.repository.ts",
+              "tokens": 155
+            },
+            {
+              "path": "app/packages/server/src/gmail-oauth.test.ts",
+              "tokens": 1529
+            },
+            {
+              "path": "AGENTS.md",
+              "tokens": 1319
+            },
+            {
+              "path": ".lean/README.md",
+              "tokens": 711
+            },
+            {
+              "path": ".lean/skills/lean-multi-agent/SKILL.md",
+              "tokens": 986
+            }
+          ]
+        }
+      },
+      "current-dirty": {
+        "handoff-and-app-source-only": 4176,
+        "fresh-worker-bounded-instructions": {
+          "tokens": 6677,
+          "files": [
+            {
+              "path": "worker-task.txt",
+              "tokens": 248
+            },
+            {
+              "path": "app/AGENTS.md",
+              "tokens": 270
+            },
+            {
+              "path": "app/packages/server/src/modules/connectors/gmail-oauth.usecases.ts",
+              "tokens": 1974
+            },
+            {
+              "path": "app/packages/server/src/modules/connectors/gmail-oauth.repository.ts",
+              "tokens": 155
+            },
+            {
+              "path": "app/packages/server/src/gmail-oauth.test.ts",
+              "tokens": 1529
+            },
+            {
+              "path": "AGENTS.md",
+              "tokens": 1504
+            },
+            {
+              "path": ".lean/README.md",
+              "tokens": 709
+            },
+            {
+              "path": ".lean/skills/lean-agents/SKILL.md#Worker-and-checkout-boundary",
+              "tokens": 288
+            }
+          ]
+        },
+        "fresh-worker-full-delegation-skill": {
+          "tokens": 7997,
+          "files": [
+            {
+              "path": "worker-task.txt",
+              "tokens": 248
+            },
+            {
+              "path": "app/AGENTS.md",
+              "tokens": 270
+            },
+            {
+              "path": "app/packages/server/src/modules/connectors/gmail-oauth.usecases.ts",
+              "tokens": 1974
+            },
+            {
+              "path": "app/packages/server/src/modules/connectors/gmail-oauth.repository.ts",
+              "tokens": 155
+            },
+            {
+              "path": "app/packages/server/src/gmail-oauth.test.ts",
+              "tokens": 1529
+            },
+            {
+              "path": "AGENTS.md",
+              "tokens": 1504
+            },
+            {
+              "path": ".lean/README.md",
+              "tokens": 709
+            },
+            {
+              "path": ".lean/skills/lean-agents/SKILL.md",
+              "tokens": 1608
+            }
+          ]
+        }
+      }
+    },
+    "cl100k_base": {
+      "v4.7.0": {
+        "handoff-and-app-source-only": 4056,
+        "fresh-worker-bounded-instructions": {
+          "tokens": 6315,
+          "files": [
+            {
+              "path": "worker-task.txt",
+              "tokens": 250
+            },
+            {
+              "path": "app/AGENTS.md",
+              "tokens": 270
+            },
+            {
+              "path": "app/packages/server/src/modules/connectors/gmail-oauth.usecases.ts",
+              "tokens": 1888
+            },
+            {
+              "path": "app/packages/server/src/modules/connectors/gmail-oauth.repository.ts",
+              "tokens": 149
+            },
+            {
+              "path": "app/packages/server/src/gmail-oauth.test.ts",
+              "tokens": 1499
+            },
+            {
+              "path": "AGENTS.md",
+              "tokens": 1317
+            },
+            {
+              "path": ".lean/README.md",
+              "tokens": 710
+            },
+            {
+              "path": ".lean/skills/lean-multi-agent/SKILL.md#Worker-and-checkout-boundary",
+              "tokens": 232
+            }
+          ]
+        },
+        "fresh-worker-full-delegation-skill": {
+          "tokens": 7070,
+          "files": [
+            {
+              "path": "worker-task.txt",
+              "tokens": 250
+            },
+            {
+              "path": "app/AGENTS.md",
+              "tokens": 270
+            },
+            {
+              "path": "app/packages/server/src/modules/connectors/gmail-oauth.usecases.ts",
+              "tokens": 1888
+            },
+            {
+              "path": "app/packages/server/src/modules/connectors/gmail-oauth.repository.ts",
+              "tokens": 149
+            },
+            {
+              "path": "app/packages/server/src/gmail-oauth.test.ts",
+              "tokens": 1499
+            },
+            {
+              "path": "AGENTS.md",
+              "tokens": 1317
+            },
+            {
+              "path": ".lean/README.md",
+              "tokens": 710
+            },
+            {
+              "path": ".lean/skills/lean-multi-agent/SKILL.md",
+              "tokens": 987
+            }
+          ]
+        }
+      },
+      "current-dirty": {
+        "handoff-and-app-source-only": 4056,
+        "fresh-worker-bounded-instructions": {
+          "tokens": 6555,
+          "files": [
+            {
+              "path": "worker-task.txt",
+              "tokens": 250
+            },
+            {
+              "path": "app/AGENTS.md",
+              "tokens": 270
+            },
+            {
+              "path": "app/packages/server/src/modules/connectors/gmail-oauth.usecases.ts",
+              "tokens": 1888
+            },
+            {
+              "path": "app/packages/server/src/modules/connectors/gmail-oauth.repository.ts",
+              "tokens": 149
+            },
+            {
+              "path": "app/packages/server/src/gmail-oauth.test.ts",
+              "tokens": 1499
+            },
+            {
+              "path": "AGENTS.md",
+              "tokens": 1503
+            },
+            {
+              "path": ".lean/README.md",
+              "tokens": 708
+            },
+            {
+              "path": ".lean/skills/lean-agents/SKILL.md#Worker-and-checkout-boundary",
+              "tokens": 288
+            }
+          ]
+        },
+        "fresh-worker-full-delegation-skill": {
+          "tokens": 7878,
+          "files": [
+            {
+              "path": "worker-task.txt",
+              "tokens": 250
+            },
+            {
+              "path": "app/AGENTS.md",
+              "tokens": 270
+            },
+            {
+              "path": "app/packages/server/src/modules/connectors/gmail-oauth.usecases.ts",
+              "tokens": 1888
+            },
+            {
+              "path": "app/packages/server/src/modules/connectors/gmail-oauth.repository.ts",
+              "tokens": 149
+            },
+            {
+              "path": "app/packages/server/src/gmail-oauth.test.ts",
+              "tokens": 1499
+            },
+            {
+              "path": "AGENTS.md",
+              "tokens": 1503
+            },
+            {
+              "path": ".lean/README.md",
+              "tokens": 708
+            },
+            {
+              "path": ".lean/skills/lean-agents/SKILL.md",
+              "tokens": 1611
+            }
+          ]
+        }
+      }
+    }
+  },
+  "limits": [
+    "Fixed input profiles only, not a replay of worker behavior or actual model token consumption.",
+    "Application PROJECT text, workflow CLI output, runtime/system prompts, message wrappers and dynamically discovered dependencies are excluded; shared brief includes project facts.",
+    "No inherited controller history is included in either arm, so these counts do not measure benefits of fresh-context delegation over a history fork."
+  ]
+}

@@ -6,6 +6,11 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
+## Unreleased
+
+- Add optional `lean-playbook` for project deployment/backup/rollback preparation, read-only readiness checks and explicitly requested execution. Include reusable playbook/release record templates, provider-parity discovery tests and compatibility with the previous 17-skill registry. Nine core skills remain enabled by default; the optional pack now has nine skills. Projects with deployment targets are offered the skill during init without automatic activation or execution.
+- Upgrade shared assets, canonical skills, templates, registry and discovery tooling together; preserve project operations documents and release records. Reload runtime skills after enabling the optional pack. No configuration or record migration is needed.
+
 ## 4.15.0 — 2026-10-23
 
 **Token highlight:** - · **Compared with:** -

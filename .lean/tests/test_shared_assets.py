@@ -9,10 +9,24 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / '.lean/scripts'))
-from shared_assets import RETIRED_SKILLS, V4_CORE_LINKS, V4_SKILLS, V4_SKILL_LINKS, declared_links
+from shared_assets import (CORE_LINKS, PRE_PLAYBOOK_LINKS, PRE_PLAYBOOK_SKILLS,
+                           RETIRED_SKILLS, SKILL_LINKS, V4_CORE_LINKS, V4_SKILLS,
+                           V4_SKILL_LINKS, declared_links)
 
 
 class SharedAssetsTests(unittest.TestCase):
+    def test_pre_playbook_registries_remain_readable_but_mixed_generations_fail(self):
+        files = [f'.lean/skills/{name}/SKILL.md' for name in PRE_PLAYBOOK_SKILLS]
+        for links in (CORE_LINKS, PRE_PLAYBOOK_LINKS):
+            self.assertEqual(declared_links({'schema': 2, 'files': files, 'links': links}), links)
+        with self.assertRaises(ValueError):
+            declared_links({'schema': 2, 'files': files, 'links': SKILL_LINKS})
+        current_files = files + ['.lean/skills/lean-playbook/SKILL.md']
+        for links in (CORE_LINKS, SKILL_LINKS):
+            self.assertEqual(declared_links({'schema': 2, 'files': current_files, 'links': links}), links)
+        with self.assertRaises(ValueError):
+            declared_links({'schema': 2, 'files': current_files, 'links': PRE_PLAYBOOK_LINKS})
+
     def test_previous_core_and_full_registries_remain_readable(self):
         v4_files = [f'.lean/skills/{name}/SKILL.md' for name in V4_SKILLS] + ['AGENTS.md', '.lean/assets.json']
         old_files = [name for name in v4_files if 'skill-effort' not in name and 'skill_effort' not in name
@@ -70,7 +84,7 @@ class SharedAssetsTests(unittest.TestCase):
 
     def test_discovery_uses_one_source_and_resources(self):
         names = sorted(p.name for p in (ROOT / ".lean/skills").iterdir())
-        self.assertEqual(len(names), 17)
+        self.assertEqual(len(names), 18)
         self.assertTrue(all(name.startswith("lean-") for name in names), names)
         self.assertIn("lean-prune", names)
         for tree in (".claude/skills", ".agents/skills"):
@@ -91,20 +105,36 @@ class SharedAssetsTests(unittest.TestCase):
                     if resource.is_file():
                         self.assertTrue((link / resource.relative_to(canonical)).samefile(resource))
 
-    def test_compress_full_read_applies_only_to_workflow_target(self):
+    def test_compress_routes_reads_by_impact_without_losing_preservation(self):
         content = (ROOT / '.lean/skills/lean-compress/SKILL.md').read_text()
-        self.assertIn('## Read what the target needs', content)
         section = content.split('## Read what the target needs', 1)[1].split('\n## ', 1)[0]
         paragraphs = [p for p in section.split('\n\n') if p.strip()]
         named = next(p for p in paragraphs if p.startswith('`/lean-compress PATH...`'))
-        audit = next(p for p in paragraphs if p.startswith('`/lean-compress workflow`'))
-        # The exhaustive read stays bound to `workflow`; named paths read their dependencies and callers.
-        full_read = [p for p in paragraphs if 'every authorized workflow file' in p.lower()]
-        self.assertEqual(full_read, [audit])
-        for required in ('AGENTS', 'policy router', 'callers', 'scripts, hooks and tests',
-                         'apply the workflow-audit read', 'edits stay limited to the named paths'):
+        workflow = next(p for p in paragraphs if p.startswith('`/lean-compress workflow`'))
+        for required in ('fully read each target', 'canonical', 'callers', 'scripts, hooks and tests',
+                         'edits stay limited to the named paths'):
             self.assertIn(required, named)
-        self.assertIn('The exhaustive read belongs to `/lean-compress workflow`', section)
+        self.assertIn('inventory', workflow)
+        self.assertIn('prose', workflow)
+        self.assertIn('not a full read of every script or test', workflow)
+        self.assertNotIn('fully read every authorized workflow file', section)
+        for required in ('coverage', 'unread', 'changed revision', 'before/after rule map',
+                         'byte-for-byte', 'authorization', 'PROJECT Quality Gate'):
+            self.assertIn(required, content)
+
+    def test_optional_skills_bound_rework_and_stop_without_waiving_checks(self):
+        # Instruction contracts, not proof of future LLM behavior or token savings.
+        for name in ('pattern', 'audit', 'prune', 'catalog', 'compress', 'takeover', 'target', 'update'):
+            with self.subTest(skill=name):
+                text = (ROOT / f'.lean/skills/lean-{name}/SKILL.md').read_text()
+                self.assertIn('delta context', text)
+                self.assertIn('Stop when', text)
+                self.assertIn('SKILL-EFFORT.md', text)
+        takeover = (ROOT / '.lean/skills/lean-takeover/SKILL.md').read_text()
+        update = (ROOT / '.lean/skills/lean-update/SKILL.md').read_text()
+        self.assertIn('Fully read every authorized workflow file', takeover)
+        self.assertIn('Full-read', update)
+        self.assertIn('HIGH independent review', update)
 
     def test_wording_only_review_lowers_reviewer_cost_not_the_floor(self):
         content = (ROOT / '.lean/policy/MODELS.md').read_text()

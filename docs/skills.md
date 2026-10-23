@@ -8,7 +8,7 @@ Run the CLI examples from the repository root.
 
 For everyday work, start with `lean-task`. It brings in scope, research, important decisions, implementation, review and completion checks as the task needs them. You can call any discovered skill yourself too. You do not need to walk through every step manually.
 
-Nine core skills are available by default. Enable the optional pack to discover the other eight, then reload your runtime's skills.
+Nine core skills are available by default. Enable the optional pack to discover the other nine, then reload your runtime's skills.
 
 | What you want to do | Pack | Claude Code | Codex |
 |---|---|---|---|
@@ -29,6 +29,7 @@ Nine core skills are available by default. Enable the optional pack to discover 
 | Migrate an existing workflow | Optional | `/lean-takeover "<target path>" [--preview\|--apply <plan-id>]` | `$lean-takeover` with the same arguments |
 | Archive completed queue items or clean repository files | Optional | `/lean-prune queue <old\|all> [--days N] [--preview]` or `/lean-prune repo [--path <path>]` | `$lean-prune` with the same arguments |
 | Update installed Lean files | Optional | `/lean-update [--ref <ref>]` | `$lean-update` with the same arguments |
+| Prepare, check or execute deployment and rollback | Optional | `/lean-playbook [check\|deploy\|rollback] [environment] [version\|release]` | `$lean-playbook` with the same arguments |
 
 For example:
 
@@ -64,6 +65,28 @@ Both skills use the existing scope/research/Grill/task handoffs, submodule recor
 /lean-pattern i18n conventions for the existing web app
 $lean-audit settings forms against accepted UX and i18n standards
 ```
+
+## Deployment and rollback playbooks
+
+Use `lean-playbook` without an action to prepare or update the project's deployment/backup/rollback plan from actual configuration, scripts and pipelines. It saves project documents, marks missing facts and never starts a backup, deployment or migration during preparation. When no operations location exists, the proposed defaults are `docs/operations/playbook.md` and `docs/operations/releases/` in the selected record root. With an application submodule, commands run in the application while these records stay outside it in Lean's target record root.
+
+```text
+# Claude Code: prepare, inspect readiness, then explicitly execute
+/lean-playbook
+/lean-playbook check staging
+/lean-playbook deploy staging v2.3.0
+/lean-playbook rollback staging release-previous
+
+# Codex uses the same arguments
+$lean-playbook check staging
+$lean-playbook deploy staging v2.3.0
+```
+
+`check` uses read-only system checks and reports ready, not ready or cannot verify with evidence. `deploy` rechecks current readiness, records the resolved immutable target, verifies required backups before dependent changes, executes the plan and checks the actual running version and health. Missing environment/release choices, incompatible migrations or unavailable evidence block dependent execution. The explicit action authorizes the plan's resolved scope without repeated confirmation; preparing a plan or enabling discovery does not.
+
+On failure, stop/report by default. Automatic application rollback needs an explicitly accepted policy. A generic rollback request does not authorize destructive database restoration: its scope, downtime and potential loss of writes since backup must be understood and authorized separately. Each execution attempt records the observed final state and links recovery attempts; an accepted job or successful command alone never proves deployment or recovery succeeded. Existing risk, review and gate rules still apply; repository validation and live health are separate evidence.
+
+Use the [playbook template](../.lean/templates/deployment-playbook.md) and [release record template](../.lean/templates/deployment-release.md) as project-owned starting points. The [shared skill](../.lean/skills/lean-playbook/SKILL.md) supplies the same instructions to both providers. It guides existing deployment tooling rather than installing a deployment engine. Template/discovery tests do not prove a provider deployment or data recovery works; each project must validate its actual commands and recovery path.
 
 ## Optional skill levels
 

@@ -1,0 +1,213 @@
+{
+  "method": "Synthetic Git-visible JSON assertion plus fixed 0.5-second sleep; tests direct runner caching, not application speed. Three uncached and three repeated cached observations per version; changed tracked input must rerun checks. All runs sequential. A check invocation counter is ignored metadata, not a check input.",
+  "runs": [
+    {
+      "version": "v4.7.0",
+      "mode": "uncached",
+      "repeat": 1,
+      "seconds": 0.7708,
+      "exit_code": 0,
+      "check_invocations": 1,
+      "load_average": [
+        4.69091796875,
+        7.5400390625,
+        10.02294921875
+      ]
+    },
+    {
+      "version": "v4.7.0",
+      "mode": "uncached",
+      "repeat": 2,
+      "seconds": 0.752,
+      "exit_code": 0,
+      "check_invocations": 1,
+      "load_average": [
+        4.69091796875,
+        7.5400390625,
+        10.02294921875
+      ]
+    },
+    {
+      "version": "v4.7.0",
+      "mode": "uncached",
+      "repeat": 3,
+      "seconds": 0.7669,
+      "exit_code": 0,
+      "check_invocations": 1,
+      "load_average": [
+        4.69091796875,
+        7.5400390625,
+        10.02294921875
+      ]
+    },
+    {
+      "version": "v4.7.0",
+      "mode": "cache-prime",
+      "repeat": 1,
+      "seconds": 0.7334,
+      "exit_code": 0,
+      "check_invocations": 1,
+      "load_average": [
+        4.69091796875,
+        7.5400390625,
+        10.02294921875
+      ]
+    },
+    {
+      "version": "v4.7.0",
+      "mode": "cache-repeat",
+      "repeat": 1,
+      "seconds": 0.7462,
+      "exit_code": 0,
+      "check_invocations": 1,
+      "load_average": [
+        4.63525390625,
+        7.48095703125,
+        9.9873046875
+      ]
+    },
+    {
+      "version": "v4.7.0",
+      "mode": "cache-repeat",
+      "repeat": 2,
+      "seconds": 0.7349,
+      "exit_code": 0,
+      "check_invocations": 1,
+      "load_average": [
+        4.63525390625,
+        7.48095703125,
+        9.9873046875
+      ]
+    },
+    {
+      "version": "v4.7.0",
+      "mode": "cache-repeat",
+      "repeat": 3,
+      "seconds": 0.7321,
+      "exit_code": 0,
+      "check_invocations": 1,
+      "load_average": [
+        4.63525390625,
+        7.48095703125,
+        9.9873046875
+      ]
+    },
+    {
+      "version": "v4.7.0",
+      "mode": "changed-input",
+      "repeat": 1,
+      "seconds": 0.7487,
+      "exit_code": 0,
+      "check_invocations": 1,
+      "load_average": [
+        4.63525390625,
+        7.48095703125,
+        9.9873046875
+      ]
+    },
+    {
+      "version": "current-dirty",
+      "mode": "uncached",
+      "repeat": 1,
+      "seconds": 0.7518,
+      "exit_code": 0,
+      "check_invocations": 1,
+      "load_average": [
+        4.63525390625,
+        7.48095703125,
+        9.9873046875
+      ]
+    },
+    {
+      "version": "current-dirty",
+      "mode": "uncached",
+      "repeat": 2,
+      "seconds": 0.7305,
+      "exit_code": 0,
+      "check_invocations": 1,
+      "load_average": [
+        4.63525390625,
+        7.48095703125,
+        9.9873046875
+      ]
+    },
+    {
+      "version": "current-dirty",
+      "mode": "uncached",
+      "repeat": 3,
+      "seconds": 0.739,
+      "exit_code": 0,
+      "check_invocations": 1,
+      "load_average": [
+        4.50390625,
+        7.40625,
+        9.9462890625
+      ]
+    },
+    {
+      "version": "current-dirty",
+      "mode": "cache-prime",
+      "repeat": 1,
+      "seconds": 0.8587,
+      "exit_code": 0,
+      "check_invocations": 1,
+      "load_average": [
+        4.50390625,
+        7.40625,
+        9.9462890625
+      ]
+    },
+    {
+      "version": "current-dirty",
+      "mode": "cache-repeat",
+      "repeat": 1,
+      "seconds": 0.3366,
+      "exit_code": 0,
+      "check_invocations": 0,
+      "load_average": [
+        4.50390625,
+        7.40625,
+        9.9462890625
+      ]
+    },
+    {
+      "version": "current-dirty",
+      "mode": "cache-repeat",
+      "repeat": 2,
+      "seconds": 0.3541,
+      "exit_code": 0,
+      "check_invocations": 0,
+      "load_average": [
+        4.50390625,
+        7.40625,
+        9.9462890625
+      ]
+    },
+    {
+      "version": "current-dirty",
+      "mode": "cache-repeat",
+      "repeat": 3,
+      "seconds": 0.2846,
+      "exit_code": 0,
+      "check_invocations": 0,
+      "load_average": [
+        4.50390625,
+        7.40625,
+        9.9462890625
+      ]
+    },
+    {
+      "version": "current-dirty",
+      "mode": "changed-input",
+      "repeat": 1,
+      "seconds": 0.8314,
+      "exit_code": 0,
+      "check_invocations": 1,
+      "load_average": [
+        4.50390625,
+        7.40625,
+        9.9462890625
+      ]
+    }
+  ]
+}

@@ -79,13 +79,18 @@ class TemplateSmokeTests(unittest.TestCase):
             subprocess.run(["python3", str(source / ".lean/scripts/skill_pack.py"), "enable"],
                            check=True, capture_output=True)
             for tree in (".agents/skills", ".claude/skills"):
-                self.assertEqual(len(lean_discovery(source, tree)), 17)
+                self.assertEqual(len(lean_discovery(source, tree)), 18)
             target = Path(directory) / "target"
             target.mkdir()
             bootstrap(target, source_root=source)
             for tree in (".agents/skills", ".claude/skills"):
                 self.assertEqual(len(lean_discovery(target, tree)), 9)
             self.assertTrue((target / ".lean/skills/lean-audit/SKILL.md").is_file())
+            self.assertTrue((target / ".lean/skills/lean-playbook/SKILL.md").is_file())
+            for name in ("deployment-playbook.md", "deployment-release.md"):
+                self.assertTrue((target / ".lean/templates" / name).is_file())
+            for tree in (".agents/skills", ".claude/skills"):
+                self.assertFalse((target / tree / "lean-playbook").is_symlink())
 
     def test_fresh_copy_setup_and_full_workset_lifecycle(self):
         with tempfile.TemporaryDirectory(prefix="lean new project ") as directory:

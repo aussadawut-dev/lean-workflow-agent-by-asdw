@@ -5,14 +5,19 @@ import os
 REQUIRED_SKILLS = ("lean-init", "lean-task", "lean-review", "lean-gate", "lean-scope",
                    "lean-research", "lean-grill", "lean-agents", "lean-effort",
                    "lean-prune", "lean-catalog", "lean-compress", "lean-takeover",
-                   "lean-target", "lean-update", "lean-pattern", "lean-audit")
+                   "lean-target", "lean-update", "lean-pattern", "lean-audit", "lean-playbook")
 EXTRA_SKILLS = ("lean-prune", "lean-compress", "lean-catalog",
-                "lean-takeover", "lean-target", "lean-update", "lean-pattern", "lean-audit")
+                "lean-takeover", "lean-target", "lean-update", "lean-pattern", "lean-audit", "lean-playbook")
 CORE_SKILLS = tuple(name for name in REQUIRED_SKILLS if name not in EXTRA_SKILLS)
 USER_COMMANDS = set(REQUIRED_SKILLS)
 SKILL_LINKS = {f"{tree}/{name}": f"../../.lean/skills/{name}"
                for tree in (".claude/skills", ".agents/skills") for name in REQUIRED_SKILLS}
 CORE_LINKS = {path: target for path, target in SKILL_LINKS.items() if PurePosixPath(path).name in CORE_SKILLS}
+
+# Accept installed 4.15-era registries during upgrade, including enabled optional packs.
+PRE_PLAYBOOK_SKILLS = tuple(name for name in REQUIRED_SKILLS if name != "lean-playbook")
+PRE_PLAYBOOK_LINKS = {path: target for path, target in SKILL_LINKS.items()
+                      if PurePosixPath(path).name in PRE_PLAYBOOK_SKILLS}
 
 
 V4_SKILLS = ("lean-init", "lean-task", "lean-review", "lean-gate", "lean-scope",
@@ -54,6 +59,7 @@ def declared_links(registry):
     files = registry.get("files", [])
     present = {name for name in ALL_KNOWN_SKILLS if f".lean/skills/{name}/SKILL.md" in files}
     generations = ((REQUIRED_SKILLS, CORE_LINKS, SKILL_LINKS),
+                   (PRE_PLAYBOOK_SKILLS, CORE_LINKS, PRE_PLAYBOOK_LINKS),
                    (V4_SKILLS, V4_CORE_LINKS, V4_SKILL_LINKS),
                    (PATTERN_SKILLS, V4_CORE_LINKS, PATTERN_FULL_LINKS),
                    (PREVIOUS_SKILLS, V4_CORE_LINKS, PREVIOUS_FULL_LINKS),

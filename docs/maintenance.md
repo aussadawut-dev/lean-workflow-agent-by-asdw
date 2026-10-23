@@ -16,15 +16,15 @@ Use `lean-compress` to remove repeated wording and filler while keeping the rule
 
 Preview is the default. `workflow` selects editable workflow prose; explicit paths limit the files. `--apply` requests edits inside approved scope. Matching approval is reused. New scope or changes to workflow behavior need a decision before dependent edits. Reading a file alone does not authorize rewriting it.
 
-Explicit paths read each target fully, along with AGENTS, the policy router, the rules, skills and references the target depends on, and its callers: workflow files that reference or restate it, and scripts, hooks or tests that read or check its text. A target that summarizes the whole workflow, or whose dependencies cannot be bounded, gets the full workflow-audit read; edits stay limited to the named paths.
+Explicit paths read each target fully with applicable instructions, canonical rules and affected callers. Search for scripts, hooks or tests that consume the text; read relevant dependency sections and expand when needed to preserve meaning. Links do not require loading unrelated subtrees. Edits stay limited to named files.
 
-The `workflow` audit requires a full read of the workflow and a coverage ledger: contract, router/policies, project facts, skills/resources/discovery links, reviewer, hooks/settings, scripts/tests/templates, CI, README and ownership/history guidance. Read large files through EOF in chunks. Listings, search snippets, hashes and summaries cannot establish full coverage. A required unread or inaccessible file blocks dependent compression.
+`workflow` inventories authorized workflow paths, then fully reads selected editable prose and relevant canonical rules/consumers. It does not require reading every script or test. Keep a compact coverage record of edited revisions, rule sources, consumers, preservation checks and exclusions. Report unread/deferred areas; an explicitly requested exhaustive audit still needs full authorized coverage. Listings, snippets and hashes are not full reads. Missing required context blocks dependent edits; reread changed target revisions and reuse valid context on rework.
 
 Exclude credentials, private settings, caches and runtime internals, and report those exclusions. Map each original rule to the proposed wording: actor, trigger, prerequisites, action, order, limits, exceptions, evidence and failure behavior.
 
 Keep frontmatter, imports, headings/anchors, code/Mermaid, inline code, commands, links, paths, identifiers, numeric limits, versions, gate markers and license notices unchanged. Code, tests, configuration and project history provide context and stay outside prose compression. Preserve project additions and unrelated pending work.
 
-Run preservation checks and the project gate before reviewing the actual diff. HIGH-risk areas need independent review; tests alone cannot establish preserved meaning. Report measured byte/word changes and unread/unchanged targets. Claim token savings only with measurement. This full-read requirement belongs to the `workflow` audit; ordinary tasks keep their normal context routing. The command does not publish or call a paid model API.
+Run preservation checks and the project gate before reviewing the actual diff. HIGH-risk areas need independent review; tests alone cannot establish preserved meaning. Report measured byte/word changes and unread/unchanged targets. Claim token savings only with measurement. Stop when selected prose is clear and required preservation, validation and review pass; further shortening needs a concrete benefit. The command does not publish or call a paid model API.
 
 ## Update installed Lean files
 
