@@ -4,9 +4,9 @@ I built this because I want a coding agent to understand the work, check what it
 
 It works with **Claude Code and Codex**, with one shared set of rules and skills. Use it with your own stack.
 
-**Baseline 4.14.0** · [MIT License](LICENSE)
+**Baseline 4.15.0** · [MIT License](LICENSE)
 
-This release keeps the Task Contract in Claude when you type a prompt while the agent is still working, so a contract declared during the turn is no longer dropped, which had cost extra `declare` calls and wrong gate refusals; Codex is unchanged. See the [4.14.0 release notes](.lean/CHANGELOG.md#4140--2026-10-23) for changes and upgrade notes.
+This release shows numbered Quality Gate progress with elapsed times on direct runs while Stops stay quiet, and makes the 4.14.0 mid-turn rule work in Claude Code: a prompt typed while the agent works keeps the Task Contract, checked live in Claude Code and Codex. See the [4.15.0 release notes](.lean/CHANGELOG.md#4150--2026-10-23) for changes and upgrade notes.
 
 The idea is simple: **agree on the work → implement → test → validate → review → finish with evidence**. Use the steps the task needs. You do not have to call every skill or read every file to get started.
 
