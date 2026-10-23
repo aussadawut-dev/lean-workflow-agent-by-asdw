@@ -707,7 +707,7 @@ def records_own_receipt(command, declared, cwd=None, depth=0):
     return any(value == declared or "$" in value or "`" in value or value in OPERATORS for value in values)
 
 
-TURN_ENDS = ("turn_duration", "stop_hook_summary")
+TURN_END = "turn_duration"  # Written once a turn finishes; stop_hook_summary also follows a Stop that blocks.
 
 
 def moment(entry):
@@ -718,15 +718,16 @@ def moment(entry):
         return None
 
 
-def still_working(path, text, since):
-    """Whether a Claude transcript shows `text` queued during the turn whose contract was bound at `since`.
+def still_working(path, since):
+    """Whether a Claude transcript shows the turn whose contract was bound at `since` still running.
 
-    A prompt typed while the agent works is recorded as a queue operation and delivered mid-turn,
-    with no user entry of its own. A finished turn leaves a turn-end entry, and a person's prompt or
-    an interrupt leaves a user entry, so either one after the binding means a new task. Any doubt
-    (no transcript, no queue record, an entry without a time) counts as a new task.
+    Claude runs UserPromptSubmit for a prompt typed while the agent works before recording that
+    prompt anywhere, then delivers it mid-turn with no user entry of its own. A prompt that starts a
+    turn is recorded as a user entry before its hook runs, an interrupt leaves a user entry and a
+    finished turn a turn_duration entry, so any of them after the binding means a new task. Any
+    doubt (no transcript, no Claude assistant entry, an entry without a time) counts as a new task.
     """
-    if not isinstance(path, str) or not path or not isinstance(text, str) or not isinstance(since, (int, float)):
+    if not isinstance(path, str) or not path or not isinstance(since, (int, float)):
         return False
     try:
         with open(path, "rb") as source:
@@ -739,7 +740,7 @@ def still_working(path, text, since):
     lines = data.splitlines()
     if size > TRANSCRIPT_TAIL:
         lines = lines[1:]  # The first line may be cut.
-    queued = False
+    claude = False  # Codex rollouts have no assistant entries, so a Codex prompt always starts a task.
     for line in lines:
         try:
             entry = json.loads(line)
@@ -747,7 +748,8 @@ def still_working(path, text, since):
             continue
         if not isinstance(entry, dict) or entry.get("isSidechain"):
             continue
-        boundary = entry.get("type") == "system" and entry.get("subtype") in TURN_ENDS
+        claude = claude or (entry.get("type") == "assistant" and isinstance(entry.get("message"), dict))
+        boundary = entry.get("type") == "system" and entry.get("subtype") == TURN_END
         if entry.get("type") == "user" and not entry.get("isMeta"):
             message = entry.get("message") if isinstance(entry.get("message"), dict) else {}
             words = text_of(message.get("content"))
@@ -756,10 +758,7 @@ def still_working(path, text, since):
             when = moment(entry)
             if when is None or when >= since:
                 return False
-            queued = False  # A queue record before that boundary belongs to an earlier turn.
-        elif entry.get("type") == "queue-operation" and entry.get("content") == text:
-            queued = True
-    return queued
+    return claude
 
 
 def prompt(root, payload):
@@ -775,7 +774,7 @@ def prompt(root, payload):
     with Store(root) as store:
         record = store.sessions.get(session)
         if record and "contract" in record:
-            if still_working(payload.get("transcript_path"), text, record.get("at")):
+            if still_working(payload.get("transcript_path"), record.get("at")):
                 return
             for name in ("contract", "meta", "model"):
                 record.pop(name, None)

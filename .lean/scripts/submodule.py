@@ -270,7 +270,7 @@ def use(root, remote):
                 "lean_status": git(root, "status", "--short")}
 
 
-def gate(root, optional=False):
+def gate(root, optional=False, quiet=False):
     paths = context(root)
     if paths["target"] is None:
         if optional:
@@ -288,11 +288,15 @@ def gate(root, optional=False):
         return 2
     if git(Path(paths["project_root"]), "symbolic-ref", "--quiet", "HEAD", optional=True) is None:
         fail("target is detached; choose a branch before application work")
-    for command in commands:
+    for number, command in enumerate(commands, 1):
+        if not quiet:
+            print(f"Target Quality Gate: check {number} started", file=sys.stderr, flush=True)
         result = subprocess.run(["bash", "-c", command], cwd=paths["project_root"])
         if result.returncode:
             print(f"Target Quality Gate failed ({result.returncode}): {command}", file=sys.stderr)
             return 2
+        if not quiet:
+            print(f"Target Quality Gate: check {number} passed", file=sys.stderr, flush=True)
     return 0
 
 
@@ -310,6 +314,7 @@ def main():
     commands.add_parser("clear")
     run_gate = commands.add_parser("gate")
     run_gate.add_argument("--optional", action="store_true")
+    run_gate.add_argument("--quiet", action="store_true")
     args = parser.parse_args()
     try:
         root = args.root.resolve()
@@ -324,7 +329,7 @@ def main():
                 safe_path(root, ".agent-runtime/active-target.json").unlink(missing_ok=True)
             result = context(root)
         else:
-            return gate(root, args.optional)
+            return gate(root, args.optional, args.quiet)
         print(json.dumps(result, indent=2))
     except (ValueError, OSError, TypeError, KeyError) as error:
         print(f"submodule error: {error}", file=sys.stderr)

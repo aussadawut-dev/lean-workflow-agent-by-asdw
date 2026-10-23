@@ -233,46 +233,45 @@ class MidTurnPromptTests(HookFixture):
         name, tool_input = self.WRITES[provider]
         return self.tool(provider, name, session, **tool_input).returncode == 0
 
-    def queued(self, text, offset=1):
-        return {"type": "queue-operation", "operation": "enqueue", "timestamp": self.at(offset), "content": text}
+    def assistant(self, offset):
+        """A Claude assistant entry that runs a tool, `offset` seconds from now."""
+        return {"type": "assistant", "timestamp": self.at(offset),
+                "message": {"role": "assistant", "content": [{"type": "tool_use", "name": "Bash", "input": {}}]}}
 
-    def test_a_prompt_queued_while_the_agent_works_keeps_the_contract(self):
+    def test_a_prompt_typed_while_the_agent_works_keeps_the_contract(self):
+        # Claude runs the hook before it records such a prompt at all, so nothing in the transcript marks it.
         self.declare()
-        self.submit("status?", self.transcript(self.queued("status?")))
+        self.submit("status?", self.transcript(self.assistant(-2), self.assistant(2)))
         self.assertTrue(self.can_write(), "a status question sent mid-turn dropped the bound contract")
 
-    def test_a_prompt_after_the_turn_ended_clears_the_contract(self):
+    def test_a_stop_that_blocks_does_not_end_the_turn(self):
         self.declare()
-        for end in ("turn_duration", "stop_hook_summary"):
-            with self.subTest(end=end):
+        path = self.transcript(self.assistant(2),
+                               {"type": "user", "isMeta": True, "timestamp": self.at(2),
+                                "message": {"role": "user", "content": "Stop hook feedback:\nGate refused"}},
+                               {"type": "system", "subtype": "stop_hook_summary", "timestamp": self.at(2)})
+        self.submit("status?", path)
+        self.assertTrue(self.can_write(), "a blocked Stop counted as the end of the turn")
+
+    def test_a_finished_turn_or_an_untimed_turn_end_clears_the_contract(self):
+        for offset in (2, None):
+            with self.subTest(offset=offset):
                 self.declare()
-                path = self.transcript(self.queued("next"), {"type": "system", "subtype": end, "timestamp": self.at(2)})
-                self.submit("next", path)
+                end = {"type": "system", "subtype": "turn_duration"}
+                if offset is not None:
+                    end["timestamp"] = self.at(offset)
+                self.submit("next", self.transcript(self.assistant(2), end))
                 self.assertFalse(self.can_write())
 
-    def test_a_human_or_interrupt_entry_after_binding_clears_the_contract(self):
+    def test_a_person_prompt_or_interrupt_after_binding_clears_the_contract(self):
+        # A prompt that starts a turn is recorded as a user entry before its hook runs.
         for text in ("next task", "[Request interrupted by user]"):
             with self.subTest(text=text):
                 self.declare()
-                path = self.transcript(self.queued("next"), {"type": "user", "timestamp": self.at(2),
-                                                             "message": {"role": "user", "content": text}})
-                self.submit("next", path)
+                path = self.transcript(self.assistant(2), {"type": "user", "timestamp": self.at(2),
+                                                           "message": {"role": "user", "content": text}})
+                self.submit("next task", path)
                 self.assertFalse(self.can_write())
-
-    def test_a_prompt_without_its_queue_record_clears_the_contract(self):
-        self.declare()
-        path = self.transcript(self.queued("something else"),
-                               {"type": "assistant", "timestamp": self.at(1),
-                                "message": {"content": [{"type": "text", "text": "working"}]}})
-        self.submit("new task", path)
-        self.assertFalse(self.can_write())
-
-    def test_a_queue_record_from_an_earlier_turn_does_not_keep_the_contract(self):
-        path = self.transcript(self.queued("again", -120), {"type": "system", "subtype": "turn_duration",
-                                                             "timestamp": self.at(-60)})
-        self.declare()
-        self.submit("again", path)
-        self.assertFalse(self.can_write())
 
     def test_without_a_readable_transcript_every_prompt_still_clears(self):
         for provider, transcript in (("claude", None), ("claude", "/nonexistent/t.jsonl"), ("codex", None)):
@@ -281,6 +280,17 @@ class MidTurnPromptTests(HookFixture):
                 self.declare(provider, session)
                 self.submit("status?", transcript, provider, session)
                 self.assertFalse(self.can_write(provider, session))
+
+    def test_a_codex_prompt_with_its_own_transcript_still_clears(self):
+        # Codex rollouts carry no queue records or Claude turn ends, so every Codex prompt starts a task.
+        path = self.transcript(
+            {"timestamp": self.at(-5), "type": "session_meta", "payload": {"id": "c1"}},
+            {"timestamp": self.at(1), "type": "event_msg", "payload": {"type": "task_started"}},
+            {"timestamp": self.at(1), "type": "response_item",
+             "payload": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "status?"}]}})
+        self.declare("codex", "codex-rollout")
+        self.submit("status?", path, "codex", "codex-rollout")
+        self.assertFalse(self.can_write("codex", "codex-rollout"))
 
 
 class GuardHookTests(HookFixture):
