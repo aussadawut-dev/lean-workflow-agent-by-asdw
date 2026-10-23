@@ -1,0 +1,167 @@
+{
+  "runs": [
+    {
+      "case": "passing",
+      "shards": 1,
+      "command": [
+        "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3",
+        "/Users/x10/orca/workspaces/lean-workflow-agent-by-asdw/feat-improve-flow-2026-10-24/.lean/tests/run_tests.py",
+        "--shards",
+        "1",
+        "--start-dir",
+        "<fixture>/.lean/tests"
+      ],
+      "expected_returncode": 0,
+      "returncode": 0,
+      "passed": true,
+      "output": "ok      0.1s test_ok.py\n\n1 files in 0.1s: OK\n"
+    },
+    {
+      "case": "python_failure",
+      "shards": 1,
+      "command": [
+        "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3",
+        "/Users/x10/orca/workspaces/lean-workflow-agent-by-asdw/feat-improve-flow-2026-10-24/.lean/tests/run_tests.py",
+        "--shards",
+        "1",
+        "--start-dir",
+        "<fixture>/.lean/tests"
+      ],
+      "expected_returncode": 1,
+      "returncode": 1,
+      "passed": true,
+      "output": "FAIL    0.1s test_bad.py\n\n===== test_bad.py =====\nF\n======================================================================\nFAIL: test_bad (test_bad.T.test_bad)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private<fixture>/.lean/tests/test_bad.py\", line 3, in test_bad\n    def test_bad(self): self.fail(\"planted failure\")\n                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^^\nAssertionError: planted failure\n\n----------------------------------------------------------------------\nRan 1 test in 0.001s\n\nFAILED (failures=1)\n\nFailed tests:\ntest_bad.py: FAIL: test_bad (test_bad.T.test_bad)\n1 files in 0.1s: FAILED (1)\n"
+    },
+    {
+      "case": "failed_shard",
+      "shards": 1,
+      "command": [
+        "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3",
+        "/Users/x10/orca/workspaces/lean-workflow-agent-by-asdw/feat-improve-flow-2026-10-24/.lean/tests/run_tests.py",
+        "--shards",
+        "1",
+        "--start-dir",
+        "<fixture>/.lean/tests"
+      ],
+      "expected_returncode": 1,
+      "returncode": 1,
+      "passed": true,
+      "output": "FAIL    0.1s test_mixed.py\n\n===== test_mixed.py =====\nF..\n======================================================================\nFAIL: test_bad (test_mixed.T.test_bad)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private<fixture>/.lean/tests/test_mixed.py\", line 3, in test_bad\n    def test_bad(self): self.fail(\"planted failure\")\n                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^^\nAssertionError: planted failure\n\n----------------------------------------------------------------------\nRan 3 tests in 0.000s\n\nFAILED (failures=1)\n\nFailed tests:\ntest_mixed.py: FAIL: test_bad (test_mixed.T.test_bad)\n1 files in 0.1s: FAILED (1)\n"
+    },
+    {
+      "case": "shell_failure",
+      "shards": 1,
+      "command": [
+        "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3",
+        "/Users/x10/orca/workspaces/lean-workflow-agent-by-asdw/feat-improve-flow-2026-10-24/.lean/tests/run_tests.py",
+        "--shards",
+        "1",
+        "--start-dir",
+        "<fixture>/.lean/tests",
+        "suite.sh"
+      ],
+      "expected_returncode": 1,
+      "returncode": 1,
+      "passed": true,
+      "output": "FAIL    0.0s suite.sh\n\n===== suite.sh =====\nplanted shell failure\n\n1 files in 0.0s: FAILED (1)\n"
+    },
+    {
+      "case": "import_failure",
+      "shards": 1,
+      "command": [
+        "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3",
+        "/Users/x10/orca/workspaces/lean-workflow-agent-by-asdw/feat-improve-flow-2026-10-24/.lean/tests/run_tests.py",
+        "--shards",
+        "1",
+        "--start-dir",
+        "<fixture>/.lean/tests"
+      ],
+      "expected_returncode": 1,
+      "returncode": 1,
+      "passed": true,
+      "output": "FAIL    0.0s test_broken.py\n\n===== test_broken.py =====\nE\n======================================================================\nERROR: test_broken (unittest.loader._FailedTest.test_broken)\n----------------------------------------------------------------------\nImportError: Failed to import test module: test_broken\nTraceback (most recent call last):\n  File \"/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/loader.py\", line 426, in _find_test_path\n    module = self._get_module_from_name(name)\n  File \"/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/loader.py\", line 367, in _get_module_from_name\n    __import__(name)\n    ~~~~~~~~~~^^^^^^\n  File \"/private<fixture>/.lean/tests/test_broken.py\", line 1, in <module>\n    raise ImportError(\"planted import failure\")\nImportError: planted import failure\n\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nFAILED (errors=1)\n\nFailed tests:\ntest_broken.py: ERROR: test_broken (unittest.loader._FailedTest.test_broken)\n1 files in 0.0s: FAILED (1)\n"
+    },
+    {
+      "case": "passing",
+      "shards": 6,
+      "command": [
+        "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3",
+        "/Users/x10/orca/workspaces/lean-workflow-agent-by-asdw/feat-improve-flow-2026-10-24/.lean/tests/run_tests.py",
+        "--shards",
+        "6",
+        "--start-dir",
+        "<fixture>/.lean/tests"
+      ],
+      "expected_returncode": 0,
+      "returncode": 0,
+      "passed": true,
+      "output": "ok      0.0s test_ok.py\n\n1 files in 0.0s: OK\n"
+    },
+    {
+      "case": "python_failure",
+      "shards": 6,
+      "command": [
+        "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3",
+        "/Users/x10/orca/workspaces/lean-workflow-agent-by-asdw/feat-improve-flow-2026-10-24/.lean/tests/run_tests.py",
+        "--shards",
+        "6",
+        "--start-dir",
+        "<fixture>/.lean/tests"
+      ],
+      "expected_returncode": 1,
+      "returncode": 1,
+      "passed": true,
+      "output": "FAIL    0.0s test_bad.py\n\n===== test_bad.py =====\nF\n======================================================================\nFAIL: test_bad (test_bad.T.test_bad)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private<fixture>/.lean/tests/test_bad.py\", line 3, in test_bad\n    def test_bad(self): self.fail(\"planted failure\")\n                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^^\nAssertionError: planted failure\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nFAILED (failures=1)\n\nFailed tests:\ntest_bad.py: FAIL: test_bad (test_bad.T.test_bad)\n1 files in 0.0s: FAILED (1)\n"
+    },
+    {
+      "case": "failed_shard",
+      "shards": 6,
+      "command": [
+        "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3",
+        "/Users/x10/orca/workspaces/lean-workflow-agent-by-asdw/feat-improve-flow-2026-10-24/.lean/tests/run_tests.py",
+        "--shards",
+        "6",
+        "--start-dir",
+        "<fixture>/.lean/tests"
+      ],
+      "expected_returncode": 1,
+      "returncode": 1,
+      "passed": true,
+      "output": "FAIL    0.0s test_mixed.py [1/3]\nok      0.0s test_mixed.py [2/3]\nok      0.0s test_mixed.py [3/3]\n\n===== test_mixed.py [1/3] =====\nF\n======================================================================\nFAIL: test_bad (test_mixed.T.test_bad)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private<fixture>/.lean/tests/test_mixed.py\", line 3, in test_bad\n    def test_bad(self): self.fail(\"planted failure\")\n                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^^\nAssertionError: planted failure\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nFAILED (failures=1)\n\nFailed tests:\ntest_mixed.py [1/3]: FAIL: test_bad (test_mixed.T.test_bad)\n1 files (3 processes) in 0.0s: FAILED (1)\n"
+    },
+    {
+      "case": "shell_failure",
+      "shards": 6,
+      "command": [
+        "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3",
+        "/Users/x10/orca/workspaces/lean-workflow-agent-by-asdw/feat-improve-flow-2026-10-24/.lean/tests/run_tests.py",
+        "--shards",
+        "6",
+        "--start-dir",
+        "<fixture>/.lean/tests",
+        "suite.sh"
+      ],
+      "expected_returncode": 1,
+      "returncode": 1,
+      "passed": true,
+      "output": "FAIL    0.0s suite.sh\n\n===== suite.sh =====\nplanted shell failure\n\n1 files in 0.0s: FAILED (1)\n"
+    },
+    {
+      "case": "import_failure",
+      "shards": 6,
+      "command": [
+        "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3",
+        "/Users/x10/orca/workspaces/lean-workflow-agent-by-asdw/feat-improve-flow-2026-10-24/.lean/tests/run_tests.py",
+        "--shards",
+        "6",
+        "--start-dir",
+        "<fixture>/.lean/tests"
+      ],
+      "expected_returncode": 1,
+      "returncode": 1,
+      "passed": true,
+      "output": "FAIL    0.0s test_broken.py\n\n===== test_broken.py =====\nE\n======================================================================\nERROR: test_broken (unittest.loader._FailedTest.test_broken)\n----------------------------------------------------------------------\nImportError: Failed to import test module: test_broken\nTraceback (most recent call last):\n  File \"/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/loader.py\", line 426, in _find_test_path\n    module = self._get_module_from_name(name)\n  File \"/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/loader.py\", line 367, in _get_module_from_name\n    __import__(name)\n    ~~~~~~~~~~^^^^^^\n  File \"/private<fixture>/.lean/tests/test_broken.py\", line 1, in <module>\n    raise ImportError(\"planted import failure\")\nImportError: planted import failure\n\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nFAILED (errors=1)\n\nFailed tests:\ntest_broken.py: ERROR: test_broken (unittest.loader._FailedTest.test_broken)\n1 files in 0.0s: FAILED (1)\n"
+    }
+  ],
+  "all_passed": true
+}

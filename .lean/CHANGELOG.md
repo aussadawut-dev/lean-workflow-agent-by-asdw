@@ -8,6 +8,9 @@ Token highlights come from the [historical smoke-test notes](https://github.com/
 
 ## Unreleased
 
+- Print parallel test-job status as each job completes, including fast failures behind earlier slow jobs; retain all checks, detailed failure blocks and the final recap in submission order. Barrier regression and separate feedback-latency measurements are retained with the benchmark notes.
+- Run the full CI regression suite with six shards per Python file while retaining the CPU-sized worker pool and all matrix checks. Local paired measurements and actual test-ID coverage are retained in `docs/benchmarks/2026-10-24/`; remote matrix timings remain unmeasured.
+- Index active and archived tracker documents once per queue validation instead of rescanning them for every item; count and stat only IDs referenced by active or archived queue records to avoid unrelated history work. Preserve exact ID linkage, duplicate detection, validation order and fresh lookups on each call.
 - Add optional `lean-playbook` for project deployment/backup/rollback preparation, read-only readiness checks and explicitly requested execution. Include reusable playbook/release record templates, provider-parity discovery tests and compatibility with the previous 17-skill registry. Nine core skills remain enabled by default; the optional pack now has nine skills. Projects with deployment targets are offered the skill during init without automatic activation or execution.
 - Upgrade shared assets, canonical skills, templates, registry and discovery tooling together; preserve project operations documents and release records. Reload runtime skills after enabling the optional pack. No configuration or record migration is needed.
 
