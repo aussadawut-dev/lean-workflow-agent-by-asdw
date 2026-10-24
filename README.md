@@ -4,9 +4,9 @@ I built this because I want a coding agent to understand the work, check what it
 
 It works with **Claude Code and Codex**, with one shared set of rules and skills. Use it with your own stack.
 
-**Baseline 4.15.0** · [MIT License](LICENSE)
+**Baseline 4.16.0** · [MIT License](LICENSE)
 
-This release shows numbered Quality Gate progress with elapsed times on direct runs while Stops stay quiet, and makes the 4.14.0 mid-turn rule work in Claude Code: a prompt typed while the agent works keeps the Task Contract, checked live in Claude Code and Codex. See the [4.15.0 release notes](.lean/CHANGELOG.md#4150--2026-10-23) for changes and upgrade notes.
+This release adds optional operational playbooks for deployment, backup and rollback preparation, refines queue lookups, shards CI checks and reports parallel test status as jobs finish. See the [4.16.0 release notes](.lean/CHANGELOG.md#4160--2026-10-24) for changes, measured limits and upgrade notes.
 
 The idea is simple: **agree on the work → implement → test → validate → review → finish with evidence**. Use the steps the task needs. You do not have to call every skill or read every file to get started.
 
