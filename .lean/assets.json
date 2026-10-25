@@ -73,6 +73,7 @@
     ".lean/templates/tracker.md",
     ".lean/tests/run_tests.py",
     ".lean/tests/test-hooks.sh",
+    ".lean/tests/test_busy_cap.py",
     ".lean/tests/test_clean_repo.py",
     ".lean/tests/test_contract_guard.py",
     ".lean/tests/test_downgrade.py",
