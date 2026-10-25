@@ -69,7 +69,7 @@ jobs:
         run: python3 .lean/scripts/model_catalog.py check
 
       - name: Workflow regression tests
-        run: python3 .lean/tests/run_tests.py
+        run: python3 .lean/tests/run_tests.py --shards 6
 
       - name: Eval graders and fixtures (no model calls)
         run: |

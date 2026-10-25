@@ -1,0 +1,396 @@
+{
+  "python": "3.14.3 (v3.14.3:323c59a5e34, Feb  3 2026, 11:41:37) [Clang 16.0.0 (clang-1600.0.26.6)]",
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "cpus": 8,
+  "source_sha256": {
+    "baseline": "11331ae4757b9a6fd52fb7ce4989911309b40774672c341e9ae5849eadc900ea",
+    "candidate": "11331ae4757b9a6fd52fb7ce4989911309b40774672c341e9ae5849eadc900ea"
+  },
+  "method": "One warm-up per version/case; sequential pairs alternate order; fixture setup excluded; CLI startup included.",
+  "cases": [
+    {
+      "items": 0,
+      "tracker_files": 10,
+      "layout": "shared",
+      "samples": [
+        {
+          "pair": 1,
+          "version": "baseline",
+          "load_before": 4.78662109375,
+          "seconds": 0.053415166039485484
+        },
+        {
+          "pair": 1,
+          "version": "candidate",
+          "load_before": 4.78662109375,
+          "seconds": 0.04968541697598994
+        },
+        {
+          "pair": 2,
+          "version": "candidate",
+          "load_before": 4.78662109375,
+          "seconds": 0.0482360830064863
+        },
+        {
+          "pair": 2,
+          "version": "baseline",
+          "load_before": 4.78662109375,
+          "seconds": 0.04830779100302607
+        },
+        {
+          "pair": 3,
+          "version": "baseline",
+          "load_before": 4.78662109375,
+          "seconds": 0.04940699995495379
+        },
+        {
+          "pair": 3,
+          "version": "candidate",
+          "load_before": 4.78662109375,
+          "seconds": 0.048252416017930955
+        }
+      ],
+      "median_seconds": {
+        "baseline": 0.04940699995495379,
+        "candidate": 0.048252416017930955
+      },
+      "records_unchanged": true
+    },
+    {
+      "items": 0,
+      "tracker_files": 10,
+      "layout": "distinct",
+      "samples": [
+        {
+          "pair": 1,
+          "version": "baseline",
+          "load_before": 4.78662109375,
+          "seconds": 0.04821383400121704
+        },
+        {
+          "pair": 1,
+          "version": "candidate",
+          "load_before": 4.78662109375,
+          "seconds": 0.050968124996870756
+        },
+        {
+          "pair": 2,
+          "version": "candidate",
+          "load_before": 4.78662109375,
+          "seconds": 0.04940341698238626
+        },
+        {
+          "pair": 2,
+          "version": "baseline",
+          "load_before": 4.78662109375,
+          "seconds": 0.04843362502288073
+        },
+        {
+          "pair": 3,
+          "version": "baseline",
+          "load_before": 4.78662109375,
+          "seconds": 0.04939554102020338
+        },
+        {
+          "pair": 3,
+          "version": "candidate",
+          "load_before": 4.78662109375,
+          "seconds": 0.048360041982959956
+        }
+      ],
+      "median_seconds": {
+        "baseline": 0.04843362502288073,
+        "candidate": 0.04940341698238626
+      },
+      "records_unchanged": true
+    },
+    {
+      "items": 1,
+      "tracker_files": 10000,
+      "layout": "shared",
+      "samples": [
+        {
+          "pair": 1,
+          "version": "baseline",
+          "load_before": 4.78662109375,
+          "seconds": 0.13739325001370162
+        },
+        {
+          "pair": 1,
+          "version": "candidate",
+          "load_before": 4.78662109375,
+          "seconds": 0.14260541601106524
+        },
+        {
+          "pair": 2,
+          "version": "candidate",
+          "load_before": 4.78662109375,
+          "seconds": 0.14525679202051833
+        },
+        {
+          "pair": 2,
+          "version": "baseline",
+          "load_before": 4.78662109375,
+          "seconds": 0.13612570898840204
+        },
+        {
+          "pair": 3,
+          "version": "baseline",
+          "load_before": 4.78662109375,
+          "seconds": 0.13163041701773182
+        },
+        {
+          "pair": 3,
+          "version": "candidate",
+          "load_before": 4.78662109375,
+          "seconds": 0.13102375000016764
+        }
+      ],
+      "median_seconds": {
+        "baseline": 0.13612570898840204,
+        "candidate": 0.14260541601106524
+      },
+      "records_unchanged": true
+    },
+    {
+      "items": 1,
+      "tracker_files": 10000,
+      "layout": "distinct",
+      "samples": [
+        {
+          "pair": 1,
+          "version": "baseline",
+          "load_before": 5.76416015625,
+          "seconds": 0.23690045799594373
+        },
+        {
+          "pair": 1,
+          "version": "candidate",
+          "load_before": 5.76416015625,
+          "seconds": 0.23214691696921363
+        },
+        {
+          "pair": 2,
+          "version": "candidate",
+          "load_before": 5.76416015625,
+          "seconds": 0.2314951250446029
+        },
+        {
+          "pair": 2,
+          "version": "baseline",
+          "load_before": 5.76416015625,
+          "seconds": 0.23160037503112108
+        },
+        {
+          "pair": 3,
+          "version": "baseline",
+          "load_before": 5.76416015625,
+          "seconds": 0.2330261250026524
+        },
+        {
+          "pair": 3,
+          "version": "candidate",
+          "load_before": 5.76416015625,
+          "seconds": 0.23832820798270404
+        }
+      ],
+      "median_seconds": {
+        "baseline": 0.2330261250026524,
+        "candidate": 0.23214691696921363
+      },
+      "records_unchanged": true
+    },
+    {
+      "items": 10,
+      "tracker_files": 10000,
+      "layout": "shared",
+      "samples": [
+        {
+          "pair": 1,
+          "version": "baseline",
+          "load_before": 5.94287109375,
+          "seconds": 0.13960595900425687
+        },
+        {
+          "pair": 1,
+          "version": "candidate",
+          "load_before": 5.94287109375,
+          "seconds": 0.13927895796950907
+        },
+        {
+          "pair": 2,
+          "version": "candidate",
+          "load_before": 5.94287109375,
+          "seconds": 0.13417312497040257
+        },
+        {
+          "pair": 2,
+          "version": "baseline",
+          "load_before": 5.94287109375,
+          "seconds": 0.1347695830045268
+        },
+        {
+          "pair": 3,
+          "version": "baseline",
+          "load_before": 5.94287109375,
+          "seconds": 0.1338526249746792
+        },
+        {
+          "pair": 3,
+          "version": "candidate",
+          "load_before": 5.94287109375,
+          "seconds": 0.1346502499654889
+        }
+      ],
+      "median_seconds": {
+        "baseline": 0.1347695830045268,
+        "candidate": 0.1346502499654889
+      },
+      "records_unchanged": true
+    },
+    {
+      "items": 10,
+      "tracker_files": 10000,
+      "layout": "distinct",
+      "samples": [
+        {
+          "pair": 1,
+          "version": "baseline",
+          "load_before": 5.94287109375,
+          "seconds": 0.24148708302527666
+        },
+        {
+          "pair": 1,
+          "version": "candidate",
+          "load_before": 5.94287109375,
+          "seconds": 0.24219816701952368
+        },
+        {
+          "pair": 2,
+          "version": "candidate",
+          "load_before": 5.787109375,
+          "seconds": 0.2326463750214316
+        },
+        {
+          "pair": 2,
+          "version": "baseline",
+          "load_before": 5.787109375,
+          "seconds": 0.24701916699996218
+        },
+        {
+          "pair": 3,
+          "version": "baseline",
+          "load_before": 5.787109375,
+          "seconds": 0.27487529203062877
+        },
+        {
+          "pair": 3,
+          "version": "candidate",
+          "load_before": 5.787109375,
+          "seconds": 0.24335345800500363
+        }
+      ],
+      "median_seconds": {
+        "baseline": 0.24701916699996218,
+        "candidate": 0.24219816701952368
+      },
+      "records_unchanged": true
+    },
+    {
+      "items": 1000,
+      "tracker_files": 1000,
+      "layout": "shared",
+      "samples": [
+        {
+          "pair": 1,
+          "version": "baseline",
+          "load_before": 5.787109375,
+          "seconds": 0.08532133401604369
+        },
+        {
+          "pair": 1,
+          "version": "candidate",
+          "load_before": 5.787109375,
+          "seconds": 0.08629529096651822
+        },
+        {
+          "pair": 2,
+          "version": "candidate",
+          "load_before": 5.787109375,
+          "seconds": 0.08607162500265986
+        },
+        {
+          "pair": 2,
+          "version": "baseline",
+          "load_before": 5.787109375,
+          "seconds": 0.08561191702028736
+        },
+        {
+          "pair": 3,
+          "version": "baseline",
+          "load_before": 5.787109375,
+          "seconds": 0.08483975002309307
+        },
+        {
+          "pair": 3,
+          "version": "candidate",
+          "load_before": 5.787109375,
+          "seconds": 0.08730933303013444
+        }
+      ],
+      "median_seconds": {
+        "baseline": 0.08532133401604369,
+        "candidate": 0.08629529096651822
+      },
+      "records_unchanged": true
+    },
+    {
+      "items": 1000,
+      "tracker_files": 1000,
+      "layout": "distinct",
+      "samples": [
+        {
+          "pair": 1,
+          "version": "baseline",
+          "load_before": 5.787109375,
+          "seconds": 0.11545687500620261
+        },
+        {
+          "pair": 1,
+          "version": "candidate",
+          "load_before": 5.787109375,
+          "seconds": 0.11321712500648573
+        },
+        {
+          "pair": 2,
+          "version": "candidate",
+          "load_before": 5.787109375,
+          "seconds": 0.11368541698902845
+        },
+        {
+          "pair": 2,
+          "version": "baseline",
+          "load_before": 5.787109375,
+          "seconds": 0.12174741696799174
+        },
+        {
+          "pair": 3,
+          "version": "baseline",
+          "load_before": 5.787109375,
+          "seconds": 0.12637045799056068
+        },
+        {
+          "pair": 3,
+          "version": "candidate",
+          "load_before": 5.787109375,
+          "seconds": 0.12233170901890844
+        }
+      ],
+      "median_seconds": {
+        "baseline": 0.12174741696799174,
+        "candidate": 0.11368541698902845
+      },
+      "records_unchanged": true
+    }
+  ]
+}

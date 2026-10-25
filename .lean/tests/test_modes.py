@@ -1,10 +1,12 @@
 """Behavior checks for repository modes and full-mode queue ownership."""
 
+import importlib.util
 import json
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/workflow.py"
@@ -744,6 +746,184 @@ class WorkflowModeTests(unittest.TestCase):
                                text=True, capture_output=True, check=True).stdout.strip()
         (markers / ".gate-cache").write_text(state)
         self.assertEqual(json.loads(self.run_cli("context").stdout)["gate"]["status"], "PASS")
+
+
+class QueueTrackerLookupTests(unittest.TestCase):
+    """Queue validation scales with records while keeping exact, fresh tracker linkage."""
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        for name in ("docs/tracking", "docs/history/agent-workflow/2026", ".agents/queue/items"):
+            (self.root / name).mkdir(parents=True)
+        spec = importlib.util.spec_from_file_location("workflow_lookup", SCRIPT)
+        self.workflow = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.workflow)
+
+    def tracker(self, name="TCK001.md", archived=False):
+        directory = "docs/history/agent-workflow/2026" if archived else "docs/tracking"
+        path = self.root / directory / name
+        path.write_text("# Workset\nStatus: PLANNED\n")
+        return path
+
+    def item(self, number=1, tracker="TCK001"):
+        value = {"id": f"Q{number:04d}", "tracker": tracker, "title": "Task", "status": "READY",
+                 "scopes": [f"area:{number}"], "dependencies": [], "evidence": None}
+        (self.root / ".agents/queue/items" / f"Q{number:04d}.json").write_text(json.dumps(value))
+        return value
+
+    def test_queue_enumerates_tracker_directories_once_per_validation(self):
+        self.tracker()
+        self.tracker("TCK002-task.md")
+        self.tracker("TCK003-task.md", archived=True)
+        expected = {}
+        for n in range(1, 13):
+            item = self.item(n, f"TCK{n % 3 + 1:03d}")
+            expected[item["id"]] = item
+        active, history = [], []
+        glob, rglob = Path.glob, Path.rglob
+
+        def count_active(path, *args, **kwargs):
+            if path == self.root / "docs/tracking":
+                active.append(args[0])
+            return glob(path, *args, **kwargs)
+
+        def count_history(path, *args, **kwargs):
+            if path == self.root / "docs/history/agent-workflow":
+                history.append(args[0])
+            return rglob(path, *args, **kwargs)
+
+        with mock.patch.object(Path, "glob", count_active), mock.patch.object(Path, "rglob", count_history):
+            self.assertEqual(self.workflow.items(self.root), expected)
+        # Deterministic I/O bound, not a host-dependent wall-clock threshold.
+        self.assertLessEqual(len(active), 1, active)
+        self.assertLessEqual(len(history), 1, history)
+
+    def test_sparse_queue_stats_only_referenced_tracker_documents(self):
+        self.tracker()
+        self.tracker("TCK002-task.md", archived=True)
+        for number in range(3, 103):
+            self.tracker(f"TCK{number:03d}-unrelated.md", archived=True)
+        expected = {item["id"]: item for item in (self.item(), self.item(2, "TCK002"))}
+        checked = []
+        is_file = Path.is_file
+
+        def count_documents(path):
+            if path.suffix == ".md" and path.name.startswith("TCK"):
+                checked.append(path.name)
+            return is_file(path)
+
+        with mock.patch.object(Path, "is_file", count_documents):
+            self.assertEqual(self.workflow.items(self.root), expected)
+        self.assertCountEqual(checked, ["TCK001.md", "TCK002-task.md"])
+
+    def test_queue_lookup_includes_archived_queue_sources(self):
+        self.tracker()
+        self.tracker("TCK002-task.md", archived=True)
+        current = self.item()
+        archived = self.item(2, "TCK002")
+        archived.update(status="DONE", evidence="checked")
+        with mock.patch.object(self.workflow, "queue_history", return_value={
+                "Q0002": {"content": json.dumps(archived)}}):
+            (self.root / ".agents/queue/items/Q0002.json").unlink()
+            self.assertEqual(self.workflow.items(self.root), {"Q0001": current, "Q0002": archived})
+            self.tracker("TCK002-duplicate.md")
+            with self.assertRaisesRegex(ValueError, "expected one tracker document for TCK002, found 2"):
+                self.workflow.items(self.root)
+
+    def test_queue_lookup_preserves_first_item_error_before_later_invalid_tracker(self):
+        self.item()
+        self.item(2, tracker=["invalid"])
+        with self.assertRaisesRegex(ValueError, "expected one tracker document for TCK001, found 0"):
+            self.workflow.items(self.root)
+
+    def test_queue_resolves_nested_archive_and_ignores_original_text(self):
+        self.tracker("TCK001-original.txt")
+        self.tracker("TCK001-task.md", archived=True)
+        self.tracker("TCK0010-other.md")
+        item = self.item()
+        self.assertEqual(self.workflow.items(self.root), {item["id"]: item})
+
+    def test_queue_requires_exact_id_and_a_document(self):
+        self.tracker("TCK0010-other.md")
+        self.tracker("TCK001-original.txt", archived=True)
+        (self.root / "docs/tracking/TCK001.md").mkdir()
+        self.item()
+        with self.assertRaisesRegex(ValueError, "expected one tracker document for TCK001, found 0"):
+            self.workflow.items(self.root)
+
+    def test_queue_rejects_active_and_archived_duplicates(self):
+        self.tracker()
+        self.item()
+        for archived in (False, True):
+            with self.subTest(archived=archived):
+                duplicate = self.tracker("TCK001-other.md", archived=archived)
+                try:
+                    with self.assertRaisesRegex(ValueError, "expected one tracker document for TCK001, found 2"):
+                        self.workflow.items(self.root)
+                finally:
+                    duplicate.unlink()
+
+    def test_queue_refreshes_lookup_after_a_move_deletion_and_addition(self):
+        active = self.tracker()
+        item = self.item()
+        self.assertEqual(self.workflow.items(self.root), {item["id"]: item})
+        archived = self.root / "docs/history/agent-workflow/2026/TCK001-task.md"
+        active.rename(archived)
+        self.assertEqual(self.workflow.items(self.root), {item["id"]: item})
+        archived.unlink()
+        with self.assertRaisesRegex(ValueError, "found 0"):
+            self.workflow.items(self.root)
+        self.tracker()
+        self.assertEqual(self.workflow.items(self.root), {item["id"]: item})
+        self.tracker("TCK001-second.md", archived=True)
+        with self.assertRaisesRegex(ValueError, "found 2"):
+            self.workflow.items(self.root)
+
+    def test_queue_lookup_does_not_leak_between_roots(self):
+        self.tracker()
+        self.item()
+        self.assertEqual(len(self.workflow.items(self.root)), 1)
+        other = self.root / "other"
+        (other / ".agents/queue/items").mkdir(parents=True)
+        source = self.root / ".agents/queue/items/Q0001.json"
+        (other / ".agents/queue/items/Q0001.json").write_bytes(source.read_bytes())
+        with self.assertRaisesRegex(ValueError, "found 0"):
+            self.workflow.items(other)
+
+    def test_queue_skips_tracker_scan_until_basic_item_validation_passes(self):
+        with mock.patch.object(self.workflow, "tracker_document_counts") as index:
+            self.assertEqual(self.workflow.items(self.root), {})
+            item = self.item(tracker="invalid")
+            with self.assertRaisesRegex(ValueError, "invalid tracker: Q0001"):
+                self.workflow.items(self.root)
+            item["tracker"] = "TCK001"
+            item["title"] = ""
+            (self.root / ".agents/queue/items/Q0001.json").write_text(json.dumps(item))
+            with self.assertRaisesRegex(ValueError, "missing title: Q0001"):
+                self.workflow.items(self.root)
+            index.assert_not_called()
+
+    def test_queue_counts_duplicates_in_separate_archive_directories(self):
+        self.tracker(archived=True)
+        nested = self.root / "docs/history/agent-workflow/2025/nested"
+        nested.mkdir(parents=True)
+        (nested / "TCK001-another.md").write_text("# Workset\n")
+        self.item()
+        with self.assertRaisesRegex(ValueError, "expected one tracker document for TCK001, found 2"):
+            self.workflow.items(self.root)
+
+    def test_queue_ignores_nested_active_trackers_and_non_hyphen_suffixes(self):
+        nested = self.root / "docs/tracking/nested"
+        nested.mkdir()
+        (nested / "TCK001.md").write_text("# Workset\n")
+        self.tracker("TCK001.other.md")
+        self.item()
+        with self.assertRaisesRegex(ValueError, "expected one tracker document for TCK001, found 0"):
+            self.workflow.items(self.root)
+        self.tracker("TCK001-.md", archived=True)
+        self.assertEqual(len(self.workflow.items(self.root)), 1)
 
 
 if __name__ == "__main__":

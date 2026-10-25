@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 import unittest
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -93,10 +93,14 @@ def main(argv=None):
     began = time.monotonic()
     failed = []
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
-        for label, code, seconds, output in pool.map(lambda job: run_job(start, job), jobs):
+        futures = {pool.submit(run_job, start, job): index for index, job in enumerate(jobs)}
+        for future in as_completed(futures):
+            label, code, seconds, output = future.result()
             print(f"{'ok  ' if code == 0 else 'FAIL'} {seconds:6.1f}s {label}", flush=True)
             if code != 0:
-                failed.append((label, output))
+                failed.append((futures[future], label, output))
+    # Keep detailed failures and the final recap in submission order.
+    failed = [(label, output) for _, label, output in sorted(failed)]
     for label, output in failed:
         print(f"\n===== {label} =====\n{output}", end="")
     # Repeat every failing name last, where a gate's short output tail still shows them all.
