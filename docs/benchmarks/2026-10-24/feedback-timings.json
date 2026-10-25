@@ -1,0 +1,1135 @@
+{
+  "host": {
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "python": "3.14.3 (v3.14.3:323c59a5e34, Feb  3 2026, 11:41:37) [Clang 16.0.0 (clang-1600.0.26.6)]",
+    "cpu_count": 8
+  },
+  "source_sha256": {
+    "baseline": "6f874a69f3afb1e121509f2273f15bbc85b133e7cafb5a0826bbb3020afc54e5",
+    "candidate": "0bd05ba4386ed6a5ed04069d3a958ed1f9c7c5084bfe5163e4a7117b4d4ef1e1"
+  },
+  "harness_sha256": "1469bcc28440e309c4d4605794cb661951273d1ddcddc2152291a86f7cab3a7a",
+  "method": "Sequential alternating pairs; two workers; first job sleeps 1.5s after marker; second fails after marker; third passes. Startup included, setup excluded; no warmup.",
+  "runs": [
+    {
+      "pair": 1,
+      "version": "baseline",
+      "feedback_seconds": 1.6229191250167787,
+      "total_seconds": 1.6357387909665704,
+      "returncode": 1,
+      "load_before": [
+        10.54736328125,
+        16.18798828125,
+        17.70361328125
+      ],
+      "load_after": [
+        10.54736328125,
+        16.18798828125,
+        17.70361328125
+      ],
+      "events": [
+        {
+          "seconds": 1.6228904579766095,
+          "line": "ok      1.6s test_a.py"
+        },
+        {
+          "seconds": 1.6229191250167787,
+          "line": "FAIL    0.0s test_b.py"
+        },
+        {
+          "seconds": 1.6229210830060765,
+          "line": "ok      0.0s test_c.py"
+        },
+        {
+          "seconds": 1.6232223749975674,
+          "line": ""
+        },
+        {
+          "seconds": 1.6232245829887688,
+          "line": "===== test_b.py ====="
+        },
+        {
+          "seconds": 1.6232260830001906,
+          "line": "F"
+        },
+        {
+          "seconds": 1.6232289579929784,
+          "line": "======================================================================"
+        },
+        {
+          "seconds": 1.6232320410199463,
+          "line": "FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.623232415993698,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.6232341660070233,
+          "line": "Traceback (most recent call last):"
+        },
+        {
+          "seconds": 1.6232370000216179,
+          "line": "  File \"/private/var/folders/1j/hzh7y3gn7yl8648zpkw4rvbw0000gn/T/tmpttwyalte/.lean/tests/test_b.py\", line 9, in test_fast_failure"
+        },
+        {
+          "seconds": 1.623237457999494,
+          "line": "    self.fail('planted fast failure')"
+        },
+        {
+          "seconds": 1.62323791597737,
+          "line": "    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^"
+        },
+        {
+          "seconds": 1.6232382080052048,
+          "line": "AssertionError: planted fast failure"
+        },
+        {
+          "seconds": 1.6232386250048876,
+          "line": ""
+        },
+        {
+          "seconds": 1.6232390410150401,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.6232394159887917,
+          "line": "Ran 1 test in 0.000s"
+        },
+        {
+          "seconds": 1.62323974998435,
+          "line": ""
+        },
+        {
+          "seconds": 1.6232400410226546,
+          "line": "FAILED (failures=1)"
+        },
+        {
+          "seconds": 1.6232402909663506,
+          "line": ""
+        },
+        {
+          "seconds": 1.6232407909701578,
+          "line": "Failed tests:"
+        },
+        {
+          "seconds": 1.623241166002117,
+          "line": "test_b.py: FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.6232414999976754,
+          "line": "3 files in 1.6s: FAILED (1)"
+        }
+      ]
+    },
+    {
+      "pair": 1,
+      "version": "candidate",
+      "feedback_seconds": 0.09866520797368139,
+      "total_seconds": 1.6112355410004966,
+      "returncode": 1,
+      "load_before": [
+        10.54736328125,
+        16.18798828125,
+        17.70361328125
+      ],
+      "load_after": [
+        10.54736328125,
+        16.18798828125,
+        17.70361328125
+      ],
+      "events": [
+        {
+          "seconds": 0.09866520797368139,
+          "line": "FAIL    0.0s test_b.py"
+        },
+        {
+          "seconds": 0.170623957994394,
+          "line": "ok      0.1s test_c.py"
+        },
+        {
+          "seconds": 1.6032845409936272,
+          "line": "ok      1.6s test_a.py"
+        },
+        {
+          "seconds": 1.6035681659705006,
+          "line": ""
+        },
+        {
+          "seconds": 1.6035702910157852,
+          "line": "===== test_b.py ====="
+        },
+        {
+          "seconds": 1.603570832987316,
+          "line": "F"
+        },
+        {
+          "seconds": 1.6035732079762965,
+          "line": "======================================================================"
+        },
+        {
+          "seconds": 1.60357712500263,
+          "line": "FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.6035774999763817,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.6035787079599686,
+          "line": "Traceback (most recent call last):"
+        },
+        {
+          "seconds": 1.6035789579618722,
+          "line": "  File \"/private/var/folders/1j/hzh7y3gn7yl8648zpkw4rvbw0000gn/T/tmpkyq741ym/.lean/tests/test_b.py\", line 9, in test_fast_failure"
+        },
+        {
+          "seconds": 1.6035791249596514,
+          "line": "    self.fail('planted fast failure')"
+        },
+        {
+          "seconds": 1.6035792909679003,
+          "line": "    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^"
+        },
+        {
+          "seconds": 1.603579415997956,
+          "line": "AssertionError: planted fast failure"
+        },
+        {
+          "seconds": 1.603579582995735,
+          "line": ""
+        },
+        {
+          "seconds": 1.6035799160017632,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.6035800409736112,
+          "line": "Ran 1 test in 0.000s"
+        },
+        {
+          "seconds": 1.6035802079713903,
+          "line": ""
+        },
+        {
+          "seconds": 1.6035803749691695,
+          "line": "FAILED (failures=1)"
+        },
+        {
+          "seconds": 1.6035805409774184,
+          "line": ""
+        },
+        {
+          "seconds": 1.6035807079751976,
+          "line": "Failed tests:"
+        },
+        {
+          "seconds": 1.6035808330052532,
+          "line": "test_b.py: FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.6035810000030324,
+          "line": "3 files in 1.6s: FAILED (1)"
+        }
+      ]
+    },
+    {
+      "pair": 2,
+      "version": "candidate",
+      "feedback_seconds": 0.11734045902267098,
+      "total_seconds": 1.6170647920225747,
+      "returncode": 1,
+      "load_before": [
+        10.54736328125,
+        16.18798828125,
+        17.70361328125
+      ],
+      "load_after": [
+        10.74365234375,
+        16.134765625,
+        17.67578125
+      ],
+      "events": [
+        {
+          "seconds": 0.11734045902267098,
+          "line": "FAIL    0.1s test_b.py"
+        },
+        {
+          "seconds": 0.16476137499557808,
+          "line": "ok      0.0s test_c.py"
+        },
+        {
+          "seconds": 1.61059637501603,
+          "line": "ok      1.6s test_a.py"
+        },
+        {
+          "seconds": 1.6108215840067714,
+          "line": ""
+        },
+        {
+          "seconds": 1.6108226249925792,
+          "line": "===== test_b.py ====="
+        },
+        {
+          "seconds": 1.6108231670223176,
+          "line": "F"
+        },
+        {
+          "seconds": 1.6108251250116155,
+          "line": "======================================================================"
+        },
+        {
+          "seconds": 1.6108254169812426,
+          "line": "FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.6108256250154227,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.6108266669907607,
+          "line": "Traceback (most recent call last):"
+        },
+        {
+          "seconds": 1.61082704202272,
+          "line": "  File \"/private/var/folders/1j/hzh7y3gn7yl8648zpkw4rvbw0000gn/T/tmp856si9d_/.lean/tests/test_b.py\", line 9, in test_fast_failure"
+        },
+        {
+          "seconds": 1.6108272090204991,
+          "line": "    self.fail('planted fast failure')"
+        },
+        {
+          "seconds": 1.610827375028748,
+          "line": "    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^"
+        },
+        {
+          "seconds": 1.610827500000596,
+          "line": "AssertionError: planted fast failure"
+        },
+        {
+          "seconds": 1.6108276669983752,
+          "line": ""
+        },
+        {
+          "seconds": 1.6108278339961544,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.6108280420303345,
+          "line": "Ran 1 test in 0.012s"
+        },
+        {
+          "seconds": 1.6108282090281136,
+          "line": ""
+        },
+        {
+          "seconds": 1.610828374978155,
+          "line": "FAILED (failures=1)"
+        },
+        {
+          "seconds": 1.610828541975934,
+          "line": ""
+        },
+        {
+          "seconds": 1.6108287090319209,
+          "line": "Failed tests:"
+        },
+        {
+          "seconds": 1.6108288749819621,
+          "line": "test_b.py: FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.6108290419797413,
+          "line": "3 files in 1.6s: FAILED (1)"
+        }
+      ]
+    },
+    {
+      "pair": 2,
+      "version": "baseline",
+      "feedback_seconds": 1.5899449159624055,
+      "total_seconds": 1.597056332975626,
+      "returncode": 1,
+      "load_before": [
+        10.74365234375,
+        16.134765625,
+        17.67578125
+      ],
+      "load_after": [
+        10.74365234375,
+        16.134765625,
+        17.67578125
+      ],
+      "events": [
+        {
+          "seconds": 1.589936290984042,
+          "line": "ok      1.5s test_a.py"
+        },
+        {
+          "seconds": 1.5899449159624055,
+          "line": "FAIL    0.1s test_b.py"
+        },
+        {
+          "seconds": 1.5899467499693856,
+          "line": "ok      0.0s test_c.py"
+        },
+        {
+          "seconds": 1.590166957990732,
+          "line": ""
+        },
+        {
+          "seconds": 1.5901674579945393,
+          "line": "===== test_b.py ====="
+        },
+        {
+          "seconds": 1.59016799996607,
+          "line": "F"
+        },
+        {
+          "seconds": 1.5901697909575887,
+          "line": "======================================================================"
+        },
+        {
+          "seconds": 1.5901700829854235,
+          "line": "FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.5901702499832027,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.5901712499908172,
+          "line": "Traceback (most recent call last):"
+        },
+        {
+          "seconds": 1.5901715829968452,
+          "line": "  File \"/private/var/folders/1j/hzh7y3gn7yl8648zpkw4rvbw0000gn/T/tmpckzsi3m_/.lean/tests/test_b.py\", line 9, in test_fast_failure"
+        },
+        {
+          "seconds": 1.5901717499946244,
+          "line": "    self.fail('planted fast failure')"
+        },
+        {
+          "seconds": 1.5901745409937575,
+          "line": "    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^"
+        },
+        {
+          "seconds": 1.5901747499592602,
+          "line": "AssertionError: planted fast failure"
+        },
+        {
+          "seconds": 1.5901749159675092,
+          "line": ""
+        },
+        {
+          "seconds": 1.5901751659694128,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.5901752909994684,
+          "line": "Ran 1 test in 0.013s"
+        },
+        {
+          "seconds": 1.590175499964971,
+          "line": ""
+        },
+        {
+          "seconds": 1.59017566597322,
+          "line": "FAILED (failures=1)"
+        },
+        {
+          "seconds": 1.5901758329709992,
+          "line": ""
+        },
+        {
+          "seconds": 1.5901759999687783,
+          "line": "Failed tests:"
+        },
+        {
+          "seconds": 1.5901761659770273,
+          "line": "test_b.py: FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.5901763750007376,
+          "line": "3 files in 1.5s: FAILED (1)"
+        }
+      ]
+    },
+    {
+      "pair": 3,
+      "version": "baseline",
+      "feedback_seconds": 1.6180241249967366,
+      "total_seconds": 1.6317585419747047,
+      "returncode": 1,
+      "load_before": [
+        10.74365234375,
+        16.134765625,
+        17.67578125
+      ],
+      "load_after": [
+        10.74365234375,
+        16.134765625,
+        17.67578125
+      ],
+      "events": [
+        {
+          "seconds": 1.6180034579592757,
+          "line": "ok      1.6s test_a.py"
+        },
+        {
+          "seconds": 1.6180241249967366,
+          "line": "FAIL    0.1s test_b.py"
+        },
+        {
+          "seconds": 1.618024916970171,
+          "line": "ok      0.0s test_c.py"
+        },
+        {
+          "seconds": 1.6183887079823762,
+          "line": ""
+        },
+        {
+          "seconds": 1.6183906249934807,
+          "line": "===== test_b.py ====="
+        },
+        {
+          "seconds": 1.6183919169707224,
+          "line": "F"
+        },
+        {
+          "seconds": 1.6183943749638274,
+          "line": "======================================================================"
+        },
+        {
+          "seconds": 1.6183949169935659,
+          "line": "FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.6183954579755664,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.6183974169543944,
+          "line": "Traceback (most recent call last):"
+        },
+        {
+          "seconds": 1.6183979169582017,
+          "line": "  File \"/private/var/folders/1j/hzh7y3gn7yl8648zpkw4rvbw0000gn/T/tmpv148i0qk/.lean/tests/test_b.py\", line 9, in test_fast_failure"
+        },
+        {
+          "seconds": 1.6183982499642298,
+          "line": "    self.fail('planted fast failure')"
+        },
+        {
+          "seconds": 1.618398624996189,
+          "line": "    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^"
+        },
+        {
+          "seconds": 1.6183990419958718,
+          "line": "AssertionError: planted fast failure"
+        },
+        {
+          "seconds": 1.6183995829778723,
+          "line": ""
+        },
+        {
+          "seconds": 1.6184001250076108,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.6184004579554312,
+          "line": "Ran 1 test in 0.013s"
+        },
+        {
+          "seconds": 1.6184008329873905,
+          "line": ""
+        },
+        {
+          "seconds": 1.618401207961142,
+          "line": "FAILED (failures=1)"
+        },
+        {
+          "seconds": 1.6184015419567004,
+          "line": ""
+        },
+        {
+          "seconds": 1.6184019169886597,
+          "line": "Failed tests:"
+        },
+        {
+          "seconds": 1.6184023329988122,
+          "line": "test_b.py: FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.6184027079725638,
+          "line": "3 files in 1.6s: FAILED (1)"
+        }
+      ]
+    },
+    {
+      "pair": 3,
+      "version": "candidate",
+      "feedback_seconds": 0.11301541602006182,
+      "total_seconds": 1.6201149580301717,
+      "returncode": 1,
+      "load_before": [
+        10.74365234375,
+        16.134765625,
+        17.67578125
+      ],
+      "load_after": [
+        10.84423828125,
+        16.06591796875,
+        17.64208984375
+      ],
+      "events": [
+        {
+          "seconds": 0.11301541602006182,
+          "line": "FAIL    0.1s test_b.py"
+        },
+        {
+          "seconds": 0.15695516602136195,
+          "line": "ok      0.0s test_c.py"
+        },
+        {
+          "seconds": 1.6070164580014534,
+          "line": "ok      1.6s test_a.py"
+        },
+        {
+          "seconds": 1.6073650000034831,
+          "line": ""
+        },
+        {
+          "seconds": 1.607365625037346,
+          "line": "===== test_b.py ====="
+        },
+        {
+          "seconds": 1.6073665409930982,
+          "line": "F"
+        },
+        {
+          "seconds": 1.6073699159896933,
+          "line": "======================================================================"
+        },
+        {
+          "seconds": 1.6073709159973077,
+          "line": "FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.607371416001115,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.6073729160125367,
+          "line": "Traceback (most recent call last):"
+        },
+        {
+          "seconds": 1.6073734579840675,
+          "line": "  File \"/private/var/folders/1j/hzh7y3gn7yl8648zpkw4rvbw0000gn/T/tmphj_s2kjb/.lean/tests/test_b.py\", line 9, in test_fast_failure"
+        },
+        {
+          "seconds": 1.6073736249818467,
+          "line": "    self.fail('planted fast failure')"
+        },
+        {
+          "seconds": 1.607374000013806,
+          "line": "    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^"
+        },
+        {
+          "seconds": 1.6073741660220549,
+          "line": "AssertionError: planted fast failure"
+        },
+        {
+          "seconds": 1.607374333019834,
+          "line": ""
+        },
+        {
+          "seconds": 1.6073745830217376,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.6073747079935856,
+          "line": "Ran 1 test in 0.013s"
+        },
+        {
+          "seconds": 1.6073751660296693,
+          "line": ""
+        },
+        {
+          "seconds": 1.6073752910015173,
+          "line": "FAILED (failures=1)"
+        },
+        {
+          "seconds": 1.607375416031573,
+          "line": ""
+        },
+        {
+          "seconds": 1.6073755830293521,
+          "line": "Failed tests:"
+        },
+        {
+          "seconds": 1.6073757080012,
+          "line": "test_b.py: FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.6073759160353802,
+          "line": "3 files in 1.6s: FAILED (1)"
+        }
+      ]
+    },
+    {
+      "pair": 4,
+      "version": "candidate",
+      "feedback_seconds": 0.11692437500460073,
+      "total_seconds": 1.6409087909851223,
+      "returncode": 1,
+      "load_before": [
+        10.84423828125,
+        16.06591796875,
+        17.64208984375
+      ],
+      "load_after": [
+        10.84423828125,
+        16.06591796875,
+        17.64208984375
+      ],
+      "events": [
+        {
+          "seconds": 0.11692437500460073,
+          "line": "FAIL    0.1s test_b.py"
+        },
+        {
+          "seconds": 0.15985141601413488,
+          "line": "ok      0.0s test_c.py"
+        },
+        {
+          "seconds": 1.6239674160024151,
+          "line": "ok      1.6s test_a.py"
+        },
+        {
+          "seconds": 1.62421166599961,
+          "line": ""
+        },
+        {
+          "seconds": 1.624212125025224,
+          "line": "===== test_b.py ====="
+        },
+        {
+          "seconds": 1.6242127909790725,
+          "line": "F"
+        },
+        {
+          "seconds": 1.6242160410038196,
+          "line": "======================================================================"
+        },
+        {
+          "seconds": 1.6242165410076268,
+          "line": "FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.6242168750031851,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.624217958014924,
+          "line": "Traceback (most recent call last):"
+        },
+        {
+          "seconds": 1.6242183750146069,
+          "line": "  File \"/private/var/folders/1j/hzh7y3gn7yl8648zpkw4rvbw0000gn/T/tmpelqmjw0y/.lean/tests/test_b.py\", line 9, in test_fast_failure"
+        },
+        {
+          "seconds": 1.624218708020635,
+          "line": "    self.fail('planted fast failure')"
+        },
+        {
+          "seconds": 1.624218999990262,
+          "line": "    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^"
+        },
+        {
+          "seconds": 1.6242192080244422,
+          "line": "AssertionError: planted fast failure"
+        },
+        {
+          "seconds": 1.6242194580263458,
+          "line": ""
+        },
+        {
+          "seconds": 1.6242196660023183,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.6242198750260286,
+          "line": "Ran 1 test in 0.013s"
+        },
+        {
+          "seconds": 1.6242201660061255,
+          "line": ""
+        },
+        {
+          "seconds": 1.6242203330039047,
+          "line": "FAILED (failures=1)"
+        },
+        {
+          "seconds": 1.6242241250001825,
+          "line": ""
+        },
+        {
+          "seconds": 1.6242243750020862,
+          "line": "Failed tests:"
+        },
+        {
+          "seconds": 1.624224541010335,
+          "line": "test_b.py: FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.6242247910122387,
+          "line": "3 files in 1.6s: FAILED (1)"
+        }
+      ]
+    },
+    {
+      "pair": 4,
+      "version": "baseline",
+      "feedback_seconds": 1.6964000839507207,
+      "total_seconds": 1.711486749991309,
+      "returncode": 1,
+      "load_before": [
+        10.84423828125,
+        16.06591796875,
+        17.64208984375
+      ],
+      "load_after": [
+        10.84423828125,
+        16.06591796875,
+        17.64208984375
+      ],
+      "events": [
+        {
+          "seconds": 1.6963778749923222,
+          "line": "ok      1.6s test_a.py"
+        },
+        {
+          "seconds": 1.6964000839507207,
+          "line": "FAIL    0.1s test_b.py"
+        },
+        {
+          "seconds": 1.6964009999646805,
+          "line": "ok      0.1s test_c.py"
+        },
+        {
+          "seconds": 1.696806708991062,
+          "line": ""
+        },
+        {
+          "seconds": 1.6968079999787733,
+          "line": "===== test_b.py ====="
+        },
+        {
+          "seconds": 1.6968092089518905,
+          "line": "F"
+        },
+        {
+          "seconds": 1.6968124589766376,
+          "line": "======================================================================"
+        },
+        {
+          "seconds": 1.6968130839522928,
+          "line": "FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.6968135419883765,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.696815458999481,
+          "line": "Traceback (most recent call last):"
+        },
+        {
+          "seconds": 1.6968164589488879,
+          "line": "  File \"/private/var/folders/1j/hzh7y3gn7yl8648zpkw4rvbw0000gn/T/tmpupz9r59s/.lean/tests/test_b.py\", line 9, in test_fast_failure"
+        },
+        {
+          "seconds": 1.6968169169849716,
+          "line": "    self.fail('planted fast failure')"
+        },
+        {
+          "seconds": 1.6968174169887789,
+          "line": "    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^"
+        },
+        {
+          "seconds": 1.696817916992586,
+          "line": "AssertionError: planted fast failure"
+        },
+        {
+          "seconds": 1.6968183749704622,
+          "line": ""
+        },
+        {
+          "seconds": 1.6968188749742694,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.6968193339998834,
+          "line": "Ran 1 test in 0.011s"
+        },
+        {
+          "seconds": 1.6968198340036906,
+          "line": ""
+        },
+        {
+          "seconds": 1.6968202919815667,
+          "line": "FAILED (failures=1)"
+        },
+        {
+          "seconds": 1.6968206249875948,
+          "line": ""
+        },
+        {
+          "seconds": 1.6968210419872776,
+          "line": "Failed tests:"
+        },
+        {
+          "seconds": 1.6968214589869604,
+          "line": "test_b.py: FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.696822041994892,
+          "line": "3 files in 1.6s: FAILED (1)"
+        }
+      ]
+    },
+    {
+      "pair": 5,
+      "version": "baseline",
+      "feedback_seconds": 1.625515333027579,
+      "total_seconds": 1.6422091250424273,
+      "returncode": 1,
+      "load_before": [
+        10.84423828125,
+        16.06591796875,
+        17.64208984375
+      ],
+      "load_after": [
+        10.7763671875,
+        15.96484375,
+        17.59716796875
+      ],
+      "events": [
+        {
+          "seconds": 1.6255022910190746,
+          "line": "ok      1.6s test_a.py"
+        },
+        {
+          "seconds": 1.625515333027579,
+          "line": "FAIL    0.1s test_b.py"
+        },
+        {
+          "seconds": 1.625516375002917,
+          "line": "ok      0.0s test_c.py"
+        },
+        {
+          "seconds": 1.6260379580198787,
+          "line": ""
+        },
+        {
+          "seconds": 1.626040916016791,
+          "line": "===== test_b.py ====="
+        },
+        {
+          "seconds": 1.6260425000218675,
+          "line": "F"
+        },
+        {
+          "seconds": 1.6260431249975227,
+          "line": "======================================================================"
+        },
+        {
+          "seconds": 1.6260442080092616,
+          "line": "FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.6260447910171933,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.6260474580340087,
+          "line": "Traceback (most recent call last):"
+        },
+        {
+          "seconds": 1.6260485830134712,
+          "line": "  File \"/private/var/folders/1j/hzh7y3gn7yl8648zpkw4rvbw0000gn/T/tmpbr_mkk0y/.lean/tests/test_b.py\", line 9, in test_fast_failure"
+        },
+        {
+          "seconds": 1.626049000013154,
+          "line": "    self.fail('planted fast failure')"
+        },
+        {
+          "seconds": 1.6260495830210857,
+          "line": "    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^"
+        },
+        {
+          "seconds": 1.6260500000207685,
+          "line": "AssertionError: planted fast failure"
+        },
+        {
+          "seconds": 1.626050541002769,
+          "line": ""
+        },
+        {
+          "seconds": 1.626051125000231,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.6260515830363147,
+          "line": "Ran 1 test in 0.013s"
+        },
+        {
+          "seconds": 1.6260521660442464,
+          "line": ""
+        },
+        {
+          "seconds": 1.6260525830439292,
+          "line": "FAILED (failures=1)"
+        },
+        {
+          "seconds": 1.6260529159917496,
+          "line": ""
+        },
+        {
+          "seconds": 1.6260533329914324,
+          "line": "Failed tests:"
+        },
+        {
+          "seconds": 1.6260537499911152,
+          "line": "test_b.py: FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.626054375024978,
+          "line": "3 files in 1.6s: FAILED (1)"
+        }
+      ]
+    },
+    {
+      "pair": 5,
+      "version": "candidate",
+      "feedback_seconds": 0.09991895902203396,
+      "total_seconds": 1.6533009590348229,
+      "returncode": 1,
+      "load_before": [
+        10.7763671875,
+        15.96484375,
+        17.59716796875
+      ],
+      "load_after": [
+        10.7763671875,
+        15.96484375,
+        17.59716796875
+      ],
+      "events": [
+        {
+          "seconds": 0.09991895902203396,
+          "line": "FAIL    0.0s test_b.py"
+        },
+        {
+          "seconds": 0.1449132920242846,
+          "line": "ok      0.0s test_c.py"
+        },
+        {
+          "seconds": 1.6399415420019068,
+          "line": "ok      1.6s test_a.py"
+        },
+        {
+          "seconds": 1.6404738750425167,
+          "line": ""
+        },
+        {
+          "seconds": 1.6404761250014417,
+          "line": "===== test_b.py ====="
+        },
+        {
+          "seconds": 1.6404775840346701,
+          "line": "F"
+        },
+        {
+          "seconds": 1.640482625050936,
+          "line": "======================================================================"
+        },
+        {
+          "seconds": 1.640483834024053,
+          "line": "FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.6404844589997083,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.6404868340468965,
+          "line": "Traceback (most recent call last):"
+        },
+        {
+          "seconds": 1.640487834054511,
+          "line": "  File \"/private/var/folders/1j/hzh7y3gn7yl8648zpkw4rvbw0000gn/T/tmpzht162xj/.lean/tests/test_b.py\", line 9, in test_fast_failure"
+        },
+        {
+          "seconds": 1.6404883750365116,
+          "line": "    self.fail('planted fast failure')"
+        },
+        {
+          "seconds": 1.6404887920361944,
+          "line": "    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^"
+        },
+        {
+          "seconds": 1.6404891250422224,
+          "line": "AssertionError: planted fast failure"
+        },
+        {
+          "seconds": 1.6404895420419052,
+          "line": ""
+        },
+        {
+          "seconds": 1.6404900000197813,
+          "line": "----------------------------------------------------------------------"
+        },
+        {
+          "seconds": 1.6404904590453953,
+          "line": "Ran 1 test in 0.000s"
+        },
+        {
+          "seconds": 1.6404909170232713,
+          "line": ""
+        },
+        {
+          "seconds": 1.6404912920552306,
+          "line": "FAILED (failures=1)"
+        },
+        {
+          "seconds": 1.6404917090549134,
+          "line": ""
+        },
+        {
+          "seconds": 1.6404921250068583,
+          "line": "Failed tests:"
+        },
+        {
+          "seconds": 1.6404925840324722,
+          "line": "test_b.py: FAIL: test_fast_failure (test_b.T.test_fast_failure)"
+        },
+        {
+          "seconds": 1.6404931250144728,
+          "line": "3 files in 1.6s: FAILED (1)"
+        }
+      ]
+    }
+  ],
+  "medians": {
+    "baseline": {
+      "feedback_seconds": 1.6229191250167787,
+      "total_seconds": 1.6357387909665704
+    },
+    "candidate": {
+      "feedback_seconds": 0.11301541602006182,
+      "total_seconds": 1.6201149580301717
+    }
+  }
+}

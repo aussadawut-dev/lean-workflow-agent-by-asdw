@@ -192,6 +192,20 @@ def tracker_file(root, tracker_id, archived=False):
     return matches[0]
 
 
+def tracker_document_counts(root, requested):
+    """Count requested active/history tracker IDs for one queue validation."""
+    counts = {}
+    for directory, recursive in ((root / "docs/tracking", False), (root / HISTORY, True)):
+        if not directory.is_dir():
+            continue
+        documents = directory.rglob("*.md") if recursive else directory.glob("*.md")
+        for path in documents:
+            tracker_id = path.stem.split("-", 1)[0]
+            if tracker_id in requested and path.is_file():
+                counts[tracker_id] = counts.get(tracker_id, 0) + 1
+    return counts
+
+
 def unchecked_tracker_items(content):
     """Return unchecked items under Acceptance criteria/Tasks headings and their subheadings.
 
@@ -361,6 +375,7 @@ def items(root):
             continue
         sources.append((path, value))
     result = {}
+    tracker_counts = None
     for path, value in sources:
         item_id = value.get("id") if isinstance(value, dict) else None
         if not isinstance(item_id, str) or not ID.fullmatch(item_id) or path.name != f"{item_id}.json":
@@ -373,7 +388,16 @@ def items(root):
             fail(f"missing title: {item_id}")
         if not isinstance(value.get("tracker"), str) or not TRACKER.fullmatch(value["tracker"]):
             fail(f"invalid tracker: {item_id}")
-        tracker_file(root, value["tracker"], archived=True)
+        if tracker_counts is None:
+            # Collect without validating later items: the first error must still
+            # follow source order, including archived queue records.
+            requested = {record["tracker"] for _, record in sources
+                         if isinstance(record, dict) and isinstance(record.get("tracker"), str)
+                         and TRACKER.fullmatch(record["tracker"])}
+            tracker_counts = tracker_document_counts(root, requested)
+        count = tracker_counts.get(value["tracker"], 0)
+        if count != 1:
+            fail(f"expected one tracker document for {value['tracker']}, found {count}")
         for field in ("created_at", "completed_at"):
             if field in value:
                 timestamp(value[field])

@@ -6,10 +6,65 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
-## Unreleased
+## 4.17.0 — 2026-10-25
 
+**Token highlight:** - · **Compared with:** -
+
+- Keep each session's original commit boundary across commits, resumes, prompt clearing and later gate passes. Committed High-risk changes still require a current independent HIGH-depth review in Claude and Codex.
+- Apply every retained target's High-risk policy to its application changes, including after clearing or switching the active target and after committing application and parent gitlink changes. Handle new targets and unborn parent repositories; changed deinitialized High-risk targets require initialization before validation.
+- Protect retained target gate blocks and trusted-control references, including inactive targets, and protect the submodule gate implementation. Check controls before executing target commands in shared, standalone and provider entrypoints. Reuse the root review receipt and reject stale coverage or unsafe retained policy links.
+- Add regressions for the reproduced gate gaps and a reproducible offline context inventory. Startup and fixed-task input inventories remain 2,213 and 11,146 tokens with `o200k_base`; the five-file gate source inventory grows by 1,836 tokens (6.83%). These counts exclude runtime prompts, model output, retries and cache billing and do not establish actual usage or cost savings. See the [measurement artifact](../docs/benchmarks/2026-10-25/context-tokens.json) and [measurement script](../docs/benchmarks/2026-10-25/measure_context.py).
+
+**Upgrade:** update the contract guard, shared gate runner, evidence helper, submodule helper and Codex adapter together. Keep project policy and runtime records. Inspect and approve newly protected controls through the existing approval/review procedure; an older accepted baseline may lack the new submodule control. Start a fresh session after upgrading to record its original commit boundary. Initialize a changed retained High-risk target before gating it. No configuration or data migration is needed.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+- เก็บ commit เริ่มต้นของ session ไว้ แม้ commit งาน, resume, ล้าง contract เมื่อมี prompt ใหม่ หรือผ่าน gate แล้ว งาน High-risk ที่ commit ไปยังต้องมี independent HIGH-depth review ที่ครอบคลุมสถานะปัจจุบัน ทั้ง Claude และ Codex
+- ตรวจ High-risk policy ของทุก target ที่ยังเก็บ policy ไว้ แม้ล้างหรือสลับ target ปัจจุบัน และแม้ commit งานใน application กับ gitlink ของ parent แล้ว รองรับ target ใหม่และ parent ที่ยังไม่มี commit ส่วน target High-risk ที่เปลี่ยนและถูก deinitialize ต้อง initialize ก่อนตรวจ
+- ป้องกัน gate block และ trusted-control references ของ target รวมถึง target ที่ไม่ได้เลือก และป้องกันตัว submodule gate ตรวจ controls ก่อนรันคำสั่งของ target ในทุก entrypoint ใช้ review receipt ของ root ร่วมกัน และปฏิเสธหลักฐานที่ล้าสมัยหรือ policy link ที่ไม่ปลอดภัย
+- เพิ่ม regression ของช่องว่างที่ทำซ้ำได้ พร้อมสคริปต์นับ context แบบ offline ชุด startup และ fixed-task ยังเป็น 2,213 กับ 11,146 tokens เมื่อใช้ `o200k_base` ส่วน inventory โค้ด gate ห้าไฟล์เพิ่ม 1,836 tokens (6.83%) ตัวเลขนี้ไม่รวม runtime prompts, output, retries และ cache billing จึงยังสรุป usage หรือค่าใช้จ่ายจริงไม่ได้ ดู [ผลวัด](../docs/benchmarks/2026-10-25/context-tokens.json) และ [สคริปต์](../docs/benchmarks/2026-10-25/measure_context.py)
+
+**เมื่ออัปเกรด:** อัปเดต contract guard, shared gate runner, evidence helper, submodule helper และ Codex adapter พร้อมกัน เก็บ policy และ runtime records ของโปรเจกต์ไว้ ตรวจ diff และอนุมัติ controls ที่เพิ่มการป้องกันตามขั้นตอนเดิม เพราะ baseline เก่าอาจยังไม่มี submodule control เริ่ม session ใหม่หลังอัปเกรดเพื่อบันทึก commit เริ่มต้น และ initialize target High-risk ที่เปลี่ยนก่อนรัน gate ไม่ต้องย้าย configuration หรือข้อมูล
+
+</details>
+
+## 4.16.0 — 2026-10-24
+
+**Token highlight:** - · **Compared with:** -
+
+Prepare project operations with optional playbooks and get earlier feedback from workflow checks. Deployment and rollback execution still require an explicit request; preparation and read-only readiness checks do not authorize execution.
+
+- Print parallel test-job status as each job completes, including fast failures behind earlier slow jobs; retain all checks, detailed failure blocks and the final recap in submission order. Barrier regression and separate feedback-latency measurements are retained with the benchmark notes.
+- Run the full CI regression suite with six shards per Python file while retaining the CPU-sized worker pool and all matrix checks. Local paired measurements and actual test-ID coverage are retained in `docs/benchmarks/2026-10-24/`; remote matrix timings remain unmeasured.
+- Index active and archived tracker documents once per queue validation instead of rescanning them for every item; count and stat only IDs referenced by active or archived queue records to avoid unrelated history work. Preserve exact ID linkage, duplicate detection, validation order and fresh lookups on each call.
 - Add optional `lean-playbook` for project deployment/backup/rollback preparation, read-only readiness checks and explicitly requested execution. Include reusable playbook/release record templates, provider-parity discovery tests and compatibility with the previous 17-skill registry. Nine core skills remain enabled by default; the optional pack now has nine skills. Projects with deployment targets are offered the skill during init without automatic activation or execution.
 - Upgrade shared assets, canonical skills, templates, registry and discovery tooling together; preserve project operations documents and release records. Reload runtime skills after enabling the optional pack. No configuration or record migration is needed.
+
+**Local measurements:** paired full-suite medians fell from 175.748 s to 97.346 s (44.6% less elapsed time), with the same 445 test IDs executed exactly once in each measured run. The final suite adds the completion-order regression for 446 tests. Sparse queue fixtures with 1 or 10 linked items and 10,000 tracker files took about 7–21% less time locally. A deliberately blocked-first fixture reported failure status in 0.113015 s instead of 1.622919 s; total duration stayed about 1.6 s. These results do not establish remote CI speed, overall agent performance or token savings. Methods, raw samples and limitations are retained in [the benchmark notes](../docs/benchmarks/2026-10-24/README.md).
+
+**Upgrade:** update the shared assets, canonical skills, playbook/release templates, registry and discovery tooling together. Preserve project operations documents, release records and the existing optional-skill selection. Nine core skills remain enabled by default and the optional pack now has nine skills; reload runtime discovery after enabling it. No data, configuration or record migration is needed.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+เตรียมงานดูแลระบบด้วย playbook แบบเลือกเปิดใช้ และรับผลตรวจ workflow ได้เร็วขึ้น การ deploy หรือ rollback ยังต้องมีคำขอให้ลงมืออย่างชัดเจน การเตรียมเอกสารและตรวจความพร้อมแบบอ่านอย่างเดียวไม่ได้อนุญาตให้ดำเนินการจริง
+
+- แสดงสถานะงานทดสอบขนานทันทีที่แต่ละงานเสร็จ รวมถึงงานที่ fail เร็วแต่ถูกส่งหลังงานช้า ยังคงรันทุก check และแสดงรายละเอียด failure กับสรุปท้ายตามลำดับส่งงาน เก็บ regression ที่ใช้ barrier และผลวัดเวลารอ feedback แยกไว้กับ benchmark
+- รัน regression suite เต็มใน CI โดยแบ่งแต่ละไฟล์ Python เป็นหก shard ใช้ worker pool ตามจำนวน CPU และคงทุก matrix check ไว้ เก็บผลวัดแบบจับคู่ในเครื่องและ test ID ที่รันจริงใน `docs/benchmarks/2026-10-24/` โดยยังไม่ได้วัดเวลา remote matrix
+- สร้างดัชนี tracker ปัจจุบันและที่เก็บในประวัติครั้งเดียวต่อการตรวจ queue แทนการสแกนซ้ำทุกรายการ นับและตรวจ stat เฉพาะ ID ที่ queue ปัจจุบันหรือประวัติอ้างถึง ยังคงการเชื่อม ID ที่ตรงกัน การตรวจซ้ำ ลำดับ validation และการค้นข้อมูลใหม่ในแต่ละครั้ง
+- เพิ่ม optional `lean-playbook` สำหรับเตรียม deployment, backup และ rollback ของโปรเจกต์ ตรวจความพร้อมแบบอ่านอย่างเดียว และลงมือเมื่อมีคำขอชัดเจน มี template ของ playbook/release record, test ความเท่าเทียมของ discovery ทั้งสอง provider และรองรับ registry เดิมที่มี 17 skill ยังคงเปิดเก้า core skill เป็นค่าเริ่มต้น ส่วน optional pack มีเก้า skill โปรเจกต์ที่มีเป้าหมาย deployment จะได้รับคำแนะนำให้ใช้ระหว่าง init โดยไม่เปิดใช้หรือลงมือเอง
+- อัปเกรด shared assets, canonical skills, templates, registry และ discovery tooling พร้อมกัน รักษาเอกสาร operations และ release records ของโปรเจกต์ไว้ โหลด skill ของ runtime ใหม่หลังเปิด optional pack ไม่ต้องย้าย configuration หรือ records
+
+**ผลวัดในเครื่อง:** ค่ามัธยฐาน full suite แบบจับคู่ลดจาก 175.748 เป็น 97.346 วินาที (ใช้เวลาน้อยลง 44.6%) โดยแต่ละรอบรัน 445 test ID เดิมครั้งเดียวครบทุกตัว suite สุดท้ายเพิ่ม regression ของ completion-order รวมเป็น 446 test ส่วน fixture queue ที่มีรายการเชื่อมโยง 1 หรือ 10 รายการกับ tracker 10,000 ไฟล์ ใช้เวลาน้อยลงประมาณ 7–21% ในเครื่อง fixture ที่จงใจบล็อกงานแรกแสดงสถานะ failure ใน 0.113015 แทน 1.622919 วินาที แต่เวลารวมยังประมาณ 1.6 วินาที ผลเหล่านี้ไม่ได้ยืนยันความเร็ว remote CI, ประสิทธิภาพ agent โดยรวม หรือการประหยัด token ดูวิธีวัด ตัวอย่างดิบ และข้อจำกัดได้ใน [benchmark notes](../docs/benchmarks/2026-10-24/README.md)
+
+**เมื่ออัปเกรด:** อัปเดต shared assets, canonical skills, template ของ playbook/release, registry และ discovery tooling พร้อมกัน รักษาเอกสาร operations, release records และการเลือกเปิด optional skill ของโปรเจกต์ไว้ เก้า core skill ยังเปิดเป็นค่าเริ่มต้น และ optional pack มีเก้า skill แล้ว โหลด discovery ของ runtime ใหม่หลังเปิดใช้ ไม่ต้องย้ายข้อมูล configuration หรือ records
+
+</details>
 
 ## 4.15.0 — 2026-10-23
 

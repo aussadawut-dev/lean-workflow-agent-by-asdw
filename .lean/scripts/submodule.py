@@ -270,7 +270,7 @@ def use(root, remote):
                 "lean_status": git(root, "status", "--short")}
 
 
-def gate(root, optional=False, quiet=False):
+def gate(root, optional=False, quiet=False, session=""):
     paths = context(root)
     if paths["target"] is None:
         if optional:
@@ -288,6 +288,11 @@ def gate(root, optional=False, quiet=False):
         return 2
     if git(Path(paths["project_root"]), "symbolic-ref", "--quiet", "HEAD", optional=True) is None:
         fail("target is detached; choose a branch before application work")
+    # Standalone runs share the workspace's controls and review receipt. Nothing from
+    # the application PROJECT may execute until its recorded controls are accepted.
+    from contract_guard import current
+    from gate_evidence import check_shipped, guard_controls, high_risk_changes
+    guard_controls(root, current(root, session) if session else None)
     for number, command in enumerate(commands, 1):
         if not quiet:
             print(f"Target Quality Gate: check {number} started", file=sys.stderr, flush=True)
@@ -297,6 +302,14 @@ def gate(root, optional=False, quiet=False):
             return 2
         if not quiet:
             print(f"Target Quality Gate: check {number} passed", file=sys.stderr, flush=True)
+    # Approved deterministic checks run before semantic review, as in the shared gate.
+    risky = high_risk_changes(root, session)
+    if risky:
+        try:
+            check_shipped(root)
+        except (OSError, ValueError) as error:
+            fail("High-risk areas changed; HIGH independent review is required:\n"
+                 + "\n".join(risky) + "\n" + str(error))
     return 0
 
 
@@ -315,6 +328,7 @@ def main():
     run_gate = commands.add_parser("gate")
     run_gate.add_argument("--optional", action="store_true")
     run_gate.add_argument("--quiet", action="store_true")
+    run_gate.add_argument("--session", default="", help="workspace session whose original target pin bounds changes")
     args = parser.parse_args()
     try:
         root = args.root.resolve()
@@ -329,9 +343,9 @@ def main():
                 safe_path(root, ".agent-runtime/active-target.json").unlink(missing_ok=True)
             result = context(root)
         else:
-            return gate(root, args.optional, args.quiet)
+            return gate(root, args.optional, args.quiet, args.session)
         print(json.dumps(result, indent=2))
-    except (ValueError, OSError, TypeError, KeyError) as error:
+    except (ValueError, OSError, TypeError, KeyError, subprocess.CalledProcessError) as error:
         print(f"submodule error: {error}", file=sys.stderr)
         if args.command == "use" and args.apply:
             print("Any partial checkout/registration is preserved. Inspect Git status, resolve the cause and rerun; no commit or push was performed.", file=sys.stderr)

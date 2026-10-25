@@ -54,17 +54,26 @@ refusal="$root/.agent-runtime/gate-refusal"
 active=0
 transcript=""
 errlog=""
-if [ "$hook" -eq 1 ] && [ "$seed" -eq 0 ]; then
+if [ "$hook" -eq 1 ]; then
   input="$(cat)"
 
-  active="$(printf '%s' "$input" | python3 "$helper" --root "$root" hook-field --field stop_hook_active)" || exit 2
-  transcript="$(printf '%s' "$input" | python3 "$helper" --root "$root" hook-field --field transcript_path)" || exit 2
-  session="$(printf '%s' "$input" | python3 "$helper" --root "$root" hook-field --field session_id)" || exit 2
-  # Keep this run's messages so a refusal is fingerprinted by its reason; they still reach
-  # stderr when the run ends.
-  errlog="$(mktemp "${TMPDIR:-/tmp}/lean-gate.XXXXXX")" || exit 2
-  exec 3>&2 2>"$errlog"
-  trap 'cat "$errlog" >&3; rm -f "$errlog"' EXIT
+  if [ "$seed" -eq 1 ]; then
+    if [ -n "$input" ]; then
+      session="$(printf '%s' "$input" | python3 "$helper" --root "$root" hook-field --field session_id)" || exit 2
+    fi
+    if [ -n "$session" ]; then
+      python3 "$helper" --root "$root" seed-session --session "$session" || exit 2
+    fi
+  else
+    active="$(printf '%s' "$input" | python3 "$helper" --root "$root" hook-field --field stop_hook_active)" || exit 2
+    transcript="$(printf '%s' "$input" | python3 "$helper" --root "$root" hook-field --field transcript_path)" || exit 2
+    session="$(printf '%s' "$input" | python3 "$helper" --root "$root" hook-field --field session_id)" || exit 2
+    # Keep this run's messages so a refusal is fingerprinted by its reason; they still reach
+    # stderr when the run ends.
+    errlog="$(mktemp "${TMPDIR:-/tmp}/lean-gate.XXXXXX")" || exit 2
+    exec 3>&2 2>"$errlog"
+    trap 'cat "$errlog" >&3; rm -f "$errlog"' EXIT
+  fi
 fi
 
 # Progress is diagnostic only: Stop hooks and --quiet runs omit it, so a refusal carries only its failure.
@@ -119,16 +128,6 @@ gate_refused() {
   [ -f "$failed" ] && case "$(cat "$failed" 2>/dev/null)" in c*) return 1 ;; *) return 0 ;; esac
 }
 
-# Application checks must run before the Lean cache can skip its own checks.
-# Target state (including untracked files) is separate from the superproject.
-if [ "$seed" -eq 0 ] && { [ -e "$root/.agent-runtime/active-target.json" ] || [ -L "$root/.agent-runtime/active-target.json" ]; }; then
-  progress "target checks started"
-  target=(gate --optional)
-  [ "$quiet" -eq 0 ] || target+=(--quiet)
-  python3 "$root/.lean/scripts/submodule.py" --root "$root" "${target[@]}" || { refuse; exit 2; }
-  progress "target checks passed"
-fi
-
 # The contract a session declared through the PreToolUse guard, read from the guard's store by
 # session id (a hook payload or --session). Only a receipt for that contract can accept changed
 # controls: the guard stops the author's main thread recording one for it, while an explicit --contract or a
@@ -147,10 +146,22 @@ fi
 # Name any High-risk review still ahead in the same refusal, so both steps are asked for at once.
 guard_args=()
 [ -z "$session_contract" ] || guard_args=(--contract "$session_contract")
+session_args=()
+[ -z "$session" ] || session_args=(--session "$session")
 if ! python3 "$helper" --root "$root" guard-controls ${guard_args[@]+"${guard_args[@]}"}; then
-  pending="$(python3 "$helper" --root "$root" high-risk 2>/dev/null)" || pending=""
+  pending="$(python3 "$helper" --root "$root" high-risk ${session_args[@]+"${session_args[@]}"} 2>/dev/null)" || pending=""
   [ -z "$pending" ] || { echo "After that, HIGH independent review is also required for these High-risk changes:"; printf '%s\n' "$pending"; } >&2
   refuse; exit 2
+fi
+# Protect both workspace and retained target controls before any application command.
+# Target checks still run before the Lean cache can skip its own checks.
+if [ "$seed" -eq 0 ] && { [ -e "$root/.agent-runtime/active-target.json" ] || [ -L "$root/.agent-runtime/active-target.json" ]; }; then
+  progress "target checks started"
+  target=(gate --optional)
+  [ "$quiet" -eq 0 ] || target+=(--quiet)
+  [ -z "$session" ] || target+=(--session "$session")
+  python3 "$root/.lean/scripts/submodule.py" --root "$root" "${target[@]}" || { refuse; exit 2; }
+  progress "target checks passed"
 fi
 [ -f "$project" ] || { echo "Quality Gate undefined: missing .lean/PROJECT.md; run /lean-init." >&2; refuse; exit 2; }
 
@@ -211,10 +222,10 @@ case "$contract" in
 esac
 
 # PROJECT.md High-risk areas set a review floor that a self-declared risk cannot lower.
-# An unchanged state matches the session baseline or a pass that already applied it.
+# A session's commit boundary survives state baselines and cached passes; receipts prove review.
 risky=""
-if [ "$changed" -eq 1 ]; then
-  risky="$(python3 "$helper" --root "$root" high-risk)" || { refuse; exit 2; }
+if [ "$changed" -eq 1 ] || [ -n "$session" ]; then
+  risky="$(python3 "$helper" --root "$root" high-risk ${session_args[@]+"${session_args[@]}"})" || { refuse; exit 2; }
 fi
 
 # Explain a refused review receipt, naming any High-risk areas that required it.

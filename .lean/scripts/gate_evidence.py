@@ -12,7 +12,7 @@ import sys
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from contract_guard import LINE as CONTRACT, parse as parse_contract  # noqa: E402
+from contract_guard import LINE as CONTRACT, initial_head, parse as parse_contract, start_session  # noqa: E402
 
 
 def digest(value):
@@ -135,8 +135,9 @@ def receipt_gap(root, receipt):
 
 CONTROL_NAMES = (".claude/settings.json", ".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py",
                  ".lean/scripts/gate_lock.py", ".lean/scripts/contract_guard.py", ".lean/scripts/gate_mode.py",
-                 ".codex/hooks.json", ".codex/hooks/quality_gate.py", ".codex/quality-gate.json")
+                 ".lean/scripts/submodule.py", ".codex/hooks.json", ".codex/hooks/quality_gate.py", ".codex/quality-gate.json")
 PROJECT = ".lean/PROJECT.md"
+TARGET_PROJECT = re.compile(r"\.lean/targets/[^/]+/\.lean/PROJECT\.md")
 TRUSTED_LINE = re.compile(r"(?m)^<!-- trusted-control-refs:(.*?)-->[ \t]*$")
 TRUSTED_REF = re.compile(r"refs/remotes/[A-Za-z0-9._/-]+")
 
@@ -158,6 +159,15 @@ def controls(root):
     for name in names:
         path = root / name
         values[name] = {"sha256": digest(path.read_bytes()), "mode": path.stat().st_mode & 0o777} if path.is_file() else None
+    # Retained records stay protected when another target is selected. Reject directory
+    # symlinks before globbing and file symlinks before reading any target control bytes.
+    for path in (root / ".lean", root / ".lean/targets"):
+        if path.is_symlink():
+            raise ValueError(f"symlink boundary: {path}")
+    for path in sorted((root / ".lean/targets").glob("*/.lean/PROJECT.md")):
+        if any(parent.is_symlink() for parent in (path, *path.parents) if parent != root):
+            raise ValueError(f"symlink boundary: {path}")
+        values[str(path.relative_to(root))] = project_controls({}, path.read_text())
     project = root / PROJECT
     return project_controls(values, project.read_text() if project.is_file() else "")
 
@@ -181,6 +191,12 @@ def controls_at(root, commit):
     names = list(CONTROL_NAMES) + sorted(name for name in hooks if fnmatch.fnmatch(name, ".claude/hooks/*.sh")
                                          and "/" not in name[len(".claude/hooks/"):])
     values = {name: entry(name)[0] for name in names}
+    targets = git(root, "--no-replace-objects", "ls-tree", "-r", "-z", "--name-only", commit,
+                  "--", ".lean/targets/").split(b"\0")
+    for name in map(os.fsdecode, targets):
+        if TARGET_PROJECT.fullmatch(name):
+            metadata, text = entry(name)
+            values[name] = project_controls({}, text.decode()) if text is not None else metadata
     _, project = entry(PROJECT)
     return project_controls(values, project.decode() if project is not None else "")
 
@@ -285,7 +301,7 @@ def high_risk_areas(root):
     return [area for area in areas if area.strip("/")]
 
 
-def changed_paths(root):
+def changed_paths(root, session="", base=None):
     """Uncommitted, untracked and session-committed paths relative to the root."""
     names = set(git(root, "ls-files", "--others", "--exclude-standard", "-z").split(b"\0"))
     head = subprocess.run(["git", "-C", str(root), "rev-parse", "-q", "--verify", "HEAD"], capture_output=True)
@@ -294,19 +310,22 @@ def changed_paths(root):
     else:
         names |= set(git(root, "diff", "--relative", "--name-only", "--no-renames", "-z", "HEAD").split(b"\0"))
         names |= set(git(root, "diff", "--cached", "--relative", "--name-only", "--no-renames", "-z", "HEAD").split(b"\0"))
-        base_file = root / ".agent-runtime/gate-baseline-head"
-        base = base_file.read_text().strip() if base_file.is_file() else ""
-        if re.fullmatch(r"[0-9a-f]{40,64}", base):
+        if base is None:
+            base = initial_head(root, session) if session else None
+        if base is None:  # Legacy/direct callers retain the checkout-wide boundary.
+            base_file = root / ".agent-runtime/gate-baseline-head"
+            base = (base_file.read_text().strip() or None) if base_file.is_file() else None
+        if base == "":  # A session that began in an unborn repository owns its first commit too.
+            names |= set(git(root, "ls-tree", "-r", "--name-only", "-z", "HEAD").split(b"\0"))
+        elif base is not None and re.fullmatch(r"[0-9a-f]{40,64}", base):
             known = subprocess.run(["git", "-C", str(root), "cat-file", "-e", base + "^{commit}"], capture_output=True)
             if known.returncode == 0:
                 names |= set(git(root, "diff", "--relative", "--name-only", "--no-renames", "-z", base, "HEAD").split(b"\0"))
     return sorted(os.fsdecode(name) for name in names - {b""})
 
 
-def high_risk_changes(root):
-    if subprocess.run(["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"], capture_output=True).returncode:
-        return []
-    areas = high_risk_areas(root)
+def matching_risk(paths, areas):
+    """Match application-relative paths against the selected project's declared policy."""
     def risky(path):
         for area in areas:
             if any(mark in area for mark in "*?["):
@@ -315,7 +334,74 @@ def high_risk_changes(root):
             elif path == area.rstrip("/") or path.startswith(area.rstrip("/") + "/"):
                 return True
         return False
-    return [path for path in changed_paths(root) if risky(path)] if areas else []
+    return [path for path in paths if risky(path)] if areas else []
+
+
+def target_high_risk_changes(root, paths, session=""):
+    """Use the parent session's original gitlink, even after target and pointer commits.
+
+    If that tree predates the target registration, its whole Git-visible content is new.
+    Without a session boundary use the parent HEAD pin (or the initial indexed pin).
+    """
+    project = Path(paths["project_root"])
+    relative = project.relative_to(root).as_posix()
+    base = initial_head(root, session) if session else None
+    if base is None:
+        baseline = root / ".agent-runtime/gate-baseline-head"
+        base = baseline.read_text().strip() if baseline.is_file() else "HEAD"
+    pin = b""
+    def gitlink(value):
+        fields = value.split(b"\t", 1)[0].split()
+        if fields and fields[0] == b"160000":
+            return fields[2 if fields[1] == b"commit" else 1].decode()
+        return ""
+    # HEAD is optional in a newly initialized parent; explicit recorded baselines are not.
+    head = subprocess.run(["git", "-C", str(root), "rev-parse", "-q", "--verify", "HEAD^{commit}"],
+                          capture_output=True)
+    if base and (base != "HEAD" or head.returncode == 0):
+        pin = git(root, "--no-replace-objects", "ls-tree", "-z", base, "--", relative)
+    if not pin and base == "HEAD":
+        pin = git(root, "ls-files", "--stage", "-z", "--", relative)
+    target_base = gitlink(pin)
+    areas = high_risk_areas(Path(paths["record_root"]))
+    if not (project / ".git").exists():
+        # Normal clones retain policy records without initializing every application.
+        # Only an unchanged pin can be skipped without inspecting its application content.
+        pins = [git(root, "ls-files", "--stage", "-z", "--", relative)]
+        if head.returncode == 0:
+            pins.append(git(root, "--no-replace-objects", "ls-tree", "-z", "HEAD", "--", relative))
+        if not areas or all(gitlink(value) == target_base for value in pins):
+            return []
+        raise ValueError("Changed target submodule is not initialized; initialize it before validation: " + relative)
+    if target_base:
+        known = subprocess.run(["git", "-C", str(project), "--no-replace-objects", "cat-file", "-e",
+                                target_base + "^{commit}"], capture_output=True)
+        if known.returncode:
+            raise ValueError("Target change baseline is unavailable; restore its Git objects before validation")
+    changed = changed_paths(project, base=target_base)
+    return [relative + "/" + name for name in matching_risk(changed, areas)]
+
+
+def high_risk_changes(root, session=""):
+    if subprocess.run(["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"], capture_output=True).returncode:
+        return []
+    found = matching_risk(changed_paths(root, session), high_risk_areas(root))
+    active = root / ".agent-runtime/active-target.json"
+    records = root / ".lean/targets"
+    if not any(path.exists() or path.is_symlink() for path in (active, records)):
+        return sorted(set(found))
+    from submodule import context, safe_path
+    context(root)  # Invalid active selections must still fail instead of falling back.
+    # Policies belong to retained application records, independently of which app is selected.
+    records = safe_path(root, ".lean/targets")
+    for policy in sorted(records.glob("*/.lean/PROJECT.md")):
+        safe_path(root, str(policy.relative_to(root)))
+        name = policy.parents[1].name
+        project = safe_path(root, "targets/" + name)
+        safe_path(root, "targets/" + name + "/.git")
+        paths = {"project_root": str(project), "record_root": str(policy.parents[1])}
+        found += target_high_risk_changes(root, paths, session)
+    return sorted(set(found))
 
 
 def check_review(root, contract):
@@ -394,6 +480,45 @@ def git_visible(root, name):
     return bool(listed.strip(b"\0") or deleted.strip(b"\0"))
 
 
+def guard_controls(root, contract=None, reason=None):
+    """Refuse changed controls before running checks; reason records existing user approval."""
+    path = root / ".agent-runtime/gate-controls.json"
+    current = controls(root)
+    if reason is not None:
+        if not reason.strip():
+            raise ValueError("User approval reason is required")
+        old = json.loads(path.read_text()) if path.exists() else None
+        history = old.get("history", []) if old else []
+        history.append({"before": old.get("controls") if old else None,
+                        "after": current, "reason": reason})
+        save(path, {"schema": 1, "controls": current, "history": history})
+    elif not path.exists():
+        save(path, {"schema": 1, "controls": current, "history": []})
+    else:
+        old = json.loads(path.read_text())
+        if old.get("controls") != current:
+            match = trusted_match(root, current)
+            if match is not None:
+                ref, commit = match
+                reason = f"automatic: controls match trusted ref {ref} at {commit}"
+                note = f"Gate evidence: protected gate controls accepted; they match {ref} ({commit[:12]})."
+            else:
+                reviewed = reviewed_controls(root, old, current, contract)
+                if reviewed is None:
+                    hint = (" No trusted-control-refs entry matches them." if current.get("trusted_control_refs") else "")
+                    raise ValueError("Protected gate controls changed. Inspect the diff; use accept-controls --reason "
+                                     "only for an already user-approved change, or let an independent HIGH-depth "
+                                     "PASS review cover the change." + hint)
+                reviewer, contract, receipt_state = reviewed
+                reason = (f"automatic: independent HIGH-depth review PASS by {reviewer} for {contract} covers "
+                          f"these controls (receipt state {receipt_state[:12]})")
+                note = (f"Gate evidence: protected gate controls accepted; an independent HIGH-depth PASS review "
+                        f"by {reviewer} covers them.")
+            history = old.get("history", []) + [{"before": old.get("controls"), "after": current, "reason": reason}]
+            save(path, {"schema": 1, "controls": current, "history": history})
+            print(note, file=sys.stderr)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
@@ -404,7 +529,10 @@ def main():
     accept.add_argument("--reason", required=True)
     commands.add_parser("state", help="the shipping state a review receipt covers")
     commands.add_parser("gate-state", help="the state a gate cache and change baseline cover")
-    commands.add_parser("high-risk")
+    high_risk = commands.add_parser("high-risk")
+    high_risk.add_argument("--session", default="")
+    seed = commands.add_parser("seed-session")
+    seed.add_argument("--session", required=True)
     commands.add_parser("check-shipped")
     transcript = commands.add_parser("contract")
     transcript.add_argument("--transcript", required=True)
@@ -422,49 +550,18 @@ def main():
     root = args.root.resolve()
     try:
         if args.command in {"guard-controls", "accept-controls"}:
-            path = root / ".agent-runtime/gate-controls.json"
-            current = controls(root)
-            if args.command == "accept-controls":
-                if not args.reason.strip():
-                    raise ValueError("User approval reason is required")
-                old = json.loads(path.read_text()) if path.exists() else None
-                history = old.get("history", []) if old else []
-                history.append({"before": old.get("controls") if old else None,
-                                "after": current, "reason": args.reason})
-                save(path, {"schema": 1, "controls": current, "history": history})
-            elif not path.exists():
-                save(path, {"schema": 1, "controls": current, "history": []})
-            else:
-                old = json.loads(path.read_text())
-                if old.get("controls") != current:
-                    match = trusted_match(root, current)
-                    if match is not None:
-                        ref, commit = match
-                        reason = f"automatic: controls match trusted ref {ref} at {commit}"
-                        note = f"Gate evidence: protected gate controls accepted; they match {ref} ({commit[:12]})."
-                    else:
-                        reviewed = reviewed_controls(root, old, current, args.contract)
-                        if reviewed is None:
-                            hint = (" No trusted-control-refs entry matches them." if current.get("trusted_control_refs") else "")
-                            raise ValueError("Protected gate controls changed. Inspect the diff; use accept-controls --reason "
-                                             "only for an already user-approved change, or let an independent HIGH-depth "
-                                             "PASS review cover the change." + hint)
-                        reviewer, contract, receipt_state = reviewed
-                        reason = (f"automatic: independent HIGH-depth review PASS by {reviewer} for {contract} covers "
-                                  f"these controls (receipt state {receipt_state[:12]})")
-                        note = (f"Gate evidence: protected gate controls accepted; an independent HIGH-depth PASS review "
-                                f"by {reviewer} covers them.")
-                    history = old.get("history", []) + [{"before": old.get("controls"), "after": current, "reason": reason}]
-                    save(path, {"schema": 1, "controls": current, "history": history})
-                    print(note, file=sys.stderr)
+            guard_controls(root, args.contract if args.command == "guard-controls" else None,
+                           args.reason if args.command == "accept-controls" else None)
         elif args.command == "state":
             print(captured_state(root))
         elif args.command == "gate-state":
             print(state(root))
+        elif args.command == "seed-session":
+            start_session(root, args.session, state(root))
         elif args.command == "check-shipped":
             check_shipped(root)
         elif args.command == "high-risk":
-            for path in high_risk_changes(root):
+            for path in high_risk_changes(root, args.session):
                 print(path)
         elif args.command == "contract":
             print(contract_from_transcript(args.transcript))

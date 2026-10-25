@@ -1,8 +1,11 @@
 """The parallel runners must report every failure and fail when any part fails."""
 import shutil
+import queue
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 
@@ -50,6 +53,67 @@ class ParallelRunnerTests(unittest.TestCase):
         self.assertIn("planted failure", result.stdout)
         self.assertIn("2 files", result.stdout)
         self.assertIn("FAILED (1)", result.stdout)
+
+    def test_completed_failure_is_reported_while_first_job_is_blocked(self):
+        with tempfile.TemporaryDirectory() as directory:
+            start = Path(directory) / ".lean/tests"
+            start.mkdir(parents=True)
+            release = start / "release"
+            entered = start / "entered"
+            slow = ("import time, unittest\nfrom pathlib import Path\n"
+                    "class T(unittest.TestCase):\n"
+                    " def test_slow(self):\n"
+                    "  base = Path(__file__).parent\n"
+                    "  (base / 'entered').touch()\n"
+                    "  deadline = time.monotonic() + 30\n"
+                    "  while not (base / 'release').exists():\n"
+                    "   if time.monotonic() > deadline: self.fail('release timed out')\n"
+                    "   time.sleep(0.01)\n")
+            for name, body in {"test_a.py": slow, "test_b.py": FAILING, "test_c.py": PASSING}.items():
+                (start / name).write_text(body)
+            process = subprocess.Popen([sys.executable, str(RUNNER), "--start-dir", str(start), "-j", "2"],
+                                       text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            lines = queue.Queue()
+            output = []
+
+            def read_output():
+                for line in process.stdout:
+                    output.append(line)
+                    lines.put(line)
+
+            reader = threading.Thread(target=read_output, daemon=True)
+            reader.start()
+            early = []
+            try:
+                deadline = time.monotonic() + 10
+                while not entered.exists() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue(entered.exists(), "slow job never entered its barrier")
+                # A generous timeout detects missing feedback; timing is not the acceptance metric.
+                deadline = time.monotonic() + 10
+                while not any(line.startswith("FAIL") and "test_b.py" in line for line in early):
+                    early.append(lines.get(timeout=max(0.01, deadline - time.monotonic())))
+                self.assertIsNone(process.poll(), "runner exited while first job was blocked")
+                self.assertFalse(release.exists())
+            except queue.Empty:
+                self.fail("completed failure was hidden behind the blocked first job")
+            finally:
+                release.touch()
+                try:
+                    process.wait(timeout=15)
+                finally:
+                    if process.poll() is None:
+                        process.kill()
+                        process.wait()
+                    reader.join(timeout=5)
+                    process.stdout.close()
+            result = "".join(output)
+            self.assertEqual(process.returncode, 1, result)
+            self.assertIn("test_a.py", result)
+            self.assertIn("test_c.py", result)  # A failure must not cancel pending work.
+            self.assertIn("===== test_b.py =====", result)
+            self.assertIn("test_b.py: FAIL: test_bad", result)
+            self.assertTrue(result.rstrip().endswith("FAILED (1)"), result)
 
     def test_named_missing_file_is_not_success(self):
         # unittest discover exits 0 for a pattern that matches nothing on Python < 3.12.
