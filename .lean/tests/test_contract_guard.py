@@ -703,6 +703,63 @@ class StopContractTests(HookFixture):
         self.assertEqual(refused.get("decision"), "block", refused)
         self.assertIn("no declared Task Contract", refused["reason"])
 
+    def check_committed_high_risk_session(self, provider):
+        project = self.root / ".lean/PROJECT.md"
+        project.write_text(project.read_text() + "\n## High-risk areas\n\n- `auth.py`: permissions.\n")
+        auth = self.root / "auth.py"
+        auth.write_text("deny = True\n")
+        def commit():
+            subprocess.run(["git", "-C", str(self.root), "add", "-A"], check=True)
+            subprocess.run(["git", "-C", str(self.root), "-c", "user.name=t", "-c",
+                            "user.email=t@e.invalid", "commit", "-qm", "fixture"], check=True)
+        commit()
+        payload = {"session_id": "committed", "stop_hook_active": False}
+        def event(seed=False):
+            if provider == "codex":
+                return stop_refusal(self.codex_event("session-start" if seed else "stop", "committed"))
+            return stop_refusal(subprocess.run(
+                ["bash", str(self.root / ".claude/hooks/quality-gate.sh"), *(["--seed"] if seed else [])],
+                input=json.dumps(payload), env={**os.environ, "CLAUDE_PROJECT_DIR": str(self.root)},
+                text=True, capture_output=True))
+        self.assertEqual(event(seed=True).returncode, 0)
+        self.assertEqual(self.tool(provider, "Bash", "committed",
+                                   command=f"{DECLARE} --contract '{LINE}'").returncode, 0)
+        auth.write_text("deny = False\n")
+        before = event()
+        self.assertEqual(before.returncode, 2, before.stderr)
+        self.assertIn("auth.py", before.stderr)
+        commit()
+        # Resume must retain the original HEAD, even though the working tree is now clean.
+        self.assertEqual(event(seed=True).returncode, 0)
+        self.assertEqual(self.prompt(provider, "continue", "committed").returncode, 0)
+        self.assertEqual(self.tool(provider, "Bash", "committed",
+                                   command=f"{DECLARE} --contract '{LINE}'").returncode, 0)
+        after = event()
+        self.assertEqual(after.returncode, 2, after.stderr)
+        self.assertIn("auth.py", after.stderr)
+        high = "Contract: risk=HIGH quality=HIGH acceptance=review fixture"
+        evidence = ["python3", str(self.root / ".lean/scripts/gate_evidence.py"), "--root", str(self.root)]
+        state = subprocess.check_output([*evidence, "state"], text=True).strip()
+        recorded = subprocess.run([*evidence, "record-review", "--contract", high, "--reviewer", "independent",
+                                   "--evidence", "fixture", "--verdict", "PASS", "--state", state],
+                                  text=True, capture_output=True)
+        self.assertEqual(recorded.returncode, 0, recorded.stderr)
+        for _ in range(2):  # An unchanged reviewed state reuses the receipt.
+            passed = event()
+            self.assertEqual(passed.returncode, 0, passed.stderr)
+            self.assertNotIn("UNVERIFIED", passed.stdout)
+        (self.root / ".agent-runtime/review.json").unlink()
+        # A prior pass/mutable state baseline must not erase session commit coverage.
+        missing = event()
+        self.assertEqual(missing.returncode, 2, missing.stderr)
+        self.assertIn("auth.py", missing.stderr)
+
+    def test_codex_committed_high_risk_change_survives_resume_and_pass(self):
+        self.check_committed_high_risk_session("codex")
+
+    def test_claude_committed_high_risk_change_survives_resume_and_pass(self):
+        self.check_committed_high_risk_session("claude")
+
     def test_codex_stop_requires_a_declaration_only_for_changed_work(self):
         self.assertEqual(self.codex_event("session-start", "x1").returncode, 0)
         unchanged = self.codex_event("stop", "x1")

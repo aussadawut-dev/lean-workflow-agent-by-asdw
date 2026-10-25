@@ -34,6 +34,8 @@ bash .lean/scripts/quality-gate.sh --root .
 
 Checks rerun by default, including continued Stops after failure. A missing or empty gate blocks completion with setup guidance. SessionStart records a change baseline; it does not validate the project.
 
+Both adapters retain the session's original commit boundary across resumes, new prompts and later gate passes. Committing a High-risk change does not remove its review requirement; an unchanged reviewed state can still reuse its valid receipt.
+
 `--cache-tree` is an opt-in cache for checks whose inputs are entirely visible to Git. This repository uses it for both providers' Stop commands and for `/lean-gate`. A pass made with it, by a direct run or either Stop, is recorded for the shipping state, and a later `--cache-tree` run or Stop on that unchanged state reuses it while contract and required review checks still run. Changed files or a standing refusal trigger fresh validation, and any refusal other than a contract refusal drops the recorded pass.
 
 Changes to tools, environment or ignored dependencies need a fresh direct run. Downstream projects whose checks depend on those inputs should remove `--cache-tree` from their Stop commands in `.claude/settings.json` and `.codex/hooks.json`. For HIGH-depth work, include `--require-review --contract '<exact contract line>'` when validating and checking the receipt together.

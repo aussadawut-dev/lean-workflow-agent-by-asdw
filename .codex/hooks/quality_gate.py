@@ -57,8 +57,7 @@ def main():
             try:
                 # Keep the first baseline: a resume or subagent reuses the session id, and
                 # rebasing then would absorb undeclared work made earlier in the session.
-                if not contract_guard.baseline(root, session):
-                    contract_guard.baseline(root, session, state(root))
+                contract_guard.start_session(root, session, state(root))
             except (OSError, ValueError, subprocess.CalledProcessError):
                 pass  # No baseline: the Stop treats any uncommitted change as this session's work.
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": policy(mode)}}))

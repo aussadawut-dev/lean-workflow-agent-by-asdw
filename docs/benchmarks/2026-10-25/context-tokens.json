@@ -1,0 +1,337 @@
+{
+  "measurement": "Offline sum of per-file text tokens, not actual model usage or billing.",
+  "baseline_revision": "c5247c7067381fe7364c7794cfa44ba52546380a",
+  "tiktoken_version": "0.12.0",
+  "historical_source": "docs/benchmarks/2026-10-23/context-tokens.json",
+  "worker_source": "docs/benchmarks/2026-10-23/worker-context-tokens.json",
+  "worker_application_revision": "7f76ac426784c3665e891a192cfd00d88af1af98",
+  "limits": [
+    "Excludes system/runtime prompts, wrappers, tool traffic, retries, output and cache billing.",
+    "Fixed profiles are comparable input inventories, not required reads for every task.",
+    "Worker application/brief tokens reuse the pinned prior artifact; no app or model was run.",
+    "Historical deployment count 0 means the feature was absent in v4.7.0, not free deployment.",
+    "Maintenance source profile counts full files; focused range reads can cost less.",
+    "No causal claim about actual token savings, agent correctness or application speed."
+  ],
+  "encodings": {
+    "o200k_base": {
+      "startup-required": {
+        "historical_4_7_0_tokens": 2030,
+        "historical_2026_10_23_tokens": 2213,
+        "before_tokens": 2213,
+        "after_tokens": 2213,
+        "delta_tokens": 0,
+        "files": [
+          {
+            "path": "AGENTS.md",
+            "before_tokens": 1504,
+            "after_tokens": 1504
+          },
+          {
+            "path": ".lean/README.md",
+            "before_tokens": 709,
+            "after_tokens": 709
+          }
+        ]
+      },
+      "task-fixed-read-set": {
+        "historical_4_7_0_tokens": 10186,
+        "historical_2026_10_23_tokens": 11146,
+        "before_tokens": 11146,
+        "after_tokens": 11146,
+        "delta_tokens": 0,
+        "files": [
+          {
+            "path": "AGENTS.md",
+            "before_tokens": 1504,
+            "after_tokens": 1504
+          },
+          {
+            "path": ".lean/README.md",
+            "before_tokens": 709,
+            "after_tokens": 709
+          },
+          {
+            "path": ".lean/skills/lean-task/SKILL.md",
+            "before_tokens": 685,
+            "after_tokens": 685
+          },
+          {
+            "path": ".lean/skills/lean-scope/SKILL.md",
+            "before_tokens": 1335,
+            "after_tokens": 1335
+          },
+          {
+            "path": ".lean/skills/lean-review/SKILL.md",
+            "before_tokens": 617,
+            "after_tokens": 617
+          },
+          {
+            "path": ".lean/skills/lean-gate/SKILL.md",
+            "before_tokens": 578,
+            "after_tokens": 578
+          },
+          {
+            "path": ".lean/policy/CONTEXT.md",
+            "before_tokens": 823,
+            "after_tokens": 823
+          },
+          {
+            "path": ".lean/policy/CONTRACTS.md",
+            "before_tokens": 1390,
+            "after_tokens": 1390
+          },
+          {
+            "path": ".lean/policy/TESTING.md",
+            "before_tokens": 146,
+            "after_tokens": 146
+          },
+          {
+            "path": ".lean/policy/REVIEW.md",
+            "before_tokens": 1017,
+            "after_tokens": 1017
+          },
+          {
+            "path": ".lean/policy/QUALITY.md",
+            "before_tokens": 2342,
+            "after_tokens": 2342
+          }
+        ]
+      },
+      "deployment-optional": {
+        "historical_4_7_0_tokens": 0,
+        "historical_2026_10_23_tokens": 2185,
+        "before_tokens": 2185,
+        "after_tokens": 2185,
+        "delta_tokens": 0,
+        "files": [
+          {
+            "path": ".lean/skills/lean-playbook/SKILL.md",
+            "before_tokens": 1471,
+            "after_tokens": 1471
+          },
+          {
+            "path": ".lean/templates/deployment-playbook.md",
+            "before_tokens": 451,
+            "after_tokens": 451
+          },
+          {
+            "path": ".lean/templates/deployment-release.md",
+            "before_tokens": 263,
+            "after_tokens": 263
+          }
+        ]
+      },
+      "gate-maintenance-source-inventory": {
+        "before_tokens": 26896,
+        "after_tokens": 28732,
+        "files": [
+          {
+            "path": ".codex/hooks/quality_gate.py",
+            "before_tokens": 1982,
+            "after_tokens": 1971
+          },
+          {
+            "path": ".lean/scripts/contract_guard.py",
+            "before_tokens": 11006,
+            "after_tokens": 11175
+          },
+          {
+            "path": ".lean/scripts/gate_evidence.py",
+            "before_tokens": 6040,
+            "after_tokens": 7371
+          },
+          {
+            "path": ".lean/scripts/quality-gate.sh",
+            "before_tokens": 4080,
+            "after_tokens": 4238
+          },
+          {
+            "path": ".lean/scripts/submodule.py",
+            "before_tokens": 3788,
+            "after_tokens": 3977
+          }
+        ]
+      },
+      "worker-pinned-scenario": {
+        "source_tokens_reused": 4176,
+        "historical_bounded": 6677,
+        "historical_full_skill": 7997,
+        "full_skill_before": 7997,
+        "full_skill_after": 7997,
+        "delegation_skill_unchanged": true,
+        "bounded_method": "Historical count only; prior excerpt whitespace not retained for recounting."
+      }
+    },
+    "cl100k_base": {
+      "startup-required": {
+        "historical_4_7_0_tokens": 2027,
+        "historical_2026_10_23_tokens": 2211,
+        "before_tokens": 2211,
+        "after_tokens": 2211,
+        "delta_tokens": 0,
+        "files": [
+          {
+            "path": "AGENTS.md",
+            "before_tokens": 1503,
+            "after_tokens": 1503
+          },
+          {
+            "path": ".lean/README.md",
+            "before_tokens": 708,
+            "after_tokens": 708
+          }
+        ]
+      },
+      "task-fixed-read-set": {
+        "historical_4_7_0_tokens": 10194,
+        "historical_2026_10_23_tokens": 11153,
+        "before_tokens": 11153,
+        "after_tokens": 11153,
+        "delta_tokens": 0,
+        "files": [
+          {
+            "path": "AGENTS.md",
+            "before_tokens": 1503,
+            "after_tokens": 1503
+          },
+          {
+            "path": ".lean/README.md",
+            "before_tokens": 708,
+            "after_tokens": 708
+          },
+          {
+            "path": ".lean/skills/lean-task/SKILL.md",
+            "before_tokens": 684,
+            "after_tokens": 684
+          },
+          {
+            "path": ".lean/skills/lean-scope/SKILL.md",
+            "before_tokens": 1339,
+            "after_tokens": 1339
+          },
+          {
+            "path": ".lean/skills/lean-review/SKILL.md",
+            "before_tokens": 616,
+            "after_tokens": 616
+          },
+          {
+            "path": ".lean/skills/lean-gate/SKILL.md",
+            "before_tokens": 580,
+            "after_tokens": 580
+          },
+          {
+            "path": ".lean/policy/CONTEXT.md",
+            "before_tokens": 824,
+            "after_tokens": 824
+          },
+          {
+            "path": ".lean/policy/CONTRACTS.md",
+            "before_tokens": 1393,
+            "after_tokens": 1393
+          },
+          {
+            "path": ".lean/policy/TESTING.md",
+            "before_tokens": 146,
+            "after_tokens": 146
+          },
+          {
+            "path": ".lean/policy/REVIEW.md",
+            "before_tokens": 1017,
+            "after_tokens": 1017
+          },
+          {
+            "path": ".lean/policy/QUALITY.md",
+            "before_tokens": 2343,
+            "after_tokens": 2343
+          }
+        ]
+      },
+      "deployment-optional": {
+        "historical_4_7_0_tokens": 0,
+        "historical_2026_10_23_tokens": 2172,
+        "before_tokens": 2172,
+        "after_tokens": 2172,
+        "delta_tokens": 0,
+        "files": [
+          {
+            "path": ".lean/skills/lean-playbook/SKILL.md",
+            "before_tokens": 1459,
+            "after_tokens": 1459
+          },
+          {
+            "path": ".lean/templates/deployment-playbook.md",
+            "before_tokens": 450,
+            "after_tokens": 450
+          },
+          {
+            "path": ".lean/templates/deployment-release.md",
+            "before_tokens": 263,
+            "after_tokens": 263
+          }
+        ]
+      },
+      "gate-maintenance-source-inventory": {
+        "before_tokens": 26690,
+        "after_tokens": 28516,
+        "files": [
+          {
+            "path": ".codex/hooks/quality_gate.py",
+            "before_tokens": 1962,
+            "after_tokens": 1951
+          },
+          {
+            "path": ".lean/scripts/contract_guard.py",
+            "before_tokens": 10908,
+            "after_tokens": 11076
+          },
+          {
+            "path": ".lean/scripts/gate_evidence.py",
+            "before_tokens": 5992,
+            "after_tokens": 7315
+          },
+          {
+            "path": ".lean/scripts/quality-gate.sh",
+            "before_tokens": 4068,
+            "after_tokens": 4226
+          },
+          {
+            "path": ".lean/scripts/submodule.py",
+            "before_tokens": 3760,
+            "after_tokens": 3948
+          }
+        ]
+      },
+      "worker-pinned-scenario": {
+        "source_tokens_reused": 4056,
+        "historical_bounded": 6555,
+        "historical_full_skill": 7878,
+        "full_skill_before": 7878,
+        "full_skill_after": 7878,
+        "delegation_skill_unchanged": true,
+        "bounded_method": "Historical count only; prior excerpt whitespace not retained for recounting."
+      }
+    }
+  },
+  "current_file_sha256": {
+    "AGENTS.md": "cc58fa7d4cbb6de7fbe9728818b565bdf31725b37102784542dc738ce365c2aa",
+    ".lean/README.md": "4b22a2e1edeb1069125cd1c35ad8a99ed7e552aa5b3dd4dbaac672dd70ce3299",
+    ".lean/skills/lean-task/SKILL.md": "b4ebbf85aa952c13c20245338ed5400969c2f1a5a4cbd6cbf8aa385166455adf",
+    ".lean/skills/lean-scope/SKILL.md": "7a33517cf76120224702de42651e9eee0794df85b197a646003e499f9bb7b91e",
+    ".lean/skills/lean-review/SKILL.md": "78f6ec050f8dd0e2900e276edfcef1a7aae46477ec30c18fdfb5fb8c5c864b59",
+    ".lean/skills/lean-gate/SKILL.md": "f5c3ae34386cbd845c46f168650cbfb9a32a536118113e8bca70c6b31fa11484",
+    ".lean/policy/CONTEXT.md": "e8e4008b935240ddf514109dcedbce229798a76bdabb4c354dbcf8cd363da68c",
+    ".lean/policy/CONTRACTS.md": "b8fb5659e1e9f2d753de198a475a1b181f769995fef352162cfc35199c96ff17",
+    ".lean/policy/TESTING.md": "9bf9e13e295f35355fb2e9d40374ce82f4317425d666f1a3643d17bebeee1ee2",
+    ".lean/policy/REVIEW.md": "2a7675357f4b41d82c46f7bd58040fdf9d27694b5383defc657388ed3c5c610b",
+    ".lean/policy/QUALITY.md": "1b0efbee36a105dba69d2d973f98336be1c7634ec77e369e352883660b0e7655",
+    ".lean/skills/lean-playbook/SKILL.md": "374c43b91ce1433e47daf7adf7b2e08edec1dded1c1f6e5464b58d02726fd2aa",
+    ".lean/templates/deployment-playbook.md": "111eddf8bbda73b5853ed55dfae0bee9f69828b68fc6634b261256569cb1748a",
+    ".lean/templates/deployment-release.md": "d264769134d2f3d6817b5da5ec24d5e6087b48ca91da4a5f3cc9d8cc1f46800a",
+    ".codex/hooks/quality_gate.py": "f496cddf68de08aa5ea16744b3af9809961c81fa29c00e5a8566e97fbb1052dc",
+    ".lean/scripts/contract_guard.py": "62db558066367776165a8ccf86456337d26a6c353162000ab1c9296619eabcb9",
+    ".lean/scripts/gate_evidence.py": "d041be6a292516dfcb8104d9cddd1dd224b318525144594895bbef6d748b2ae3",
+    ".lean/scripts/quality-gate.sh": "0b1ffae45d55e8aab099c9ba986e1d221655b3ddd6846fd72873614285cfd485",
+    ".lean/scripts/submodule.py": "9be3cd4722ec5bd0bc3eb65c27702aecde2b7ff1bb44b8a762b57e9d3cc6f4d3"
+  }
+}

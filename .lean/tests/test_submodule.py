@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
 import tempfile
 import unittest
@@ -34,7 +35,7 @@ class SubmoduleTests(unittest.TestCase):
                     "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "test@example.invalid"}
         for name in (".lean/scripts/submodule.py", ".lean/scripts/workflow.py", ".lean/scripts/model_catalog.py",
                      ".lean/templates/tracker.md", ".lean/templates/queue-item.json",
-                     ".lean/scripts/gate_evidence.py", ".lean/scripts/contract_guard.py", ".lean/scripts/gate_lock.py", ".lean/scripts/gate_mode.py", ".lean/scripts/skill_effort.py", ".lean/scripts/quality-gate.sh", ".claude/hooks/quality-gate.sh", ".claude/hooks/session-start.sh", ".gitignore", "AGENTS.md"):
+                     ".lean/scripts/gate_evidence.py", ".lean/scripts/contract_guard.py", ".lean/scripts/gate_lock.py", ".lean/scripts/gate_mode.py", ".lean/scripts/skill_effort.py", ".lean/scripts/quality-gate.sh", ".claude/hooks/quality-gate.sh", ".claude/hooks/session-start.sh", ".codex/hooks/quality_gate.py", ".gitignore", "AGENTS.md"):
             dst = self.root / name
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / name, dst)
@@ -47,6 +48,7 @@ class SubmoduleTests(unittest.TestCase):
         self.script = self.root / ".lean/scripts/submodule.py"
 
     def command(self, *args, **kwargs):
+        kwargs.setdefault("cwd", self.root)
         return subprocess.run([str(a) for a in args], env=self.env, text=True, capture_output=True, **kwargs)
 
     def git(self, root, *args):
@@ -81,11 +83,304 @@ class SubmoduleTests(unittest.TestCase):
     def gate_file(self, context, command):
         Path(context["project_file"]).write_text("# Application\n<!-- gate:start -->\n```sh\n" + command + "\n```\n<!-- gate:end -->\n")
 
-    def hook(self, seed=False):
+    def hook(self, seed=False, session=""):
         result = subprocess.run(["bash", str(self.root / ".claude/hooks/quality-gate.sh"), *(["--seed"] if seed else [])],
-                                input="{}", env={**self.env, "CLAUDE_PROJECT_DIR": str(self.root)},
-                                text=True, capture_output=True)
+                                input=json.dumps({"session_id": session}), env={**self.env, "CLAUDE_PROJECT_DIR": str(self.root)},
+                                text=True, capture_output=True, cwd=self.root)
         return stop_refusal(result)
+
+    def evidence(self, *args):
+        result = self.command("python3", self.root / ".lean/scripts/gate_evidence.py", "--root", self.root, *args)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return result.stdout.strip()
+
+    def gate_entry(self, entry, *args, session=""):
+        if session:
+            args = (*args, "--session", session)
+        if entry == "standalone":
+            return self.command("python3", self.script, "gate", *args)
+        if entry == "claude":
+            return self.hook(session=session)
+        if entry == "codex":
+            return stop_refusal(self.command("python3", self.root / ".codex/hooks/quality_gate.py",
+                                             "stop", input=json.dumps({"session_id": session})))
+        return self.command("bash", self.root / ".lean/scripts/quality-gate.sh", "--root", self.root, *args)
+
+    def reviewed(self, contract="Contract: risk=HIGH quality=HIGH acceptance=target fixture reviewed"):
+        self.evidence("record-review", "--contract", contract, "--reviewer", "independent-fixture",
+                      "--verdict", "PASS", "--evidence", "target contents and controls",
+                      "--state", self.evidence("state"))
+
+    def bind(self, session, contract):
+        result = self.command("python3", self.root / ".lean/scripts/contract_guard.py", "--root", self.root,
+                              "pre-tool", input=json.dumps({"session_id": session, "tool_name": "Bash",
+                              "tool_input": {"command": "python3 .lean/scripts/contract_guard.py declare --contract '"
+                                             + contract + "'"}}))
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_target_high_risk_floor_applies_to_all_gate_entries_and_stale_reviews(self):
+        context = self.install()
+        marker = self.root / ".agent-runtime/target-check-ran"
+        self.gate_file(context, "test -f app.txt && touch " + shlex.quote(str(marker)))
+        project = Path(context["project_file"])
+        project.write_text(project.read_text() + "\n## High-risk areas\n- `app.txt` and `secret/`\n")
+        self.git(self.root, "add", ".")
+        self.git(self.root, "commit", "-qm", "Registered target policy")
+        self.assertEqual(self.gate_entry("shared", "--cache-tree").returncode, 0)
+        self.bind("target-low", "Contract: risk=LOW quality=STANDARD acceptance=target fixture")
+        target = Path(context["project_root"])
+        (target / "app.txt").write_text("unreviewed target edit")
+        for entry in ("shared", "standalone", "claude", "codex"):
+            with self.subTest(entry=entry):
+                marker.unlink(missing_ok=True)
+                result = self.gate_entry(entry, session="target-low")
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("targets/application/app.txt", result.stderr)
+                self.assertTrue(marker.is_file(), "approved deterministic checks must precede review enforcement")
+        self.reviewed()
+        for entry in ("shared", "standalone", "claude", "codex"):
+            result = self.gate_entry(entry, session="target-low")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        (target / "secret").mkdir()
+        (target / "secret/new.txt").write_text("untracked risk invalidates review")
+        for entry in ("shared", "standalone"):
+            result = self.gate_entry(entry, *(["--cache-tree"] if entry == "shared" else []))
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("targets/application/secret/new.txt", result.stderr)
+
+    def test_target_session_commit_and_pointer_update_keep_high_risk_floor(self):
+        context = self.install()
+        self.gate_file(context, "true")
+        project = Path(context["project_file"])
+        project.write_text(project.read_text() + "\n## High-risk areas\n- `app.txt`\n")
+        self.git(self.root, "add", ".")
+        self.git(self.root, "commit", "-qm", "Registered target policy")
+        self.evidence("seed-session", "--session", "target-session")
+        target = Path(context["project_root"])
+        (target / "app.txt").write_text("committed risk")
+        self.git(target, "add", ".")
+        self.git(target, "commit", "-qm", "Target edit")
+        self.git(self.root, "add", "targets/application")
+        self.git(self.root, "commit", "-qm", "Advance target pointer")
+        self.evidence("seed-session", "--session", "target-session")  # Resume preserves initial pin.
+        for entry in ("shared", "standalone"):
+            result = self.gate_entry(entry, "--session", "target-session")
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("targets/application/app.txt", result.stderr)
+        self.reviewed()
+        for entry in ("shared", "standalone"):
+            result = self.gate_entry(entry, "--session", "target-session")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_target_added_after_session_start_reviews_all_new_high_risk_content(self):
+        self.evidence("seed-session", "--session", "new-target")
+        context = self.install()
+        self.gate_file(context, "true")
+        project = Path(context["project_file"])
+        project.write_text(project.read_text() + "\n## High-risk areas\n- `app.txt`\n")
+        self.git(self.root, "add", ".")
+        self.git(self.root, "commit", "-qm", "New target is part of this session")
+        for entry in ("shared", "standalone"):
+            result = self.gate_entry(entry, session="new-target")
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("targets/application/app.txt", result.stderr)
+        self.reviewed()
+        self.assertEqual(self.gate_entry("standalone", session="new-target").returncode, 0)
+
+    def test_inactive_target_risk_survives_clear_switch_and_session_commits(self):
+        first = self.install()
+        self.gate_file(first, "true")
+        project = Path(first["project_file"])
+        project.write_text(project.read_text() + "\n## High-risk areas\n- `app.txt`\n")
+        self.git(self.root, "add", ".")
+        self.git(self.root, "commit", "-qm", "First target policy")
+        second_remote = self.make_remote("second")
+        second = self.install(second_remote)
+        self.gate_file(second, "true")
+        self.git(self.root, "add", ".")
+        self.git(self.root, "commit", "-qm", "Second target policy")
+        self.install()
+        self.evidence("seed-session", "--session", "inactive-risk")
+        self.bind("inactive-risk", "Contract: risk=LOW quality=STANDARD acceptance=inactive target")
+        target = Path(first["project_root"])
+        (target / "app.txt").write_text("unreviewed inactive target")
+        for selection in ("clear", "switch"):
+            self.cli("clear") if selection == "clear" else self.install(second_remote)
+            for entry in ("shared", "claude", "codex"):
+                with self.subTest(selection=selection, entry=entry):
+                    result = self.gate_entry(entry, session="inactive-risk")
+                    self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                    self.assertIn("targets/application/app.txt", result.stderr)
+            # Once another application is selected, its standalone gate enforces the root receipt too.
+            if selection == "switch":
+                result = self.gate_entry("standalone", session="inactive-risk")
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("targets/application/app.txt", result.stderr)
+        self.git(target, "add", ".")
+        self.git(target, "commit", "-qm", "Commit inactive target risk")
+        self.git(self.root, "add", ".")
+        self.git(self.root, "commit", "-qm", "Commit inactive target pin")
+        self.cli("clear")
+        result = self.gate_entry("shared", session="inactive-risk")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("targets/application/app.txt", result.stderr)
+        self.reviewed()
+        for entry in ("shared", "claude", "codex"):
+            result = self.gate_entry(entry, session="inactive-risk")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        (target / "app.txt").write_text("later inactive target edit")
+        result = self.gate_entry("shared", session="inactive-risk")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("targets/application/app.txt", result.stderr)
+
+    def test_unborn_parent_target_uses_index_and_session_new_content_boundaries(self):
+        self.git(self.root, "checkout", "--orphan", "unborn")
+        self.evidence("seed-session", "--session", "unborn-target")
+        self.bind("unborn-target", "Contract: risk=LOW quality=STANDARD acceptance=new target")
+        context = self.install()
+        self.gate_file(context, "true")
+        for entry in ("shared", "standalone", "claude", "codex"):
+            result = self.gate_entry(entry)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        project = Path(context["project_file"])
+        project.write_text(project.read_text() + "\n## High-risk areas\n- `app.txt`\n")
+        # Direct validation uses the staged pin in an unborn parent.
+        self.assertEqual(self.gate_entry("shared").returncode, 0)
+        # A session begun before any parent commit owns all newly registered app content.
+        for committed in (False, True):
+            if committed:
+                self.git(self.root, "add", ".")
+                self.git(self.root, "commit", "-qm", "First parent commit with new target")
+            for entry in ("shared", "standalone", "claude", "codex"):
+                with self.subTest(committed=committed, entry=entry):
+                    result = self.gate_entry(entry, session="unborn-target")
+                    self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                    self.assertIn("targets/application/app.txt", result.stderr)
+
+    def test_unchanged_deinitialized_retained_target_does_not_block_root_gate(self):
+        context = self.install()
+        self.gate_file(context, "true")
+        project = Path(context["project_file"])
+        project.write_text(project.read_text() + "\n## High-risk areas\n- `app.txt`\n")
+        self.git(self.root, "add", ".")
+        self.git(self.root, "commit", "-qm", "Retained target policy")
+        self.cli("clear")
+        self.git(self.root, "submodule", "deinit", "-f", "--", "targets/application")
+        result = self.gate_entry("shared")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_changed_deinitialized_target_and_explicit_missing_baseline_fail_closed(self):
+        context = self.install()
+        self.gate_file(context, "true")
+        project = Path(context["project_file"])
+        project.write_text(project.read_text() + "\n## High-risk areas\n- `app.txt`\n")
+        self.git(self.root, "add", ".")
+        self.git(self.root, "commit", "-qm", "Target policy baseline")
+        self.evidence("seed-session", "--session", "deinitialized-risk")
+        target = Path(context["project_root"])
+        (target / "app.txt").write_text("changed target pin")
+        self.git(target, "add", ".")
+        self.git(target, "commit", "-qm", "New target content")
+        self.git(self.root, "add", ".")
+        self.git(self.root, "commit", "-qm", "Advance target pin")
+        self.cli("clear")
+        self.git(self.root, "submodule", "deinit", "-f", "--", "targets/application")
+        result = self.gate_entry("shared", session="deinitialized-risk")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("Changed target submodule is not initialized", result.stderr)
+        # Only an optional HEAD can fall back to the index; a recorded unavailable tree cannot.
+        (self.root / ".agent-runtime/gate-baseline-head").write_text("1" * 40)
+        result = self.command("python3", self.root / ".lean/scripts/gate_evidence.py", "--root", self.root,
+                              "high-risk")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("ls-tree", result.stderr)
+
+    def test_target_control_drift_never_executes_before_guard_in_any_entry(self):
+        context = self.install()
+        self.gate_file(context, "true")
+        self.assertEqual(self.gate_entry("shared").returncode, 0)
+        self.gate_file(context, "false")
+        self.evidence("accept-controls", "--reason", "fixture author approved failing target command")
+        result = self.gate_entry("shared")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("Target Quality Gate failed", result.stderr)
+        baseline = (self.root / ".agent-runtime/gate-controls.json").read_bytes()
+        self.gate_file(context, ":; touch escaped-control")
+        for entry in ("standalone", "shared", "claude", "codex"):
+            with self.subTest(entry=entry):
+                result = self.gate_entry(entry)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("Protected gate controls changed", result.stderr)
+                self.assertFalse((Path(context["project_root"]) / "escaped-control").exists())
+                self.assertEqual((self.root / ".agent-runtime/gate-controls.json").read_bytes(), baseline)
+
+    def test_switching_target_does_not_approve_inactive_gate_drift(self):
+        first = self.install()
+        self.gate_file(first, "true")
+        self.git(self.root, "add", ".")
+        self.git(self.root, "commit", "-qm", "First registered target")
+        second = self.install(self.make_remote("second"))
+        self.gate_file(second, "true")
+        self.assertEqual(self.gate_entry("shared").returncode, 0)
+        self.gate_file(first, "touch inactive-control")
+        result = self.gate_entry("shared")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("Protected gate controls changed", result.stderr)
+        self.install()
+        self.assertEqual(self.gate_entry("standalone").returncode, 2)
+        self.assertFalse((Path(first["project_root"]) / "inactive-control").exists())
+
+    def test_target_control_review_uses_root_session_trust_for_all_entries(self):
+        context = self.install()
+        self.gate_file(context, "true")
+        self.git(self.root, "add", ".")
+        self.git(self.root, "commit", "-qm", "Baseline target checks")
+        self.assertEqual(self.gate_entry("standalone").returncode, 0)
+        contract = "Contract: risk=HIGH quality=HIGH acceptance=review target controls"
+        self.bind("target-controls", contract)
+        for entry in ("standalone", "shared", "claude", "codex"):
+            with self.subTest(entry=entry):
+                self.gate_file(context, "true # reviewed " + entry)
+                rejected = self.gate_entry(entry, session="target-controls")
+                self.assertEqual(rejected.returncode, 2, rejected.stdout + rejected.stderr)
+                self.assertIn("Protected gate controls changed", rejected.stderr)
+                self.reviewed(contract)
+                # A receipt alone cannot accept drift without the session's declared contract.
+                unbound = self.gate_entry("standalone")
+                self.assertEqual(unbound.returncode, 2, unbound.stderr)
+                accepted = self.gate_entry(entry, session="target-controls")
+                self.assertEqual(accepted.returncode, 0, accepted.stdout + accepted.stderr)
+                history = json.loads((self.root / ".agent-runtime/gate-controls.json").read_text())["history"]
+                self.assertIn("independent HIGH-depth", history[-1]["reason"])
+                self.git(self.root, "add", ".")
+                self.git(self.root, "commit", "-qm", "Accept reviewed target checks " + entry)
+
+    def test_target_controls_match_trusted_root_ref_and_reject_retained_symlinks(self):
+        context = self.install()
+        self.gate_file(context, "true")
+        project = self.root / ".lean/PROJECT.md"
+        project.write_text(project.read_text() + "\n<!-- trusted-control-refs: refs/remotes/origin/main -->\n")
+        self.git(self.root, "add", ".")
+        self.git(self.root, "commit", "-qm", "Baseline targets and trusted ref")
+        self.git(self.root, "update-ref", "refs/remotes/origin/main", "HEAD")
+        self.assertEqual(self.gate_entry("standalone").returncode, 0)
+        self.gate_file(context, "true # trusted target gate")
+        self.git(self.root, "add", ".")
+        self.git(self.root, "commit", "-qm", "Upstream reviewed target gate")
+        self.git(self.root, "update-ref", "refs/remotes/origin/main", "HEAD")
+        result = self.gate_entry("standalone")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("match refs/remotes/origin/main", result.stderr)
+        # Retained records are checked even with no selected target.
+        self.cli("clear")
+        target_project = Path(context["project_file"])
+        external = self.base / "external PROJECT.md"
+        external.write_bytes(target_project.read_bytes())
+        target_project.unlink()
+        target_project.symlink_to(external)
+        result = self.gate_entry("shared")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("symlink boundary", result.stderr)
 
     def test_preview_has_no_filesystem_or_index_effects(self):
         before = self.git(self.root, "status", "--porcelain")
@@ -190,6 +485,7 @@ class SubmoduleTests(unittest.TestCase):
         self.assertIn("Target Quality Gate: check 1 passed", result.stderr)
         self.assertNotIn("Target Quality Gate: check", self.cli("gate", "--quiet").stderr)
         self.gate_file(context, "false")
+        self.evidence("accept-controls", "--reason", "fixture author approved failing target command")
         self.assertIn("Target Quality Gate failed", self.cli("gate", success=False).stderr)
 
     def test_direct_shared_gate_checks_target_even_when_claude_cache_would_skip(self):

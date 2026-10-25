@@ -29,6 +29,10 @@ Workflow, model-catalog and skill-effort commands select active target records b
 
 Fill the returned project file with verified application checks, then run `python3 .lean/scripts/submodule.py gate`. Keep Lean self-checks separate. Claude runs target checks before using its Lean cache; Codex runs target checks explicitly and also checks Lean for workflow changes.
 
+The standalone target gate and both runtime adapters check retained target gate controls before running application commands. Switching the active target does not approve changed controls. Use the existing control-acceptance procedure only for an already approved change; an upgrade that protects an additional control may also need that recorded acceptance.
+
+High-risk paths come from each retained target's project file and apply to its application files, even after clearing or switching selection. The review receipt remains in Lean's `.agent-runtime/review.json` and covers the whole shipping state, including target contents. Runtime sessions retain their original commit boundary; pass `--session <existing-session-id>` to a direct target gate to use that boundary after committing application work and its parent gitlink. A later target edit invalidates the receipt.
+
 ## Keep Git changes clear
 
 Adding a submodule stages its registration but does not commit or push. Initializing a registered submodule keeps its pinned commit. If the default branch differs, the command creates `codex/lean-<name>` at that commit instead of advancing the pointer.

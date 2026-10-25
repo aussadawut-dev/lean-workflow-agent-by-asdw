@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import re
 import shlex
+import subprocess
 import sys
 import time
 
@@ -173,6 +174,24 @@ def baseline(root, session, value=None):
         record.update({"baseline": value, "at": record.get("at", time.time())})
         store.save()
     return value
+
+
+def start_session(root, session, value):
+    """Keep the original commit boundary across resumes and later verified-state updates."""
+    head = subprocess.run(["git", "-C", str(root), "rev-parse", "-q", "--verify", "HEAD"],
+                          capture_output=True, text=True)
+    with Store(root) as store:
+        record = store.sessions.setdefault(session, {})
+        record.setdefault("baseline", value)
+        record.setdefault("initial_head", head.stdout.strip() if head.returncode == 0 else "")
+        record.setdefault("at", time.time())
+        store.save()
+
+
+def initial_head(root, session):
+    """The session's immutable original HEAD; empty means it began before the first commit."""
+    with Store(root) as store:
+        return (store.sessions.get(session) or {}).get("initial_head")
 
 
 def text_of(content):
