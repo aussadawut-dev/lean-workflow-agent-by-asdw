@@ -314,8 +314,8 @@
     }
   },
   "current_file_sha256": {
-    "AGENTS.md": "cc58fa7d4cbb6de7fbe9728818b565bdf31725b37102784542dc738ce365c2aa",
-    ".lean/README.md": "4b22a2e1edeb1069125cd1c35ad8a99ed7e552aa5b3dd4dbaac672dd70ce3299",
+    "AGENTS.md": "598f2b8a2a7680859b5942d41f38fe63a2818355faac09ff139ce1b4bc8fa099",
+    ".lean/README.md": "04ebe7c3c2f96dd7e384db1bf97a98f5324258dd7e0146b6f9a32ee916773b6f",
     ".lean/skills/lean-task/SKILL.md": "b4ebbf85aa952c13c20245338ed5400969c2f1a5a4cbd6cbf8aa385166455adf",
     ".lean/skills/lean-scope/SKILL.md": "7a33517cf76120224702de42651e9eee0794df85b197a646003e499f9bb7b91e",
     ".lean/skills/lean-review/SKILL.md": "78f6ec050f8dd0e2900e276edfcef1a7aae46477ec30c18fdfb5fb8c5c864b59",

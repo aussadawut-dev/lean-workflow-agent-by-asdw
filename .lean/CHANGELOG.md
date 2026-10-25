@@ -6,6 +6,31 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
+## 4.17.0 — 2026-10-25
+
+**Token highlight:** - · **Compared with:** -
+
+- Keep each session's original commit boundary across commits, resumes, prompt clearing and later gate passes. Committed High-risk changes still require a current independent HIGH-depth review in Claude and Codex.
+- Apply every retained target's High-risk policy to its application changes, including after clearing or switching the active target and after committing application and parent gitlink changes. Handle new targets and unborn parent repositories; changed deinitialized High-risk targets require initialization before validation.
+- Protect retained target gate blocks and trusted-control references, including inactive targets, and protect the submodule gate implementation. Check controls before executing target commands in shared, standalone and provider entrypoints. Reuse the root review receipt and reject stale coverage or unsafe retained policy links.
+- Add regressions for the reproduced gate gaps and a reproducible offline context inventory. Startup and fixed-task input inventories remain 2,213 and 11,146 tokens with `o200k_base`; the five-file gate source inventory grows by 1,836 tokens (6.83%). These counts exclude runtime prompts, model output, retries and cache billing and do not establish actual usage or cost savings. See the [measurement artifact](../docs/benchmarks/2026-10-25/context-tokens.json) and [measurement script](../docs/benchmarks/2026-10-25/measure_context.py).
+
+**Upgrade:** update the contract guard, shared gate runner, evidence helper, submodule helper and Codex adapter together. Keep project policy and runtime records. Inspect and approve newly protected controls through the existing approval/review procedure; an older accepted baseline may lack the new submodule control. Start a fresh session after upgrading to record its original commit boundary. Initialize a changed retained High-risk target before gating it. No configuration or data migration is needed.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+- เก็บ commit เริ่มต้นของ session ไว้ แม้ commit งาน, resume, ล้าง contract เมื่อมี prompt ใหม่ หรือผ่าน gate แล้ว งาน High-risk ที่ commit ไปยังต้องมี independent HIGH-depth review ที่ครอบคลุมสถานะปัจจุบัน ทั้ง Claude และ Codex
+- ตรวจ High-risk policy ของทุก target ที่ยังเก็บ policy ไว้ แม้ล้างหรือสลับ target ปัจจุบัน และแม้ commit งานใน application กับ gitlink ของ parent แล้ว รองรับ target ใหม่และ parent ที่ยังไม่มี commit ส่วน target High-risk ที่เปลี่ยนและถูก deinitialize ต้อง initialize ก่อนตรวจ
+- ป้องกัน gate block และ trusted-control references ของ target รวมถึง target ที่ไม่ได้เลือก และป้องกันตัว submodule gate ตรวจ controls ก่อนรันคำสั่งของ target ในทุก entrypoint ใช้ review receipt ของ root ร่วมกัน และปฏิเสธหลักฐานที่ล้าสมัยหรือ policy link ที่ไม่ปลอดภัย
+- เพิ่ม regression ของช่องว่างที่ทำซ้ำได้ พร้อมสคริปต์นับ context แบบ offline ชุด startup และ fixed-task ยังเป็น 2,213 กับ 11,146 tokens เมื่อใช้ `o200k_base` ส่วน inventory โค้ด gate ห้าไฟล์เพิ่ม 1,836 tokens (6.83%) ตัวเลขนี้ไม่รวม runtime prompts, output, retries และ cache billing จึงยังสรุป usage หรือค่าใช้จ่ายจริงไม่ได้ ดู [ผลวัด](../docs/benchmarks/2026-10-25/context-tokens.json) และ [สคริปต์](../docs/benchmarks/2026-10-25/measure_context.py)
+
+**เมื่ออัปเกรด:** อัปเดต contract guard, shared gate runner, evidence helper, submodule helper และ Codex adapter พร้อมกัน เก็บ policy และ runtime records ของโปรเจกต์ไว้ ตรวจ diff และอนุมัติ controls ที่เพิ่มการป้องกันตามขั้นตอนเดิม เพราะ baseline เก่าอาจยังไม่มี submodule control เริ่ม session ใหม่หลังอัปเกรดเพื่อบันทึก commit เริ่มต้น และ initialize target High-risk ที่เปลี่ยนก่อนรัน gate ไม่ต้องย้าย configuration หรือข้อมูล
+
+</details>
+
 ## 4.16.0 — 2026-10-24
 
 **Token highlight:** - · **Compared with:** -

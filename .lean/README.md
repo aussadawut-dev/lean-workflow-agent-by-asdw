@@ -1,6 +1,6 @@
 # Agent policy router
 
-Lean Workflow Baseline 4.16.0. See `CHANGELOG.md` for changes and migration steps.
+Lean Workflow Baseline 4.17.0. See `CHANGELOG.md` for changes and migration steps.
 
 Operating rules and their self-checks; not application structure, and no stack or primary provider is prescribed. `AGENTS.md` is canonical and `CLAUDE.md` imports it. Procedures live in `.lean/skills/`; `.claude/skills/` and `.agents/skills/` hold the core discovery symlinks and any enabled extras.
 
