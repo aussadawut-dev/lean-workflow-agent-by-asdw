@@ -6,6 +6,45 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
+## 5.0.0 — 2026-10-26
+
+**Token highlight:** - · **Compared with:** -
+
+Rebuild the workflow around one `lean` command line. Every rule, hook and check from 4.17.0 that the core keeps carries over with its tests; the layout, commands and spawning defaults change, so this is a major release.
+
+- **One command.** `python3 .lean/bin/lean` replaces every script in `.lean/scripts/`, the Claude hook scripts and the Codex adapter. Code lives in `.lean/lean/`, one module per command group (`guard`, `gate`, `evidence`, `hooks`, `records`, `progress`, `models`, `spawn`, `testsel`, `structure`, `update`). Provider hooks call `lean hook claude|codex <event>`. The bash gate runner is now Python; ShellCheck is no longer needed.
+- **Progress bars.** `lean progress set <phase>` drives a solid/shade bar (`████████░░░░░░░░░░░░ 40%`) by lean-task phase, refined by counts inside a phase. One state file feeds the agent's replies, `lean status`, `lean watch`, `lean test`, `lean gate run`, `lean spawn run` (one bar per agent), the Claude status line and Codex's Stop message. Codex and agy have no custom in-window status line; they use `lean watch` in a second pane.
+- **Tests by impact.** Tests sit in `.lean/tests/unit`, `hooks` and `e2e`; `.lean/tests/impact.json` maps paths to them. `lean test --changed` runs only what the change can affect, documentation-only changes run lint only, and an unmapped path runs everything. The gate runs the selection; CI runs `lean test --all` on every push and pull request.
+- **Model list and spawning.** `.lean/models.json` maps sizes S/M/L/XL to models for Claude, Codex and agy; `lean models check --live` verifies them against the provider CLIs. By default at most `max_agents` (1) sized agent runs at a time, only when cheaper than finishing in the session. `/lean-agents` spawns one agent per parallel task; `/lean-agents <model> xN` runs up to N at once on that model. `lean spawn plan` computes waves with exclusive file ownership; `lean spawn run` starts headless `claude -p`, `codex exec` or `agy -p` processes in separate worktrees, removing metered API keys so they use the subscription login.
+- **Activity log.** Phase changes, gate runs, test runs, spawned agents, contract bindings and review receipts are timed in `.agent-runtime/activity.jsonl`; `lean log` shows the timeline or a per-phase summary and `--export` keeps a copy in the repository.
+- **agy support.** Antigravity CLI is a third provider for spawning, review and the gate (run explicitly; agy has no hooks).
+- **Smaller core.** Eleven skills remain: init, task, scope, research, grill, agents, review, gate, effort, update and target. The optional skills audit, catalog, compress, pattern, playbook, prune and takeover are removed with their tools, along with the optional skill pack and queue cleanup (`clean-queue`). Archived queue history stays readable. Application targets (`lean target use|context|clear|gate`, records in `.lean/targets/<name>/`) carry over unchanged in behavior. The shared "skill level" text moved into `policy/SKILL-EFFORT.md`.
+- **Update with migration.** `lean update preview|apply|rollback` replaces the takeover-based updater: an external pinned clone, a reviewed plan, snapshots, a journal and rollback, with 4.x migration of hooks, gate block, gate mode and skill links.
+- Gate mode moves from `.codex/quality-gate.json` to `.lean/gate.json` (`lean gate mode`). Gate runtime markers move from `.claude/.gate-cache`/`.gate-failed` to `.agent-runtime/`.
+
+**Upgrade:** this release changes paths and commands; follow [migrating to v5](../docs/migrating-to-v5.md). A 4.x installation has no `lean` command, so run the preview from the pinned 5.0.0 release: `python3 <release>/.lean/bin/lean update preview --target <project>`, review the plan, then `update apply`. Approve the changed gate controls through a covering HIGH review or `lean gate accept-controls`. Project records, PROJECT facts, config and trackers are kept.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+สร้าง workflow ใหม่รอบคำสั่งเดียว `lean` กฎ hook และการตรวจของ 4.17.0 ที่แกนหลักเก็บไว้ยกมาพร้อม test ทั้งหมด แต่โครงสร้างไฟล์ คำสั่ง และค่าเริ่มต้นของการ spawn เปลี่ยน จึงเป็น major release
+
+- **คำสั่งเดียว** `python3 .lean/bin/lean` แทนทุก script ใน `.lean/scripts/`, hook script ของ Claude และ adapter ของ Codex โค้ดอยู่ใน `.lean/lean/` แยก module ตามกลุ่มคำสั่ง hook ของ provider เรียก `lean hook claude|codex <event>` gate runner เปลี่ยนจาก bash เป็น Python จึงไม่ต้องใช้ ShellCheck แล้ว
+- **Progress bar** `lean progress set <phase>` แสดงแถบทึบ/จาง (`████████░░░░░░░░░░░░ 40%`) ตาม phase ของ lean-task และละเอียดขึ้นด้วยจำนวนงานใน phase ไฟล์ state เดียวแสดงได้ทุกที่: คำตอบของ agent, `lean status`, `lean watch`, `lean test`, `lean gate run`, `lean spawn run` (แถบละหนึ่ง agent), status line ของ Claude และข้อความ Stop ของ Codex ส่วน Codex และ agy ไม่มี status line ที่กำหนดเองได้ ให้ใช้ `lean watch` ในอีก pane
+- **Test ตามผลกระทบ** test แบ่งเป็น `unit`, `hooks`, `e2e` และ `.lean/tests/impact.json` จับคู่ path กับ test `lean test --changed` รันเฉพาะที่งานกระทบ แก้แต่เอกสารรันแค่ lint ส่วน path ที่ไม่มีกฎรองรับจะรันทั้งหมด gate ใช้การเลือกนี้ ส่วน CI รัน `lean test --all` ทุก push และ pull request
+- **Model list และการ spawn** `.lean/models.json` กำหนดขนาด S/M/L/XL เป็น model ของ Claude, Codex และ agy และ `lean models check --live` ตรวจกับ CLI ของ provider ค่าเริ่มต้น spawn ได้ไม่เกิน `max_agents` (1) ตัวต่อครั้งตามขนาดงาน และเฉพาะเมื่อคุ้มกว่าทำใน session `/lean-agents` แตกหนึ่ง agent ต่องานที่ขนานได้ และ `/lean-agents <model> xN` รันพร้อมกันได้สูงสุด N ตัวด้วย model นั้น `lean spawn plan` คำนวณ wave โดยไม่ให้ไฟล์ชนกัน และ `lean spawn run` เปิด `claude -p`, `codex exec` หรือ `agy -p` ใน worktree แยก โดยตัด API key แบบคิดเงินออกเพื่อใช้ login ของ subscription
+- **Activity log** บันทึกเวลาของการเปลี่ยน phase, การรัน gate และ test, agent ที่ spawn, การผูก contract และ review receipt ลง `.agent-runtime/activity.jsonl` ดูได้ด้วย `lean log` (timeline) หรือ `lean log --summary` (เวลาต่อ phase) และ `--export` เก็บสำเนาลง repo
+- **รองรับ agy** Antigravity CLI เป็น provider ที่สามสำหรับ spawn, review และ gate (รัน gate เองเพราะ agy ไม่มี hook)
+- **แกนเล็กลง** เหลือ 11 skill: init, task, scope, research, grill, agents, review, gate, effort, update และ target ตัด skill เสริม audit, catalog, compress, pattern, playbook, prune, takeover พร้อมเครื่องมือ, optional skill pack และการล้าง queue (`clean-queue`) ประวัติ queue ที่ archive ไว้ยังอ่านได้ ส่วน application target (`lean target use|context|clear|gate` และ records ใน `.lean/targets/<name>/`) ยังทำงานเหมือนเดิม ข้อความ "skill level" ที่ซ้ำกันย้ายไปไว้ใน `policy/SKILL-EFFORT.md`
+- **อัปเดตพร้อม migration** `lean update preview|apply|rollback` แทน updater ที่อิง takeover: clone แบบ pin ไว้นอก repo, แผนที่ review ได้, snapshot, journal และ rollback พร้อมย้าย hook, gate block, gate mode และ skill link ของ 4.x
+- gate mode ย้ายจาก `.codex/quality-gate.json` ไป `.lean/gate.json` (`lean gate mode`) และ marker ของ gate ย้ายจาก `.claude/.gate-cache`/`.gate-failed` ไป `.agent-runtime/`
+
+**เมื่ออัปเกรด:** รุ่นนี้เปลี่ยน path และคำสั่ง ให้ทำตาม [migrating to v5](../docs/migrating-to-v5.md) การติดตั้ง 4.x ยังไม่มีคำสั่ง `lean` จึงต้องรัน preview จาก release 5.0.0 ที่ pin ไว้: `python3 <release>/.lean/bin/lean update preview --target <project>` ตรวจแผนแล้วค่อย `update apply` อนุมัติ gate controls ที่เปลี่ยนผ่าน HIGH review ที่ครอบคลุม หรือ `lean gate accept-controls` โดย records, ข้อมูลใน PROJECT, config และ tracker ของโปรเจกต์ยังอยู่ครบ
+
+</details>
+
 ## 4.17.0 — 2026-10-25
 
 **Token highlight:** - · **Compared with:** -

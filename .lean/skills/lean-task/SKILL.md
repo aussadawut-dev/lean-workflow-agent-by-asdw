@@ -1,20 +1,20 @@
 ---
 name: lean-task
-description: Run a task through contract, scope, execution, tests, validation, review and Quality Gate.
+description: Run a task through contract, scope, execution, tests, validation, review and Quality Gate, showing progress at each phase.
 user-invocable: true
 argument-hint: "<task description>"
 ---
 
-Input: `$ARGUMENTS` means the explicit invocation arguments, or the current user task when the runtime does not substitute it.
-
-Apply `.lean/policy/SKILL-EFFORT.md` to resolve this skill's procedure intensity; keep model reasoning effort separate.
+Input: `$ARGUMENTS` means the explicit invocation arguments, or the current user task when the runtime does not substitute it. Resolve this skill's procedure intensity under `.lean/policy/SKILL-EFFORT.md`; keep model reasoning effort separate.
 
 Task: $ARGUMENTS
 
-1. Write the contract from `AGENTS.md` before changes. Infer risk/quality; read `.lean/policy/CONTRACTS.md` when needed.
-2. Read `.lean/PROJECT.md` and use `python3 .lean/scripts/workflow.py show`. Follow `.lean/policy/WORKFLOW.md` and select task context under `.lean/policy/CONTEXT.md`: start with relevant routes and target source, expand along affected dependencies, and reuse valid context on feedback. Standard uses session records; non-trivial tracker/full work uses one owning tracker. Trivial tasks need no new tracker. Full tasks require appropriate items/claims before scope edits, including trivial edits inside existing claims.
-3. Use `/lean-scope` for non-trivial work: reuse already accepted scope and treat a clear implementation request as approval of the scope that matches it; wait for approval only when the request is ambiguous, a material decision is open, risk is HIGH, or a material expansion is proposed. Use `/lean-research` for evidence-backed alternatives and `/lean-grill` for unresolved material decisions/high-risk boundaries. Clear accepted work need not reopen decisions. Explicit user invocations still run; discovery and high/ultra intensity do not activate all procedures. Read skill references only when the current step needs them.
-4. Follow configured execution: direct work stays with the active agent; delegated work uses the Controller/worker procedure in `.lean/skills/lean-agents/SKILL.md`. Select models/effort under `.lean/policy/MODELS.md` and record any dispatch. Consult a project catalog only alongside current runtime options under MODELS; use `/lean-catalog` when refresh is requested, never automatically apply it or switch the session. Concurrent workers require explicit user intent and exclusive independent scopes. Preserve the required review depth when delegation is unavailable.
-5. Work, then test. Behavior changes need meaningful tests; bug fixes demonstrate regression fails before the fix and passes after. Validate deterministically with the Quality Gate in PROJECT.
-6. Synchronize tracker/session progress first, so review covers it. Review at the deeper of risk and quality. HIGH depth requires an independent reviewer: Claude's `reviewer` subagent, or a Codex subagent/fresh session. Give it contract and diff without author reasoning; select model/effort under `.lean/policy/MODELS.md`. Report BLOCKED if independent review cannot run. Follow bounded rounds in `.lean/policy/REVIEW.md`.
-7. Verify claim completion/evidence when applicable and record the review result and status in the tracker/session records; staging the reviewed bytes, committing the whole reviewed change and `docs/tracking/*.md` edits keep the receipt valid. Run `/lean-gate` and report the Result Contract, including validation/review evidence and unverified work. Worker completion alone does not mark the task DONE.
+Run `python3 .lean/bin/lean progress set <phase>` on entering each phase below and show the bar it prints (`.lean/policy/WORKFLOW.md`).
+
+1. **contract** — write the contract from `AGENTS.md` before changes. Infer risk/quality; read `.lean/policy/CONTRACTS.md` when needed. Set `--task '<short title>'` with the first progress call.
+2. **scope** — read `.lean/PROJECT.md` and `lean mode show`; select context under `.lean/policy/CONTEXT.md`. Standard uses session records; non-trivial tracker/full work uses one owning tracker (`lean tracker new`). Full tasks need items/claims before scope edits. Use `/lean-scope` for non-trivial work: reuse accepted scope and treat a clear implementation request as approval of the matching scope; wait only when the request is ambiguous, a material decision is open, risk is HIGH, or a material expansion is proposed. Use `/lean-research` for evidence-backed alternatives and `/lean-grill` for unresolved material decisions or high-risk boundaries.
+3. **implement** — follow configured execution. Direct work stays here and spawns only as `.lean/policy/MODELS.md` allows (one sized agent at a time by default; more only through `/lean-agents`). Delegated work uses the Controller/worker procedure in `.lean/skills/lean-agents/SKILL.md`. Record every dispatch. Report counts with `--done/--total` when the work splits into parts.
+4. **test** — behavior changes need meaningful tests; bug fixes show the regression test failing before the fix and passing after. While iterating, run only what the change can affect (`.lean/policy/TESTING.md`).
+5. **validate** — run the deterministic checks from PROJECT.
+6. **review** — synchronize tracker/session progress first, so review covers it. Review at the deeper of risk and quality. HIGH depth requires an independent reviewer: Claude's `reviewer` subagent, or a Codex/agy subagent or fresh session, given contract and diff without author reasoning, with model/effort sized under `.lean/policy/MODELS.md`. Report BLOCKED if independent review cannot run. Follow the bounded rounds in `.lean/policy/REVIEW.md`.
+7. **gate** — verify claim completion and evidence when applicable and record the review result and status in the tracker/session records (tracker edits under `docs/tracking/` keep the receipt valid). Run `/lean-gate`, then `lean progress set done`, and report the Result Contract with the final bar, validation/review evidence and unverified work. Worker completion alone does not mark the task DONE.

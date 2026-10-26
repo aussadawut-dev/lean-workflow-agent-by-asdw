@@ -1,5 +1,5 @@
 {
-  "mode": "standard",
-  "configured": false,
+  "mode": "tracker",
+  "configured": true,
   "execution": "direct"
 }
