@@ -4,9 +4,9 @@ I built this because I want a coding agent to understand the work, check what it
 
 It works with **Claude Code and Codex**, with one shared set of rules and skills. Use it with your own stack.
 
-**Baseline 4.17.0** · [MIT License](LICENSE)
+**Baseline 4.17.1** · [MIT License](LICENSE)
 
-This release keeps High-risk review coverage after commits, session resumes and target selection changes, and protects target gate controls before running checks. See the [4.17.0 release notes](.lean/CHANGELOG.md#4170--2026-10-25) for changes, measurement limits and upgrade notes.
+This patch release hardens the gate lock against a killed holder, keeps refusal markers per session and makes the Codex Stop fail closed. See the [4.17.1 release notes](.lean/CHANGELOG.md#4171--2026-10-27) for changes, limits and upgrade notes.
 
 The idea is simple: **agree on the work → implement → test → validate → review → finish with evidence**. Use the steps the task needs. You do not have to call every skill or read every file to get started.
 

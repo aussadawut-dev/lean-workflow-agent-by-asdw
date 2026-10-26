@@ -193,11 +193,12 @@ class LockInheritTests(unittest.TestCase):
                      'while [ ! -f release ]; do sleep 0.05; done')
         holder = self.holder()
         self.wait_for('ready')
+        pipes = {'tPIPE', 'tFIFO'}  # lsof reports an anonymous pipe as PIPE on macOS and FIFO on Linux.
         gate_fds = (self.root / 'gate.fds').read_text().split()
-        self.assertNotIn('tPIPE', gate_fds, 'the gate inherited a pipe descriptor')
+        self.assertFalse(pipes & set(gate_fds), 'the gate inherited a pipe descriptor')
         mine = subprocess.run(['lsof', '-nP', '-a', '-p', str(holder.pid), '-d', '3-255', '-F', 't'], text=True,
                               capture_output=True, stdin=subprocess.DEVNULL).stdout.split()
-        self.assertIn('tPIPE', mine, 'the holder should own the control pipe')
+        self.assertTrue(pipes & set(mine), 'the holder should own the control pipe')
         (self.root / 'release').touch()
         holder.communicate(timeout=20)
         self.assertEqual(holder.returncode, 0)
