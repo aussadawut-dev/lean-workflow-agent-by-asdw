@@ -1,5 +1,6 @@
 """A busy gate lock must not loop the Claude Stop hook: the busy block is counted and capped like any refusal."""
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -11,52 +12,13 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 HOOK = ".claude/hooks/quality-gate.sh"
 SCRIPTS = (".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py",
-           ".lean/scripts/gate_mode.py", ".lean/scripts/contract_guard.py",
+           ".lean/scripts/gate_mode.py", ".lean/scripts/lean_core.py", ".lean/scripts/contract_guard.py",
            HOOK, ".claude/hooks/session-start.sh", ".gitignore")
 
 
-# The Claude Stop wrapper as shipped in 4.17.0, which blocked every busy Stop without a cap.
-PREVIOUS_WRAPPER = r'''#!/usr/bin/env bash
-# Claude Stop adapter; execution and verdicts live in the shared runner.
-# A Stop refusal is reported as JSON {"decision":"block"} on exit 0: headless
-# `claude -p` only feeds a Stop reason back to the model in that form, and treats
-# exit 2 as a hook error. SessionStart seeding keeps the runner's exit codes.
-root="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-seed=0
-for option in "$@"; do
-  [ "$option" != "--seed" ] || seed=1
-done
-
-# block <reason>: refuse this Stop with a reason the model sees.
-block() {
-  printf '%s' "$1" | python3 -c 'import json, sys
-reason = sys.stdin.read()[-12000:].strip() or "Lean Quality Gate refused; report BLOCKED and do not declare DONE."
-print(json.dumps({"decision": "block", "reason": reason}))' && exit 0
-  printf '%s\n' "$1" >&2
-  exit 2
-}
-
-if [ "$seed" -eq 0 ]; then
-  policy="$(python3 "$(dirname "$0")/../../.lean/scripts/gate_mode.py" --root "$root" --check-auto 2>&1)"
-  status=$?
-  case "$status" in
-    0) ;;
-    3) if [ -z "${CLAUDE_GATE_FORCE:-}" ]; then printf '%s\n' "$policy" >&2; exit 0; fi ;;
-    *) block "$policy" ;;
-  esac
-fi
-runner="$(dirname "$0")/../../.lean/scripts/quality-gate.sh"
-[ "$seed" -eq 0 ] || exec "$runner" --claude-hook --root "$root" "$@"
-
-errors="$(mktemp)" || block "Lean Quality Gate could not create a temporary file; validation NOT_RUN."
-"$runner" --claude-hook --root "$root" "$@" 2>"$errors"
-status=$?
-reason="$(cat "$errors")"
-rm -f "$errors"
-[ "$status" -ne 2 ] || block "$reason"
-[ -z "$reason" ] || printf '%s\n' "$reason" >&2
-exit "$status"
-'''
+def head_wrapper():
+    return subprocess.run(["git", "-C", str(ROOT), "show", f"HEAD:{HOOK}"], capture_output=True, text=True,
+                          check=True).stdout
 
 
 class BusyCapTests(unittest.TestCase):
@@ -91,7 +53,11 @@ class BusyCapTests(unittest.TestCase):
                               timeout=30, env={**os.environ, "CLAUDE_PROJECT_DIR": str(root), **(env or {})})
 
     def marker(self, root):
-        path = root / ".claude/.gate-failed"
+        # The wrapper keys the marker by session; the previous wrapper (HEAD) used the un-keyed name.
+        key = hashlib.sha256(b"s").hexdigest()[:16]
+        path = root / f".agent-runtime/gate-failed.{key}"
+        if not path.exists():
+            path = root / ".claude/.gate-failed"
         return path.read_text() if path.exists() else None
 
     def held(self, root):
@@ -155,9 +121,79 @@ class BusyCapTests(unittest.TestCase):
             self.assertEqual(self.kind(self.stop(root, False, payload={"stop_hook_active": "yes"})), "block")
         self.assertEqual(self.marker(root), "1")
 
+    def test_unavailable_core_falls_back(self):
+        root = self.make_repo()
+        shim = root.parent / (root.name + " bin")
+        shim.mkdir()
+        self.addCleanup(shutil.rmtree, shim, True)
+        (shim / "python3").write_text(f'#!/bin/sh\n[ "$1" = "-c" ] && [ -n "$LEAN_SHIM_CORE" ] && '
+                                      f'case "$2" in *lean_core*) exit 1;; esac\nexec "{shutil.which("python3")}" "$@"\n')
+        (shim / "python3").chmod(0o755)
+        env = {"PATH": f"{shim}{os.pathsep}{os.environ['PATH']}", "LEAN_SHIM_CORE": "1"}
+        self.held(root)
+        self.assertEqual(self.kind(self.stop(root, False, env)), "block")
+        self.assertEqual(self.marker(root), "1")
+        self.assertEqual(self.kind(self.stop(root, True, env)), "release")
+        self.assertEqual(self.marker(root), "4")
+
+    def message(self, result):
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)
+        return data.get("systemMessage") if data.get("decision") != "block" else "block: " + data["reason"]
+
+    def make_lock_unavailable(self, root):
+        (root / ".agent-runtime").mkdir(exist_ok=True)
+        (root / ".agent-runtime/quality-gate.lock").mkdir()  # opening a directory for the lock fails
+
+    def test_lock_unavailable_releases_with_its_own_wording(self):
+        root = self.make_repo()
+        self.make_lock_unavailable(root)
+        first = self.message(self.stop(root, False))
+        self.assertTrue(first.startswith("block: Quality Gate lock unavailable"), first)
+        for _ in range(2):
+            self.assertTrue(self.message(self.stop(root, True)).startswith("block: "))
+        released = self.message(self.stop(root, True))
+        self.assertEqual(released, "Lean Quality Gate could not take its lock (gate lock unavailable in this checkout) "
+                                   "after 3 attempts; Stop released UNVERIFIED. Validation did not run, so the work "
+                                   "is not DONE; report BLOCKED.")
+        self.assertNotIn("busy", released)
+
+    def test_busy_release_wording_is_unchanged(self):
+        root = self.make_repo()
+        self.held(root)
+        self.stop(root, False)
+        self.stop(root, True)
+        self.stop(root, True)
+        self.assertEqual(self.message(self.stop(root, True)),
+                         "Lean Quality Gate stayed busy (another gate is running in this checkout) after 3 attempts; "
+                         "Stop released UNVERIFIED. Validation did not run, so the work is not DONE; report BLOCKED.")
+
+    def test_unusable_marker_releases_a_continued_busy_stop(self):
+        root = self.make_repo()
+        self.held(root)
+        key = hashlib.sha256(b"s").hexdigest()[:16]
+        (root / f".agent-runtime/gate-failed.{key}").mkdir()
+        self.assertEqual(self.kind(self.stop(root, False)), "block")
+        self.assertEqual(self.kind(self.stop(root, True)), "release")
+
+    def test_unusable_runtime_keeps_the_count_in_the_legacy_marker(self):
+        root = self.make_repo()
+        lock = self.held(root)
+        lock.close()
+        shutil.rmtree(root / ".agent-runtime")
+        (root / ".agent-runtime").write_text("not a directory")
+        # No lock can be taken, so the wrapper sees "lock unavailable"; the count still reaches 3.
+        kinds = []
+        for index in range(5):
+            result = self.stop(root, index > 0)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            kinds.append("block" if json.loads(result.stdout).get("decision") == "block" else "release")
+        self.assertEqual(kinds, ["block"] * 3 + ["release"] * 2)
+        self.assertEqual((root / ".claude/.gate-failed").read_text(), "5")
+
     def test_non_busy_results_are_identical_to_the_previous_wrapper(self):
         outputs = {}
-        for label, text in (("old", PREVIOUS_WRAPPER), ("new", None)):
+        for label, text in (("old", head_wrapper()), ("new", None)):
             type(self).wrapper_text = text
             try:
                 failing = self.make_repo("echo boom >&2; false")
