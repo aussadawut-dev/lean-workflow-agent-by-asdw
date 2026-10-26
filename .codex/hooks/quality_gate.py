@@ -5,14 +5,72 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / ".lean/scripts"))
-from gate_mode import policy, read_mode
-from gate_evidence import check_review, state
-import contract_guard
+IMPORT_FAILURE = None  # why the shared modules could not be imported; only a Stop turns it into a block
+
+
+class _Unavailable:
+    """Stands in for a shared module name that failed to import: using it re-raises the import failure."""
+
+    def __init__(self, name):
+        self._name = name
+
+    def _fail(self):
+        raise IMPORT_FAILURE
+
+    def __call__(self, *args, **kwargs):
+        self._fail()
+
+    def __getattr__(self, attribute):
+        if attribute.startswith("__"):
+            raise AttributeError(attribute)
+        self._fail()
+
+
+try:
+    from gate_mode import policy, read_mode
+    from gate_evidence import check_review, state
+    import contract_guard
+except (Exception, SystemExit) as failure:
+    # A missing, stale or broken shared module must not crash before the Stop handler's fail-closed
+    # wrapper exists: main() blocks a Stop; session-start and run still fail as before when they use
+    # a name. A non-zero exit is not a pass and propagates now; KeyboardInterrupt is never caught.
+    if isinstance(failure, SystemExit) and failure.code not in (None, 0):
+        raise
+    IMPORT_FAILURE = failure
+    policy, read_mode, check_review, state, contract_guard = (
+        _Unavailable(n) for n in ("policy", "read_mode", "check_review", "state", "contract_guard"))
+try:
+    import lean_core
+except (Exception, SystemExit):  # partial upgrade: a missing, stale or broken lean_core.py must degrade, not crash
+    lean_core = None  # (a core that exits at import must not end this hook with a silent pass)
+BLOCK = getattr(lean_core, "BLOCK", "block")
+RELEASE_UNCHANGED = getattr(lean_core, "RELEASE_UNCHANGED", "release_unchanged")
+RELEASE_CAPPED = getattr(lean_core, "RELEASE_CAPPED", "release_capped")
 
 MAX_REFUSALS = 3
+# Fixed stderr prefixes of a runner that could not take the gate lock (gate_lock.py).
+BUSY_PREFIXES = ("Quality Gate busy", "Quality Gate lock unavailable")
+
+
+def valid_session_key(key):
+    """A session key is exactly 16 lowercase hex characters; anything else is never a path component."""
+    return (isinstance(key, str) and len(key) == 16 and key.isascii()
+            and all(c in "0123456789abcdef" for c in key))
+
+
+def marker_names(session):
+    """The Codex refusal file names for a session: keyed, or the legacy names without a session id
+    (or when lean_core is missing)."""
+    try:
+        key = getattr(lean_core, "session_key", lambda _s: None)(session) if lean_core else None
+    except (Exception, SystemExit):  # a stale or broken core: legacy names, as when the core is missing
+        key = None
+    suffix = f".{key}" if valid_session_key(key) else ""
+    return f"codex-gate-failed{suffix}", f"codex-gate-refusal{suffix}"
 
 
 def current_review_contract(root):
@@ -28,7 +86,28 @@ def current_review_contract(root):
         return None
 
 
+STOP_UNDECIDED = "Codex Quality Gate could not decide; validation NOT_RUN; report BLOCKED"
+
+
 def main():
+    """Fail closed: any unexpected error while deciding a Stop is a block, never an empty stdout."""
+    if "stop" in sys.argv[1:]:
+        try:
+            if IMPORT_FAILURE is not None:
+                raise OSError("shared gate modules could not be imported")
+            return run_hook()
+        except Exception:
+            print(json.dumps({"decision": "block", "reason": STOP_UNDECIDED}))
+            return 0
+        except SystemExit as stop:
+            if stop.code not in (None, 0):
+                raise  # a non-zero exit (usage error) is not a pass; let it propagate unchanged
+            print(json.dumps({"decision": "block", "reason": STOP_UNDECIDED}))  # exit 0 without a decision is a silent pass
+            return 0
+    return run_hook()
+
+
+def run_hook():
     parser = argparse.ArgumentParser()
     parser.add_argument("event", choices=("session-start", "stop", "run"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
@@ -51,8 +130,8 @@ def main():
         print(json.dumps({"systemMessage": message}))
         return 0
     if args.event == "session-start":
-        clear_session_refusals(root)
         session = payload_session(sys.stdin)
+        clear_session_refusals(root, session)
         if session:
             try:
                 # Keep the first baseline: a resume or subagent reuses the session id, and
@@ -97,7 +176,7 @@ def main():
         return subprocess.run(command, cwd=root).returncode
     result = subprocess.run(command, text=True, capture_output=True, cwd=root)
     if result.returncode == 0:
-        clear_refusals(root)
+        clear_refusals(root, session)
         if session:
             try:
                 contract_guard.baseline(root, session, state(root))
@@ -105,27 +184,50 @@ def main():
                 pass
         print(json.dumps({"systemMessage": "Quality Gate checks passed; acceptance and required semantic review remain separate."}))
         return 0
+    busy = result.returncode == 2 and result.stderr.startswith(BUSY_PREFIXES)
+    if busy and result.stderr.startswith(BUSY_PREFIXES[1]):
+        busy = "unavailable"  # truthy: counted like a busy gate, worded as a lock that could not be taken
     return refuse(root, payload, (result.stderr + result.stdout)[-12000:],
-                  session=session, contract=contract or "", fixloop=fixloop)
+                  session=session, contract=contract or "", fixloop=fixloop, busy=busy)
 
 
-def clear_refusals(root):
-    for name in ("codex-gate-failed", "codex-gate-refusal"):
+def clear_refusals(root, session=""):
+    names = marker_names(session)
+    if names[0] != "codex-gate-failed":
+        names += ("codex-gate-failed", "codex-gate-refusal")  # a keyed pass also drops the legacy files
+    for name in names:
         try:
             (root / ".agent-runtime" / name).unlink(missing_ok=True)
         except OSError:
             pass
 
 
-def clear_session_refusals(root):
+def clear_session_refusals(root, session=""):
     runtime = root / ".agent-runtime"
+    failed_name, refusal_name = marker_names(session)
     try:
-        (runtime / "codex-gate-refusal").unlink(missing_ok=True)
-        failed = runtime / "codex-gate-failed"
+        (runtime / refusal_name).unlink(missing_ok=True)
+        failed = runtime / failed_name
         if failed.is_file() and failed.read_text().startswith("c"):
             failed.unlink(missing_ok=True)
+        if failed_name != "codex-gate-failed":  # keyed session: legacy markers are dropped once
+            (runtime / "codex-gate-failed").unlink(missing_ok=True)
+            (runtime / "codex-gate-refusal").unlink(missing_ok=True)
+        prune_markers(runtime)
     except OSError:
         pass
+
+
+def prune_markers(runtime, max_age=86400):
+    """Delete keyed Codex marker files untouched for a day; legacy and unrelated names are kept."""
+    now = time.time()
+    for pattern in ("codex-gate-failed.", "codex-gate-refusal."):
+        for path in runtime.glob(pattern + "[0-9a-f]" * 16):
+            try:
+                if path.is_file() and now - path.stat().st_mtime > max_age:
+                    path.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 def payload_session(stream):
@@ -147,21 +249,22 @@ def changed_since_baseline(root, session):
     return dirty.returncode != 0 or bool(dirty.stdout.strip())
 
 
-def refuse(root, payload, detail, session="", contract="", is_contract=False, fixloop=False):
-    """Block up to MAX_REFUSALS attempts; release unchanged or capped continued Stops UNVERIFIED."""
+def refuse(root, payload, detail, session="", contract="", is_contract=False, fixloop=False, busy=False):
+    """Block up to MAX_REFUSALS attempts; release unchanged or capped continued Stops UNVERIFIED.
+
+    A busy gate lock is counted like Claude's busy_stop: capped, and never released as unchanged."""
     runtime = root / ".agent-runtime"
-    failed = runtime / "codex-gate-failed"
-    refusal = runtime / "codex-gate-refusal"
-    count = 0
+    failed_name, refusal_name = marker_names(session)
+    failed = runtime / failed_name
+    refusal = runtime / refusal_name
+    continued = bool(payload.get("stop_hook_active"))
+    action = decided = None
     try:
         if not runtime.is_symlink():
             runtime.mkdir(exist_ok=True)
-            if payload.get("stop_hook_active") and failed.is_file():
-                raw = failed.read_text().strip().lstrip("c")
-                count = int(raw) if raw.isdigit() else 0
-            count += 1
-            failed.write_text(f"{'c' if is_contract else ''}{count}")
-            if not is_contract and session:
+            previous = failed.read_text() if continued and failed.is_file() else ""
+            fingerprint = ""
+            if not is_contract and not busy and session:
                 try:
                     current = state(root)
                 except (OSError, ValueError, subprocess.CalledProcessError):
@@ -169,13 +272,43 @@ def refuse(root, payload, detail, session="", contract="", is_contract=False, fi
                 if current:
                     reason = hashlib.sha256(detail.encode()).hexdigest()
                     fingerprint = f"{session} {current} {reason} {contract}"
-                    if refusal.is_file() and refusal.read_text() == fingerprint:
-                        print(json.dumps({"systemMessage": "Codex Quality Gate refused again with nothing changed since the last refusal; Stop released UNVERIFIED. The work is not DONE; see that refusal."}))
-                        return 0
-                    refusal.write_text(fingerprint)
+            same = readable = False
+            if fingerprint:
+                try:
+                    same = refusal.is_file() and refusal.read_text() == fingerprint
+                    readable = True
+                except (OSError, ValueError):
+                    pass  # an unreadable record only skips the unchanged check; the count below still stands
+            decide = getattr(lean_core, "gate_refusal", None)
+            if decide is None:
+                raise OSError("shared refusal core missing")  # use the fallback below
+            try:
+                decided, marker = decide(previous, continued, is_contract, same)
+            except (Exception, SystemExit) as error:  # a stale or broken core is treated as a missing one
+                if isinstance(error, SystemExit) and error.code not in (None, 0):
+                    raise  # a non-zero exit is not a pass; let it propagate
+                raise OSError(f"shared refusal core failed: {error!r}")
+            if (failed.exists() or failed.is_symlink()) and not failed.is_file():
+                raise OSError("refusal marker is not a regular file")  # unusable: never open a directory or FIFO
+            failed.write_text(marker)
+            action = decided  # a marker that cannot be kept decides nothing: the fallback below applies
+            if readable and action != RELEASE_UNCHANGED:
+                refusal.write_text(fingerprint)
     except (OSError, ValueError, subprocess.CalledProcessError):
-        count = count or (MAX_REFUSALS + 1 if payload.get("stop_hook_active") else 1)
-    if count > MAX_REFUSALS:
+        pass  # keep a decision already made; otherwise fall back below
+    if action == RELEASE_UNCHANGED:
+        print(json.dumps({"systemMessage": "Codex Quality Gate refused again with nothing changed since the last refusal; Stop released UNVERIFIED. The work is not DONE; see that refusal."}))
+        return 0
+    if action is None:
+        # The shared decision could not run (unwritable runtime): a continued Stop is released, a fresh one blocks once.
+        action = RELEASE_CAPPED if continued else BLOCK
+    if action == RELEASE_CAPPED and busy == "unavailable":
+        print(json.dumps({"systemMessage": f"Codex Quality Gate could not take its lock (gate lock unavailable in this checkout) after {MAX_REFUSALS} attempts; Stop released UNVERIFIED. Validation did not run, so the work is not DONE; report BLOCKED."}))
+        return 0
+    if action == RELEASE_CAPPED and busy:
+        print(json.dumps({"systemMessage": f"Codex Quality Gate stayed busy (another gate is running in this checkout) after {MAX_REFUSALS} attempts; Stop released UNVERIFIED. Validation did not run, so the work is not DONE; report BLOCKED."}))
+        return 0
+    if action == RELEASE_CAPPED:
         print(json.dumps({"systemMessage": f"Codex Quality Gate still refused after {MAX_REFUSALS} attempts; Stop released UNVERIFIED. The work is not DONE; see the last gate refusal.\n{detail}"}))
         return 0
     if fixloop:

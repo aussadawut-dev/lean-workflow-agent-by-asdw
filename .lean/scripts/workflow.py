@@ -756,9 +756,23 @@ def queue_command(root, args):
             fail("no claimable queue item")
 
 
+def latest_gate_failed(root):
+    """The most recently written refusal marker: the legacy file or any session's keyed `gate-failed.<16 hex>`
+    (under .agent-runtime; an earlier draft kept it at `.claude/.gate-failed.<16 hex>`, still read)."""
+    marker = root / ".claude/.gate-failed"
+    found = [marker] if marker.is_file() else []
+    hexkey = "[0-9a-f]" * 16
+    found += [p for p in (root / ".agent-runtime").glob("gate-failed." + hexkey) if p.is_file()]
+    found += [p for p in (root / ".claude").glob(".gate-failed." + hexkey) if p.is_file()]
+    try:
+        return max(found, key=lambda p: p.stat().st_mtime) if found else marker
+    except OSError:
+        return marker
+
+
 def gate_status(root):
     """Last recorded gate result (a Claude Stop or any --cache-tree run) from the runner's markers, never a fresh validation."""
-    failed, cache = root / ".claude/.gate-failed", root / ".claude/.gate-cache"
+    failed, cache = latest_gate_failed(root), root / ".claude/.gate-cache"
     if failed.is_file():
         # A "c" marker is a contract refusal, which says nothing about the checks.
         return "CONTRACT_REFUSED" if failed.read_text().startswith("c") else "FAIL"

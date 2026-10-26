@@ -39,11 +39,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-24.04, macos-latest]  # ubuntu-latest (26.04) no longer provides Python 3.9
         python-version: ['3.9', '3.13']
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # test_partial_upgrade needs the 4.17.0 commit; a shallow clone skips it
 
       - uses: actions/setup-python@v5
         with:

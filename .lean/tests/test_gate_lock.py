@@ -57,6 +57,25 @@ class GateLockTests(unittest.TestCase):
         self.assertNotIn('unbound variable', result.stderr)
         self.assertEqual((self.root / 'runs').read_text(), 'ran')
 
+    def test_a_ps_without_the_needed_options_is_never_reported_as_busy(self):
+        # BusyBox ps rejects -o/-p, and slim images have no ps at all. On Linux the lock reads /proc instead;
+        # elsewhere the gate must say the lock is unavailable, never that another gate is running.
+        tools = self.root / 'tools'
+        tools.mkdir()
+        (tools / 'ps').write_text('#!/bin/sh\necho "ps: unrecognized option" >&2\nexit 1\n')
+        (tools / 'ps').chmod(0o755)
+        environment = {**os.environ, 'PATH': f"{tools}{os.pathsep}{os.environ['PATH']}"}
+        result = subprocess.run(['bash', str(ROOT / '.lean/scripts/quality-gate.sh'), '--root', str(self.root)],
+                                env=environment, text=True, capture_output=True, timeout=20)
+        self.assertNotIn('busy', result.stderr)
+        if Path('/proc/self/stat').exists():
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((self.root / 'runs').read_text(), 'ran')
+        else:
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn('lock unavailable', result.stderr)
+            self.assertFalse((self.root / 'runs').exists())
+
     def test_running_gate_holds_lock_and_releases_after_failure(self):
         self.root.joinpath('.lean/PROJECT.md').write_text(
             '<!-- gate:start -->\n```sh\nprintf ready > ready; while [ ! -f release ]; do sleep 0.05; done; false\n```\n<!-- gate:end -->\n')

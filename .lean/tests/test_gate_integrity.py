@@ -1,4 +1,5 @@
 """Gate failures, provenance and review evidence in disposable Git repositories."""
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -9,6 +10,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = "Contract: risk=HIGH quality=HIGH acceptance=fixture checks pass"
+SESSION_S = hashlib.sha256(b"s").hexdigest()[:16]  # lean_core.session_key("s")
 
 
 def stop_refusal(result):
@@ -27,7 +29,7 @@ class GateIntegrityTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="lean integrity ")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        for name in (".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py", ".lean/scripts/gate_mode.py", ".lean/scripts/contract_guard.py",
+        for name in (".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py", ".lean/scripts/gate_mode.py", ".lean/scripts/lean_core.py", ".lean/scripts/contract_guard.py",
                      ".claude/hooks/quality-gate.sh", ".claude/hooks/session-start.sh", ".gitignore"):
             source = ROOT / name
             if source.exists():
@@ -136,7 +138,7 @@ class GateIntegrityTests(unittest.TestCase):
                 repeated = self.gate("--claude-hook", payload={"stop_hook_active": active, "session_id": "s"})
                 self.assertEqual(repeated.returncode, 0, repeated.stderr)
                 self.assertIn("UNVERIFIED", json.loads(repeated.stdout)["systemMessage"])
-                self.assertTrue((self.root / ".claude/.gate-failed").exists())
+                self.assertTrue((self.root / f".agent-runtime/gate-failed.{SESSION_S}").exists())
                 self.assertFalse((self.root / ".claude/.gate-cache").exists())
         (self.root / "changed.txt").write_text("new work\n")
         changed = self.gate("--claude-hook", payload={"stop_hook_active": False, "session_id": "s"})
@@ -172,7 +174,7 @@ class GateIntegrityTests(unittest.TestCase):
         # Accepting the drift lets the gate run its checks, which pass and clear the refusal.
         self.evidence("accept-controls", "--reason", "User approved fixture gate change")
         self.assertEqual(self.gate("--claude-hook", payload={"session_id": "s"}).returncode, 0)
-        self.assertFalse((self.root / ".claude/.gate-failed").exists())
+        self.assertFalse((self.root / f".agent-runtime/gate-failed.{SESSION_S}").exists())
 
     def test_empty_gate_and_missing_project_are_explicitly_unconfigured(self):
         self.project.write_text("<!-- gate:start -->\n```sh\n```\n<!-- gate:end -->\n")
@@ -663,7 +665,7 @@ class TrustedControlRefTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         for name in (".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py",
-                     ".lean/scripts/gate_mode.py", ".lean/scripts/contract_guard.py", ".claude/hooks/quality-gate.sh",
+                     ".lean/scripts/gate_mode.py", ".lean/scripts/lean_core.py", ".lean/scripts/contract_guard.py", ".claude/hooks/quality-gate.sh",
                      ".claude/hooks/session-start.sh", ".codex/hooks.json", ".codex/hooks/quality_gate.py", ".gitignore"):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -884,7 +886,7 @@ class PassReuseTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         for name in (".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py",
-                     ".lean/scripts/gate_mode.py", ".lean/scripts/contract_guard.py", ".claude/hooks/quality-gate.sh",
+                     ".lean/scripts/gate_mode.py", ".lean/scripts/lean_core.py", ".lean/scripts/contract_guard.py", ".claude/hooks/quality-gate.sh",
                      ".claude/hooks/session-start.sh", ".codex/hooks/quality_gate.py", ".gitignore"):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -1041,7 +1043,7 @@ class GateProgressTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         for name in (".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py",
-                     ".lean/scripts/gate_mode.py", ".lean/scripts/contract_guard.py", ".claude/hooks/quality-gate.sh",
+                     ".lean/scripts/gate_mode.py", ".lean/scripts/lean_core.py", ".lean/scripts/contract_guard.py", ".claude/hooks/quality-gate.sh",
                      ".claude/hooks/session-start.sh", ".codex/hooks/quality_gate.py", ".gitignore"):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)

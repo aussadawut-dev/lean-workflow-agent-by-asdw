@@ -6,6 +6,29 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
+## 4.17.1 — 2026-10-27
+
+**Token highlight:** - · **Compared with:** -
+
+No token or speed saving is claimed. Gate behaviour ported from the v5 draft; the tests named below are the evidence, and nothing else is claimed.
+
+**Fixed**
+
+- The gate lock holder keeps its descriptor private, runs the gate as a child and records an owner token that nested `--check` calls validate; a guardian process holds the lock until the gate has ended, and the gate announces its pid to the guardian before it starts, so a holder killed with SIGKILL cannot leave the gate running without the lock. A process a check leaves running in the background no longer keeps the checkout locked. The busy message and exit code 2 are unchanged. Tests: `test_lock_inherit.py`, `test_gate_lock.py`. Process start times and parents come from `/proc` on Linux and from `ps -o … -p` elsewhere; without either, the gate stops with "Quality Gate lock unavailable" (exit 2, NOT_RUN) instead of reporting a busy lock (`test_gate_lock.py`). The tree kill still depends on `ps`: without it, a holder killed with SIGKILL stops the gate shell but not the check it is running, which can outlive the lock and overlap a later gate. Gate runs were verified on macOS, Linux CI and a Linux image without `ps`; the kill guarantee only where `ps` exists.
+- The Codex hook counts a busy gate lock like the Claude hook (three blocks, then a release marked UNVERIFIED). Its Stop path fails closed: a missing or failing `lean_core.py`, a failed import of `gate_mode`, `gate_evidence` or `contract_guard`, or any unexpected error gives a fixed block message instead of empty output, and a zero-status `SystemExit` counts as a failure. Tests: `test_codex_busy.py`, `test_codex_partial.py`.
+- Refusal markers are kept per session: `.agent-runtime/gate-failed.<key>` and `.agent-runtime/gate-refusal.<key>` (and the Codex equivalents), `<key>` being the first 16 hex characters of the sha256 of the session id. Runs without a session id keep the previous file names, and a keyed seed or pass removes those once. A marker that is a directory or other non-regular file, an unusable `.agent-runtime`, and a malformed `session_id` are bounded by the cap of three instead of blocking without end. A session key that is not 16 lowercase hex characters is ignored wherever it would become a file name. `workflow.py` status reads the newest marker. Tests: `test_session_markers.py`, `test_busy_cap.py`, `test_gate_integrity.py`.
+- `test_lock_inherit.py` accepts the pipe type lsof reports on Linux (`FIFO`) as well as macOS (`PIPE`); the Linux CI jobs failed on that assertion alone.
+- CI clones full history, so the partial-upgrade tests that need the 4.17.0 commit run instead of skipping.
+- `gate_evidence.py hook-field` answers a JSON array or scalar payload with "payload must be a JSON object" (exit 2) instead of a Python error text. Test: `test_hook_field.py` (6 non-object payloads fail on the previous code, pass now).
+
+**Added**
+
+- `lean_core.py`: `gate_refusal`, `session_key` and `valid_session_key`, the single refusal decision used by the Claude Stop hook, the shell runner and the Codex hook (`test_lean_core.py`). It is a protected gate control file.
+
+**Known limits:** after a killed holder, the guardian's no-pid fallback signals orphans of the holder's process group, which could include an unrelated background process started from the same group. `workflow.py` status may show FAIL from another session's refusal marker until it is pruned. In Codex, an invalid gate policy or hook input is still reported and released, not blocked. `test_busy_cap.py` and `test_codex_busy.py` compare the unchanged paths with `HEAD`, so they guard later edits, not this release against 4.17.0. CI runs Linux on `ubuntu-24.04`, the last runner image with Python 3.9.
+
+**Upgrade:** update `.lean/scripts/lean_core.py`, `gate_evidence.py`, `gate_lock.py`, `quality-gate.sh`, `.claude/hooks/quality-gate.sh` and `.codex/hooks/quality_gate.py` together, then approve the changed controls through the existing review procedure. A Codex hook updated without `lean_core.py` degrades (a fresh Stop blocks once, a continued Stop is released UNVERIFIED), checked by `test_partial_upgrade.py`. One in-flight refusal restarts at count 1. A project test fixture that copies the gate scripts must also copy `lean_core.py`, and a test that reads the refusal marker of a run with a session id must read `.agent-runtime/gate-failed.<key>` instead of `.claude/.gate-failed` (the legacy name still applies without a valid session id).
+
 ## 4.17.0 — 2026-10-25
 
 **Token highlight:** - · **Compared with:** -

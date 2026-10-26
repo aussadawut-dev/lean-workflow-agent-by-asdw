@@ -135,7 +135,7 @@ def receipt_gap(root, receipt):
 
 CONTROL_NAMES = (".claude/settings.json", ".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py",
                  ".lean/scripts/gate_lock.py", ".lean/scripts/contract_guard.py", ".lean/scripts/gate_mode.py",
-                 ".lean/scripts/submodule.py", ".codex/hooks.json", ".codex/hooks/quality_gate.py", ".codex/quality-gate.json")
+                 ".lean/scripts/lean_core.py", ".lean/scripts/submodule.py", ".codex/hooks.json", ".codex/hooks/quality_gate.py", ".codex/quality-gate.json")
 PROJECT = ".lean/PROJECT.md"
 TARGET_PROJECT = re.compile(r"\.lean/targets/[^/]+/\.lean/PROJECT\.md")
 TRUSTED_LINE = re.compile(r"(?m)^<!-- trusted-control-refs:(.*?)-->[ \t]*$")
@@ -567,6 +567,8 @@ def main():
             print(contract_from_transcript(args.transcript))
         elif args.command == "hook-field":
             payload = json.load(sys.stdin)
+            if not isinstance(payload, dict):
+                raise ValueError("payload must be a JSON object")
             value = payload.get(args.field, False if args.field == "stop_hook_active" else "")
             if args.field == "stop_hook_active":
                 if not isinstance(value, bool):

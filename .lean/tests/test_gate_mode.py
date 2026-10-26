@@ -16,7 +16,7 @@ class GateModeTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="lean gate mode ")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        for name in (".lean/scripts/gate_mode.py", ".codex/hooks/quality_gate.py", ".codex/hooks.json",
+        for name in (".lean/scripts/gate_mode.py", ".lean/scripts/lean_core.py", ".codex/hooks/quality_gate.py", ".codex/hooks.json",
                      ".lean/scripts/quality-gate.sh", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py", ".lean/scripts/contract_guard.py",
                      ".claude/hooks/quality-gate.sh", ".claude/hooks/session-start.sh"):
             target = self.root / name

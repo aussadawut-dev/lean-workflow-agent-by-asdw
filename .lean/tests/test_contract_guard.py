@@ -18,7 +18,7 @@ DECLARE = "python3 .lean/scripts/contract_guard.py declare"
 BLOCK = "Contract:\ntopic: guard\nrisk: LOW\nquality: STANDARD\nbudget: CHEAP\nacceptance: tests pass"
 LINE = "Contract: risk=LOW quality=STANDARD acceptance=tests pass"
 FILES = (".gitignore", ".lean/scripts/contract_guard.py", ".lean/scripts/gate_evidence.py", ".lean/scripts/gate_lock.py",
-         ".lean/scripts/gate_mode.py", ".lean/scripts/quality-gate.sh", ".claude/hooks/quality-gate.sh",
+         ".lean/scripts/gate_mode.py", ".lean/scripts/lean_core.py", ".lean/scripts/quality-gate.sh", ".claude/hooks/quality-gate.sh",
          ".claude/settings.json", ".codex/hooks.json", ".codex/hooks/quality_gate.py")
 
 

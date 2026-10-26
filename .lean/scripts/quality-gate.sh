@@ -46,12 +46,11 @@ if ! python3 "$lock_helper" --check "$root"; then
 fi
 project="$root/.lean/PROJECT.md"
 cache="$root/.claude/.gate-cache"
-failed="$root/.claude/.gate-failed"
 baseline="$root/.agent-runtime/gate-baseline"
-refusal="$root/.agent-runtime/gate-refusal"
 [ "$hook" -eq 0 ] || mkdir -p "$root/.claude" || exit 2
 
 active=0
+bad_session=""
 transcript=""
 errlog=""
 if [ "$hook" -eq 1 ]; then
@@ -67,7 +66,12 @@ if [ "$hook" -eq 1 ]; then
   else
     active="$(printf '%s' "$input" | python3 "$helper" --root "$root" hook-field --field stop_hook_active)" || exit 2
     transcript="$(printf '%s' "$input" | python3 "$helper" --root "$root" hook-field --field transcript_path)" || exit 2
-    session="$(printf '%s' "$input" | python3 "$helper" --root "$root" hook-field --field session_id)" || exit 2
+    # A malformed session id (newline, number, null, list) is refused below, once the refusal counter
+    # exists, so repeated Stops are bounded like any other refusal instead of blocking without end.
+    if ! session="$(printf '%s' "$input" | python3 "$helper" --root "$root" hook-field --field session_id 2>&1)"; then
+      bad_session="$session"
+      session=""
+    fi
     # Keep this run's messages so a refusal is fingerprinted by its reason; they still reach
     # stderr when the run ends.
     errlog="$(mktemp "${TMPDIR:-/tmp}/lean-gate.XXXXXX")" || exit 2
@@ -75,6 +79,36 @@ if [ "$hook" -eq 1 ]; then
     trap 'cat "$errlog" >&3; rm -f "$errlog"' EXIT
   fi
 fi
+
+# Refusal markers are per session: a session's key names its own counter and fingerprint, so two
+# sessions in one checkout never share a count. A run without a session id (a direct run) keeps the
+# legacy un-keyed names; if the key cannot be computed the legacy names are used too.
+session_key=""
+if [ -n "$session" ]; then
+  session_key="$(python3 -B -c 'import sys; sys.path.insert(0, sys.argv[1]); import lean_core
+k = lean_core.session_key(sys.argv[2])
+print(k if isinstance(k, str) else "")' "$(dirname "$helper")" "$session" 2>/dev/null)" || session_key=""
+  case "$session_key" in
+    ????????????????) case "$session_key" in *[!0123456789abcdef]*) session_key="" ;; esac ;;
+    *) session_key="" ;;
+  esac  # only a 16-hex-digit key may become part of a file name
+fi
+legacy_failed="$root/.claude/.gate-failed"
+legacy_refusal="$root/.agent-runtime/gate-refusal"
+# A keyed failed marker lives under .agent-runtime (ignored in every install); the legacy .claude/.gate-failed
+# is already ignored, but a keyed file there would show as an untracked change in a project without the glob.
+if [ -n "$session_key" ]; then
+  failed="$root/.agent-runtime/gate-failed.$session_key"
+  prior_failed="$legacy_failed.$session_key"  # where an earlier v5 draft kept it
+else
+  failed="$legacy_failed"
+  prior_failed=""
+fi
+refusal="$legacy_refusal${session_key:+.$session_key}"
+# A legacy marker is ignored by a keyed session; its seed or pass deletes the legacy files.
+drop_legacy() {
+  [ -z "$session_key" ] || rm -f "$legacy_failed" "$legacy_refusal" "$prior_failed" 2>/dev/null
+}
 
 # Progress is diagnostic only: Stop hooks and --quiet runs omit it, so a refusal carries only its failure.
 progress() {
@@ -95,29 +129,51 @@ refuse() {
   # later --cache-tree run reuses a state this one could not pass.
   [ "${1:-}" = "c" ] || [ "$seed" -eq 1 ] || rm -f "$cache"
   [ "$hook" -eq 1 ] && [ "$seed" -eq 0 ] || return 0
-  local n=0
-  if [ "$active" -eq 1 ]; then
-    n="$(cat "$failed" 2>/dev/null)"
-    n="${n#c}"
-    case "$n" in ''|*[!0-9]*) n=0 ;; esac
-  fi
-  n=$((n + 1))
-  printf '%s' "${1:-}$n" > "$failed"
   # This session has already been shown this exact refusal (same reason, shipping state and
   # contract); blocking every Stop while the agent waits on the user only loops, so warn instead.
-  # A contract refusal keeps the cap below: the agent can fix it in its next reply, which the
+  # A contract refusal keeps the cap: the agent can fix it in its next reply, which the
   # state does not show.
-  local print reason
+  local previous="" print="" reason same=0 decision action marker held="$failed"
+  # Where this Stop's count is kept. A keyed marker lives in .agent-runtime; if that directory is
+  # unusable (a regular file, read-only) the count falls back to the legacy .claude/.gate-failed so
+  # the cap of max_refusals still holds wherever a marker can be kept.
+  if [ "$failed" != "$legacy_failed" ] && { ! mkdir -p "$root/.agent-runtime" 2>/dev/null || [ ! -w "$root/.agent-runtime" ]; }; then
+    held="$legacy_failed"
+  fi
+  [ "$active" -eq 1 ] && [ -f "$held" ] && previous="$(cat "$held" 2>/dev/null)"
   if [ "${1:-}" != "c" ] && [ -n "$session" ] && reason="$(cksum < "$errlog")" &&
      print="$(python3 "$helper" --root "$root" gate-state 2>/dev/null)" && [ -n "$print" ]; then
     print="$session $print $reason $contract"
-    if [ -f "$refusal" ] && [ "$(cat "$refusal")" = "$print" ]; then
-      printf '{"systemMessage":"Lean Quality Gate refused again with nothing changed since the last refusal; Stop released UNVERIFIED. The work is not DONE; see that refusal."}\n'
-      exit 0
-    fi
-    mkdir -p "$(dirname "$refusal")" && printf '%s' "$print" > "$refusal"
+    [ -f "$refusal" ] && [ "$(cat "$refusal")" = "$print" ] && same=1
+  else
+    print=""
   fi
-  if [ "$n" -gt "$max_refusals" ]; then
+  # lean_core.py decides count, cap and the unchanged release; if it cannot run, a continued Stop
+  # is released and a fresh one blocks once.
+  if decision="$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import lean_core
+action, marker = lean_core.gate_refusal(sys.argv[2], sys.argv[3] == "1", sys.argv[4] == "c", sys.argv[5] == "1")
+print(action, marker)' "$(dirname "$helper")" "$previous" "$active" "${1:-}" "$same" 2>/dev/null)" && [ -n "$decision" ]; then
+    action="${decision%% *}"
+    marker="${decision#* }"
+  elif [ "$active" -eq 1 ]; then
+    action=release_capped marker="${1:-}$((max_refusals + 1))"
+  else
+    action=block marker="${1:-}1"
+  fi
+  # A marker that cannot be kept (the path is a directory or other non-regular file, or no writable
+  # place exists) cannot bound a continued Stop, so release it rather than loop; a fresh Stop blocks once.
+  if { [ ! -e "$held" ] && [ ! -L "$held" ] || [ -f "$held" ]; } &&
+     { mkdir -p "$(dirname "$held")" && printf '%s' "$marker" > "$held"; } 2>/dev/null; then
+    :
+  else
+    [ "$active" -ne 1 ] || [ "$action" != block ] || action=release_capped
+  fi
+  if [ "$action" = release_unchanged ]; then
+    printf '{"systemMessage":"Lean Quality Gate refused again with nothing changed since the last refusal; Stop released UNVERIFIED. The work is not DONE; see that refusal."}\n'
+    exit 0
+  fi
+  [ -z "$print" ] || { mkdir -p "$(dirname "$refusal")" && printf '%s' "$print" > "$refusal"; } 2>/dev/null
+  if [ "$action" = release_capped ]; then
     printf '{"systemMessage":"Lean Quality Gate still refused after %s attempts; Stop released UNVERIFIED. The work is not DONE; see the last gate refusal."}\n' "$max_refusals"
     exit 0
   fi
@@ -127,6 +183,14 @@ refuse() {
 gate_refused() {
   [ -f "$failed" ] && case "$(cat "$failed" 2>/dev/null)" in c*) return 1 ;; *) return 0 ;; esac
 }
+
+# A malformed session id refuses this Stop (the message is the helper's, unchanged). It is counted
+# under the legacy un-keyed marker like a contract refusal, so a repeated Stop is released UNVERIFIED
+# after max_refusals instead of blocking without end.
+if [ -n "$bad_session" ]; then
+  printf '%s\n' "$bad_session" >&2
+  refuse c; exit 2
+fi
 
 # The contract a session declared through the PreToolUse guard, read from the guard's store by
 # session id (a hook payload or --session). Only a receipt for that contract can accept changed
@@ -192,6 +256,11 @@ fi
 if [ "$seed" -eq 1 ]; then
   # A new session has not seen any earlier refusal, so its first one blocks again.
   rm -f "$refusal"
+  drop_legacy
+  # Marker files of sessions that ended long ago are pruned (only the keyed names, only after a day).
+  find "$root/.agent-runtime" -maxdepth 1 -type f -name 'gate-failed.[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]' -mtime +0 -exec rm -f {} + 2>/dev/null
+  find "$root/.claude" -maxdepth 1 -type f -name '.gate-failed.[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]' -mtime +0 -exec rm -f {} + 2>/dev/null
+  find "$root/.agent-runtime" -maxdepth 1 -type f -name 'gate-refusal.[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]' -mtime +0 -exec rm -f {} + 2>/dev/null
   gate_refused && exit 0
   rm -f "$failed"
   if [ -n "$state" ]; then
@@ -307,7 +376,7 @@ done <<< "$commands"
 
 check_receipt
 # A pass ends any standing refusal; a run that fingerprinted the state records the pass.
-if [ "$hook" -eq 1 ] || [ -n "$pass_state" ]; then rm -f "$failed" "$refusal"; fi
+if [ "$hook" -eq 1 ] || [ -n "$pass_state" ]; then rm -f "$failed" "$refusal" 2>/dev/null; drop_legacy; fi
 if [ -n "$pass_state" ]; then
   record="$pass_state"
   [ "$hook" -eq 1 ] || record="direct $pass_state"

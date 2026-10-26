@@ -91,7 +91,7 @@ EOF
   # The gate's own state files must stay untracked, or each run's state includes
   # the file the previous run wrote and the gate never settles. Asked by effect,
   # so any equivalent .gitignore pattern passes.
-  for ignored in '.claude/.gate-cache' '.claude/.gate-failed'; do
+  for ignored in '.claude/.gate-cache' '.claude/.gate-failed' '.agent-runtime/gate-failed.0123456789abcdef'; do
     git check-ignore -q "$ignored" || bad "not ignored by git: $ignored"
   done
 fi
