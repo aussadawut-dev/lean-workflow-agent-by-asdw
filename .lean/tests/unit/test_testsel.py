@@ -153,6 +153,8 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(failed.returncode, 1, failed.stdout)
         self.assertIn("unit/test_fail.py FAIL", failed.stdout)
         self.assertIn("boom", failed.stdout)
+        summary = failed.stdout.strip().splitlines()[-1]
+        self.assertRegex(summary, r"^1/2 test files passed in [\d.]+s; failed: unit/test_fail\.py$")
 
     def test_a_documentation_only_change_runs_lint_only(self):
         (self.root / "notes.md").write_text("words\n")

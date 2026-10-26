@@ -23,6 +23,8 @@ MAX_REFUSALS = 3
 LOCK_ENV = "LEAN_GATE_LOCK_FD"
 FORCE_ENV = "LEAN_GATE_FORCE"
 GATE_FILE = ".lean/gate.json"
+PENDING_FILE = ".agent-runtime/review-pending.json"
+PENDING_LIMIT = 2 * 3600  # Seconds a marked review keeps Stops quiet; a longer wait blocks again.
 HIGH_REVIEW = re.compile(r"Contract: (?:risk=HIGH quality=|risk=(?:LOW|MEDIUM) quality=VERY_HIGH acceptance=)")
 
 
@@ -75,6 +77,59 @@ def policy(mode):
             "authorization (reuse matching approval for this workset or batch) before the full gate: "
             f"{run} with --contract and --require-review when required. Deferred validation is not a pass: "
             "stay VALIDATING/BLOCKED until the gate and required review cover the shipping state.")
+
+
+# --- Pending review ---------------------------------------------------------------------------
+
+def receipt_digest(root):
+    """A digest of the review receipt file, or "" when there is none; any new receipt changes it."""
+    try:
+        return hashlib.sha256(safe_path(root, ".agent-runtime/review.json").read_bytes()).hexdigest()
+    except FileNotFoundError:
+        return ""
+
+
+def mark_review_pending(root, contract, session):
+    """Record that an independent review of the current shipping state is running for `contract`.
+
+    While the marker holds, a Stop of `session` refused only for that review's missing receipt is
+    released UNVERIFIED instead of blocked. It never records a pass, cache or receipt. Returns the
+    marker; raises ValueError for a malformed contract or session.
+    """
+    if not isinstance(contract, str) or not evidence.CONTRACT.fullmatch(contract):
+        raise ValueError("A real Task Contract is required")
+    if not isinstance(session, str) or not session.strip() or "\n" in session:
+        raise ValueError("session must be a non-empty single-line string")
+    root = Path(root).resolve()
+    marker = {"schema": 1, "contract": contract, "state": evidence.captured_state(root), "session": session,
+              "at": time.time(), "receipt": receipt_digest(root)}
+    write_json(safe_path(root, PENDING_FILE), marker)
+    return marker
+
+
+def pending_review(root, contract, session):
+    """The marker's time when it covers this session, contract and shipping state, else None.
+
+    A marker of this session that no longer applies (changed state or contract, a receipt recorded
+    since, expired or malformed) is removed, so its quiet period ends for good.
+    """
+    path = safe_path(root, PENDING_FILE)
+    try:
+        marker = read_json(path)
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError):
+        marker = None
+    if not isinstance(marker, dict) or not session or marker.get("session") != session:
+        return None
+    at = marker.get("at")
+    if (marker.get("schema") == 1 and contract and marker.get("contract") == contract
+            and type(at) in (int, float) and 0 <= time.time() - at <= PENDING_LIMIT
+            and marker.get("receipt") == receipt_digest(root)
+            and marker.get("state") == evidence.captured_state(root)):
+        return at
+    path.unlink(missing_ok=True)
+    return None
 
 
 # --- Checkout lock ----------------------------------------------------------------------------
@@ -174,9 +229,10 @@ class Run:
     """One gate run. `out` collects stdout (hook JSON), `err` the refusal text."""
 
     def __init__(self, root, hook=False, seed=False, cache_tree=False, require_review=False, quiet=False,
-                 contract="", session="", payload=None, show=None):
+                 contract="", session="", payload=None, show=None, stop=False):
         self.root = Path(root).resolve()
         self.hook, self.seed, self.cache_tree = hook, seed, cache_tree
+        self.stop = (hook or stop) and not seed  # Only a provider Stop may be released for a pending review.
         self.require_review, self.quiet = require_review, quiet or hook  # No one watches a Stop live.
         self.contract, self.session = contract, session
         self.payload = payload if payload is not None else {}
@@ -237,6 +293,28 @@ class Run:
                                         "gate refusal."}))
             return 0
         return 2
+
+    def release_pending(self):
+        """0 with a release message when a marked review of this exact state is still running, else None.
+
+        Reached only after every check passed and only a review receipt is missing, so a failing
+        check, a contract refusal or control drift never gets here. Like any release it records
+        no pass: the cache is dropped and refusal markers are left as they are.
+        """
+        if not self.stop:
+            return None
+        try:
+            at = pending_review(self.root, self.contract, self.session)
+        except (OSError, ValueError, LeanError, subprocess.CalledProcessError):
+            at = None
+        if at is None:
+            return None
+        self.cache.unlink(missing_ok=True)
+        since = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(at))
+        self.out.append(json.dumps({"systemMessage": f"Lean Quality Gate: independent review pending since {since} "
+                                    "for this contract and shipping state; Stop released UNVERIFIED. The work is "
+                                    "not DONE until the review receipt is recorded and the gate passes."}))
+        return 0
 
     def target_checks(self):
         """Run the selected application's gate in its own directory; a refusal code or None."""
@@ -382,7 +460,8 @@ class Run:
                 self.say(f"Gate evidence: {error}")
                 if risky:
                     self.say("High-risk areas changed; HIGH independent review is required:\n" + "\n".join(risky))
-                return self.refuse()
+                released = self.release_pending()
+                return self.refuse() if released is None else released
 
         # Only a real passing run can be cached; contracts and HIGH review are checked first. A direct
         # run's record is marked: it skips the commands but never makes changed work count as unchanged.
@@ -436,6 +515,11 @@ class Run:
         if self.hook or pass_state:
             self.failed.unlink(missing_ok=True)
             self.refusal.unlink(missing_ok=True)
+        if self.stop and (self.require_review or risky):
+            try:
+                pending_review(root, self.contract, self.session)  # A recorded receipt removes this session's marker.
+            except (OSError, ValueError, LeanError, subprocess.CalledProcessError):
+                pass
         if pass_state:
             self.cache.parent.mkdir(exist_ok=True)
             self.cache.write_text(pass_state if self.hook else f"direct {pass_state}")

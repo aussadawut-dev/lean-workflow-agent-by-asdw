@@ -210,8 +210,12 @@ def codex_stop(root, stdin, cache_tree):
         contract = current_review_contract(root) or ""
         require_review = bool(contract)
     # The runner reads that session's declared contract itself; Stop output is quiet.
-    code, _, err = gate.run(root, cache_tree=cache_tree, quiet=True, contract=contract, session=session,
-                            require_review=require_review)
+    code, out, err = gate.run(root, cache_tree=cache_tree, quiet=True, contract=contract, session=session,
+                              require_review=require_review, stop=True)
+    if code == 0 and out:
+        # Released for a marked pending review: not a pass, so the refusal markers and session
+        # baseline stay as they are.
+        return 0, out[-1], ""
     if code == 0:
         clear_codex_refusals(root)
         if session:

@@ -48,7 +48,8 @@
         "hooks/test_guard.py",
         "hooks/test_hook_cases.py",
         "hooks/test_gate.py",
-        "hooks/test_target.py"
+        "hooks/test_target.py",
+        "hooks/test_review_pending.py"
       ]
     },
     {
@@ -107,7 +108,8 @@
         "unit/test_models.py",
         "unit/test_spawn.py",
         "unit/test_structure.py",
-        "e2e/test_spawn_scenarios.py"
+        "e2e/test_spawn_scenarios.py",
+        "e2e/test_spawn_permissions.py"
       ]
     },
     {
@@ -119,7 +121,8 @@
         "unit/test_spawn.py",
         "e2e/test_spawn_run.py",
         "e2e/test_spawn_scenarios.py",
-        "unit/test_activity.py"
+        "unit/test_activity.py",
+        "e2e/test_spawn_permissions.py"
       ]
     },
     {

@@ -86,6 +86,19 @@ class SpawnRunTests(unittest.TestCase):
     def status(self):
         return json.loads((self.root / ".agent-runtime/spawn/current.json").read_text())
 
+    def test_trust_agents_flag_is_opt_in_and_warns(self):
+        default = self.run_spawn("--tasks", self.tasks("work"), "--timeout", "20")
+        self.assertEqual(default.returncode, 0, default.stdout + default.stderr)
+        self.assertNotIn("bypassPermissions", self.stub_record(self.status()["agents"][0])["args"])
+        self.assertFalse(self.status()["agents"][0]["trusted"])
+        self.remove_worktrees()
+        trusted = self.run_spawn("--tasks", self.tasks("work"), "--timeout", "20", "--trust-agents")
+        self.assertEqual(trusted.returncode, 0, trusted.stdout + trusted.stderr)
+        row = self.status()["agents"][0]
+        self.assertTrue(row["trusted"])
+        self.assertEqual(self.stub_record(row)["args"][-2:], ["--permission-mode", "bypassPermissions"])
+        self.assertIn("TRUSTED run", trusted.stdout + trusted.stderr)
+
     def test_parallel_agents_run_in_their_own_worktrees_without_api_keys(self):
         result = self.run_spawn("--tasks", self.tasks("work", "work"), "--level", "max", "--timeout", "20")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -131,24 +144,32 @@ class SpawnRunTests(unittest.TestCase):
         record = self.stub_record(self.status()["agents"][0])
         self.assertEqual(record["keys"], ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"])
 
+    @staticmethod
+    def gone(pid, wait=10):
+        """True once the process has exited; a loaded machine may take a moment to reap it."""
+        end = time.monotonic() + wait
+        while time.monotonic() < end:
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                return True
+            time.sleep(0.1)
+        return False
+
     def test_failures_and_timeouts_are_reported_and_fail_the_run(self):
-        result = self.run_spawn("--tasks", self.tasks("FAIL", "SLEEP"), "--level", "max", "--timeout", "1")
+        result = self.run_spawn("--tasks", self.tasks("FAIL", "SLEEP"), "--level", "max", "--timeout", "6")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         rows = self.status()["agents"]
         self.assertEqual([row["status"] for row in rows], ["failed", "timeout"])
         pid = int((Path(rows[1]["worktree"]) / "grandchild-t1.pid").read_text())
-        time.sleep(0.5)
-        with self.assertRaises(ProcessLookupError, msg="a timed-out agent's own children must be stopped too"):
-            os.kill(pid, 0)
+        self.assertTrue(self.gone(pid), "a timed-out agent's own children must be stopped too")
 
     def test_an_agent_that_exits_cleanly_leaves_no_background_child(self):
         result = self.run_spawn("--tasks", self.tasks("BACKGROUND"), "--timeout", "20")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         row = self.status()["agents"][0]
         pid = int((Path(row["worktree"]) / "grandchild-t0.pid").read_text())
-        time.sleep(0.5)
-        with self.assertRaises(ProcessLookupError):
-            os.kill(pid, 0)
+        self.assertTrue(self.gone(pid), "a clean exit left a background child running")
 
     def test_dependents_start_from_their_dependencies_results(self):
         tasks = self.tasks("\nWRITE f0.py=made by t0", "\nREAD f0.py", deps={"t1": ["t0"]})

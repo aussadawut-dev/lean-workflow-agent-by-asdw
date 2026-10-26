@@ -146,7 +146,8 @@ def run_files(root, files, jobs=None, show=None, reason=""):
     for name, output in failures:
         show(f"\n===== {name} =====\n" + "\n".join(output.splitlines()[-60:]))
     seconds = time.monotonic() - began
-    show(f"{len(files) - len(failures)}/{len(files)} test files passed in {seconds:.1f}s")
+    named = "; failed: " + ", ".join(sorted(name for name, _ in failures)) if failures else ""
+    show(f"{len(files) - len(failures)}/{len(files)} test files passed in {seconds:.1f}s{named}")
     from . import activity
     activity.record(root, "test", files=len(files), failed=len(failures), seconds=round(seconds, 1), selection=reason,
                     failures=[name for name, _ in failures] or None)

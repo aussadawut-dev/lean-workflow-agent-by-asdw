@@ -18,7 +18,16 @@ STUB = r'''#!/usr/bin/env python3
 import json, os, sys, time
 task = next(arg.split("TASK=")[1].split()[0] for arg in sys.argv[1:] if "TASK=" in arg)
 began = time.time()
-time.sleep(1.5)  # Long enough that agents meant to run together overlap.
+# Agents meant to run together wait here until every peer has started, so overlap never depends on how
+# fast a loaded machine launches them. A single-agent run (peers 1) just sleeps long enough to be timed.
+here = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), ".agent-runtime", "peers")
+open(os.path.join(here, f"began-{os.path.basename(sys.argv[0])}-{task}"), "w").close()
+peers = int(open(os.path.join(here, "peers.txt")).read())
+mark = f"began-{os.path.basename(sys.argv[0])}-"
+deadline = time.time() + 25
+while time.time() < deadline and sum(name.startswith(mark) for name in os.listdir(here)) < peers:
+    time.sleep(0.05)
+time.sleep(1.5 if peers == 1 else 0.3)
 open(f"task-{task}.txt", "w").write("done\n")
 json.dump({"task": task, "args": sys.argv[1:], "began": began, "ended": time.time(),
            "provider": os.path.basename(sys.argv[0])}, open(f"stub-{task}.json", "w"))
@@ -55,7 +64,9 @@ class SpawnScenarioTests(unittest.TestCase):
             if path and Path(path).resolve() != self.root:
                 subprocess.run(["git", "-C", str(self.root), "worktree", "remove", "--force", path], capture_output=True)
 
-    def spawn(self, tasks, *args, provider="claude"):
+    def spawn(self, tasks, *args, provider="claude", peers=1):
+        (self.root / ".agent-runtime/peers").mkdir(parents=True, exist_ok=True)
+        (self.root / ".agent-runtime/peers/peers.txt").write_text(str(peers))
         path = self.root / ".agent-runtime/tasks.json"
         path.parent.mkdir(exist_ok=True)
         path.write_text(json.dumps({"tasks": tasks}))
@@ -108,7 +119,7 @@ class SpawnScenarioTests(unittest.TestCase):
     # Scenario 2: /lean-agents. As many agents as tasks can run in parallel.
     def test_lean_agents_spawns_every_parallel_task_at_once(self):
         tasks = [task("api", "M"), task("ui", "S"), task("docs", "S"), task("migrate", "L")]
-        planned, status, records = self.spawn(tasks, "--level", "max")
+        planned, status, records = self.spawn(tasks, "--level", "max", peers=4)
         self.assertEqual((planned["level"], planned["agents"]), ("max", 4))
         self.assertEqual([row["status"] for row in status["agents"]], ["done"] * 4)
         self.assertEqual(self.most_at_once(records), 4, "independent tasks did not all run together")
@@ -117,7 +128,7 @@ class SpawnScenarioTests(unittest.TestCase):
 
     def test_lean_agents_respects_dependencies_and_shared_files(self):
         tasks = [task("api"), task("client", deps=["api"]), task("docs")]
-        planned, status, records = self.spawn(tasks, "--level", "max")
+        planned, status, records = self.spawn(tasks, "--level", "max", peers=2)
         self.assertEqual([[entry["id"] for entry in wave] for wave in planned["waves"]], [["api", "docs"], ["client"]])
         by_task = {record["task"]: record for record in records}
         self.assertGreaterEqual(by_task["client"]["began"], by_task["api"]["ended"], "a dependent started early")
@@ -126,7 +137,7 @@ class SpawnScenarioTests(unittest.TestCase):
     # Scenario 3: /lean-agents <model> xN. Exactly N at a time, all on that model.
     def test_named_model_and_count_run_up_to_n_agents_at_once_on_that_model(self):
         tasks = [task(f"t{n}") for n in range(5)]
-        planned, status, records = self.spawn(tasks, "--model", "sonnet", "-n", "3")
+        planned, status, records = self.spawn(tasks, "--model", "sonnet", "-n", "3", peers=3)
         self.assertEqual((planned["level"], planned["agents"], planned["concurrency"]), ("explicit", 3, 3))
         self.assertEqual([row["status"] for row in status["agents"]], ["done"] * 5)
         self.assertEqual(self.most_at_once(records), 3, "the explicit count was not what ran at once")
@@ -144,7 +155,7 @@ class SpawnScenarioTests(unittest.TestCase):
         for provider in ("codex", "agy"):
             with self.subTest(provider=provider):
                 planned, status, records = self.spawn([task("x", "L"), task("y", "S")], "--level", "max",
-                                                      provider=provider)
+                                                      provider=provider, peers=2)
                 self.assertEqual(planned["provider"], provider)
                 self.assertEqual(self.most_at_once(records), 2)
                 for record, size in zip(records, ("L", "S")):

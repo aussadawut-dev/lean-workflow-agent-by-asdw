@@ -7,6 +7,7 @@
     "claude": {
       "command": "claude",
       "args": ["-p", "{prompt}", "--model", "{model}", "--effort", "{effort}", "--permission-mode", "acceptEdits", "--output-format", "json"],
+      "trusted_args": ["--permission-mode", "bypassPermissions"],
       "tiers": {
         "S": {"model": "claude-haiku-5-5", "effort": "low"},
         "M": {"model": "claude-sonnet-5-5", "effort": "medium"},
@@ -17,6 +18,7 @@
     "codex": {
       "command": "codex",
       "args": ["exec", "-m", "{model}", "-c", "model_reasoning_effort={effort}", "--sandbox", "workspace-write", "{prompt}"],
+      "trusted_args": [],
       "tiers": {
         "S": {"model": "gpt-6-luna", "effort": "low"},
         "M": {"model": "gpt-6.1-sol", "effort": "medium"},
@@ -27,6 +29,7 @@
     "agy": {
       "command": "agy",
       "args": ["-p", "{prompt}", "--model", "{model}", "--output-format", "json", "--print-timeout", "{timeout}s"],
+      "trusted_args": ["--dangerously-skip-permissions"],
       "tiers": {
         "S": {"model": "gemini-3.8-flash-low", "effort": null},
         "M": {"model": "gemini-3.8-flash-high", "effort": null},

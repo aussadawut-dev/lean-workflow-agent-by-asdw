@@ -24,4 +24,4 @@ Scope: $ARGUMENTS (default: uncommitted changes)
 5. Act on the verdict under `Rounds` in `.lean/policy/REVIEW.md`, which bounds both branches:
    - `PASS` — the review is over; anything applied after it is a new contract.
    - `REWORK` — fix the findings, re-run validation, review again with delta context only.
-6. Have the HIGH reviewer record its verdict through `python3 .lean/bin/lean evidence record-review` as `REVIEW.md` specifies. Never record it yourself; if the reviewer cannot, report `BLOCKED`. Check the receipt against the shipping state and exact contract; later edits invalidate it. Report the Review Contract, scope and round.
+6. Have the HIGH reviewer record its verdict through `python3 .lean/bin/lean evidence record-review` as `REVIEW.md` specifies. Never record it yourself; if the reviewer cannot, report `BLOCKED`. While it runs, `lean gate review-pending --contract '<line>' --session <id>` releases Stops UNVERIFIED instead of refusing them for the missing receipt. Check the receipt against the shipping state and exact contract; later edits invalidate it. Report the Review Contract, scope and round.

@@ -59,6 +59,12 @@ A headless agent cannot ask you for permission, so it gets only what its provide
 - **Codex** (`--sandbox workspace-write`): may edit and run commands inside its worktree.
 - **agy**: denies every tool that needs permission (verified with agy 1.4.7: `RunCommand` denied, nothing written). Add allow rules under `permissions.allow` in agy's settings (for example `command(python3)`), or add `--dangerously-skip-permissions` to the agy `args` in `models.json` only if you accept that agent running any command on this machine; its worktree isolates files in Git, not the machine.
 
+### Opting in with `--trust-agents`
+
+`lean spawn run --trust-agents` is the explicit, per-run opt-in. It appends each provider's `trusted_args` from `models.json` to the agent command: Claude `--permission-mode bypassPermissions` (replacing `acceptEdits`), agy `--dangerously-skip-permissions`, Codex nothing (its `workspace-write` sandbox already allows commands in the worktree). It is never the default; Lean prints a warning, marks each agent `trusted` in `status.json`, and `command.txt` shows the flags.
+
+Risk: a trusted agent can run any command on this machine, including outside its worktree, because worktrees isolate files in Git, not the machine. Use it only for tasks and prompts you trust. The safer alternative is provider allow rules (Claude `.claude/settings.json` `permissions.allow`, agy `permissions.allow`), which grant only the commands you name and work without the flag.
+
 ## Subscription only
 
 `spawn run` removes `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` and similar variables from each agent's environment and says which it removed, so the provider CLIs use your subscription login instead of metered API billing. It cannot change a login the CLI stored itself: a Codex `auth.json` in API-key mode, a Claude `apiKeyHelper` or Console (API) login still bills metered credit, so check each CLI is logged in with your subscription. `--allow-api-keys` keeps them, only when you ask for it. More agents still spend your subscription quota faster; agy's OAuth login also has a daily request limit.

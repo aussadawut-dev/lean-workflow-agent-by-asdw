@@ -314,6 +314,9 @@ def pre_tool(root, payload):
         return ("Lean contract guard: the review receipt is written only by the reviewer through "
                 "`lean evidence record-review`, never edited directly. If the reviewer cannot record it, "
                 "report BLOCKED.")
+    if writes_receipt(name, tool_input, PENDING):
+        return ("Lean contract guard: the review-pending marker is written only by "
+                "`lean gate review-pending --contract ... --session ...`, never edited directly.")
     if name in READ_ONLY or name.startswith(READ_ONLY_PREFIXES):
         return None
     # Only write tools and writing shell commands wait for the contract; the Stop gate still refuses
@@ -357,6 +360,7 @@ def shell_words(command):
 # Text unique to the evidence command, so a renamed or copied script is still recognised.
 GATE_MARKER = '("record-review", ' + '"check-review")'  # Split so this file is not mistaken for one.
 RECEIPT = RUNTIME + "/review.json"
+PENDING = RUNTIME + "/review-pending.json"  # Written only by `lean gate review-pending`.
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit", "apply_patch"}
 
 
@@ -645,8 +649,8 @@ def shell_writes(command, depth=0):
     return False
 
 
-def writes_receipt(name, tool_input):
-    """Whether a tool call writes the receipt file itself (mentioning or reading it is fine).
+def writes_receipt(name, tool_input, target=RECEIPT):
+    """Whether a tool call writes the receipt file (or another runtime `target`) itself; mentioning or reading it is fine.
 
     A heuristic: redirect targets and writer arguments are checked, so a write through a path the
     guard cannot see (`cd .agent-runtime && echo > review.json`) is not caught.
@@ -654,12 +658,12 @@ def writes_receipt(name, tool_input):
     if not isinstance(tool_input, dict):
         return False
     if name in EDIT_TOOLS - {"apply_patch"}:
-        return any(str(tool_input.get(key, "")).endswith(RECEIPT) for key in ("file_path", "notebook_path", "path"))
+        return any(str(tool_input.get(key, "")).endswith(target) for key in ("file_path", "notebook_path", "path"))
     command = tool_input.get("command")
-    if not isinstance(command, str) or RECEIPT not in command:
+    if not isinstance(command, str) or target not in command:
         return False
     if name == "apply_patch":
-        return any(line.startswith("*** ") and "File:" in line and line.rstrip().endswith(RECEIPT)
+        return any(line.startswith("*** ") and "File:" in line and line.rstrip().endswith(target)
                    for line in command.splitlines())
     if name != "Bash":
         return False
@@ -667,16 +671,16 @@ def writes_receipt(name, tool_input):
     if words is None:
         return True  # Unparseable and naming the receipt: refuse rather than guess.
     for index, word in enumerate(words[:-1]):
-        if word in (">", ">>", ">|") and words[index + 1].endswith(RECEIPT):
+        if word in (">", ">>", ">|") and words[index + 1].endswith(target):
             return True
     for command_words in simple_commands(words):
         if not command_words:
             continue
         tool = Path(command_words[0]).name
-        targets = any(word.endswith(RECEIPT) for word in command_words[1:])
+        targets = any(word.endswith(target) for word in command_words[1:])
         if targets and (tool in WRITERS or (tool == "sed" and any(w.startswith("-i") for w in command_words))):
             return True
-        if any(RECEIPT in word and re.search(r"open\([^)]*['\"][wax]|write_(text|bytes)\(", word)
+        if any(target in word and re.search(r"open\([^)]*['\"][wax]|write_(text|bytes)\(", word)
                for word in command_words):
             return True
     return False

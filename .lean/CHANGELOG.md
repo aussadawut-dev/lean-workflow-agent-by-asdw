@@ -8,7 +8,7 @@ Token highlights come from the [historical smoke-test notes](https://github.com/
 
 ## 5.0.0 — 2026-10-26
 
-**Token highlight:** - · **Compared with:** -
+**Token highlight:** fixed-task inventory 11,146 → 10,149 (-8.9%), startup 2,213 → 2,396 (+8.3%), o200k_base ([measurement](../docs/benchmarks/2026-10-26/README.md)) · **Compared with:** 4.17.0
 
 Rebuild the workflow around one `lean` command line. Every rule, hook and check from 4.17.0 that the core keeps carries over with its tests; the layout, commands and spawning defaults change, so this is a major release.
 
@@ -20,6 +20,9 @@ Rebuild the workflow around one `lean` command line. Every rule, hook and check 
 - **agy support.** Antigravity CLI is a third provider for spawning, review and the gate (run explicitly; agy has no hooks).
 - **Smaller core.** Eleven skills remain: init, task, scope, research, grill, agents, review, gate, effort, update and target. The optional skills audit, catalog, compress, pattern, playbook, prune and takeover are removed with their tools, along with the optional skill pack and queue cleanup (`clean-queue`). Archived queue history stays readable. Application targets (`lean target use|context|clear|gate`, records in `.lean/targets/<name>/`) carry over unchanged in behavior. The shared "skill level" text moved into `policy/SKILL-EFFORT.md`.
 - **Update with migration.** `lean update preview|apply|rollback` replaces the takeover-based updater: an external pinned clone, a reviewed plan, snapshots, a journal and rollback, with 4.x migration of hooks, gate block, gate mode and skill links.
+- **Quiet Stops while a review runs.** `lean gate review-pending --contract ... --session ...` marks an independent review as running; that session's Stops whose only refusal is the missing receipt for the same contract and shipping state are released UNVERIFIED (never passed) for up to two hours, instead of being refused again. Any change, another contract, a recorded receipt or any other refusal ends it. Only the command writes the marker.
+- **Trusted spawn runs.** `lean spawn run --trust-agents` adds each provider's `trusted_args` from `models.json` (agy `--dangerously-skip-permissions`, Claude `--permission-mode bypassPermissions`), so headless agents can run their task's commands; it warns and is never the default.
+- `lean test` names failing test files in its summary line.
 - Gate mode moves from `.codex/quality-gate.json` to `.lean/gate.json` (`lean gate mode`). Gate runtime markers move from `.claude/.gate-cache`/`.gate-failed` to `.agent-runtime/`.
 
 **Upgrade:** this release changes paths and commands; follow [migrating to v5](../docs/migrating-to-v5.md). A 4.x installation has no `lean` command, so run the preview from the pinned 5.0.0 release: `python3 <release>/.lean/bin/lean update preview --target <project>`, review the plan, then `update apply`. Approve the changed gate controls through a covering HIGH review or `lean gate accept-controls`. Project records, PROJECT facts, config and trackers are kept.
@@ -27,7 +30,7 @@ Rebuild the workflow around one `lean` command line. Every rule, hook and check 
 <details>
 <summary>ภาษาไทย</summary>
 
-**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+**ผลด้าน token:** ชุดไฟล์ fixed-task 11,146 → 10,149 (-8.9%), startup 2,213 → 2,396 (+8.3%), o200k_base ([ผลวัด](../docs/benchmarks/2026-10-26/README.md)) · **เทียบกับรุ่น:** 4.17.0
 
 สร้าง workflow ใหม่รอบคำสั่งเดียว `lean` กฎ hook และการตรวจของ 4.17.0 ที่แกนหลักเก็บไว้ยกมาพร้อม test ทั้งหมด แต่โครงสร้างไฟล์ คำสั่ง และค่าเริ่มต้นของการ spawn เปลี่ยน จึงเป็น major release
 
@@ -39,6 +42,9 @@ Rebuild the workflow around one `lean` command line. Every rule, hook and check 
 - **รองรับ agy** Antigravity CLI เป็น provider ที่สามสำหรับ spawn, review และ gate (รัน gate เองเพราะ agy ไม่มี hook)
 - **แกนเล็กลง** เหลือ 11 skill: init, task, scope, research, grill, agents, review, gate, effort, update และ target ตัด skill เสริม audit, catalog, compress, pattern, playbook, prune, takeover พร้อมเครื่องมือ, optional skill pack และการล้าง queue (`clean-queue`) ประวัติ queue ที่ archive ไว้ยังอ่านได้ ส่วน application target (`lean target use|context|clear|gate` และ records ใน `.lean/targets/<name>/`) ยังทำงานเหมือนเดิม ข้อความ "skill level" ที่ซ้ำกันย้ายไปไว้ใน `policy/SKILL-EFFORT.md`
 - **อัปเดตพร้อม migration** `lean update preview|apply|rollback` แทน updater ที่อิง takeover: clone แบบ pin ไว้นอก repo, แผนที่ review ได้, snapshot, journal และ rollback พร้อมย้าย hook, gate block, gate mode และ skill link ของ 4.x
+- **Stop เงียบระหว่างรอ review** `lean gate review-pending --contract ... --session ...` บันทึกว่า independent review กำลังทำงาน Stop ของ session นั้นที่ถูกปฏิเสธเพียงเพราะยังไม่มี receipt ของ contract และ shipping state เดียวกัน จะถูกปล่อยแบบ UNVERIFIED (ไม่นับเป็นผ่าน) ได้นานสุดสองชั่วโมงแทนการปฏิเสธซ้ำ การเปลี่ยนแปลงใดๆ, contract อื่น, receipt ที่บันทึกแล้ว หรือเหตุปฏิเสธอื่นจะยุติทันที และมีเพียงคำสั่งนี้ที่เขียน marker ได้
+- **Spawn แบบ trusted** `lean spawn run --trust-agents` เติม `trusted_args` ของแต่ละ provider จาก `models.json` (agy `--dangerously-skip-permissions`, Claude `--permission-mode bypassPermissions`) เพื่อให้ agent แบบ headless รันคำสั่งของงานได้ มีคำเตือนและไม่ใช่ค่าเริ่มต้น
+- `lean test` บอกชื่อไฟล์ test ที่ fail ในบรรทัดสรุป
 - gate mode ย้ายจาก `.codex/quality-gate.json` ไป `.lean/gate.json` (`lean gate mode`) และ marker ของ gate ย้ายจาก `.claude/.gate-cache`/`.gate-failed` ไป `.agent-runtime/`
 
 **เมื่ออัปเกรด:** รุ่นนี้เปลี่ยน path และคำสั่ง ให้ทำตาม [migrating to v5](../docs/migrating-to-v5.md) การติดตั้ง 4.x ยังไม่มีคำสั่ง `lean` จึงต้องรัน preview จาก release 5.0.0 ที่ pin ไว้: `python3 <release>/.lean/bin/lean update preview --target <project>` ตรวจแผนแล้วค่อย `update apply` อนุมัติ gate controls ที่เปลี่ยนผ่าน HIGH review ที่ครอบคลุม หรือ `lean gate accept-controls` โดย records, ข้อมูลใน PROJECT, config และ tracker ของโปรเจกต์ยังอยู่ครบ

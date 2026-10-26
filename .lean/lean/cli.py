@@ -76,6 +76,10 @@ def build_parser():
     gate_mode.add_argument("--policy", action="store_true", help="print the policy text")
     accept = gate_actions.add_parser("accept-controls", help="record an already user-approved control change")
     accept.add_argument("--reason", required=True)
+    pending = gate_actions.add_parser("review-pending",
+                                      help="quiet Stops while an independent review of this exact state runs")
+    pending.add_argument("--contract", required=True)
+    pending.add_argument("--session", required=True)
 
     evidence_parser = commands.add_parser("evidence", help="review receipts and shipping state", add_help=False)
     evidence_parser.add_argument("rest", nargs=argparse.REMAINDER)
@@ -120,6 +124,8 @@ def build_parser():
             sub.add_argument("--allow-api-keys", action="store_true",
                              help="keep metered API credentials in agent environments")
             sub.add_argument("--allow-dirty", action="store_true")
+            sub.add_argument("--trust-agents", action="store_true",
+                             help="let agents run any command without asking (see docs/agents-and-models.md)")
     spawn_clean = spawn_actions.add_parser("clean", help="remove a run's worktrees and branches")
     spawn_clean.add_argument("run")
 
@@ -353,6 +359,15 @@ def gate_command(root, args):
         return 0
     if args.action == "accept-controls":
         return evidence.main(["accept-controls", "--reason", args.reason], root=root)
+    if args.action == "review-pending":
+        try:
+            marker = gate.mark_review_pending(root, args.contract, args.session)
+        except ValueError as error:
+            print(f"review-pending refused: {error}", file=sys.stderr)
+            return 2
+        print(f"Review pending for this contract and shipping state; Stops are released UNVERIFIED for up to "
+              f"{gate.PENDING_LIMIT // 3600}h or until the state, contract or receipt changes ({marker['state'][:12]}).")
+        return 0
     try:
         gate.read_mode(root)
     except (OSError, ValueError) as error:
@@ -429,6 +444,7 @@ def spawn_command(root, args):
         raise LeanError("spawn run builds worktrees of the Lean workspace, which do not contain the selected "
                         "target's application; for target work spawn in-session subagents from `lean spawn plan`, "
                         "or clear the target first")
-    document = spawn.run(root, planned, args.timeout, args.allow_api_keys, args.allow_dirty)
+    document = spawn.run(root, planned, args.timeout, args.allow_api_keys, args.allow_dirty,
+                         trusted=args.trust_agents)
     print(spawn.summary(document))
     return 0 if all(row["status"] == "done" for row in document["agents"]) else 1

@@ -144,7 +144,7 @@ def child_environment(allow_api_keys=False, environment=None):
     return environment, removed
 
 
-def command_for(data, provider, prompt, model, effort, timeout):
+def command_for(data, provider, prompt, model, effort, timeout, trusted=False):
     spec = data["providers"][provider]
     values = {"{prompt}": prompt, "{model}": model, "{effort}": effort or "", "{timeout}": str(timeout)}
     args = []
@@ -157,6 +157,14 @@ def command_for(data, provider, prompt, model, effort, timeout):
         for key, value in values.items():
             arg = arg.replace(key, value)
         args.append(arg)
+    if trusted:
+        extra = list(spec.get("trusted_args") or [])
+        for index, arg in enumerate(extra):
+            # A trusted flag replaces the same flag and value already in args (a later duplicate is ambiguous).
+            if arg.startswith("-") and arg in args and index + 1 < len(extra) and not extra[index + 1].startswith("-"):
+                position = args.index(arg)
+                del args[position:position + 2]
+        args += extra
     return [spec["command"], *args]
 
 
@@ -204,11 +212,11 @@ class Agent:
             pass
         self.process.wait()
 
-    def row(self, provider):
+    def row(self, provider, trusted=False):
         state = progress.load(self.worktree) if self.worktree.is_dir() else None
         return {"id": self.id, "provider": provider, "model": self.entry["model"], "status": self.status,
                 "exit_code": self.code, "worktree": str(self.worktree), "branch": self.branch,
-                "log": str(self.log), "progress": state, "note": self.note}
+                "log": str(self.log), "progress": state, "note": self.note, "trusted": trusted}
 
 
 def snapshot_tree(worktree):
@@ -250,8 +258,12 @@ def denials(log):
     return []
 
 
-def run(root, planned, timeout=DEFAULT_TIMEOUT, allow_api_keys=False, allow_dirty=False, show=None):
-    """Run a plan wave by wave; return the final status document."""
+def run(root, planned, timeout=DEFAULT_TIMEOUT, allow_api_keys=False, allow_dirty=False, show=None,
+        trusted=False):
+    """Run a plan wave by wave; return the final status document.
+
+    `trusted` (opt-in, never a default) appends each provider's `trusted_args` so agents may run commands
+    without asking, which headless runs otherwise deny."""
     root = Path(root).resolve()
     data = models.load(root)
     provider = planned["provider"]
@@ -269,12 +281,15 @@ def run(root, planned, timeout=DEFAULT_TIMEOUT, allow_api_keys=False, allow_dirt
         notes.append("removed metered API credentials from agent environments (subscription login only): "
                       + ", ".join(removed))
     display = show or (lambda text: print(text, file=sys.stderr, flush=True))
+    if trusted:
+        notes.append("TRUSTED run: agents can run any command on this machine without asking; worktrees isolate "
+                     "files in Git, not the machine")
     for note in notes:
         display("lean spawn: " + note)
 
     def publish():
         document = {"schema": 1, "run": run_id, "provider": provider, "notes": notes,
-                    "agents": [agent.row(provider) for agent in agents]}
+                    "agents": [agent.row(provider, trusted) for agent in agents]}
         write_json(status_path, document)
         write_json(run_dir / "status.json", document)
         return document
@@ -323,7 +338,7 @@ def run(root, planned, timeout=DEFAULT_TIMEOUT, allow_api_keys=False, allow_dirt
                 prompt = (agent.entry.get("prompt") or agent.entry.get("title") or agent.id) + BRIEF.format(
                     id=agent.id, run=run_id, files=", ".join(agent.entry["files"]))
                 command = command_for(data, provider, prompt, agent.entry["model"], agent.entry.get("effort"),
-                                      timeout)
+                                      timeout, trusted)
                 # The command as run, with the prompt (which may be long or private) replaced by a marker.
                 shown = ["<prompt>" if arg == prompt else arg for arg in command]
                 (agent.directory / "command.txt").write_text(shlex.join(shown) + "\n")
