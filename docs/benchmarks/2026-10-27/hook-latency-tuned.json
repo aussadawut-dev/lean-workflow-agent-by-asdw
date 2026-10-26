@@ -1,0 +1,254 @@
+{
+  "measurement": "Wall-clock ms of each configured Claude hook command; trivial gate (`true`).",
+  "python": "3.14.3",
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "runs": 20,
+  "versions": {
+    "4.17.1": {
+      "ref": "v4.17.1",
+      "commit": "0824b8a3fa3c34f29f5f98d9067ca0cf1f168665",
+      "hooks": {
+        "SessionStart": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh",
+        "Stop": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/quality-gate.sh --cache-tree",
+        "PreToolUse": "python3 \"$CLAUDE_PROJECT_DIR\"/.lean/scripts/contract_guard.py --root \"$CLAUDE_PROJECT_DIR\" pre-tool || exit 2",
+        "UserPromptSubmit": "python3 \"$CLAUDE_PROJECT_DIR\"/.lean/scripts/contract_guard.py --root \"$CLAUDE_PROJECT_DIR\" prompt"
+      },
+      "results": {
+        "session_start": {
+          "median_ms": 626.5,
+          "p90_ms": 654.0,
+          "min_ms": 602.7,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        },
+        "prompt_submit": {
+          "median_ms": 45.9,
+          "p90_ms": 47.5,
+          "min_ms": 44.1,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        },
+        "pre_tool_read": {
+          "median_ms": 46.6,
+          "p90_ms": 78.1,
+          "min_ms": 44.9,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        },
+        "pre_tool_write_bound": {
+          "median_ms": 46.9,
+          "p90_ms": 50.8,
+          "min_ms": 44.7,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        },
+        "stop_cold_trivial_gate": {
+          "median_ms": 736.8,
+          "p90_ms": 771.5,
+          "min_ms": 721.4,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        },
+        "stop_cached": {
+          "median_ms": 729.9,
+          "p90_ms": 761.9,
+          "min_ms": 717.3,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        },
+        "stop_git_calls": 11
+      },
+      "commands": {
+        "show_mode": {
+          "median_ms": 54.3,
+          "p90_ms": 57.5,
+          "min_ms": 51.1,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        },
+        "check_records": {
+          "median_ms": 54.2,
+          "p90_ms": 56.3,
+          "min_ms": 51.3,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        },
+        "check_models": {
+          "median_ms": 48.7,
+          "p90_ms": 50.9,
+          "min_ms": 46.5,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        }
+      },
+      "suite": {
+        "command": "python3 .lean/tests/run_tests.py --shards 6",
+        "exit_code": 0,
+        "seconds": 155.0,
+        "last_line": [
+          "29 files (163 processes) in 154.8s: OK"
+        ]
+      }
+    },
+    "5.0.0": {
+      "ref": "38092fd85f12b66ea0314c5904d9d967dc111d67",
+      "commit": "38092fd85f12b66ea0314c5904d9d967dc111d67",
+      "hooks": {
+        "SessionStart": "python3 \"$CLAUDE_PROJECT_DIR\"/.lean/bin/lean hook claude session-start",
+        "Stop": "python3 \"$CLAUDE_PROJECT_DIR\"/.lean/bin/lean hook claude stop --cache-tree",
+        "PreToolUse": "python3 \"$CLAUDE_PROJECT_DIR\"/.lean/bin/lean hook claude pre-tool || exit 2",
+        "UserPromptSubmit": "python3 \"$CLAUDE_PROJECT_DIR\"/.lean/bin/lean hook claude prompt",
+        "statusLine": "python3 \"$CLAUDE_PROJECT_DIR\"/.lean/bin/lean status --line"
+      },
+      "results": {
+        "session_start": {
+          "median_ms": 128.3,
+          "p90_ms": 133.9,
+          "min_ms": 120.5,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        },
+        "prompt_submit": {
+          "median_ms": 36.0,
+          "p90_ms": 37.5,
+          "min_ms": 34.7,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        },
+        "pre_tool_read": {
+          "median_ms": 37.4,
+          "p90_ms": 39.0,
+          "min_ms": 35.4,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        },
+        "pre_tool_write_bound": {
+          "median_ms": 38.3,
+          "p90_ms": 40.6,
+          "min_ms": 36.5,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        },
+        "stop_cold_trivial_gate": {
+          "median_ms": 128.3,
+          "p90_ms": 136.3,
+          "min_ms": 124.1,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        },
+        "stop_cached": {
+          "median_ms": 125.2,
+          "p90_ms": 130.8,
+          "min_ms": 120.0,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        },
+        "status_line": {
+          "median_ms": 53.4,
+          "p90_ms": 58.1,
+          "min_ms": 50.1,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        },
+        "stop_git_calls": 6
+      },
+      "commands": {
+        "show_mode": {
+          "median_ms": 52.7,
+          "p90_ms": 55.9,
+          "min_ms": 50.0,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        },
+        "check_records": {
+          "median_ms": 53.4,
+          "p90_ms": 55.4,
+          "min_ms": 51.7,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        },
+        "check_models": {
+          "median_ms": 54.6,
+          "p90_ms": 57.2,
+          "min_ms": 51.9,
+          "runs": 20,
+          "exit_codes": [
+            0
+          ]
+        }
+      },
+      "suite": {
+        "command": "python3 .lean/bin/lean test --all",
+        "exit_code": 0,
+        "seconds": 80.4,
+        "last_line": [
+          "31/31 test files passed in 80.3s"
+        ]
+      }
+    }
+  },
+  "floors": {
+    "python_start": {
+      "median_ms": 16.1,
+      "p90_ms": 17.4,
+      "min_ms": 15.2,
+      "runs": 20,
+      "exit_codes": [
+        0
+      ]
+    },
+    "git_rev_parse": {
+      "median_ms": 9.6,
+      "p90_ms": 10.5,
+      "min_ms": 8.7,
+      "runs": 20,
+      "exit_codes": [
+        0
+      ]
+    }
+  },
+  "delta_median_percent": {
+    "session_start": -79.5,
+    "prompt_submit": -21.6,
+    "pre_tool_read": -19.7,
+    "pre_tool_write_bound": -18.3,
+    "stop_cold_trivial_gate": -82.6,
+    "stop_cached": -82.8
+  }
+}

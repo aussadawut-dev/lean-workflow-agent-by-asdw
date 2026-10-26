@@ -8,7 +8,7 @@ import sys
 import time
 
 from . import __version__
-from .util import LeanError, WORKFLOW_ROOT
+from .util import LeanError, WORKFLOW_ROOT, recorded_gate
 
 
 class Parser(argparse.ArgumentParser):
@@ -20,8 +20,12 @@ class Parser(argparse.ArgumentParser):
         super().__init__(*args, **kwargs)
 
 
-def build_parser():
-    from . import gate, models, progress, records, spawn
+def build_parser(argv=()):
+    from . import models, progress, records, spawn
+    gate_modes = ()
+    if "gate" in argv:  # Only the gate group needs the gate's constants; importing it costs every other call.
+        from . import gate
+        gate_modes = gate.MODES
     parser = Parser(prog="lean", description="Lean Workflow command line.")
     parser.add_argument("--root", type=Path, default=None,
                         help="explicit root (default: this checkout; records follow the selected target)")
@@ -71,8 +75,8 @@ def build_parser():
     gate_run.add_argument("--hook", action="store_true", help=argparse.SUPPRESS)  # Raw hook mode, payload on stdin.
     gate_run.add_argument("--seed", action="store_true", help=argparse.SUPPRESS)
     gate_actions.add_parser("status", help="last recorded gate result (never a fresh run)")
-    gate_mode = gate_actions.add_parser("mode", help="show or set automation: " + ", ".join(gate.MODES))
-    gate_mode.add_argument("mode", nargs="?", choices=gate.MODES)
+    gate_mode = gate_actions.add_parser("mode", help="show or set automation: " + ", ".join(gate_modes))
+    gate_mode.add_argument("mode", nargs="?", choices=gate_modes)
     gate_mode.add_argument("--policy", action="store_true", help="print the policy text")
     accept = gate_actions.add_parser("accept-controls", help="record an already user-approved control change")
     accept.add_argument("--reason", required=True)
@@ -171,7 +175,7 @@ def build_parser():
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
-    parser = build_parser()
+    parser = build_parser(argv)
     args = parser.parse_args(argv)
     try:
         root = (args.root or WORKFLOW_ROOT).resolve()
@@ -303,16 +307,17 @@ def dispatch(root, args, parser):
 
 
 def status(root, args):
-    from . import gate, progress, records
+    from . import progress
     state = progress.load(root)
-    if args.line:
-        try:
-            gate_state = gate.status(root, verify=False)  # Refreshed often: no tree hashing.
-        except (OSError, ValueError, subprocess.CalledProcessError):
-            gate_state = "UNKNOWN"
+    if args.line:  # Refreshed often: no tree hashing, and none of the gate's imports.
         text = progress.line(state) if state else "Lean: no task tracked"
+        try:
+            gate_state = recorded_gate(root)
+        except (OSError, ValueError):
+            gate_state = "UNKNOWN"
         print(f"{text} · gate {gate_state}")
         return 0
+    from . import gate, records
     config = records.config(root)
     report = {"version": __version__, "mode": config["mode"], "execution": config["execution"],
               "gate": gate.status(root), "progress": state}

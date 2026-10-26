@@ -16,7 +16,7 @@ import sys
 import time
 
 from . import evidence, guard
-from .util import LeanError, in_git, locked, read_json, safe_path, write_json
+from .util import RUNTIME, GitView, LeanError, locked, read_json, recorded_gate, safe_path, write_json
 
 MODES = ("auto", "manual", "auto_fixloop", "manual_fixloop")
 MAX_REFUSALS = 3
@@ -403,11 +403,14 @@ class Run:
             self.say("Quality Gate undefined: configure checks in .lean/PROJECT.md; no validation passed.")
             return self.refuse()
         self.checks = len(commands)
-        git_tree = in_git(root)
-        state = evidence.state(root) if self.hook and git_tree else ""
+        # One view of the checkout serves the state and the High-risk check below; no command runs
+        # in between. Each answer equals its separate Git call (util.GitView).
+        view = GitView(root)
+        git_tree = view.in_git()
+        state = evidence.state(root, view) if self.hook and git_tree else ""
         # A direct --cache-tree run fingerprints the state only for its pass record: it never
         # compares with the session baseline, so the High-risk floor still covers it.
-        pass_state = evidence.state(root) if (not self.hook and self.cache_tree and git_tree) else state
+        pass_state = evidence.state(root, view) if (not self.hook and self.cache_tree and git_tree) else state
         if self.seed:
             # SessionStart records a change baseline, never a passing cache. A new session has not
             # seen any earlier refusal, so its first one blocks again.
@@ -419,10 +422,9 @@ class Run:
                 self.baseline.parent.mkdir(exist_ok=True)
                 self.baseline.write_text(state)
                 head_file = self.baseline.with_name("gate-baseline-head")
-                head = subprocess.run(["git", "-C", str(root), "rev-parse", "-q", "--verify", "HEAD"],
-                                      capture_output=True, text=True)
-                if head.returncode == 0:
-                    head_file.write_text(head.stdout)
+                head = view.head()
+                if head:
+                    head_file.write_text(head + "\n")
                 else:
                     head_file.unlink(missing_ok=True)
             return 0
@@ -442,7 +444,7 @@ class Run:
         if HIGH_REVIEW.match(self.contract or ""):
             self.require_review = True
         # PROJECT.md High-risk areas set a review floor that a self-declared risk cannot lower.
-        risky = evidence.high_risk_changes(root, self.session) if (changed or self.session) else []
+        risky = evidence.high_risk_changes(root, self.session, view) if (changed or self.session) else []
 
         def receipt_gap():
             """A refusal for a missing receipt, or None. A HIGH contract needs a receipt for itself;
@@ -560,15 +562,10 @@ def status(root, verify=True):
 
     Verifying hashes every Git-visible file; a status bar refreshing often passes verify=False and
     reports a recorded pass as LAST_PASS without checking it still matches."""
-    runtime = Path(root) / ".agent-runtime"
-    failed, cache = runtime / "gate-failed", runtime / "gate-cache"
-    if failed.is_file():
-        # A "c" marker is a contract refusal, which says nothing about the checks.
-        return "CONTRACT_REFUSED" if failed.read_text().startswith("c") else "FAIL"
-    if not cache.is_file():
-        return "NOT_RUN"
-    if not verify:
-        return "LAST_PASS"
+    recorded = recorded_gate(root)
+    if recorded != "LAST_PASS" or not verify:
+        return recorded
+    cache = Path(root) / RUNTIME / "gate-cache"
     try:
         current = evidence.state(Path(root))
     except (OSError, ValueError, subprocess.CalledProcessError):

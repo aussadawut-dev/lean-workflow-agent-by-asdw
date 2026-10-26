@@ -8,7 +8,7 @@ Token highlights come from the [historical smoke-test notes](https://github.com/
 
 ## 5.0.0 — 2026-10-26
 
-**Token highlight:** fixed-task inventory 11,146 → 10,149 (-8.9%), startup 2,213 → 2,396 (+8.3%), o200k_base ([measurement](../docs/benchmarks/2026-10-26/README.md)) · **Compared with:** 4.17.0
+**Token highlight:** fixed-task inventory 11,146 → 9,962 (-10.6%), startup 2,213 → 2,209 (-0.2%), o200k_base ([measurement](../docs/benchmarks/2026-10-27/README.md)) · **Compared with:** 4.17.1
 
 Rebuild the workflow around one `lean` command line. Every rule, hook and check from 4.17.0 that the core keeps carries over with its tests; the layout, commands and spawning defaults change, so this is a major release.
 
@@ -22,6 +22,7 @@ Rebuild the workflow around one `lean` command line. Every rule, hook and check 
 - **Update with migration.** `lean update preview|apply|rollback` replaces the takeover-based updater: an external pinned clone, a reviewed plan, snapshots, a journal and rollback, with 4.x migration of hooks, gate block, gate mode and skill links.
 - **Quiet Stops while a review runs.** `lean gate review-pending --contract ... --session ...` marks an independent review as running; that session's Stops whose only refusal is the missing receipt for the same contract and shipping state are released UNVERIFIED (never passed) for up to two hours, instead of being refused again. Any change, another contract, a recorded receipt or any other refusal ends it. Only the command writes the marker.
 - **Trusted spawn runs.** `lean spawn run --trust-agents` adds each provider's `trusted_args` from `models.json` (agy `--dangerously-skip-permissions`, Claude `--permission-mode bypassPermissions`), so headless agents can run their task's commands; it warns and is never the default.
+- **Faster hooks and commands.** Measured against 4.17.1 on one machine with a trivial gate: a Stop takes 125 ms instead of 730 ms and starts 6 `git` processes instead of 11, SessionStart 128 ms instead of 627 ms, and plain commands are within 6 ms of 4.17.1's scripts (53–55 ms). The CLI keeps compiled bytecode in a private per-user cache (`~/.cache/lean-workflow/pycache`, or under `$XDG_CACHE_HOME`; used only when every directory on that path is the user's own and not writable by others, never in the checkout; delete it to clear it), the status line reads the gate's markers without loading the gate, and AGENTS.md is shorter with every rule kept. Data: [docs/benchmarks/2026-10-27](../docs/benchmarks/2026-10-27/README.md).
 - `lean test` names failing test files in its summary line.
 - Gate mode moves from `.codex/quality-gate.json` to `.lean/gate.json` (`lean gate mode`). Gate runtime markers move from `.claude/.gate-cache`/`.gate-failed` to `.agent-runtime/`.
 
@@ -30,7 +31,7 @@ Rebuild the workflow around one `lean` command line. Every rule, hook and check 
 <details>
 <summary>ภาษาไทย</summary>
 
-**ผลด้าน token:** ชุดไฟล์ fixed-task 11,146 → 10,149 (-8.9%), startup 2,213 → 2,396 (+8.3%), o200k_base ([ผลวัด](../docs/benchmarks/2026-10-26/README.md)) · **เทียบกับรุ่น:** 4.17.0
+**ผลด้าน token:** ชุดไฟล์ fixed-task 11,146 → 9,962 (-10.6%), startup 2,213 → 2,209 (-0.2%), o200k_base ([ผลวัด](../docs/benchmarks/2026-10-27/README.md)) · **เทียบกับรุ่น:** 4.17.1
 
 สร้าง workflow ใหม่รอบคำสั่งเดียว `lean` กฎ hook และการตรวจของ 4.17.0 ที่แกนหลักเก็บไว้ยกมาพร้อม test ทั้งหมด แต่โครงสร้างไฟล์ คำสั่ง และค่าเริ่มต้นของการ spawn เปลี่ยน จึงเป็น major release
 
@@ -44,6 +45,7 @@ Rebuild the workflow around one `lean` command line. Every rule, hook and check 
 - **อัปเดตพร้อม migration** `lean update preview|apply|rollback` แทน updater ที่อิง takeover: clone แบบ pin ไว้นอก repo, แผนที่ review ได้, snapshot, journal และ rollback พร้อมย้าย hook, gate block, gate mode และ skill link ของ 4.x
 - **Stop เงียบระหว่างรอ review** `lean gate review-pending --contract ... --session ...` บันทึกว่า independent review กำลังทำงาน Stop ของ session นั้นที่ถูกปฏิเสธเพียงเพราะยังไม่มี receipt ของ contract และ shipping state เดียวกัน จะถูกปล่อยแบบ UNVERIFIED (ไม่นับเป็นผ่าน) ได้นานสุดสองชั่วโมงแทนการปฏิเสธซ้ำ การเปลี่ยนแปลงใดๆ, contract อื่น, receipt ที่บันทึกแล้ว หรือเหตุปฏิเสธอื่นจะยุติทันที และมีเพียงคำสั่งนี้ที่เขียน marker ได้
 - **Spawn แบบ trusted** `lean spawn run --trust-agents` เติม `trusted_args` ของแต่ละ provider จาก `models.json` (agy `--dangerously-skip-permissions`, Claude `--permission-mode bypassPermissions`) เพื่อให้ agent แบบ headless รันคำสั่งของงานได้ มีคำเตือนและไม่ใช่ค่าเริ่มต้น
+- **Hook และคำสั่งเร็วขึ้น** วัดเทียบกับ 4.17.1 บนเครื่องเดียวด้วย gate ว่าง: Stop ใช้ 125 ms แทน 730 ms และเรียก `git` 6 ครั้งแทน 11, SessionStart 128 ms แทน 627 ms และคำสั่งทั่วไปช้ากว่า script ของ 4.17.1 ไม่เกิน 6 ms (53–55 ms) CLI เก็บ bytecode ไว้ใน cache ส่วนตัวของผู้ใช้ (`~/.cache/lean-workflow/pycache` หรือใต้ `$XDG_CACHE_HOME` ใช้เฉพาะเมื่อทุก directory บน path นั้นเป็นของผู้ใช้และคนอื่นเขียนไม่ได้ ไม่เขียนลง checkout ลบทิ้งได้เพื่อล้าง cache) status line อ่าน marker ของ gate โดยไม่โหลด gate และ AGENTS.md สั้นลงโดยยังมีครบทุก rule ข้อมูล: [docs/benchmarks/2026-10-27](../docs/benchmarks/2026-10-27/README.md)
 - `lean test` บอกชื่อไฟล์ test ที่ fail ในบรรทัดสรุป
 - gate mode ย้ายจาก `.codex/quality-gate.json` ไป `.lean/gate.json` (`lean gate mode`) และ marker ของ gate ย้ายจาก `.claude/.gate-cache`/`.gate-failed` ไป `.agent-runtime/`
 

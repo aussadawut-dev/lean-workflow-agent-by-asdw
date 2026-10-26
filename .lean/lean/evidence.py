@@ -10,6 +10,7 @@ import subprocess
 import sys
 
 from .guard import LINE as CONTRACT, initial_head, parse as parse_contract, start_session
+from .util import GitView
 
 
 def digest(value):
@@ -20,9 +21,9 @@ def git(root, *args):
     return subprocess.check_output(["git", "-C", str(root), *args], stderr=subprocess.PIPE)
 
 
-def entries(root, skip=lambda name: False):
+def entries(root, skip=lambda name: False, view=None):
     """Bytes, modes and links of every Git-visible path."""
-    names = set(git(root, "ls-files", "--cached", "--others", "--exclude-standard", "-z").split(b"\0")) - {b""}
+    names = (view or GitView(root)).visible()
     found = []
     for raw in sorted(names):
         name = os.fsdecode(raw)
@@ -43,11 +44,14 @@ def entries(root, skip=lambda name: False):
     return found
 
 
-def state(root):
-    """Gate cache and change baseline: HEAD, index and all Git-visible bytes, paths, symlinks and modes."""
-    head = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True)
-    return digest(json.dumps([head.stdout.decode().strip(), controls(root),
-                             git(root, "ls-files", "--stage", "-z").hex(), entries(root)],
+def state(root, view=None):
+    """Gate cache and change baseline: HEAD, index and all Git-visible bytes, paths, symlinks and modes.
+
+    `view` shares Git answers with other queries of the same unchanged checkout (`util.GitView`).
+    """
+    view = view or GitView(root)
+    head = view.head_text()
+    return digest(json.dumps([head, controls(root), view.stage().hex(), entries(root, view=view)],
                             ensure_ascii=True, sort_keys=True).encode())
 
 
@@ -311,11 +315,11 @@ def high_risk_areas(root):
     return [area for area in areas if area.strip("/")]
 
 
-def changed_paths(root, session="", base=None):
+def changed_paths(root, session="", base=None, view=None):
     """Uncommitted, untracked and session-committed paths relative to the root."""
-    names = set(git(root, "ls-files", "--others", "--exclude-standard", "-z").split(b"\0"))
-    head = subprocess.run(["git", "-C", str(root), "rev-parse", "-q", "--verify", "HEAD"], capture_output=True)
-    if head.returncode:
+    view = view or GitView(root)
+    names = set(view.others())
+    if not view.head():
         names |= set(git(root, "ls-files", "--cached", "-z").split(b"\0"))
     else:
         names |= set(git(root, "diff", "--relative", "--name-only", "--no-renames", "-z", "HEAD").split(b"\0"))
@@ -392,10 +396,11 @@ def target_high_risk_changes(root, paths, session=""):
     return [relative + "/" + name for name in matching_risk(changed, areas)]
 
 
-def high_risk_changes(root, session=""):
-    if subprocess.run(["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"], capture_output=True).returncode:
+def high_risk_changes(root, session="", view=None):
+    view = view or GitView(root)
+    if not view.in_git():
         return []
-    found = matching_risk(changed_paths(root, session), high_risk_areas(root))
+    found = matching_risk(changed_paths(root, session, view=view), high_risk_areas(root))
     active = root / ".agent-runtime/active-target.json"
     records = root / ".lean/targets"
     if not any(path.exists() or path.is_symlink() for path in (active, records)):

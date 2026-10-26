@@ -48,7 +48,9 @@
         "hooks/test_guard.py",
         "hooks/test_hook_cases.py",
         "hooks/test_gate.py",
-        "hooks/test_target.py",
+        "hooks/test_target_gate.py",
+        "hooks/test_target_controls.py",
+        "hooks/test_target_lifecycle.py",
         "hooks/test_review_pending.py"
       ]
     },
@@ -62,7 +64,8 @@
         ".gitignore"
       ],
       "tests": [
-        "hooks"
+        "hooks",
+        "hooks/test_stop_git.py"
       ]
     },
     {
@@ -77,7 +80,9 @@
         "unit/test_queue_history.py",
         "unit/test_tracker_guards.py",
         "e2e/test_lifecycle.py",
-        "hooks/test_target.py"
+        "hooks/test_target_gate.py",
+        "hooks/test_target_controls.py",
+        "hooks/test_target_lifecycle.py"
       ]
     },
     {
@@ -96,7 +101,8 @@
         "unit/test_progress.py",
         "unit/test_cli.py",
         "hooks/test_gate.py",
-        "unit/test_activity.py"
+        "unit/test_activity.py",
+        "unit/test_cli_startup.py"
       ]
     },
     {
@@ -177,7 +183,9 @@
         ".lean/lean/target.py"
       ],
       "tests": [
-        "hooks/test_target.py",
+        "hooks/test_target_gate.py",
+        "hooks/test_target_controls.py",
+        "hooks/test_target_lifecycle.py",
         "hooks/test_gate.py",
         "hooks/test_controls.py"
       ]
@@ -190,6 +198,16 @@
         "unit/test_activity.py",
         "e2e/test_spawn_scenarios.py",
         "hooks/test_gate.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/tests/hooks/target_support.py"
+      ],
+      "tests": [
+        "hooks/test_target_gate.py",
+        "hooks/test_target_controls.py",
+        "hooks/test_target_lifecycle.py"
       ]
     }
   ]

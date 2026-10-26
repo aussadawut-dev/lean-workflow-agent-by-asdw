@@ -2,21 +2,21 @@
 
 Lean Workflow Baseline 5.0.0. See `CHANGELOG.md` for changes and migration steps.
 
-Operating rules and their self-checks; not application structure, and no stack or primary provider is prescribed. `AGENTS.md` is canonical and `CLAUDE.md` imports it. One command line, `python3 .lean/bin/lean`, runs every workflow tool; its code lives in `.lean/lean/`. Procedures live in `.lean/skills/`; `.claude/skills/` and `.agents/skills/` hold their discovery links.
+Operating rules, not application structure; no stack or primary provider is prescribed. `AGENTS.md` is canonical and `CLAUDE.md` imports it. `python3 .lean/bin/lean` runs every workflow tool (code in `.lean/lean/`). Procedures live in `.lean/skills/`; `.claude/skills/` and `.agents/skills/` hold discovery links.
 
 ## Setup and modes
 
-Use `/lean-init` or `lean mode configure standard|tracker|full` (add `--execution direct|delegated`); `lean mode show` reads settings, `lean mode check` validates mode and records. Missing configuration means unconfigured standard/direct; do not infer a heavier mode or discard accepted choices. Downgrades, leases and records: `policy/WORKFLOW.md`.
+Use `/lean-init` or `lean mode configure standard|tracker|full` (add `--execution direct|delegated`); `lean mode show` reads, `lean mode check` validates. Missing configuration means unconfigured standard/direct; never discard accepted choices. Downgrades, leases and records: `policy/WORKFLOW.md`.
 
 - `standard`: session contract, tests, validation, review and gate.
 - `tracker`: standard plus one workset tracker per non-trivial task.
 - `full`: tracker plus local lease-backed queue ownership.
 
-Direct execution is the portable default; delegated uses the Controller/worker procedure. Mode, execution, model choice, quality floor and review depth are separate. Unix tools support macOS/Linux/WSL, not native Windows. Claude and Codex run hooks; agy runs the gate explicitly.
+Direct execution is the default; delegated uses the Controller/worker procedure. Mode, execution, model, quality floor and review depth are separate. Supports macOS/Linux/WSL, not native Windows.
 
 ## Ownership
 
-Project-owned: `PROJECT.md`, `config.json`, `models.json`, optional `gate.json` and `skill-effort.json`. Workflow-owned, upgraded together by `/lean-update`: `bin/`, `lean/`, `policy/`, `roles/`, `skills/` and their discovery links, `templates/`, `tests/`. Preserve project additions and local extensions on upgrade (`CUSTOMIZING.md`); retain `LICENSE`.
+Project-owned: `PROJECT.md`, `config.json`, `models.json`, optional `gate.json` and `skill-effort.json`. Workflow-owned, upgraded together by `/lean-update`: `bin/`, `lean/`, `policy/`, `roles/`, `skills/` (and links), `templates/`, `tests/`. Upgrades preserve project additions and local extensions (`CUSTOMIZING.md`); retain `LICENSE`.
 
 ## Read when needed
 
@@ -32,8 +32,8 @@ Project-owned: `PROJECT.md`, `config.json`, `models.json`, optional `gate.json` 
 - Tool choice -> `policy/TOOLS.md`
 - Failure or retry -> `policy/RECOVERY.md`
 
-Do not load every policy or workflow internal by default. Trivial work still needs its contract/evidence but no formal tracker or scope spec. `policy/CONTEXT.md` selects context by affected behavior; selection never skips tests, review or gate checks.
+Do not load every policy by default. Trivial work needs its contract and evidence but no tracker or scope spec. Context selection (`policy/CONTEXT.md`) never skips tests, review or gate checks.
 
 ## Procedure intensity
 
-`/lean-effort [standard|high|ultra|reset] [lean-skill-name]` inspects (no arguments, read-only) or explicitly saves shared procedure intensity; missing settings mean standard. `policy/SKILL-EFFORT.md` defines precedence and boundaries. All Lean procedures are user-invocable.
+`/lean-effort [standard|high|ultra|reset] [lean-skill-name]` inspects (no arguments, read-only) or saves shared procedure intensity; missing means standard (`policy/SKILL-EFFORT.md`). All Lean procedures are user-invocable.

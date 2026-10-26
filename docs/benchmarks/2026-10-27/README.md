@@ -67,6 +67,40 @@ The 2026-10-26 comparison used 4.17.0, whose gate source was smaller (28,732); 4
 - The status line adds a 73 ms process per refresh.
 - Real agent sessions are not measured: no evidence yet that 5.0 lowers tokens or turns per task.
 
+## After tuning (TCK003)
+
+The "worse" list above led to five changes, measured again the same way into `hook-latency-tuned.json` and `context-tokens-tuned.json`. 5.0.0 here is a snapshot of the working tree (commit object 38092fd, tree c761b6a), not yet a branch commit; 4.17.1 was re-measured in the same run.
+
+```sh
+python3 docs/benchmarks/2026-10-27/measure_hooks.py --v4 v4.17.1 --v5 <commit> --runs 20 --suite > hook-latency-tuned.json
+python3 docs/benchmarks/2026-10-26/measure_context.py --v4 v4.17.1 > context-tokens-tuned.json
+```
+
+| Measure (median of 20) | 4.17.1 | 5.0.0 before | 5.0.0 tuned |
+|---|---:|---:|---:|
+| SessionStart | 627 ms | 173 ms | 128 ms |
+| UserPromptSubmit | 46 ms | 41 ms | 36 ms |
+| PreToolUse, read | 47 ms | 42 ms | 37 ms |
+| Stop, cached tree | 730 ms | 185 ms | 125 ms |
+| `git` processes per Stop | 11 | 11 | 6 |
+| Status line | none | 73 ms | 53 ms |
+| show mode | 54 ms | 75 ms | 53 ms |
+| check records | 54 ms | 79 ms | 53 ms |
+| check models | 49 ms | 76 ms | 55 ms |
+| Test suite (one run) | 155 s | 102 s | 80 s |
+| Startup tokens (o200k_base) | 2,213 | 2,396 | 2,209 |
+| Fixed-task read set | 11,146 | 10,149 | 9,962 |
+
+"5.0.0 before" is the first table set above (0aab3d9, measured earlier); 4.17.1 shows this run's numbers, which differ from the first run by up to about 5 ms on hooks and commands, the run-to-run noise on this machine. Plain commands are now within 6 ms of 4.17.1's scripts (check models is the slowest, +6 ms), down from +21-26 ms.
+
+What changed:
+
+- Bytecode cache. `.lean/bin/lean` turned bytecode writing off so the checkout stays clean, which made every command and hook recompile the package (about 20 ms). It now caches bytecode in a per-user directory outside the checkout (`$XDG_CACHE_HOME/lean-workflow/pycache` or `~/.cache/lean-workflow/pycache`), used only when every directory from the cache base down is a real directory owned by the user and not writable by group or others; otherwise nothing is written, as before.
+- Fewer `git` calls. One Git view per gate run answers "inside a work tree", HEAD, the index and untracked files from two calls instead of seven; the two `diff` calls stay because no single command gives the same union. Equivalence tests compare the results against the original commands on edge-case repositories.
+- Status line. It reads the gate's result markers through a small shared helper instead of importing the gate, evidence and guard modules.
+- Startup context. AGENTS.md and `.lean/README.md` lost duplicated and wordy text; no rule was removed.
+- Test balance. `hooks/test_target.py` (the long pole, about 114 s inside the suite) is three files that run in parallel.
+
 ## Limits
 
 One machine and one measurement set; the suites ran once. Differences under about 5 ms are within noise. The trivial gate isolates workflow overhead; a project's own checks dominate a real Stop. Each side runs its own configured commands, so 4.17.1 includes its bash wrappers by design. The cause of the slower commands is not measured here; an import-time profile is the next step.
