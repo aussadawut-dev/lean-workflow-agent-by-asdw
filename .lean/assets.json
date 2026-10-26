@@ -85,6 +85,7 @@
     ".lean/tests/test_gate_lock.py",
     ".lean/tests/test_gate_mode.py",
     ".lean/tests/test_guards.py",
+    ".lean/tests/test_hook_field.py",
     ".lean/tests/test_lean_core.py",
     ".lean/tests/test_lock_inherit.py",
     ".lean/tests/test_model_catalog.py",
