@@ -27,8 +27,23 @@ def lock_file(root, create=False):
     return descriptor
 
 
+def proc_stat(pid):
+    """(ppid, start ticks) from Linux /proc, or None where /proc is absent (macOS) or the pid is gone."""
+    try:
+        with open(f'/proc/{int(pid)}/stat') as stat_file:
+            fields = stat_file.read().rsplit(')', 1)[1].split()  # the command name may hold spaces or ')'
+        return int(fields[1]), fields[19]
+    except (OSError, ValueError, IndexError):
+        return None
+
+
 def process_start(pid):
-    """Start-time string of a live process, or None (guards against pid reuse)."""
+    """Start-time string of a live process, or None (guards against pid reuse).
+
+    /proc first: slim and BusyBox Linux images have no `ps` that accepts -o/-p."""
+    found = proc_stat(pid)
+    if found is not None:
+        return 'proc:' + found[1]
     try:
         result = subprocess.run(['ps', '-o', 'lstart=', '-p', str(pid)], capture_output=True, text=True,
                                 stdin=subprocess.DEVNULL, timeout=5)
@@ -39,6 +54,9 @@ def process_start(pid):
 
 
 def parent_of(pid):
+    found = proc_stat(pid)
+    if found is not None:
+        return found[0]
     try:
         result = subprocess.run(['ps', '-o', 'ppid=', '-p', str(pid)], capture_output=True, text=True,
                                 stdin=subprocess.DEVNULL, timeout=5)
@@ -295,7 +313,13 @@ def announce(control, pause=0.0):
 
 def run(descriptor, command):
     """Run the gate as a child while this process (and its guardian) hold the lock; mirror its exit status."""
-    token = '|'.join((str(os.getpid()), process_start(os.getpid()) or '', os.urandom(16).hex()))
+    start = process_start(os.getpid())
+    if start is None:
+        # Without a start time no nested check can prove ownership, and the runner would call itself busy.
+        print('Quality Gate lock unavailable: process start times need /proc or a ps that accepts -o/-p; '
+              'validation NOT_RUN.', file=sys.stderr)
+        return 2
+    token = '|'.join((str(os.getpid()), start, os.urandom(16).hex()))
     os.ftruncate(descriptor, 0)
     os.pwrite(descriptor, token.encode(), 0)
     environment = {k: v for k, v in os.environ.items() if k != 'LEAN_GATE_LOCK_FD'}

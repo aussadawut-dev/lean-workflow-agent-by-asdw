@@ -44,6 +44,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # test_partial_upgrade needs the 4.17.0 commit; a shallow clone skips it
 
       - uses: actions/setup-python@v5
         with:
