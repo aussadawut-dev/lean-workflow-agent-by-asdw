@@ -75,8 +75,10 @@ def frontmatter(text):
 
 
 def main():
-    argparse.ArgumentParser(description=__doc__).parse_args()
-    v4 = Side("4.17.0", "v4.17.0")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--v4", default="v4.17.0", help="4.x ref to compare (default: the retained v4.17.0 run)")
+    args = parser.parse_args()
+    v4 = Side(args.v4.lstrip("v"), args.v4)
     v5 = Side("5.0.0", None)
     head = git("rev-parse", "HEAD").strip()
     dirty = git("status", "--porcelain", "--untracked-files=no").strip() != ""
@@ -84,7 +86,7 @@ def main():
         "measurement": "Offline sum of per-file text tokens, not actual model usage or billing.",
         "tiktoken_version": tiktoken.__version__,
         "versions": {
-            "4.17.0": {"ref": "v4.17.0", "commit": git("rev-parse", "v4.17.0^{commit}").strip()},
+            v4.label: {"ref": args.v4, "commit": git("rev-parse", f"{args.v4}^{{commit}}").strip()},
             "5.0.0": {"ref": "working tree on feat/refactor-v4", "head_commit": head,
                       "tracked_files_modified_vs_head": dirty},
         },
@@ -104,7 +106,7 @@ def main():
         "encodings": {},
         "workflow_owned_files": {},
     }
-    for name, side in (("4.17.0", v4), ("5.0.0", v5)):
+    for name, side in ((v4.label, v4), ("5.0.0", v5)):
         paths = side.files()
         lines = sum(len(side.text(p).splitlines()) for p in paths)
         notest = [p for p in paths if not p.startswith(".lean/tests/")]
