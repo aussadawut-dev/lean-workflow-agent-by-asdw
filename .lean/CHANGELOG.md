@@ -6,6 +6,41 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
+## 5.0.1 — 2026-10-27
+
+**Token highlight:** - · **Compared with:** -
+
+Fixes found upgrading a real 4.16 project to 5.0.0, and the Low findings from the 5.0.0 reviews. No token or speed saving is claimed.
+
+**Fixed**
+
+- Lean's own tests pass in an installation whose PROJECT.md names its own `.lean/` files (such as `.lean/LOCAL-EXTENSIONS.md`): the release copy the tests build now brings the project files those documents name. A routing test no longer assumes PROJECT.md ends inside its Documentation routes section. Before, `unit/test_structure.py` failed 4 tests there.
+- `lean update preview` names what `lean lint` would reject after the update: a project's own file inside a workflow-owned folder (kept, never deleted) and 4.x paths in the documents PROJECT.md routes to (such as README.md).
+- A Codex Stop with a symlinked `.agent-runtime` blocks a fresh Stop and releases continued Stops UNVERIFIED instead of blocking them without end.
+- `lean test` takes a tier name (`lean test e2e`) and repository paths (`.lean/tests/hooks/test_gate.py`) as well as `hooks/test_gate.py`, and names an unknown file instead of a Python error.
+- A review-pending marker releases control drift only when the contract it was matched with is the session's HIGH-depth contract; a Stop run by hand with another `--contract` still blocks.
+
+**Upgrade:** `python3 .lean/bin/lean update preview`, review the plan, then `update apply`. The changed gate controls (`.lean/lean/gate.py`, `hooks.py`) need a covering HIGH review or `lean gate accept-controls`. No configuration or data migration.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+แก้ปัญหาที่เจอตอนอัปเกรดโปรเจกต์จริงจาก 4.16 เป็น 5.0.0 และ Low findings จาก review ของ 5.0.0 ไม่ได้อ้างว่าประหยัด token หรือเร็วขึ้น
+
+**แก้ไข**
+
+- test ของ Lean ผ่านในโปรเจกต์ที่ PROJECT.md อ้างไฟล์ `.lean/` ของตัวเอง (เช่น `.lean/LOCAL-EXTENSIONS.md`) เพราะชุดไฟล์ที่ test สร้างจะก๊อปไฟล์ของโปรเจกต์ที่เอกสารอ้างถึงมาด้วย และ test เรื่อง routing ไม่สันนิษฐานว่า PROJECT.md จบในหัวข้อ Documentation routes อีก ก่อนหน้านี้ `unit/test_structure.py` fail 4 test
+- `lean update preview` บอกสิ่งที่ `lean lint` จะปฏิเสธหลังอัปเกรด: ไฟล์ของโปรเจกต์ในโฟลเดอร์ที่ workflow เป็นเจ้าของ (เก็บไว้ ไม่ลบ) และ path ของ 4.x ในเอกสารที่ PROJECT.md ชี้ไป (เช่น README.md)
+- Stop ของ Codex ที่ `.agent-runtime` เป็น symlink จะ block ครั้งแรก แล้วปล่อย Stop ต่อเนื่องแบบ UNVERIFIED แทนการ block ไม่สิ้นสุด
+- `lean test` รับชื่อ tier (`lean test e2e`) และ path จาก root ของ repo (`.lean/tests/hooks/test_gate.py`) นอกจาก `hooks/test_gate.py` และบอกชื่อไฟล์ที่ไม่มีแทน Python error
+- marker ของ review-pending จะปล่อย control drift เฉพาะเมื่อ contract ที่ใช้จับคู่คือ contract ระดับ HIGH ของ session เอง Stop ที่รันเองด้วย `--contract` อื่นยังถูก block
+
+**เมื่ออัปเกรด:** `python3 .lean/bin/lean update preview` ตรวจแผนแล้ว `update apply` gate controls ที่เปลี่ยน (`.lean/lean/gate.py`, `hooks.py`) ต้องมี HIGH review ที่ครอบคลุม หรือ `lean gate accept-controls` ไม่ต้องย้าย configuration หรือข้อมูล
+
+</details>
+
 ## 5.0.0 — 2026-10-27
 
 **Token highlight:** fixed-task inventory 11,146 → 9,962 (-10.6%), startup 2,213 → 2,209 (-0.2%), o200k_base ([measurement](../docs/benchmarks/2026-10-27/README.md)) · **Compared with:** 4.17.1

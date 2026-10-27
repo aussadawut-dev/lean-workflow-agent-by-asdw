@@ -214,6 +214,24 @@ class ReviewPendingTests(unittest.TestCase):
                 # A MEDIUM-depth review can never accept changed controls, so its marker cannot quiet them.
                 self.assert_blocked(self.stop(provider, session), text="protected")
 
+    def test_control_drift_is_not_quieted_for_a_marker_of_another_contract(self):
+        # A Stop run by hand with --contract may name a lower-depth contract than the session's HIGH one.
+        session = "claude-hand"
+        self.bind(session)
+        (self.root / ".claude/settings.json").write_text(json.dumps({"drift": "hand"}))
+        medium = "Contract: risk=MEDIUM quality=HIGH acceptance=fixture checks pass"
+        gate.mark_review_pending(self.root, medium, session)
+        environment_before = dict(os.environ)
+        try:
+            os.environ.pop("LEAN_GATE_LOCK_FD", None)
+            code, out, err = gate.run(self.root, hook=True, contract=medium,
+                                      payload={"session_id": session, "stop_hook_active": False})
+        finally:
+            os.environ.clear()
+            os.environ.update(environment_before)
+        self.assertEqual(code, 2, out)
+        self.assertIn("protected", "\n".join(err).lower())
+
     def test_unreadable_accepted_controls_still_block(self):
         for provider, session in self.adapters():
             (self.root / ".agent-runtime/gate-controls.json").write_text("not json")

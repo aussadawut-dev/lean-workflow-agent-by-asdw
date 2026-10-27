@@ -80,6 +80,11 @@ def routed_documents(root):
     return routes
 
 
+def references(text):
+    """The workflow paths (.lean, .claude, .agents, .codex) a document names."""
+    return sorted(set(re.findall(r"\.(?:lean|claude|agents|codex)/[A-Za-z0-9_./-]+\.(?:md|sh|py|json)", text)))
+
+
 def instruction_markdown(root, visible):
     visible = set(visible)
     found = {name for name in visible if name.endswith(".md") and name.startswith(WORKFLOW_DIRS)}
@@ -167,7 +172,7 @@ def check(root):
         if name.startswith(HISTORY_MARKDOWN):
             continue
         text = (root / name).read_text()
-        for reference in set(re.findall(r"\.(?:lean|claude|agents|codex)/[A-Za-z0-9_./-]+\.(?:md|sh|py|json)", text)):
+        for reference in references(text):
             if reference.startswith(OPTIONAL_PATHS) or reference in OPTIONAL_PATHS + LEGACY_PATHS:
                 continue
             if not (root / reference).exists():

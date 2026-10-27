@@ -10,6 +10,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from support import ROOT, commit, git, install_release, lean  # noqa: E402
+from lean import __version__ as VERSION  # noqa: E402
 
 LEGACY_GATE = """<!-- gate:start -->
 ```sh
@@ -63,8 +64,8 @@ class UpdateTests(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.base, ignore_errors=True)
         self.source = self.base / "upstream"
         install_release(self.source)
-        commit(self.source, "release 5.0.0")
-        git(self.source, "tag", "v5.0.0")
+        commit(self.source, f"release {VERSION}")
+        git(self.source, "tag", f"v{VERSION}")
         self.target = self.base / "project"
         self.legacy_install()
         self.cli = [sys.executable, str(self.source / ".lean/bin/lean")]
@@ -128,10 +129,10 @@ class UpdateTests(unittest.TestCase):
         before = snapshot(self.target)
         result, plan = self.preview()
         self.assertEqual(snapshot(self.target), before)
-        self.assertEqual((plan["installed_version"], plan["incoming_version"]), ("4.17.0", "5.0.0"))
-        self.assertEqual(plan["ref"], "refs/tags/v5.0.0")
+        self.assertEqual((plan["installed_version"], plan["incoming_version"]), ("4.17.0", VERSION))
+        self.assertEqual(plan["ref"], f"refs/tags/v{VERSION}")
         provenance = [op for op in plan["operations"] if op["path"] == ".lean/upstream.json"][0]
-        self.assertEqual(json.loads(provenance["content"])["ref"], "refs/tags/v5.0.0")
+        self.assertEqual(json.loads(provenance["content"])["ref"], f"refs/tags/v{VERSION}")
         actions = {op["path"]: op["action"] for op in plan["operations"]}
         for retired in (".lean/scripts/workflow.py", ".claude/hooks/quality-gate.sh", ".codex/hooks/quality_gate.py",
                         ".lean/skills/lean-prune/SKILL.md", ".claude/skills/lean-prune", ".codex/quality-gate.json",
@@ -141,7 +142,7 @@ class UpdateTests(unittest.TestCase):
                         "AGENTS.md", ".lean/PROJECT.md", ".lean/upstream.json", ".lean/models.json", ".gitignore"):
             self.assertEqual(actions.get(written), "write", written)
         self.assertEqual(actions.get(".claude/skills/lean-update"), "link")
-        self.assertIn("Lean update 4.17.0 -> 5.0.0", result.stdout)
+        self.assertIn(f"Lean update 4.17.0 -> {VERSION}", result.stdout)
         # Every overwrite of an existing file is listed, not only counted.
         self.assertIn("  replace  .lean/policy/QUALITY.md — major-version migration", result.stdout)
         self.assertIn("  merge    .claude/settings.json", result.stdout)
@@ -149,6 +150,21 @@ class UpdateTests(unittest.TestCase):
         self.assertNotIn("src/app.py", actions)
         self.assertNotIn("docs/tracking/TCK001.md", actions)
         self.assertNotIn(".lean/config.json", actions)
+
+    def test_preview_names_what_lint_will_reject_after_the_update(self):
+        # Found upgrading a real 4.16 project: its own test in .lean/tests and a routed README naming 4.x paths.
+        project = self.target / ".lean/PROJECT.md"
+        project.write_text(project.read_text() + "\n## Documentation routes\n\n- Setup: `README.md`\n")
+        write(self.target, "README.md", "Run `python3 .lean/scripts/submodule.py context`.\n")
+        write(self.target, ".lean/tests/test_local_gate.py", "# the project's own test\n")
+        commit(self.target, "project files")
+        result, plan = self.preview()
+        self.assertIn("README.md still names the 4.x path .lean/scripts/submodule.py", result.stdout)
+        self.assertIn(".lean/tests/test_local_gate.py is not part of Lean but sits in a workflow-owned folder",
+                      result.stdout)
+        actions = {op["path"]: op["action"] for op in plan["operations"]}
+        self.assertNotIn(".lean/tests/test_local_gate.py", actions, "a project's file is never deleted")
+        self.assertNotIn("README.md", actions)
 
     def test_apply_migrates_preserves_project_data_and_passes_lint(self):
         _, plan = self.preview()
@@ -164,7 +180,7 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(os.readlink(target / ".agents/skills/lean-update"), "../../.lean/skills/lean-update")
         self.assertTrue(os.access(target / ".lean/bin/lean", os.X_OK))
         agents = (target / "AGENTS.md").read_text()
-        self.assertIn("Lean Workflow Baseline 5.0.0", agents)
+        self.assertIn(f"Lean Workflow Baseline {VERSION}", agents)
         self.assertTrue(agents.rstrip().endswith("- Use pnpm, never npm."))
         self.assertIn("- Claude note.", (target / "CLAUDE.md").read_text())
         settings = json.loads((target / ".claude/settings.json").read_text())
@@ -277,7 +293,7 @@ class UpdateTests(unittest.TestCase):
         data["files"].append("../evil.txt")
         registry.write_text(json.dumps(data))
         commit(self.source, "bad registry")
-        git(self.source, "tag", "-f", "v5.0.0")
+        git(self.source, "tag", "-f", f"v{VERSION}")
         result = self.lean("update", "preview", "--target", str(self.target), "--source", str(self.source),
                            "--workspace", str(self.base / "ws-bad"))
         self.assertNotEqual(result.returncode, 0)
@@ -292,7 +308,7 @@ class UpdateTests(unittest.TestCase):
         install_release(newer)
         for name in ("AGENTS.md", ".lean/README.md"):
             path = newer / name
-            path.write_text(path.read_text().replace("Baseline 5.0.0", "Baseline 6.0.0"))
+            path.write_text(path.read_text().replace(f"Baseline {VERSION}", "Baseline 6.0.0"))
         commit(newer, "6.0.0")
         older = self.lean("update", "preview", "--target", str(newer), "--source", str(self.source),
                           "--workspace", str(self.base / "ws3"))

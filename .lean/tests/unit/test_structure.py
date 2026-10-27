@@ -7,7 +7,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from support import ROOT, install_release, lean  # noqa: E402
-from lean import structure  # noqa: E402
+from lean import __version__, structure  # noqa: E402
 
 
 class StandardLibraryOnlyTests(unittest.TestCase):
@@ -53,6 +53,21 @@ class LintTests(unittest.TestCase):
         result = lean(self.root, "lint")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("lint ok", result.stdout)
+
+    def test_a_release_copy_brings_the_project_files_its_project_md_names(self):
+        # An installation's PROJECT.md may name its own `.lean/` documents (Casetodian's LOCAL-EXTENSIONS.md);
+        # the shipped tests must still pass there.
+        with tempfile.TemporaryDirectory() as other, tempfile.TemporaryDirectory() as copy:
+            source = Path(other)
+            install_release(source, init=False)
+            project = source / ".lean/PROJECT.md"
+            project.write_text(project.read_text() + "\nLocal rules: `.lean/LOCAL-EXTENSIONS.md`.\n")
+            (source / ".lean/LOCAL-EXTENSIONS.md").write_text("See `.lean/local/NOTES.md`.\n")
+            (source / ".lean/local").mkdir()
+            (source / ".lean/local/NOTES.md").write_text("notes\n")
+            install_release(copy, source=source)
+            self.assertEqual(structure.check(Path(copy)), [])
+            self.assertTrue((Path(copy) / ".lean/local/NOTES.md").is_file())
 
     def test_skill_links_must_point_at_canonical_skills(self):
         link = self.root / ".claude/skills/lean-task"
@@ -100,7 +115,8 @@ class LintTests(unittest.TestCase):
         notes.write_text("The 4.x gate ran `.lean/scripts/quality-gate.sh`.\n")
         self.assertEqual(self.failures(), [], "an unrouted history document may name retired paths")
         project = self.root / ".lean/PROJECT.md"
-        project.write_text(project.read_text() + "\n- Evaluations -> `docs/notes/2026-evaluation.md`\n")
+        # Its own routes section: an installation's PROJECT.md may end with any other heading.
+        project.write_text(project.read_text() + "\n## Documentation routes\n\n- Evaluations -> `docs/notes/2026-evaluation.md`\n")
         self.assertFails("missing .lean/scripts/quality-gate.sh (from docs/notes/2026-evaluation.md)")
         agents = self.root / "AGENTS.md"
         agents.write_text(agents.read_text() + "\n- Run `.lean/scripts/submodule.py context` first.\n")
@@ -117,7 +133,7 @@ class LintTests(unittest.TestCase):
 
     def test_versions_must_agree(self):
         router = self.root / ".lean/README.md"
-        router.write_text(router.read_text().replace("Baseline 5.0.0", "Baseline 5.0.1"))
+        router.write_text(router.read_text().replace(f"Baseline {__version__}", "Baseline 0.0.1"))
         self.assertFails("workflow version differs")
 
     def test_gate_markers_model_list_and_runtime_ignore(self):

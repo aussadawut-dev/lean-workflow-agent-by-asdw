@@ -76,17 +76,37 @@ def stop_refusal(result):
 
 
 # Files a project creates at setup, beside the registered release.
+def structure_references(text):
+    """The workflow paths a document names, as `lean lint` finds them."""
+    from lean import structure
+    return structure.references(text)
+
+
 PROJECT_FILES = (".lean/PROJECT.md", ".lean/models.json", ".lean/config.json", ".gitignore")
 
 
-def install_release(root, init=True):
-    """Copy exactly the registered release plus setup's project files, with the skill discovery links."""
-    root = Path(root)
-    registry = json.loads((ROOT / ".lean/assets.json").read_text())
-    for name in registry["files"] + list(PROJECT_FILES):
+def install_release(root, init=True, source=ROOT):
+    """Copy exactly the registered release plus setup's project files, with the skill discovery links.
+
+    The project files come from the installation running the tests, so the project-owned files they
+    name (a PROJECT.md naming `.lean/LOCAL-EXTENSIONS.md`) come along; nothing else of the project does."""
+    root, source = Path(root), Path(source)
+    registry = json.loads((source / ".lean/assets.json").read_text())
+    copied = registry["files"] + list(PROJECT_FILES)
+    for name in copied:
         target = root / name
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(ROOT / name, target)
+        shutil.copy2(source / name, target)
+    pending = [reference for name in copied if name.endswith(".md")
+               for reference in structure_references((source / name).read_text())]
+    while pending:
+        name = pending.pop()
+        if (root / name).exists() or not (source / name).is_file():
+            continue  # A reference to a missing file is lint's to report.
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source / name, root / name)
+        if name.endswith(".md"):
+            pending += structure_references((source / name).read_text())
     for tree in (".claude/skills", ".agents/skills"):
         (root / tree).mkdir(parents=True, exist_ok=True)
         for skill in registry["skills"]:

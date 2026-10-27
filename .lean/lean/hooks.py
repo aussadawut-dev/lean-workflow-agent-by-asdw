@@ -257,26 +257,27 @@ def codex_refuse(root, payload, detail, session="", contract="", is_contract=Fal
     failed, refusal = runtime / "codex-gate-failed", runtime / "codex-gate-refusal"
     count = 0
     try:
-        if not runtime.is_symlink():
-            runtime.mkdir(exist_ok=True)
-            if payload.get("stop_hook_active") and failed.is_file():
-                raw = failed.read_text().strip().lstrip("c")
-                count = int(raw) if raw.isdigit() else 0
-            failed.write_text(f"{'c' if is_contract else ''}{count + 1}")
-            count += 1
-            if not is_contract and session:
-                try:
-                    current = evidence.state(root)
-                except (OSError, ValueError, subprocess.CalledProcessError):
-                    current = ""
-                if current:
-                    reason = hashlib.sha256(detail.encode()).hexdigest()
-                    fingerprint = f"{session} {current} {reason} {contract}"
-                    if refusal.is_file() and refusal.read_text() == fingerprint:
-                        return 0, json.dumps({"systemMessage": "Codex Quality Gate refused again with nothing changed "
-                                              "since the last refusal; Stop released UNVERIFIED. The work is not "
-                                              "DONE; see that refusal."}), ""
-                    refusal.write_text(fingerprint)
+        if runtime.is_symlink():  # Its markers cannot be kept, so the count is unknown.
+            raise OSError("runtime directory is a symlink")
+        runtime.mkdir(exist_ok=True)
+        if payload.get("stop_hook_active") and failed.is_file():
+            raw = failed.read_text().strip().lstrip("c")
+            count = int(raw) if raw.isdigit() else 0
+        failed.write_text(f"{'c' if is_contract else ''}{count + 1}")
+        count += 1
+        if not is_contract and session:
+            try:
+                current = evidence.state(root)
+            except (OSError, ValueError, subprocess.CalledProcessError):
+                current = ""
+            if current:
+                reason = hashlib.sha256(detail.encode()).hexdigest()
+                fingerprint = f"{session} {current} {reason} {contract}"
+                if refusal.is_file() and refusal.read_text() == fingerprint:
+                    return 0, json.dumps({"systemMessage": "Codex Quality Gate refused again with nothing changed "
+                                          "since the last refusal; Stop released UNVERIFIED. The work is not "
+                                          "DONE; see that refusal."}), ""
+                refusal.write_text(fingerprint)
     except (OSError, ValueError, subprocess.CalledProcessError):
         # A marker that cannot be written leaves the count unknown: release continued Stops, not loop.
         count = gate.MAX_REFUSALS + 1 if payload.get("stop_hook_active") else 1

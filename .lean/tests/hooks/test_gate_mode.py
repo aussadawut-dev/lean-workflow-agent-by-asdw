@@ -214,6 +214,19 @@ class GateModeTests(unittest.TestCase):
         self.assertNotIn("decision", continued)
         self.assertIn("UNVERIFIED", continued["systemMessage"])
 
+    def test_a_symlinked_codex_runtime_releases_continued_stops(self):
+        self.project.write_text("<!-- gate:start -->\n```sh\nfalse\n```\n<!-- gate:end -->\n")
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        elsewhere = Path(outside.name)
+        shutil.rmtree(self.root / ".agent-runtime", ignore_errors=True)
+        (self.root / ".agent-runtime").symlink_to(elsewhere)
+        self.assertEqual(json.loads(self.codex(payload={"stop_hook_active": False}).stdout)["decision"], "block")
+        continued = json.loads(self.codex(payload={"stop_hook_active": True}).stdout)
+        self.assertNotIn("decision", continued)
+        self.assertIn("UNVERIFIED", continued["systemMessage"])
+        self.assertEqual(list(elsewhere.iterdir()), [], "nothing is written through the link")
+
     def test_codex_unchanged_refusal_blocks_once_then_releases_unverified_until_change(self):
         (self.root / ".gitignore").write_text(".agent-runtime/\ngate-runs\n")
         self.project.write_text("<!-- gate:start -->\n```sh\nfalse\n```\n<!-- gate:end -->\n")

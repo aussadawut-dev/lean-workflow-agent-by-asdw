@@ -98,7 +98,7 @@ def build_parser(argv=()):
     test.add_argument("--base", help="also count changes since this commit")
     test.add_argument("--list", action="store_true", help="show the selection without running it")
     test.add_argument("-j", "--jobs", type=int)
-    test.add_argument("files", nargs="*", help="category/test_file.py names")
+    test.add_argument("files", nargs="*", help="tiers (unit, hooks, e2e) or <tier>/test_<name>.py files")
 
     lint = commands.add_parser("lint", help="static workflow checks")
     lint.add_argument("--write-registry", action="store_true",
@@ -401,7 +401,7 @@ def gate_command(root, args):
 def test_command(root, args):
     from . import structure, testsel
     if args.files:
-        files, reason = args.files, "named files"
+        files, reason = testsel.named(root, args.files), "named files"
     elif args.tier:
         files, reason = testsel.all_files(root, tuple(args.tier)), "tier " + ", ".join(args.tier)
     elif args.changed:

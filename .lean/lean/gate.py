@@ -386,7 +386,9 @@ class Run:
                 self.say("After that, HIGH independent review is also required for these High-risk changes:\n"
                          + "\n".join(pending))
             # Only uncovered drift waits on a review: a HIGH-depth one, the only kind that can accept it.
-            if isinstance(error, evidence.ControlsChanged) and HIGH_REVIEW.match(session_contract):
+            # The marker is matched with self.contract; the receipt that accepts drift needs the session's.
+            if (isinstance(error, evidence.ControlsChanged) and HIGH_REVIEW.match(session_contract)
+                    and self.contract == session_contract):
                 released = self.release_pending(checks_run=False)
                 if released is not None:
                     return released

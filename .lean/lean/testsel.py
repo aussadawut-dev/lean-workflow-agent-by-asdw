@@ -115,6 +115,24 @@ def select(root, paths):
     return sorted(chosen), f"{counted} changed path(s)"
 
 
+def named(root, names):
+    """Test files for names given on the command line: a tier (`e2e`), `hooks/test_x.py`, or the same path
+    from the repository root (`.lean/tests/hooks/test_x.py`); raises LeanError for anything else."""
+    files = []
+    for name in names:
+        if name in CATEGORIES:
+            files += all_files(root, (name,))
+            continue
+        relative = name.removeprefix("./").removeprefix(TESTS + "/")
+        category, _, filename = relative.partition("/")
+        if (category not in CATEGORIES or "/" in filename or not re.fullmatch(r"test_\w+\.py", filename)
+                or not (Path(root) / TESTS / relative).is_file()):
+            raise LeanError(f"no such test file: {name} (use a tier {', '.join(CATEGORIES)} or "
+                            "<tier>/test_<name>.py)")
+        files.append(relative)
+    return sorted(set(files))
+
+
 def run_files(root, files, jobs=None, show=None, reason=""):
     """Run each test file in its own process, several at a time; return the number of failures."""
     root = Path(root)

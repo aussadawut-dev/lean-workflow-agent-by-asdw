@@ -156,6 +156,26 @@ class CommandTests(unittest.TestCase):
         summary = failed.stdout.strip().splitlines()[-1]
         self.assertRegex(summary, r"^1/2 test files passed in [\d.]+s; failed: unit/test_fail\.py$")
 
+    def test_named_tests_accept_tiers_and_repository_paths(self):
+        for names, expected in ((["unit"], "unit/test_fail.py\nunit/test_pass.py"),
+                                ([".lean/tests/unit/test_pass.py"], "unit/test_pass.py"),
+                                (["./.lean/tests/unit/test_pass.py", "unit/test_pass.py"], "unit/test_pass.py")):
+            with self.subTest(names=names):
+                listed = lean(self.root, "test", "--list", *names)
+                self.assertEqual(listed.returncode, 0, listed.stderr)
+                self.assertEqual(listed.stdout.split("\n", 1)[1].strip(), expected)
+        ran = lean(self.root, "test", ".lean/tests/unit/test_pass.py")
+        self.assertEqual(ran.returncode, 0, ran.stdout + ran.stderr)
+        for wrong in ("unit/test_missing.py", "e2e", "../unit/test_pass.py", "unit/../unit/test_pass.py"):
+            with self.subTest(wrong=wrong):
+                refused = lean(self.root, "test", "--list", wrong)
+                if wrong == "e2e":  # An empty tier is a valid, empty selection.
+                    self.assertEqual(refused.returncode, 0, refused.stderr)
+                    self.assertIn("Selected 0 test file(s)", refused.stdout)
+                    continue
+                self.assertEqual(refused.returncode, 2, refused.stdout)
+                self.assertIn("no such test file", refused.stderr)
+
     def test_a_documentation_only_change_runs_lint_only(self):
         (self.root / "notes.md").write_text("words\n")
         result = lean(self.root, "test", "--changed", "--list")
