@@ -294,12 +294,13 @@ class Run:
             return 0
         return 2
 
-    def release_pending(self):
+    def release_pending(self, checks_run=True):
         """0 with a release message when a marked review of this exact state is still running, else None.
 
-        Reached only after every check passed and only a review receipt is missing, so a failing
-        check, a contract refusal or control drift never gets here. Like any release it records
-        no pass: the cache is dropped and refusal markers are left as they are.
+        Reached only when a review receipt is missing: after every check passed, or before the checks
+        when changed controls wait for the HIGH-depth review that can accept them. A failing check or
+        a contract refusal never gets here. Like any release it records no pass: the cache is dropped
+        and refusal markers are left as they are.
         """
         if not self.stop:
             return None
@@ -312,8 +313,10 @@ class Run:
         self.cache.unlink(missing_ok=True)
         since = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(at))
         self.out.append(json.dumps({"systemMessage": f"Lean Quality Gate: independent review pending since {since} "
-                                    "for this contract and shipping state; Stop released UNVERIFIED. The work is "
-                                    "not DONE until the review receipt is recorded and the gate passes."}))
+                                    "for this contract and shipping state; Stop released UNVERIFIED"
+                                    + ("" if checks_run else " with changed gate controls and checks NOT_RUN")
+                                    + ". The work is not DONE until the review receipt is recorded and the gate "
+                                    "passes."}))
         return 0
 
     def target_checks(self):
@@ -382,6 +385,11 @@ class Run:
             if pending:
                 self.say("After that, HIGH independent review is also required for these High-risk changes:\n"
                          + "\n".join(pending))
+            # Only uncovered drift waits on a review: a HIGH-depth one, the only kind that can accept it.
+            if isinstance(error, evidence.ControlsChanged) and HIGH_REVIEW.match(session_contract):
+                released = self.release_pending(checks_run=False)
+                if released is not None:
+                    return released
             return self.refuse()
         selection = root / ".agent-runtime/active-target.json"
         if not self.seed and (selection.exists() or selection.is_symlink()):

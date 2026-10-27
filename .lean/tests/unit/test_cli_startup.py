@@ -107,6 +107,23 @@ class BytecodeCacheTests(Fixture):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.pycaches(), [])
 
+    def test_relative_home_never_caches_inside_the_working_directory(self):
+        # HOME unset with no passwd entry leaves `~` relative; the cache must not land under the cwd.
+        result = support.lean(self.root, "version", env=clean_env(HOME="relative-home"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(list(self.root.rglob("*.pyc")), [])
+        self.assertFalse((self.root / "relative-home").exists())
+
+    def test_a_test_file_run_on_its_own_leaves_the_user_cache_alone(self):
+        xdg = self.tmp / "xdg"
+        code = ("import sys; sys.path.insert(0, sys.argv[1]); import support; from pathlib import Path;"
+                "root = Path(sys.argv[2]); print(support.lean(root, 'version').returncode)")
+        result = subprocess.run([sys.executable, "-c", code, str(Path(__file__).resolve().parents[1]), str(self.root)],
+                                text=True, capture_output=True,
+                                env=clean_env(HOME=str(self.tmp / "home"), XDG_CACHE_HOME=str(xdg)))
+        self.assertEqual(result.stdout.strip(), "0", result.stderr)
+        self.assertEqual(list(self.tmp.rglob("*.pyc")), [])
+
     def refused(self, xdg, elsewhere=()):
         """A cache path another user could control is never used: nothing cached anywhere, nothing in the checkout."""
         result = support.lean(self.root, "version", env=clean_env(HOME=str(self.tmp / "home"), XDG_CACHE_HOME=str(xdg)))

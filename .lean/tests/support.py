@@ -11,6 +11,9 @@ sys.path.insert(0, str(ROOT / ".lean"))
 LEAN = ".lean/bin/lean"
 # The workflow code and both providers' hook wiring.
 RUNTIME_FILES = (".gitignore", ".claude/settings.json", ".codex/hooks.json", LEAN)
+# Fixtures live in throwaway directories; `lean test` already keeps their bytecode out of the user's
+# cache, and so does a test file run on its own (every lean process a test starts inherits this).
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 
 
 def install(root, extra=()):

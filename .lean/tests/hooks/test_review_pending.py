@@ -1,4 +1,5 @@
-"""A marked pending review quiets Stops refused only for its missing receipt, never passing them."""
+"""A marked pending review quiets Stops refused only for its missing receipt (or the controls drift it
+will cover), never passing them."""
 import json
 import os
 from pathlib import Path
@@ -185,11 +186,39 @@ class ReviewPendingTests(unittest.TestCase):
             finally:
                 self.flag.write_text("")
 
-    def test_control_drift_still_blocks(self):
+    def test_control_drift_waits_for_its_marked_high_review(self):
         for provider, session in self.adapters():
-            (self.root / ".claude/settings.json").write_text(json.dumps({"drift": provider}))
-            gate.mark_review_pending(self.root, CONTRACT, session)  # The marker covers the drifted state.
+            settings = self.root / ".claude/settings.json"
+            settings.write_text(json.dumps({"drift": provider}))
             self.assert_blocked(self.stop(provider, session), text="protected")
+            gate.mark_review_pending(self.root, CONTRACT, session)  # The marker covers the drifted state.
+            for attempt in range(gate.MAX_REFUSALS + 2):
+                released = self.stop(provider, session, active=attempt > 0)
+                self.assert_released(released)
+                self.assertIn("checks NOT_RUN", json.loads(released.stdout)["systemMessage"])
+            # The PASS receipt accepts the controls and ends the quiet period.
+            self.record("PASS")
+            passed = self.stop(provider, session)
+            self.assertEqual(passed.returncode, 0, passed.stdout + passed.stderr)
+            self.assertFalse(self.marker.exists())
+            self.touch()
+
+    def test_control_drift_is_not_quieted_below_high_depth(self):
+        medium = "Contract: risk=MEDIUM quality=HIGH acceptance=fixture checks pass"
+        for provider in ("claude", "codex"):
+            with self.subTest(adapter=provider):
+                session = f"{provider}-medium"
+                self.bind(session, medium)
+                (self.root / ".claude/settings.json").write_text(json.dumps({"drift": provider}))
+                gate.mark_review_pending(self.root, medium, session)
+                # A MEDIUM-depth review can never accept changed controls, so its marker cannot quiet them.
+                self.assert_blocked(self.stop(provider, session), text="protected")
+
+    def test_unreadable_accepted_controls_still_block(self):
+        for provider, session in self.adapters():
+            (self.root / ".agent-runtime/gate-controls.json").write_text("not json")
+            gate.mark_review_pending(self.root, CONTRACT, session)
+            self.assert_blocked(self.stop(provider, session), text="gate evidence")
 
     def test_a_recorded_receipt_ends_the_quiet_period(self):
         for provider, session in self.adapters():

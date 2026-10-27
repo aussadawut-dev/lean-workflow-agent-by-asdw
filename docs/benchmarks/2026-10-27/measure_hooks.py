@@ -174,6 +174,10 @@ def main():
     result = {"measurement": "Wall-clock ms of each configured Claude hook command; trivial gate (`true`).",
               "python": sys.version.split()[0], "platform": platform.platform(), "runs": args.runs, "versions": {}}
     with tempfile.TemporaryDirectory(prefix="lean-hooks-") as temporary:
+        # Each export is a new path, so its bytecode would stay in the user's cache for good; keep it here.
+        cache = Path(temporary) / "cache"
+        cache.mkdir(mode=0o700)
+        os.environ["XDG_CACHE_HOME"] = str(cache)
         for label, ref in (("4.17.1", args.v4), ("5.0.0", args.v5)):
             root = Path(temporary) / label
             commit = export(ref, root)

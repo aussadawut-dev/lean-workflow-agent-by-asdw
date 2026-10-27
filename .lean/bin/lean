@@ -20,7 +20,9 @@ def use_private_bytecode_cache():
     try:
         base = os.environ.get("XDG_CACHE_HOME", "")
         base = base if os.path.isabs(base) else os.path.join(os.path.expanduser("~"), ".cache")
-        chain = [base, os.path.join(base, "lean-workflow"), os.path.join(base, "lean-workflow", "pycache")]
+        if not os.path.isabs(base):  # `~` stays relative without HOME or a passwd entry: never the cwd.
+            raise RuntimeError("no absolute cache directory")
+        chain = [base,os.path.join(base, "lean-workflow"), os.path.join(base, "lean-workflow", "pycache")]
         os.makedirs(base, mode=0o700, exist_ok=True)
         for folder in chain[1:]:
             try:

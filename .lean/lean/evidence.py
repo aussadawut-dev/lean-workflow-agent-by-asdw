@@ -496,6 +496,10 @@ def git_visible(root, name):
     return bool(listed.strip(b"\0") or deleted.strip(b"\0"))
 
 
+class ControlsChanged(ValueError):
+    """Controls differ from the accepted ones and nothing (trusted ref, HIGH receipt) covers them yet."""
+
+
 def guard_controls(root, contract=None, reason=None):
     """Refuse changed controls before running checks; reason records existing user approval."""
     path = root / ".agent-runtime/gate-controls.json"
@@ -522,7 +526,7 @@ def guard_controls(root, contract=None, reason=None):
                 reviewed = reviewed_controls(root, old, current, contract)
                 if reviewed is None:
                     hint = (" No trusted-control-refs entry matches them." if current.get("trusted_control_refs") else "")
-                    raise ValueError("Protected gate controls changed. Inspect the diff; use accept-controls --reason "
+                    raise ControlsChanged("Protected gate controls changed. Inspect the diff; use accept-controls --reason "
                                      "only for an already user-approved change, or let an independent HIGH-depth "
                                      "PASS review cover the change." + hint)
                 reviewer, contract, receipt_state = reviewed
