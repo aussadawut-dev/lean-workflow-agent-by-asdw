@@ -48,6 +48,60 @@ class GateLockTests(unittest.TestCase):
                 self.assertFalse((self.root / 'runs').exists())
         self.assertEqual(self.gate().returncode, 0)
 
+    def test_busy_claude_stop_is_released_after_the_refusal_cap(self):
+        # A long gate in another session must not block this one's Stops forever (4.17.1 fix).
+        from lean import gate
+        self.runtime.mkdir()
+
+        def stop(active):
+            return subprocess.run([sys.executable, LEAN, '--root', str(self.root), 'hook', 'claude', 'stop'],
+                                  input=json.dumps({'stop_hook_active': active}), text=True, capture_output=True,
+                                  timeout=10, env=clean_env(CLAUDE_PROJECT_DIR=str(self.root)))
+
+        with (self.runtime / 'quality-gate.lock').open('w') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            for attempt in range(gate.MAX_REFUSALS):
+                blocked = stop(attempt > 0)
+                self.assertEqual(json.loads(blocked.stdout)['decision'], 'block', blocked.stdout)
+                self.assertIn('busy', blocked.stdout)
+            released = stop(True)
+            self.assertEqual(released.returncode, 0, released.stderr)
+            message = json.loads(released.stdout)
+            self.assertNotIn('decision', message)
+            self.assertIn('UNVERIFIED', message['systemMessage'])
+            self.assertIn('busy', message['systemMessage'])
+            # A fresh Stop starts counting again.
+            self.assertEqual(json.loads(stop(False).stdout)['decision'], 'block')
+        self.assertFalse((self.root / 'runs').exists())
+        self.assertFalse((self.runtime / 'gate-cache').exists(), 'a busy release never records a pass')
+
+    def test_busy_claude_stop_with_an_unwritable_counter_releases_continued_stops(self):
+        self.runtime.mkdir()
+        for blocker in ('directory', 'read-only'):
+            with self.subTest(counter=blocker):
+                counter = self.runtime / 'gate-busy'
+                if counter.is_dir():
+                    counter.rmdir()
+                elif counter.exists():
+                    counter.chmod(0o600)
+                    counter.unlink()
+                if blocker == 'directory':
+                    counter.mkdir()
+                else:
+                    counter.write_text('1')
+                    counter.chmod(0o400)
+                with (self.runtime / 'quality-gate.lock').open('w') as lock:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    for active in (False, True):
+                        result = subprocess.run([sys.executable, LEAN, '--root', str(self.root), 'hook', 'claude', 'stop'],
+                                                input=json.dumps({'stop_hook_active': active}), text=True,
+                                                capture_output=True, timeout=10,
+                                                env=clean_env(CLAUDE_PROJECT_DIR=str(self.root)))
+                        message = json.loads(result.stdout)
+                        self.assertEqual('decision' in message, not active, result.stdout)
+                if blocker == 'read-only':
+                    counter.chmod(0o600)
+
     def test_direct_runner_without_arguments_uses_the_working_directory(self):
         # A copy of the workflow gates its own checkout by default.
         install(self.root)

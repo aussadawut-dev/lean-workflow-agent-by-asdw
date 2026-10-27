@@ -6,7 +6,7 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
-## 5.0.0 — 2026-10-26
+## 5.0.0 — 2026-10-27
 
 **Token highlight:** fixed-task inventory 11,146 → 9,962 (-10.6%), startup 2,213 → 2,209 (-0.2%), o200k_base ([measurement](../docs/benchmarks/2026-10-27/README.md)) · **Compared with:** 4.17.1
 
@@ -24,6 +24,7 @@ Rebuild the workflow around one `lean` command line. Every rule, hook and check 
 - **Trusted spawn runs.** `lean spawn run --trust-agents` adds each provider's `trusted_args` from `models.json` (agy `--dangerously-skip-permissions`, Claude `--permission-mode bypassPermissions`), so headless agents can run their task's commands; it warns and is never the default.
 - **Faster hooks and commands.** Measured against 4.17.1 on one machine with a trivial gate: a Stop takes 125 ms instead of 730 ms and starts 6 `git` processes instead of 11, SessionStart 128 ms instead of 627 ms, and plain commands are within 6 ms of 4.17.1's scripts (53–55 ms). The CLI keeps compiled bytecode in a private per-user cache (`~/.cache/lean-workflow/pycache`, or under `$XDG_CACHE_HOME`; used only when the path is absolute and every directory from the cache base down is the user's own and not writable by others, never in the checkout; delete it to clear it), the status line reads the gate's markers without loading the gate, and AGENTS.md is shorter with every rule kept. Data: [docs/benchmarks/2026-10-27](../docs/benchmarks/2026-10-27/README.md).
 - `lean test` names failing test files in its summary line.
+- A Claude Stop that finds the gate lock held by another run is blocked at most three times, then released UNVERIFIED, as in 4.17.1; it records no pass. The lock is an `flock` the kernel drops with its holder, so v5 needs no guardian process or `ps`. Checks inherit it, so unlike 4.17.1 a process a check leaves running in the background keeps the checkout locked until that process exits. A busy counter or refusal marker that cannot be written no longer blocks continued Stops without end.
 - Gate mode moves from `.codex/quality-gate.json` to `.lean/gate.json` (`lean gate mode`). Gate runtime markers move from `.claude/.gate-cache`/`.gate-failed` to `.agent-runtime/`.
 
 **Upgrade:** this release changes paths and commands; follow [migrating to v5](../docs/migrating-to-v5.md). A 4.x installation has no `lean` command, so run the preview from the pinned 5.0.0 release: `python3 <release>/.lean/bin/lean update preview --target <project>`, review the plan, then `update apply`. Approve the changed gate controls through a covering HIGH review or `lean gate accept-controls`. Project records, PROJECT facts, config and trackers are kept.
@@ -47,11 +48,35 @@ Rebuild the workflow around one `lean` command line. Every rule, hook and check 
 - **Spawn แบบ trusted** `lean spawn run --trust-agents` เติม `trusted_args` ของแต่ละ provider จาก `models.json` (agy `--dangerously-skip-permissions`, Claude `--permission-mode bypassPermissions`) เพื่อให้ agent แบบ headless รันคำสั่งของงานได้ มีคำเตือนและไม่ใช่ค่าเริ่มต้น
 - **Hook และคำสั่งเร็วขึ้น** วัดเทียบกับ 4.17.1 บนเครื่องเดียวด้วย gate ว่าง: Stop ใช้ 125 ms แทน 730 ms และเรียก `git` 6 ครั้งแทน 11, SessionStart 128 ms แทน 627 ms และคำสั่งทั่วไปช้ากว่า script ของ 4.17.1 ไม่เกิน 6 ms (53–55 ms) CLI เก็บ bytecode ไว้ใน cache ส่วนตัวของผู้ใช้ (`~/.cache/lean-workflow/pycache` หรือใต้ `$XDG_CACHE_HOME` ใช้เฉพาะเมื่อ path เป็น absolute และทุก directory ตั้งแต่ฐานของ cache ลงไปเป็นของผู้ใช้และคนอื่นเขียนไม่ได้ ไม่เขียนลง checkout ลบทิ้งได้เพื่อล้าง cache) status line อ่าน marker ของ gate โดยไม่โหลด gate และ AGENTS.md สั้นลงโดยยังมีครบทุก rule ข้อมูล: [docs/benchmarks/2026-10-27](../docs/benchmarks/2026-10-27/README.md)
 - `lean test` บอกชื่อไฟล์ test ที่ fail ในบรรทัดสรุป
+- Stop ของ Claude ที่เจอ gate lock ถูก run อื่นถืออยู่ จะถูก block ไม่เกินสามครั้งแล้วปล่อยแบบ UNVERIFIED เหมือน 4.17.1 โดยไม่บันทึกว่าผ่าน lock เป็น `flock` ที่ kernel ปล่อยพร้อม process ที่ถือ จึงไม่ต้องมี guardian หรือ `ps` แต่ check ได้รับ lock ต่อไปด้วย ต่างจาก 4.17.1 process ที่ check ทิ้งไว้ทำงานเบื้องหลังจะถือ lock ไว้จนกว่า process นั้นจบ และ busy counter หรือ refusal marker ที่เขียนไม่ได้จะไม่ทำให้ Stop ต่อเนื่องถูก block ไม่สิ้นสุดอีก
 - gate mode ย้ายจาก `.codex/quality-gate.json` ไป `.lean/gate.json` (`lean gate mode`) และ marker ของ gate ย้ายจาก `.claude/.gate-cache`/`.gate-failed` ไป `.agent-runtime/`
 
 **เมื่ออัปเกรด:** รุ่นนี้เปลี่ยน path และคำสั่ง ให้ทำตาม [migrating to v5](../docs/migrating-to-v5.md) การติดตั้ง 4.x ยังไม่มีคำสั่ง `lean` จึงต้องรัน preview จาก release 5.0.0 ที่ pin ไว้: `python3 <release>/.lean/bin/lean update preview --target <project>` ตรวจแผนแล้วค่อย `update apply` อนุมัติ gate controls ที่เปลี่ยนผ่าน HIGH review ที่ครอบคลุม หรือ `lean gate accept-controls` โดย records, ข้อมูลใน PROJECT, config และ tracker ของโปรเจกต์ยังอยู่ครบ
 
 </details>
+
+## 4.17.1 — 2026-10-27
+
+**Token highlight:** - · **Compared with:** -
+
+No token or speed saving is claimed. Gate behaviour ported from the v5 draft; the tests named below are the evidence, and nothing else is claimed.
+
+**Fixed**
+
+- The gate lock holder keeps its descriptor private, runs the gate as a child and records an owner token that nested `--check` calls validate; a guardian process holds the lock until the gate has ended, and the gate announces its pid to the guardian before it starts, so a holder killed with SIGKILL cannot leave the gate running without the lock. A process a check leaves running in the background no longer keeps the checkout locked. The busy message and exit code 2 are unchanged. Tests: `test_lock_inherit.py`, `test_gate_lock.py`. Process start times and parents come from `/proc` on Linux and from `ps -o … -p` elsewhere; without either, the gate stops with "Quality Gate lock unavailable" (exit 2, NOT_RUN) instead of reporting a busy lock (`test_gate_lock.py`). The tree kill still depends on `ps`: without it, a holder killed with SIGKILL stops the gate shell but not the check it is running, which can outlive the lock and overlap a later gate. Gate runs were verified on macOS, Linux CI and a Linux image without `ps`; the kill guarantee only where `ps` exists.
+- The Codex hook counts a busy gate lock like the Claude hook (three blocks, then a release marked UNVERIFIED). Its Stop path fails closed: a missing or failing `lean_core.py`, a failed import of `gate_mode`, `gate_evidence` or `contract_guard`, or any unexpected error gives a fixed block message instead of empty output, and a zero-status `SystemExit` counts as a failure. Tests: `test_codex_busy.py`, `test_codex_partial.py`.
+- Refusal markers are kept per session: `.agent-runtime/gate-failed.<key>` and `.agent-runtime/gate-refusal.<key>` (and the Codex equivalents), `<key>` being the first 16 hex characters of the sha256 of the session id. Runs without a session id keep the previous file names, and a keyed seed or pass removes those once. A marker that is a directory or other non-regular file, an unusable `.agent-runtime`, and a malformed `session_id` are bounded by the cap of three instead of blocking without end. A session key that is not 16 lowercase hex characters is ignored wherever it would become a file name. `workflow.py` status reads the newest marker. Tests: `test_session_markers.py`, `test_busy_cap.py`, `test_gate_integrity.py`.
+- `test_lock_inherit.py` accepts the pipe type lsof reports on Linux (`FIFO`) as well as macOS (`PIPE`); the Linux CI jobs failed on that assertion alone.
+- CI clones full history, so the partial-upgrade tests that need the 4.17.0 commit run instead of skipping.
+- `gate_evidence.py hook-field` answers a JSON array or scalar payload with "payload must be a JSON object" (exit 2) instead of a Python error text. Test: `test_hook_field.py` (6 non-object payloads fail on the previous code, pass now).
+
+**Added**
+
+- `lean_core.py`: `gate_refusal`, `session_key` and `valid_session_key`, the single refusal decision used by the Claude Stop hook, the shell runner and the Codex hook (`test_lean_core.py`). It is a protected gate control file.
+
+**Known limits:** after a killed holder, the guardian's no-pid fallback signals orphans of the holder's process group, which could include an unrelated background process started from the same group. `workflow.py` status may show FAIL from another session's refusal marker until it is pruned. In Codex, an invalid gate policy or hook input is still reported and released, not blocked. `test_busy_cap.py` and `test_codex_busy.py` compare the unchanged paths with `HEAD`, so they guard later edits, not this release against 4.17.0. CI runs Linux on `ubuntu-24.04`, the last runner image with Python 3.9.
+
+**Upgrade:** update `.lean/scripts/lean_core.py`, `gate_evidence.py`, `gate_lock.py`, `quality-gate.sh`, `.claude/hooks/quality-gate.sh` and `.codex/hooks/quality_gate.py` together, then approve the changed controls through the existing review procedure. A Codex hook updated without `lean_core.py` degrades (a fresh Stop blocks once, a continued Stop is released UNVERIFIED), checked by `test_partial_upgrade.py`. One in-flight refusal restarts at count 1. A project test fixture that copies the gate scripts must also copy `lean_core.py`, and a test that reads the refusal marker of a run with a session id must read `.agent-runtime/gate-failed.<key>` instead of `.claude/.gate-failed` (the legacy name still applies without a valid session id).
 
 ## 4.17.0 — 2026-10-25
 

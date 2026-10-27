@@ -206,6 +206,14 @@ class GateModeTests(unittest.TestCase):
         self.assertNotIn("decision", continued)
         self.assertEqual(self.codex("run").returncode, 2)
 
+    def test_an_unwritable_codex_refusal_marker_releases_continued_stops(self):
+        self.project.write_text("<!-- gate:start -->\n```sh\nfalse\n```\n<!-- gate:end -->\n")
+        (self.root / ".agent-runtime/codex-gate-failed").mkdir(parents=True)  # Cannot be read or written.
+        self.assertEqual(json.loads(self.codex(payload={"stop_hook_active": False}).stdout)["decision"], "block")
+        continued = json.loads(self.codex(payload={"stop_hook_active": True}).stdout)
+        self.assertNotIn("decision", continued)
+        self.assertIn("UNVERIFIED", continued["systemMessage"])
+
     def test_codex_unchanged_refusal_blocks_once_then_releases_unverified_until_change(self):
         (self.root / ".gitignore").write_text(".agent-runtime/\ngate-runs\n")
         self.project.write_text("<!-- gate:start -->\n```sh\nfalse\n```\n<!-- gate:end -->\n")

@@ -548,11 +548,37 @@ def bar(done, total):
     return render(done / total if total else 1.0, width=10, percent=False)
 
 
+def busy(root, message, options):
+    """The answer when the lock is not ours: a refusal, or for a Claude Stop continued past the cap, a release.
+
+    The other gate owns the runner's markers, so only a separate counter is touched here; like any
+    release it records no pass. Codex Stops are capped by their own adapter."""
+    payload = options.get("payload") or {}
+    if not options.get("hook") or options.get("seed"):
+        return 2, [], [message]
+    count = 0
+    try:
+        counter = safe_path(root, f"{RUNTIME}/gate-busy")
+        counter.parent.mkdir(exist_ok=True)
+        if payload.get("stop_hook_active") is True and counter.is_file():
+            raw = counter.read_text().strip()
+            count = int(raw) if raw.isdigit() else 0
+        counter.write_text(str(count + 1))
+        count += 1
+    except (OSError, ValueError, LeanError):
+        count = 0  # Uncounted: a continued Stop is released below rather than blocked without end.
+    count = count or (MAX_REFUSALS + 1 if payload.get("stop_hook_active") is True else 1)
+    if count > MAX_REFUSALS:
+        return 0, [json.dumps({"systemMessage": f"{message} Still busy after {MAX_REFUSALS} attempts; Stop released "
+                               "UNVERIFIED. The work is not DONE; run the gate again once the other one finishes."})], []
+    return 2, [], [message]
+
+
 def run(root, **options):
     """Run the gate under the checkout lock; return (exit code, stdout lines, stderr lines)."""
     message = acquire_lock(root)
     if message:
-        return 2, [], [message]
+        return busy(root, message, options)
     gate = Run(root, **options)
     began = time.monotonic()
     code = gate.execute()

@@ -6,7 +6,7 @@ It works with **Claude Code, Codex and agy (Antigravity)**, with one shared set 
 
 **Baseline 5.0.0** · [MIT License](LICENSE)
 
-5.0.0 rebuilds the workflow around one `lean` command, shows progress as a bar on every surface, runs only the tests a change can affect, and spawns sized agents from a per-provider model list. It is a major release: upgrading from 4.x moves files and commands. See the [5.0.0 release notes](.lean/CHANGELOG.md#500--2026-10-26) and [migrating to v5](docs/migrating-to-v5.md).
+5.0.0 rebuilds the workflow around one `lean` command, shows progress as a bar on every surface, runs only the tests a change can affect, and spawns sized agents from a per-provider model list. It is a major release: upgrading from 4.x moves files and commands. See the [5.0.0 release notes](.lean/CHANGELOG.md#500--2026-10-27) and [migrating to v5](docs/migrating-to-v5.md).
 
 The idea is simple: **agree on the work → implement → test → validate → review → finish with evidence**. Use the steps the task needs.
 

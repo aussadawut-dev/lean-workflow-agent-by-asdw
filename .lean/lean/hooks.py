@@ -262,8 +262,8 @@ def codex_refuse(root, payload, detail, session="", contract="", is_contract=Fal
             if payload.get("stop_hook_active") and failed.is_file():
                 raw = failed.read_text().strip().lstrip("c")
                 count = int(raw) if raw.isdigit() else 0
+            failed.write_text(f"{'c' if is_contract else ''}{count + 1}")
             count += 1
-            failed.write_text(f"{'c' if is_contract else ''}{count}")
             if not is_contract and session:
                 try:
                     current = evidence.state(root)
@@ -278,7 +278,8 @@ def codex_refuse(root, payload, detail, session="", contract="", is_contract=Fal
                                               "DONE; see that refusal."}), ""
                     refusal.write_text(fingerprint)
     except (OSError, ValueError, subprocess.CalledProcessError):
-        count = count or (gate.MAX_REFUSALS + 1 if payload.get("stop_hook_active") else 1)
+        # A marker that cannot be written leaves the count unknown: release continued Stops, not loop.
+        count = gate.MAX_REFUSALS + 1 if payload.get("stop_hook_active") else 1
     if count > gate.MAX_REFUSALS:
         return 0, json.dumps({"systemMessage": f"Codex Quality Gate still refused after {gate.MAX_REFUSALS} attempts; "
                               f"Stop released UNVERIFIED. The work is not DONE; see the last gate refusal.\n{detail}"}), ""
