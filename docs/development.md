@@ -42,3 +42,17 @@ Bump the version in `AGENTS.md`, `.lean/README.md`, `.lean/lean/__init__.py` and
 ## Spawning tests
 
 `e2e/test_spawn_run.py` replaces the provider CLI with a stub script, so it needs no subscription and spends no quota. To try a real provider by hand: `lean spawn run --tasks .lean/templates/tasks.json --provider agy --timeout 300` in a scratch clone. agy 1.0.6 was reported to hang in print mode without a TTY; `--print-timeout` and the runner's own timeout bound that.
+
+## Writing the changelog
+
+Two files, one release heading each (`## X.Y.Z — YYYY-MM-DD`; lint checks the newest matches the version):
+
+- `.lean/CHANGELOG.md` is for users and becomes the GitHub Release text. First line under the heading: the link
+  `🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#<anchor>)`. Then one sentence on
+  why the release matters, then **มีอะไรใหม่** / **มีอะไรเปลี่ยน** or **แก้ไข** / **ต้องทำอะไรตอนอัปเกรด** (write
+  "ไม่ต้องทำอะไร" when nothing is needed). Thai first, written as Thai rather than translated; then **English** with
+  the same content, never collapsed. Bullets of one or two lines, at most five per heading; no flags, file formats
+  or internal rules; no empty fields; no claim stronger than the behaviour.
+- `docs/CHANGELOG-dev.md` (English) holds the technical detail: commands and flags, rules, changed gate controls,
+  limits and validation.
+

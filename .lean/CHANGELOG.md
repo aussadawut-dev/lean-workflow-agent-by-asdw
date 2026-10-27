@@ -1,199 +1,157 @@
 # Changelog
 
-Versions follow `MAJOR.MINOR.PATCH`: MAJOR changes existing workflow rules or required paths, MINOR adds rules, files or enforcement, and PATCH clarifies wording.
-
-Older entries describe the workflow at the time. For current installation and upgrade instructions, see [CUSTOMIZING.md](CUSTOMIZING.md).
-
-Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
+เลขรุ่น `MAJOR.MINOR.PATCH`: MAJOR เปลี่ยนกติกาหรือ path เดิม, MINOR เพิ่มของใหม่, PATCH แก้ไข · วิธีอัปเกรด: [CUSTOMIZING.md](CUSTOMIZING.md)
+Versions are `MAJOR.MINOR.PATCH`: MAJOR changes rules or paths, MINOR adds, PATCH fixes · Upgrading: [CUSTOMIZING.md](CUSTOMIZING.md) · 5.x technical notes: [docs/CHANGELOG-dev.md](../docs/CHANGELOG-dev.md)
 
 ## 5.2.0 — 2026-10-27
 
-**Token highlight:** - · **Compared with:** -
+🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#520--2026-10-27)
 
-Refresh the model list from evidence. No token or speed saving is claimed for the workflow itself.
+อัปเดตรายชื่อ model จากผลทดสอบจริง แทนการเดา
 
-**Added**
+**มีอะไรใหม่**
+- `/lean-model-update` หา model ใหม่ของแต่ละเจ้า ทดสอบกับชุดงานจริง แล้วเสนอว่าแต่ละ size ควรใช้ตัวไหน
+- `models.json` จะเปลี่ยนเมื่อคุณอนุมัติเท่านั้น
+- ตั้งงบ token ได้ ถึงงบแล้วจะไม่เริ่มงานทดสอบใหม่
+- ชุดงานทดสอบ 8 ระดับ (`3S` ถึง `3XL`) มากับทุกการติดตั้ง
 
-- `/lean-model-update`: research the models each provider offers, agree an eval plan and a token cap with the user, run the eval, have an independent reviewer check the results, and write `.lean/models.json` only for the proposal the user approved. It never edits provider permission settings; for agy it gives the user the allow rules to add.
-- `lean models eval --plan FILE --budget TOKENS [--estimate N] [--out DIR]`: runs each candidate (provider, model, effort) on the task bank in throwaway Git copies outside the repository, with the `models.json` command shapes, eval-only flags (Claude may run `python3 -m unittest`) and metered API keys removed, and scores hidden tests per subtest. Each run reserves the larger of the largest token count seen and `--estimate` (default 250000), starts only while spent plus reservations fit the budget and otherwise waits for running ones, so only a run that uses more than its reservation can go over; a CLI that never started costs nothing and is retried, an unknown count costs exactly its run's reservation, and a run that fails in any step is recorded and releases its reservation. Tokens follow one rule for every provider (input + cache writes + output, cache reads apart; Codex reports one total); an unknown count is charged like a reservation. Writes `results.jsonl` (a rerun resumes), `summary.md`, `proposal.json` (per provider and size, the fastest candidate with a full score) and raw `logs/`. Permission denials are reported as notes.
-- `lean models apply --proposal FILE --sha256 DIGEST`: writes only the proposed sizes, refuses a proposal that changed since its digest was shown, and validates the list.
-- `lean models bank` and the task bank in `.lean/evals/` (workflow-owned, shipped with every installation): one task per size, from a one-line bug fix (3S) to a single-flight thread-safe cache (3XL), each with a reference solution that scores full marks and a stub that does not.
+**ต้องทำอะไรตอนอัปเกรด**
+- `lean update preview` แล้ว `lean update apply` ไม่ต้องย้ายข้อมูล
+- ไฟล์ที่ gate ใช้ตรวจงานเปลี่ยน: ให้ reviewer ตรวจ หรือยืนยันเองด้วย `lean gate accept-controls`
 
-**Upgrade:** `python3 .lean/bin/lean update preview`, review the plan, then `update apply`; `.lean/evals/` arrives with the release. The changed gate controls (`.lean/lean/evals.py`, `models.py`, `cli.py`, `structure.py`) need a covering HIGH review or `lean gate accept-controls`. No configuration or data migration.
+**English**
 
-<details>
-<summary>ภาษาไทย</summary>
+Refresh the model list from real test results instead of guesswork.
 
-**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+- `/lean-model-update` finds new models, tests them on real tasks and proposes one per size.
+- `models.json` changes only after you approve.
+- Set a token budget: no new test run starts once it is spent.
+- An 8-level task bank (`3S` to `3XL`) ships with every install.
 
-ปรับรายชื่อ model จากหลักฐานจริง ไม่ได้อ้างว่า workflow ประหยัด token หรือเร็วขึ้น
-
-**เพิ่ม**
-
-- `/lean-model-update`: ค้นว่าแต่ละ provider มี model อะไร ตกลงแผน eval และเพดาน token กับผู้ใช้ รัน eval ให้ reviewer อิสระตรวจผล แล้วเขียน `.lean/models.json` เฉพาะข้อเสนอที่ผู้ใช้อนุมัติ skill นี้ไม่แก้ settings สิทธิ์ของ provider เอง สำหรับ agy จะให้คำสั่ง allow rule ให้ผู้ใช้เพิ่มเอง
-- `lean models eval --plan FILE --budget TOKENS [--estimate N] [--out DIR]`: รัน candidate แต่ละตัว (provider, model, effort) กับชุดงานในสำเนา Git ที่ทิ้งได้นอก repository ด้วย command แบบเดียวกับ `models.json` บวก flag เฉพาะ eval (Claude รัน `python3 -m unittest` ได้) และลบ API key ที่คิดเงินออก ให้คะแนนด้วย hidden test ราย subtest แต่ละ run จองค่าที่มากกว่าระหว่างจำนวน token สูงสุดที่เคยเห็นกับ `--estimate` (ค่าเริ่มต้น 250000) เริ่มได้เฉพาะเมื่อยอดที่ใช้บวกยอดจองยังไม่เกินงบ ไม่อย่างนั้นจะรอ run ที่กำลังทำงานอยู่ จึงเกินงบได้เฉพาะ run ที่ใช้มากกว่ายอดจอง ส่วน CLI ที่เริ่มไม่ได้จะไม่ถูกคิด token และรันใหม่ได้ จำนวนที่ไม่รู้คิดเท่ายอดจองของ run นั้นพอดี และ run ที่ error ไม่ว่าขั้นไหนจะถูกบันทึกและคืนยอดจอง นับ token แบบเดียวกันทุก provider (input + cache write + output แยก cache read; Codex รายงานยอดเดียว) ถ้าไม่รู้จำนวนจะคิดเหมือนยอดจอง เขียน `results.jsonl` (รันซ้ำแล้วทำต่อจากเดิม), `summary.md`, `proposal.json` (เลือก candidate ที่เร็วที่สุดที่ได้คะแนนเต็มต่อ provider และ size) และ `logs/` ดิบ การถูกปฏิเสธสิทธิ์รายงานเป็นหมายเหตุ
-- `lean models apply --proposal FILE --sha256 DIGEST`: เขียนเฉพาะ size ที่เสนอ ปฏิเสธข้อเสนอที่เปลี่ยนไปหลังแสดง digest และตรวจความถูกต้องของ list
-- `lean models bank` และชุดงานใน `.lean/evals/` (workflow เป็นเจ้าของ ส่งไปกับทุกการติดตั้ง): size ละหนึ่งงาน ตั้งแต่แก้บั๊กบรรทัดเดียว (3S) ถึง cache แบบ single-flight ที่ปลอดภัยต่อ thread (3XL) แต่ละงานมีเฉลยที่ได้คะแนนเต็มและ stub ที่ไม่ได้เต็ม
-
-**เมื่ออัปเกรด:** `python3 .lean/bin/lean update preview` ตรวจแผนแล้ว `update apply` โดย `.lean/evals/` มากับ release gate controls ที่เปลี่ยน (`.lean/lean/evals.py`, `models.py`, `cli.py`, `structure.py`) ต้องมี HIGH review ที่ครอบคลุม หรือ `lean gate accept-controls` ไม่ต้องย้าย configuration หรือข้อมูล
-
-</details>
+Upgrade: `lean update preview`, then `lean update apply`; no data migration. Changed gate files need a reviewer or `lean gate accept-controls`.
 
 ## 5.1.0 — 2026-10-27
 
-**Token highlight:** - · **Compared with:** -
+🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#510--2026-10-27)
 
-Eight spawn sizes instead of four. No token or speed saving is claimed for the workflow itself; the size mapping follows the [2026-10-27 model eval](../docs/benchmarks/2026-10-27-models/README.md).
+เลือกขนาด agent ได้ละเอียดขึ้น จาก 4 เป็น 8 ขนาด
 
-**Added**
+**มีอะไรใหม่**
+- ขนาด `3S` และ `2S` ถูกกว่า `S` สำหรับงานหาตำแหน่งหรืองานเล็กที่สเปกชัด
+- ขนาด `2XL` และ `3XL` สำหรับงานที่ `XL` ทำไม่ได้
+- `models.json` ที่มากับรุ่นนี้จับคู่ครบทั้ง 8 ขนาด จากผลทดสอบ model วันที่ 2026-10-27
 
-- Sizes `3S`, `2S`, `S`, `M`, `L`, `XL`, `2XL`, `3XL`, smallest first: two cheaper sizes for locating and small mechanical work, two stronger ones for work `XL` could not do. `lean models`, `lean models check [--live]` and `lean spawn plan` know all eight.
-- The shipped `.lean/models.json` (checked 2026-10-27) maps them per provider. Claude: Haiku low/medium, Sonnet low/medium, Opus high/xhigh, Fable high/max. Codex: `gpt-6-luna` low, `gpt-6.1-terra` low/medium, `gpt-6.1-sol` medium/high, `gpt-6-astra` high/xhigh/max. agy: Gemini 3.8 Flash low/medium/high, Gemini 4 Argon low/medium/high (high for `XL` to `3XL`). Codex `ultra` effort is not used.
+**มีอะไรเปลี่ยน**
+- `S` ตอนนี้ใช้ Claude Sonnet low, Codex `gpt-6.1-terra` medium และ agy Flash high
+- Claude `XL` เปลี่ยนจาก Fable เป็น Opus xhigh (Fable ย้ายไป `2XL`/`3XL`) และ agy `M` เปลี่ยนเป็น Argon low
 
-**Changed**
+**ต้องทำอะไรตอนอัปเกรด**
+- `models.json` แบบ 4 ขนาดของโปรเจกต์ยังใช้ได้ งานที่ระบุขนาดที่ไม่มีใน list จะถูกปฏิเสธพร้อมข้อความ (ระบุ `--model` เองยังรันได้) ถ้าอยากใช้ขนาดใหม่ ให้ก๊อป `tiers` จาก release แล้วรัน `lean models check --live`
+- ไฟล์ที่ gate ใช้ตรวจงานเปลี่ยน: ให้ reviewer ตรวจ หรือยืนยันเองด้วย `lean gate accept-controls`
 
-- Changed mappings in the shipped list (old → new): Claude `S` Haiku low → Sonnet low, `XL` Fable high → Opus xhigh (Fable is now `2XL`/`3XL`); Codex `S` `gpt-6-luna` low → `gpt-6.1-terra` medium (Luna is now `3S`); agy `S` Flash low → Flash high, `M` Flash high → Argon low. Every other `S`/`M`/`L`/`XL` mapping is unchanged. The old `S` is closest to the new `3S`; the old Claude `XL` is the new `2XL`.
+**English**
 
-**Upgrade:** `S`, `M`, `L` and `XL` stay required and the new sizes are optional, so a project's 5.0 `models.json` keeps working; a task sized with a size the project does not define is refused with a message (an explicit `--model` still runs). To use the new sizes, copy the `tiers` you want from the release's `.lean/models.json` and run `lean models check --live`. The changed gate controls (`.lean/lean/models.py`, `spawn.py`) need a covering HIGH review or `lean gate accept-controls`.
+Choose agent sizes more finely: eight instead of four.
 
-<details>
-<summary>ภาษาไทย</summary>
+- `3S` and `2S` are cheaper than `S` for locating code and small, clear tasks.
+- `2XL` and `3XL` are for work `XL` could not do.
+- The shipped `models.json` maps all eight sizes from the 2026-10-27 model tests.
+- Changed: `S` now uses Claude Sonnet low, Codex `gpt-6.1-terra` medium and agy Flash high; Claude `XL` moved from Fable to Opus xhigh (Fable is now `2XL`/`3XL`); agy `M` is Argon low.
 
-**ผลด้าน token:** - · **เทียบกับรุ่น:** -
-
-ขนาดของ agent ที่ spawn เพิ่มจากสี่เป็นแปด ไม่ได้อ้างว่า workflow ประหยัด token หรือเร็วขึ้น การจับคู่ขนาดกับ model อ้างอิง[ผลประเมิน model วันที่ 2026-10-27](../docs/benchmarks/2026-10-27-models/README.md)
-
-**เพิ่ม**
-
-- ขนาด `3S`, `2S`, `S`, `M`, `L`, `XL`, `2XL`, `3XL` เรียงจากเล็กไปใหญ่ เพิ่มสองขนาดที่ถูกกว่าสำหรับงานหาตำแหน่งและงานกลไกเล็กๆ และสองขนาดที่แรงกว่าสำหรับงานที่ `XL` ทำไม่ได้ `lean models`, `lean models check [--live]` และ `lean spawn plan` รู้จักครบทั้งแปด
-- `.lean/models.json` ที่มากับ release (ตรวจ 2026-10-27) จับคู่ขนาดกับ model ของแต่ละ provider: Claude ใช้ Haiku low/medium, Sonnet low/medium, Opus high/xhigh, Fable high/max; Codex ใช้ `gpt-6-luna` low, `gpt-6.1-terra` low/medium, `gpt-6.1-sol` medium/high, `gpt-6-astra` high/xhigh/max; agy ใช้ Gemini 3.8 Flash low/medium/high และ Gemini 4 Argon low/medium/high (high สำหรับ `XL` ถึง `3XL`) ไม่ใช้ effort `ultra` ของ Codex
-
-**เปลี่ยน**
-
-- การจับคู่ที่เปลี่ยนใน list ที่มากับ release (เดิม → ใหม่): Claude `S` Haiku low → Sonnet low, `XL` Fable high → Opus xhigh (Fable ย้ายไป `2XL`/`3XL`); Codex `S` `gpt-6-luna` low → `gpt-6.1-terra` medium (Luna ย้ายไป `3S`); agy `S` Flash low → Flash high, `M` Flash high → Argon low ส่วน `S`/`M`/`L`/`XL` ที่เหลือไม่เปลี่ยน `S` แบบเดิมใกล้กับ `3S` ใหม่ และ Claude `XL` แบบเดิมคือ `2XL` ใหม่
-
-**เมื่ออัปเกรด:** `S`, `M`, `L` และ `XL` ยังต้องมีทุก provider ส่วนขนาดใหม่ไม่บังคับ `models.json` ของโปรเจกต์ที่เขียนสำหรับ 5.0 จึงใช้ได้ต่อ งานที่ระบุขนาดที่โปรเจกต์ไม่ได้กำหนดจะถูกปฏิเสธพร้อมข้อความ (ถ้าระบุ `--model` เองยังรันได้) ถ้าจะใช้ขนาดใหม่ ให้ก๊อป `tiers` ที่ต้องการจาก `.lean/models.json` ของ release แล้วรัน `lean models check --live` gate controls ที่เปลี่ยน (`.lean/lean/models.py`, `spawn.py`) ต้องมี HIGH review ที่ครอบคลุม หรือ `lean gate accept-controls`
-
-</details>
+Upgrade: a project's four-size `models.json` keeps working; a task sized with a size it does not define is refused with a message (an explicit `--model` still runs). To use the new sizes, copy the `tiers` from the release and run `lean models check --live`. Changed gate files need a reviewer or `lean gate accept-controls`.
 
 ## 5.0.2 — 2026-10-27
 
-**Token highlight:** - · **Compared with:** -
+🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#502--2026-10-27)
 
-Follow-ups from the 5.0.1 release work. No token or speed saving is claimed.
-
-**Fixed**
-
-- In Claude, `lean contract declare` exits 2 with "NOT bound" when no session holds the contract it was given, as when the contract comes through a shell variable or after another command and the guard's hook does not bind it. It used to print the contract as if bound while the session kept its earlier one. Other runtimes (Codex without trust, agy) still only validate, and `lean spawn run` no longer passes Claude's `CLAUDECODE` marker to its workers.
-- `lean lint` reports a routed document that is not UTF-8 text instead of stopping with a Python error.
-- `lean update preview` reads a symlinked routed document the way lint does when the link resolves inside the project, and never one that points outside it; it notes a routed document that is not UTF-8 text, which lint reports.
-- A busy-gate Stop is counted per session, so another session's fresh Stop no longer restarts this session's count; counters older than a day are removed.
-- REVIEW.md: request the HIGH review before committing changed gate controls; a receipt cannot accept a control change committed before the review began.
-
-**Upgrade:** `python3 .lean/bin/lean update preview`, review the plan, then `update apply`. The changed gate controls (`.lean/lean/gate.py`, `guard.py`, `cli.py`, `spawn.py`, `structure.py`, `update.py`) need a covering HIGH review or `lean gate accept-controls`. No configuration or data migration.
-
-<details>
-<summary>ภาษาไทย</summary>
-
-**ผลด้าน token:** - · **เทียบกับรุ่น:** -
-
-งานต่อเนื่องจากการออก 5.0.1 ไม่ได้อ้างว่าประหยัด token หรือเร็วขึ้น
+ปิดจุดที่ทำให้ agent เข้าใจผิดว่า contract ผูกแล้ว และแก้เรื่องเล็กที่เจอตอนออก 5.0.1
 
 **แก้ไข**
+- ใน Claude ถ้า `lean contract declare` ไม่ได้ผูก contract จริง (เช่นส่งผ่านตัวแปร shell) จะแจ้งว่า "NOT bound" แทนการทำเหมือนสำเร็จ
+- `lean lint` ไม่ล่มเมื่อเจอเอกสารที่ไม่ใช่ข้อความ UTF-8
+- `lean update preview` อ่านเอกสารที่เป็น symlink ได้เหมือน lint แต่ไม่อ่านไฟล์นอกโปรเจกต์
+- Stop ที่เจอ gate ไม่ว่างนับแยกตาม session
 
-- ใน Claude คำสั่ง `lean contract declare` จบด้วย exit 2 และข้อความ "NOT bound" เมื่อไม่มี session ใดถือ contract ที่ส่งมา เช่น ส่งผ่าน shell variable หรือมีคำสั่งอื่นนำหน้า ซึ่ง hook ของ guard ไม่ผูกให้ ก่อนหน้านี้คำสั่งพิมพ์ contract เหมือนผูกแล้ว ทั้งที่ session ยังใช้ contract เดิม runtime อื่น (Codex ที่ยังไม่ trust, agy) ยังตรวจรูปแบบอย่างเดียวเหมือนเดิม และ `lean spawn run` ไม่ส่งตัวแปร `CLAUDECODE` ของ Claude ต่อให้ worker อีก
-- `lean lint` รายงานเอกสาร routed ที่ไม่ใช่ข้อความ UTF-8 แทนการหยุดด้วย Python error
-- `lean update preview` อ่านเอกสาร routed ที่เป็น symlink แบบเดียวกับ lint เมื่อ link ชี้อยู่ในโปรเจกต์ และไม่อ่าน link ที่ชี้ออกนอกโปรเจกต์ และแจ้งเอกสาร routed ที่ไม่ใช่ข้อความ UTF-8 ซึ่ง lint จะรายงาน
-- Stop ที่เจอ gate busy นับแยกตาม session แล้ว Stop ใหม่ของ session อื่นจึงไม่ทำให้ตัวนับของ session นี้เริ่มใหม่ และลบตัวนับที่เก่ากว่าหนึ่งวัน
-- REVIEW.md: ให้ขอ HIGH review ก่อน commit การเปลี่ยน gate controls เพราะ receipt ยอมรับการเปลี่ยน controls ที่ commit ไปก่อนเริ่ม review ไม่ได้
+**ต้องทำอะไรตอนอัปเกรด**
+- `lean update preview` แล้ว `lean update apply` ไม่ต้องย้ายข้อมูล
+- ไฟล์ที่ gate ใช้ตรวจงานเปลี่ยน: ให้ reviewer ตรวจ หรือยืนยันเองด้วย `lean gate accept-controls`
 
-**เมื่ออัปเกรด:** `python3 .lean/bin/lean update preview` ตรวจแผนแล้ว `update apply` gate controls ที่เปลี่ยน (`.lean/lean/gate.py`, `guard.py`, `cli.py`, `spawn.py`, `structure.py`, `update.py`) ต้องมี HIGH review ที่ครอบคลุม หรือ `lean gate accept-controls` ไม่ต้องย้าย configuration หรือข้อมูล
+**English**
 
-</details>
+Stop agents from believing a contract was bound when it was not, plus small fixes found while releasing 5.0.1.
+
+- In Claude, `lean contract declare` reports "NOT bound" when the contract was not really bound (for example passed through a shell variable).
+- `lean lint` no longer crashes on a document that is not UTF-8 text.
+- `lean update preview` reads symlinked documents like lint does, but never files outside the project.
+- Busy-gate Stops are counted per session.
+
+Upgrade: `lean update preview`, then `lean update apply`; no data migration. Changed gate files need a reviewer or `lean gate accept-controls`.
 
 ## 5.0.1 — 2026-10-27
 
-**Token highlight:** - · **Compared with:** -
+🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#501--2026-10-27)
 
-Fixes found upgrading a real 4.16 project to 5.0.0, and the Low findings from the 5.0.0 reviews. No token or speed saving is claimed.
-
-**Fixed**
-
-- Lean's own tests pass in an installation whose PROJECT.md names its own `.lean/` files (such as `.lean/LOCAL-EXTENSIONS.md`): the release copy the tests build now brings the project files those documents name. A routing test no longer assumes PROJECT.md ends inside its Documentation routes section. Before, `unit/test_structure.py` failed 4 tests there.
-- `lean update preview` names what `lean lint` would reject after the update: a project's own file inside a workflow-owned folder (kept, never deleted) and 4.x paths in the documents PROJECT.md routes to (such as README.md).
-- A Codex Stop with a symlinked `.agent-runtime` blocks a fresh Stop and releases continued Stops UNVERIFIED instead of blocking them without end.
-- `lean test` takes a tier name (`lean test e2e`) and repository paths (`.lean/tests/hooks/test_gate.py`) as well as `hooks/test_gate.py`, and names an unknown file instead of a Python error.
-- A review-pending marker releases control drift only when the contract it was matched with is the session's HIGH-depth contract; a Stop run by hand with another `--contract` still blocks.
-
-**Upgrade:** `python3 .lean/bin/lean update preview`, review the plan, then `update apply`. The changed gate controls (`.lean/lean/gate.py`, `hooks.py`) need a covering HIGH review or `lean gate accept-controls`. No configuration or data migration.
-
-<details>
-<summary>ภาษาไทย</summary>
-
-**ผลด้าน token:** - · **เทียบกับรุ่น:** -
-
-แก้ปัญหาที่เจอตอนอัปเกรดโปรเจกต์จริงจาก 4.16 เป็น 5.0.0 และ Low findings จาก review ของ 5.0.0 ไม่ได้อ้างว่าประหยัด token หรือเร็วขึ้น
+แก้ปัญหาที่เจอตอนอัปเกรดโปรเจกต์จริงจาก 4.16 เป็น 5.0
 
 **แก้ไข**
+- test ของ Lean ผ่านในโปรเจกต์ที่ PROJECT.md อ้างไฟล์ `.lean/` ของตัวเอง
+- `lean update preview` บอกล่วงหน้าว่าไฟล์ไหนที่ lint จะไม่ยอมรับหลังอัปเกรด
+- Codex ไม่ block ไม่สิ้นสุดเมื่อ `.agent-runtime` เป็น symlink
+- `lean test` รับชื่อ tier (`lean test e2e`) และ path แบบเต็มได้
 
-- test ของ Lean ผ่านในโปรเจกต์ที่ PROJECT.md อ้างไฟล์ `.lean/` ของตัวเอง (เช่น `.lean/LOCAL-EXTENSIONS.md`) เพราะชุดไฟล์ที่ test สร้างจะก๊อปไฟล์ของโปรเจกต์ที่เอกสารอ้างถึงมาด้วย และ test เรื่อง routing ไม่สันนิษฐานว่า PROJECT.md จบในหัวข้อ Documentation routes อีก ก่อนหน้านี้ `unit/test_structure.py` fail 4 test
-- `lean update preview` บอกสิ่งที่ `lean lint` จะปฏิเสธหลังอัปเกรด: ไฟล์ของโปรเจกต์ในโฟลเดอร์ที่ workflow เป็นเจ้าของ (เก็บไว้ ไม่ลบ) และ path ของ 4.x ในเอกสารที่ PROJECT.md ชี้ไป (เช่น README.md)
-- Stop ของ Codex ที่ `.agent-runtime` เป็น symlink จะ block ครั้งแรก แล้วปล่อย Stop ต่อเนื่องแบบ UNVERIFIED แทนการ block ไม่สิ้นสุด
-- `lean test` รับชื่อ tier (`lean test e2e`) และ path จาก root ของ repo (`.lean/tests/hooks/test_gate.py`) นอกจาก `hooks/test_gate.py` และบอกชื่อไฟล์ที่ไม่มีแทน Python error
-- marker ของ review-pending จะปล่อย control drift เฉพาะเมื่อ contract ที่ใช้จับคู่คือ contract ระดับ HIGH ของ session เอง Stop ที่รันเองด้วย `--contract` อื่นยังถูก block
+**ต้องทำอะไรตอนอัปเกรด**
+- `lean update preview` แล้ว `lean update apply` ไม่ต้องย้ายข้อมูล
+- ไฟล์ที่ gate ใช้ตรวจงานเปลี่ยน: ให้ reviewer ตรวจ หรือยืนยันเองด้วย `lean gate accept-controls`
 
-**เมื่ออัปเกรด:** `python3 .lean/bin/lean update preview` ตรวจแผนแล้ว `update apply` gate controls ที่เปลี่ยน (`.lean/lean/gate.py`, `hooks.py`) ต้องมี HIGH review ที่ครอบคลุม หรือ `lean gate accept-controls` ไม่ต้องย้าย configuration หรือข้อมูล
+**English**
 
-</details>
+Fixes found while upgrading a real project from 4.16 to 5.0.
+
+- Lean's own tests pass in projects whose PROJECT.md names their own `.lean/` files.
+- `lean update preview` warns in advance about files lint will reject after the upgrade.
+- Codex no longer blocks without end when `.agent-runtime` is a symlink.
+- `lean test` accepts a tier name (`lean test e2e`) and full paths.
+
+Upgrade: `lean update preview`, then `lean update apply`; no data migration. Changed gate files need a reviewer or `lean gate accept-controls`.
 
 ## 5.0.0 — 2026-10-27
 
-**Token highlight:** fixed-task inventory 11,146 → 9,962 (-10.6%), startup 2,213 → 2,209 (-0.2%), o200k_base ([measurement](../docs/benchmarks/2026-10-27/README.md)) · **Compared with:** 4.17.1
+🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#500--2026-10-27)
 
-Rebuild the workflow around one `lean` command line. Every rule, hook and check from 4.17.0 that the core keeps carries over with its tests; the layout, commands and spawning defaults change, so this is a major release.
+Lean สร้างใหม่รอบคำสั่งเดียว `lean` เร็วขึ้น อ่านไฟล์น้อยลง และส่งงานให้ agent ตัวอื่นได้
 
-- **One command.** `python3 .lean/bin/lean` replaces every script in `.lean/scripts/`, the Claude hook scripts and the Codex adapter. Code lives in `.lean/lean/`, one module per command group (`guard`, `gate`, `evidence`, `hooks`, `records`, `progress`, `models`, `spawn`, `testsel`, `structure`, `update`). Provider hooks call `lean hook claude|codex <event>`. The bash gate runner is now Python; ShellCheck is no longer needed.
-- **Progress bars.** `lean progress set <phase>` drives a solid/shade bar (`████████░░░░░░░░░░░░ 40%`) by lean-task phase, refined by counts inside a phase. One state file feeds the agent's replies, `lean status`, `lean watch`, `lean test`, `lean gate run`, `lean spawn run` (one bar per agent), the Claude status line and Codex's Stop message. Codex and agy have no custom in-window status line; they use `lean watch` in a second pane.
-- **Tests by impact.** Tests sit in `.lean/tests/unit`, `hooks` and `e2e`; `.lean/tests/impact.json` maps paths to them. `lean test --changed` runs only what the change can affect, documentation-only changes run lint only, and an unmapped path runs everything. The gate runs the selection; CI runs `lean test --all` on every push and pull request.
-- **Model list and spawning.** `.lean/models.json` maps sizes S/M/L/XL to models for Claude, Codex and agy; `lean models check --live` verifies them against the provider CLIs. By default at most `max_agents` (1) sized agent runs at a time, only when cheaper than finishing in the session. `/lean-agents` spawns one agent per parallel task; `/lean-agents <model> xN` runs up to N at once on that model. `lean spawn plan` computes waves with exclusive file ownership; `lean spawn run` starts headless `claude -p`, `codex exec` or `agy -p` processes in separate worktrees, removing metered API keys so they use the subscription login.
-- **Activity log.** Phase changes, gate runs, test runs, spawned agents, contract bindings and review receipts are timed in `.agent-runtime/activity.jsonl`; `lean log` shows the timeline or a per-phase summary and `--export` keeps a copy in the repository.
-- **agy support.** Antigravity CLI is a third provider for spawning, review and the gate (run explicitly; agy has no hooks).
-- **Smaller core.** Eleven skills remain: init, task, scope, research, grill, agents, review, gate, effort, update and target. The optional skills audit, catalog, compress, pattern, playbook, prune and takeover are removed with their tools, along with the optional skill pack and queue cleanup (`clean-queue`). Archived queue history stays readable. Application targets (`lean target use|context|clear|gate`, records in `.lean/targets/<name>/`) carry over unchanged in behavior. The shared "skill level" text moved into `policy/SKILL-EFFORT.md`.
-- **Update with migration.** `lean update preview|apply|rollback` replaces the takeover-based updater: an external pinned clone, a reviewed plan, snapshots, a journal and rollback, with 4.x migration of hooks, gate block, gate mode and skill links.
-- **Quiet Stops while a review runs.** `lean gate review-pending --contract ... --session ...` marks an independent review as running; that session's Stops whose only refusal is the missing receipt for the same contract and shipping state are released UNVERIFIED (never passed) for up to two hours, instead of being refused again. Under a HIGH-depth contract, changed gate controls waiting for that review are released the same way, with checks NOT_RUN. Any change, another contract, a recorded receipt or any other refusal ends it. Only the command writes the marker.
-- **Trusted spawn runs.** `lean spawn run --trust-agents` adds each provider's `trusted_args` from `models.json` (agy `--dangerously-skip-permissions`, Claude `--permission-mode bypassPermissions`), so headless agents can run their task's commands; it warns and is never the default.
-- **Faster hooks and commands.** Measured against 4.17.1 on one machine with a trivial gate: a Stop takes 125 ms instead of 730 ms and starts 6 `git` processes instead of 11, SessionStart 128 ms instead of 627 ms, and plain commands are within 6 ms of 4.17.1's scripts (53–55 ms). The CLI keeps compiled bytecode in a private per-user cache (`~/.cache/lean-workflow/pycache`, or under `$XDG_CACHE_HOME`; used only when the path is absolute and every directory from the cache base down is the user's own and not writable by others, never in the checkout; delete it to clear it), the status line reads the gate's markers without loading the gate, and AGENTS.md is shorter with every rule kept. Data: [docs/benchmarks/2026-10-27](../docs/benchmarks/2026-10-27/README.md).
-- `lean test` names failing test files in its summary line.
-- A Claude Stop that finds the gate lock held by another run is blocked at most three times, then released UNVERIFIED, as in 4.17.1; it records no pass. The lock is an `flock` the kernel drops with its holder, so v5 needs no guardian process or `ps`. Checks inherit it, so unlike 4.17.1 a process a check leaves running in the background keeps the checkout locked until that process exits. A busy counter or refusal marker that cannot be written no longer blocks continued Stops without end.
-- Gate mode moves from `.codex/quality-gate.json` to `.lean/gate.json` (`lean gate mode`). Gate runtime markers move from `.claude/.gate-cache`/`.gate-failed` to `.agent-runtime/`.
+**มีอะไรใหม่**
+- คำสั่งเดียว `python3 .lean/bin/lean` แทนสคริปต์ทั้งหมดใน `.lean/scripts/`
+- แถบความคืบหน้า (`████████░░░░░░░░░░░░ 40%`) ในคำตอบ, status line และ `lean watch`
+- `lean test --changed` รันเฉพาะ test ที่งานนั้นกระทบ
+- ส่งงานให้ agent ตามขนาดงานจากรายชื่อ model ของ Claude, Codex และ agy (`/lean-agents`)
+- `lean update` อัปเกรดแบบดูแผนก่อน มี snapshot และ rollback
 
-**Upgrade:** this release changes paths and commands; follow [migrating to v5](../docs/migrating-to-v5.md). A 4.x installation has no `lean` command, so run the preview from the pinned 5.0.0 release: `python3 <release>/.lean/bin/lean update preview --target <project>`, review the plan, then `update apply`. Approve the changed gate controls through a covering HIGH review or `lean gate accept-controls`. Project records, PROJECT facts, config and trackers are kept.
+**ดีขึ้นแค่ไหน** (เทียบกับ 4.17.1 บนเครื่องทดสอบหนึ่งเครื่อง)
+- Stop เร็วขึ้นจาก 730 เป็น 125 ms และ SessionStart จาก 627 เป็น 128 ms
+- ไฟล์ที่อ่านต่องานลดลง 10.6% (11,146 → 9,962 token)
+- skill เหลือ 11 ตัว ส่วน audit, catalog, compress, pattern, playbook, prune และ takeover ถูกถอดออก
 
-<details>
-<summary>ภาษาไทย</summary>
+**ต้องทำอะไรตอนอัปเกรด**
+- รุ่นนี้เปลี่ยน path และคำสั่ง ให้ทำตาม [migrating to v5](../docs/migrating-to-v5.md)
+- การติดตั้ง 4.x ยังไม่มีคำสั่ง `lean` จึงต้องรัน `lean update preview` จาก release 5.0.0 แล้วค่อย `update apply`
+- records, ข้อมูลใน PROJECT, config และ tracker ของโปรเจกต์อยู่ครบ ส่วนการตั้งค่า gate mode ย้ายไปอยู่ที่ `.lean/gate.json`
+- ไฟล์ที่ gate ใช้ตรวจงานเปลี่ยน: ให้ reviewer ตรวจ หรือยืนยันเองด้วย `lean gate accept-controls`
 
-**ผลด้าน token:** ชุดไฟล์ fixed-task 11,146 → 9,962 (-10.6%), startup 2,213 → 2,209 (-0.2%), o200k_base ([ผลวัด](../docs/benchmarks/2026-10-27/README.md)) · **เทียบกับรุ่น:** 4.17.1
+**English**
 
-สร้าง workflow ใหม่รอบคำสั่งเดียว `lean` กฎ hook และการตรวจของ 4.17.0 ที่แกนหลักเก็บไว้ยกมาพร้อม test ทั้งหมด แต่โครงสร้างไฟล์ คำสั่ง และค่าเริ่มต้นของการ spawn เปลี่ยน จึงเป็น major release
+Lean rebuilt around one `lean` command: faster, fewer files to read, and able to hand work to other agents.
 
-- **คำสั่งเดียว** `python3 .lean/bin/lean` แทนทุก script ใน `.lean/scripts/`, hook script ของ Claude และ adapter ของ Codex โค้ดอยู่ใน `.lean/lean/` แยก module ตามกลุ่มคำสั่ง hook ของ provider เรียก `lean hook claude|codex <event>` gate runner เปลี่ยนจาก bash เป็น Python จึงไม่ต้องใช้ ShellCheck แล้ว
-- **Progress bar** `lean progress set <phase>` แสดงแถบทึบ/จาง (`████████░░░░░░░░░░░░ 40%`) ตาม phase ของ lean-task และละเอียดขึ้นด้วยจำนวนงานใน phase ไฟล์ state เดียวแสดงได้ทุกที่: คำตอบของ agent, `lean status`, `lean watch`, `lean test`, `lean gate run`, `lean spawn run` (แถบละหนึ่ง agent), status line ของ Claude และข้อความ Stop ของ Codex ส่วน Codex และ agy ไม่มี status line ที่กำหนดเองได้ ให้ใช้ `lean watch` ในอีก pane
-- **Test ตามผลกระทบ** test แบ่งเป็น `unit`, `hooks`, `e2e` และ `.lean/tests/impact.json` จับคู่ path กับ test `lean test --changed` รันเฉพาะที่งานกระทบ แก้แต่เอกสารรันแค่ lint ส่วน path ที่ไม่มีกฎรองรับจะรันทั้งหมด gate ใช้การเลือกนี้ ส่วน CI รัน `lean test --all` ทุก push และ pull request
-- **Model list และการ spawn** `.lean/models.json` กำหนดขนาด S/M/L/XL เป็น model ของ Claude, Codex และ agy และ `lean models check --live` ตรวจกับ CLI ของ provider ค่าเริ่มต้น spawn ได้ไม่เกิน `max_agents` (1) ตัวต่อครั้งตามขนาดงาน และเฉพาะเมื่อคุ้มกว่าทำใน session `/lean-agents` แตกหนึ่ง agent ต่องานที่ขนานได้ และ `/lean-agents <model> xN` รันพร้อมกันได้สูงสุด N ตัวด้วย model นั้น `lean spawn plan` คำนวณ wave โดยไม่ให้ไฟล์ชนกัน และ `lean spawn run` เปิด `claude -p`, `codex exec` หรือ `agy -p` ใน worktree แยก โดยตัด API key แบบคิดเงินออกเพื่อใช้ login ของ subscription
-- **Activity log** บันทึกเวลาของการเปลี่ยน phase, การรัน gate และ test, agent ที่ spawn, การผูก contract และ review receipt ลง `.agent-runtime/activity.jsonl` ดูได้ด้วย `lean log` (timeline) หรือ `lean log --summary` (เวลาต่อ phase) และ `--export` เก็บสำเนาลง repo
-- **รองรับ agy** Antigravity CLI เป็น provider ที่สามสำหรับ spawn, review และ gate (รัน gate เองเพราะ agy ไม่มี hook)
-- **แกนเล็กลง** เหลือ 11 skill: init, task, scope, research, grill, agents, review, gate, effort, update และ target ตัด skill เสริม audit, catalog, compress, pattern, playbook, prune, takeover พร้อมเครื่องมือ, optional skill pack และการล้าง queue (`clean-queue`) ประวัติ queue ที่ archive ไว้ยังอ่านได้ ส่วน application target (`lean target use|context|clear|gate` และ records ใน `.lean/targets/<name>/`) ยังทำงานเหมือนเดิม ข้อความ "skill level" ที่ซ้ำกันย้ายไปไว้ใน `policy/SKILL-EFFORT.md`
-- **อัปเดตพร้อม migration** `lean update preview|apply|rollback` แทน updater ที่อิง takeover: clone แบบ pin ไว้นอก repo, แผนที่ review ได้, snapshot, journal และ rollback พร้อมย้าย hook, gate block, gate mode และ skill link ของ 4.x
-- **Stop เงียบระหว่างรอ review** `lean gate review-pending --contract ... --session ...` บันทึกว่า independent review กำลังทำงาน Stop ของ session นั้นที่ถูกปฏิเสธเพียงเพราะยังไม่มี receipt ของ contract และ shipping state เดียวกัน จะถูกปล่อยแบบ UNVERIFIED (ไม่นับเป็นผ่าน) ได้นานสุดสองชั่วโมงแทนการปฏิเสธซ้ำ ภายใต้ contract ระดับ HIGH การเปลี่ยน gate controls ที่รอ review นั้นอยู่จะถูกปล่อยแบบเดียวกัน (checks NOT_RUN) การเปลี่ยนแปลงใดๆ, contract อื่น, receipt ที่บันทึกแล้ว หรือเหตุปฏิเสธอื่นจะยุติทันที และมีเพียงคำสั่งนี้ที่เขียน marker ได้
-- **Spawn แบบ trusted** `lean spawn run --trust-agents` เติม `trusted_args` ของแต่ละ provider จาก `models.json` (agy `--dangerously-skip-permissions`, Claude `--permission-mode bypassPermissions`) เพื่อให้ agent แบบ headless รันคำสั่งของงานได้ มีคำเตือนและไม่ใช่ค่าเริ่มต้น
-- **Hook และคำสั่งเร็วขึ้น** วัดเทียบกับ 4.17.1 บนเครื่องเดียวด้วย gate ว่าง: Stop ใช้ 125 ms แทน 730 ms และเรียก `git` 6 ครั้งแทน 11, SessionStart 128 ms แทน 627 ms และคำสั่งทั่วไปช้ากว่า script ของ 4.17.1 ไม่เกิน 6 ms (53–55 ms) CLI เก็บ bytecode ไว้ใน cache ส่วนตัวของผู้ใช้ (`~/.cache/lean-workflow/pycache` หรือใต้ `$XDG_CACHE_HOME` ใช้เฉพาะเมื่อ path เป็น absolute และทุก directory ตั้งแต่ฐานของ cache ลงไปเป็นของผู้ใช้และคนอื่นเขียนไม่ได้ ไม่เขียนลง checkout ลบทิ้งได้เพื่อล้าง cache) status line อ่าน marker ของ gate โดยไม่โหลด gate และ AGENTS.md สั้นลงโดยยังมีครบทุก rule ข้อมูล: [docs/benchmarks/2026-10-27](../docs/benchmarks/2026-10-27/README.md)
-- `lean test` บอกชื่อไฟล์ test ที่ fail ในบรรทัดสรุป
-- Stop ของ Claude ที่เจอ gate lock ถูก run อื่นถืออยู่ จะถูก block ไม่เกินสามครั้งแล้วปล่อยแบบ UNVERIFIED เหมือน 4.17.1 โดยไม่บันทึกว่าผ่าน lock เป็น `flock` ที่ kernel ปล่อยพร้อม process ที่ถือ จึงไม่ต้องมี guardian หรือ `ps` แต่ check ได้รับ lock ต่อไปด้วย ต่างจาก 4.17.1 process ที่ check ทิ้งไว้ทำงานเบื้องหลังจะถือ lock ไว้จนกว่า process นั้นจบ และ busy counter หรือ refusal marker ที่เขียนไม่ได้จะไม่ทำให้ Stop ต่อเนื่องถูก block ไม่สิ้นสุดอีก
-- gate mode ย้ายจาก `.codex/quality-gate.json` ไป `.lean/gate.json` (`lean gate mode`) และ marker ของ gate ย้ายจาก `.claude/.gate-cache`/`.gate-failed` ไป `.agent-runtime/`
+- One command, `python3 .lean/bin/lean`, replaces every script in `.lean/scripts/`.
+- Progress bars (`████████░░░░░░░░░░░░ 40%`) in replies, the status line and `lean watch`.
+- `lean test --changed` runs only the tests a change can affect.
+- Hand work to agents sized by task from a Claude, Codex and agy model list (`/lean-agents`).
+- `lean update` upgrades from a reviewed plan, with snapshots and rollback.
+- Against 4.17.1 on one test machine: Stop 730 → 125 ms, SessionStart 627 → 128 ms, fixed-task reading 11,146 → 9,962 tokens (-10.6%). Eleven skills remain; audit, catalog, compress, pattern, playbook, prune and takeover are removed.
 
-**เมื่ออัปเกรด:** รุ่นนี้เปลี่ยน path และคำสั่ง ให้ทำตาม [migrating to v5](../docs/migrating-to-v5.md) การติดตั้ง 4.x ยังไม่มีคำสั่ง `lean` จึงต้องรัน preview จาก release 5.0.0 ที่ pin ไว้: `python3 <release>/.lean/bin/lean update preview --target <project>` ตรวจแผนแล้วค่อย `update apply` อนุมัติ gate controls ที่เปลี่ยนผ่าน HIGH review ที่ครอบคลุม หรือ `lean gate accept-controls` โดย records, ข้อมูลใน PROJECT, config และ tracker ของโปรเจกต์ยังอยู่ครบ
+Upgrade: paths and commands change; follow [migrating to v5](../docs/migrating-to-v5.md). A 4.x install has no `lean` command, so run `lean update preview` from the 5.0.0 release, then `update apply`. Project records, PROJECT facts, config and trackers are kept; the gate mode setting moves to `.lean/gate.json`. Changed gate files need a reviewer or `lean gate accept-controls`.
 
-</details>
+Token highlights in 4.x entries come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19); they are not guaranteed savings.
 
 ## 4.17.1 — 2026-10-27
 

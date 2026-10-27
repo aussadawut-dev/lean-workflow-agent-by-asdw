@@ -1,0 +1,87 @@
+# Lean 5.x — technical changelog
+
+Developer and agent notes for each 5.x release: commands, flags, rules, changed gate controls and limits.
+The user-facing summary of each release is in [`.lean/CHANGELOG.md`](../.lean/CHANGELOG.md).
+
+## 5.2.0 — 2026-10-27
+
+
+Refresh the model list from evidence. No token or speed saving is claimed for the workflow itself.
+
+**Added**
+
+- `/lean-model-update`: research the models each provider offers, agree an eval plan and a token cap with the user, run the eval, have an independent reviewer check the results, and write `.lean/models.json` only for the proposal the user approved. It never edits provider permission settings; for agy it gives the user the allow rules to add.
+- `lean models eval --plan FILE --budget TOKENS [--estimate N] [--out DIR]`: runs each candidate (provider, model, effort) on the task bank in throwaway Git copies outside the repository, with the `models.json` command shapes, eval-only flags (Claude may run `python3 -m unittest`) and metered API keys removed, and scores hidden tests per subtest. Each run reserves the larger of the largest token count seen and `--estimate` (default 250000), starts only while spent plus reservations fit the budget and otherwise waits for running ones, so only a run that uses more than its reservation can go over; a CLI that never started costs nothing and is retried, an unknown count costs exactly its run's reservation, and a run that fails in any step is recorded and releases its reservation. Tokens follow one rule for every provider (input + cache writes + output, cache reads apart; Codex reports one total); an unknown count is charged like a reservation. Writes `results.jsonl` (a rerun resumes), `summary.md`, `proposal.json` (per provider and size, the fastest candidate with a full score) and raw `logs/`. Permission denials are reported as notes.
+- `lean models apply --proposal FILE --sha256 DIGEST`: writes only the proposed sizes, refuses a proposal that changed since its digest was shown, and validates the list.
+- `lean models bank` and the task bank in `.lean/evals/` (workflow-owned, shipped with every installation): one task per size, from a one-line bug fix (3S) to a single-flight thread-safe cache (3XL), each with a reference solution that scores full marks and a stub that does not.
+
+**Upgrade:** `python3 .lean/bin/lean update preview`, review the plan, then `update apply`; `.lean/evals/` arrives with the release. The changed gate controls (`.lean/lean/evals.py`, `models.py`, `cli.py`, `structure.py`) need a covering HIGH review or `lean gate accept-controls`. No configuration or data migration.
+
+## 5.1.0 — 2026-10-27
+
+
+Eight spawn sizes instead of four. No token or speed saving is claimed for the workflow itself; the size mapping follows the [2026-10-27 model eval](benchmarks/2026-10-27-models/README.md).
+
+**Added**
+
+- Sizes `3S`, `2S`, `S`, `M`, `L`, `XL`, `2XL`, `3XL`, smallest first: two cheaper sizes for locating and small mechanical work, two stronger ones for work `XL` could not do. `lean models`, `lean models check [--live]` and `lean spawn plan` know all eight.
+- The shipped `.lean/models.json` (checked 2026-10-27) maps them per provider. Claude: Haiku low/medium, Sonnet low/medium, Opus high/xhigh, Fable high/max. Codex: `gpt-6-luna` low, `gpt-6.1-terra` low/medium, `gpt-6.1-sol` medium/high, `gpt-6-astra` high/xhigh/max. agy: Gemini 3.8 Flash low/medium/high, Gemini 4 Argon low/medium/high (high for `XL` to `3XL`). Codex `ultra` effort is not used.
+
+**Changed**
+
+- Changed mappings in the shipped list (old → new): Claude `S` Haiku low → Sonnet low, `XL` Fable high → Opus xhigh (Fable is now `2XL`/`3XL`); Codex `S` `gpt-6-luna` low → `gpt-6.1-terra` medium (Luna is now `3S`); agy `S` Flash low → Flash high, `M` Flash high → Argon low. Every other `S`/`M`/`L`/`XL` mapping is unchanged. The old `S` is closest to the new `3S`; the old Claude `XL` is the new `2XL`.
+
+**Upgrade:** `S`, `M`, `L` and `XL` stay required and the new sizes are optional, so a project's 5.0 `models.json` keeps working; a task sized with a size the project does not define is refused with a message (an explicit `--model` still runs). To use the new sizes, copy the `tiers` you want from the release's `.lean/models.json` and run `lean models check --live`. The changed gate controls (`.lean/lean/models.py`, `spawn.py`) need a covering HIGH review or `lean gate accept-controls`.
+
+## 5.0.2 — 2026-10-27
+
+
+Follow-ups from the 5.0.1 release work. No token or speed saving is claimed.
+
+**Fixed**
+
+- In Claude, `lean contract declare` exits 2 with "NOT bound" when no session holds the contract it was given, as when the contract comes through a shell variable or after another command and the guard's hook does not bind it. It used to print the contract as if bound while the session kept its earlier one. Other runtimes (Codex without trust, agy) still only validate, and `lean spawn run` no longer passes Claude's `CLAUDECODE` marker to its workers.
+- `lean lint` reports a routed document that is not UTF-8 text instead of stopping with a Python error.
+- `lean update preview` reads a symlinked routed document the way lint does when the link resolves inside the project, and never one that points outside it; it notes a routed document that is not UTF-8 text, which lint reports.
+- A busy-gate Stop is counted per session, so another session's fresh Stop no longer restarts this session's count; counters older than a day are removed.
+- REVIEW.md: request the HIGH review before committing changed gate controls; a receipt cannot accept a control change committed before the review began.
+
+**Upgrade:** `python3 .lean/bin/lean update preview`, review the plan, then `update apply`. The changed gate controls (`.lean/lean/gate.py`, `guard.py`, `cli.py`, `spawn.py`, `structure.py`, `update.py`) need a covering HIGH review or `lean gate accept-controls`. No configuration or data migration.
+
+## 5.0.1 — 2026-10-27
+
+
+Fixes found upgrading a real 4.16 project to 5.0.0, and the Low findings from the 5.0.0 reviews. No token or speed saving is claimed.
+
+**Fixed**
+
+- Lean's own tests pass in an installation whose PROJECT.md names its own `.lean/` files (such as `.lean/LOCAL-EXTENSIONS.md`): the release copy the tests build now brings the project files those documents name. A routing test no longer assumes PROJECT.md ends inside its Documentation routes section. Before, `unit/test_structure.py` failed 4 tests there.
+- `lean update preview` names what `lean lint` would reject after the update: a project's own file inside a workflow-owned folder (kept, never deleted) and 4.x paths in the documents PROJECT.md routes to (such as README.md).
+- A Codex Stop with a symlinked `.agent-runtime` blocks a fresh Stop and releases continued Stops UNVERIFIED instead of blocking them without end.
+- `lean test` takes a tier name (`lean test e2e`) and repository paths (`.lean/tests/hooks/test_gate.py`) as well as `hooks/test_gate.py`, and names an unknown file instead of a Python error.
+- A review-pending marker releases control drift only when the contract it was matched with is the session's HIGH-depth contract; a Stop run by hand with another `--contract` still blocks.
+
+**Upgrade:** `python3 .lean/bin/lean update preview`, review the plan, then `update apply`. The changed gate controls (`.lean/lean/gate.py`, `hooks.py`) need a covering HIGH review or `lean gate accept-controls`. No configuration or data migration.
+
+## 5.0.0 — 2026-10-27
+
+**Token highlight:** fixed-task inventory 11,146 → 9,962 (-10.6%), startup 2,213 → 2,209 (-0.2%), o200k_base ([measurement](benchmarks/2026-10-27/README.md)) · **Compared with:** 4.17.1
+
+Rebuild the workflow around one `lean` command line. Every rule, hook and check from 4.17.0 that the core keeps carries over with its tests; the layout, commands and spawning defaults change, so this is a major release.
+
+- **One command.** `python3 .lean/bin/lean` replaces every script in `.lean/scripts/`, the Claude hook scripts and the Codex adapter. Code lives in `.lean/lean/`, one module per command group (`guard`, `gate`, `evidence`, `hooks`, `records`, `progress`, `models`, `spawn`, `testsel`, `structure`, `update`). Provider hooks call `lean hook claude|codex <event>`. The bash gate runner is now Python; ShellCheck is no longer needed.
+- **Progress bars.** `lean progress set <phase>` drives a solid/shade bar (`████████░░░░░░░░░░░░ 40%`) by lean-task phase, refined by counts inside a phase. One state file feeds the agent's replies, `lean status`, `lean watch`, `lean test`, `lean gate run`, `lean spawn run` (one bar per agent), the Claude status line and Codex's Stop message. Codex and agy have no custom in-window status line; they use `lean watch` in a second pane.
+- **Tests by impact.** Tests sit in `.lean/tests/unit`, `hooks` and `e2e`; `.lean/tests/impact.json` maps paths to them. `lean test --changed` runs only what the change can affect, documentation-only changes run lint only, and an unmapped path runs everything. The gate runs the selection; CI runs `lean test --all` on every push and pull request.
+- **Model list and spawning.** `.lean/models.json` maps sizes S/M/L/XL to models for Claude, Codex and agy; `lean models check --live` verifies them against the provider CLIs. By default at most `max_agents` (1) sized agent runs at a time, only when cheaper than finishing in the session. `/lean-agents` spawns one agent per parallel task; `/lean-agents <model> xN` runs up to N at once on that model. `lean spawn plan` computes waves with exclusive file ownership; `lean spawn run` starts headless `claude -p`, `codex exec` or `agy -p` processes in separate worktrees, removing metered API keys so they use the subscription login.
+- **Activity log.** Phase changes, gate runs, test runs, spawned agents, contract bindings and review receipts are timed in `.agent-runtime/activity.jsonl`; `lean log` shows the timeline or a per-phase summary and `--export` keeps a copy in the repository.
+- **agy support.** Antigravity CLI is a third provider for spawning, review and the gate (run explicitly; agy has no hooks).
+- **Smaller core.** Eleven skills remain: init, task, scope, research, grill, agents, review, gate, effort, update and target. The optional skills audit, catalog, compress, pattern, playbook, prune and takeover are removed with their tools, along with the optional skill pack and queue cleanup (`clean-queue`). Archived queue history stays readable. Application targets (`lean target use|context|clear|gate`, records in `.lean/targets/<name>/`) carry over unchanged in behavior. The shared "skill level" text moved into `policy/SKILL-EFFORT.md`.
+- **Update with migration.** `lean update preview|apply|rollback` replaces the takeover-based updater: an external pinned clone, a reviewed plan, snapshots, a journal and rollback, with 4.x migration of hooks, gate block, gate mode and skill links.
+- **Quiet Stops while a review runs.** `lean gate review-pending --contract ... --session ...` marks an independent review as running; that session's Stops whose only refusal is the missing receipt for the same contract and shipping state are released UNVERIFIED (never passed) for up to two hours, instead of being refused again. Under a HIGH-depth contract, changed gate controls waiting for that review are released the same way, with checks NOT_RUN. Any change, another contract, a recorded receipt or any other refusal ends it. Only the command writes the marker.
+- **Trusted spawn runs.** `lean spawn run --trust-agents` adds each provider's `trusted_args` from `models.json` (agy `--dangerously-skip-permissions`, Claude `--permission-mode bypassPermissions`), so headless agents can run their task's commands; it warns and is never the default.
+- **Faster hooks and commands.** Measured against 4.17.1 on one machine with a trivial gate: a Stop takes 125 ms instead of 730 ms and starts 6 `git` processes instead of 11, SessionStart 128 ms instead of 627 ms, and plain commands are within 6 ms of 4.17.1's scripts (53–55 ms). The CLI keeps compiled bytecode in a private per-user cache (`~/.cache/lean-workflow/pycache`, or under `$XDG_CACHE_HOME`; used only when the path is absolute and every directory from the cache base down is the user's own and not writable by others, never in the checkout; delete it to clear it), the status line reads the gate's markers without loading the gate, and AGENTS.md is shorter with every rule kept. Data: [docs/benchmarks/2026-10-27](benchmarks/2026-10-27/README.md).
+- `lean test` names failing test files in its summary line.
+- A Claude Stop that finds the gate lock held by another run is blocked at most three times, then released UNVERIFIED, as in 4.17.1; it records no pass. The lock is an `flock` the kernel drops with its holder, so v5 needs no guardian process or `ps`. Checks inherit it, so unlike 4.17.1 a process a check leaves running in the background keeps the checkout locked until that process exits. A busy counter or refusal marker that cannot be written no longer blocks continued Stops without end.
+- Gate mode moves from `.codex/quality-gate.json` to `.lean/gate.json` (`lean gate mode`). Gate runtime markers move from `.claude/.gate-cache`/`.gate-failed` to `.agent-runtime/`.
+
+**Upgrade:** this release changes paths and commands; follow [migrating to v5](migrating-to-v5.md). A 4.x installation has no `lean` command, so run the preview from the pinned 5.0.0 release: `python3 <release>/.lean/bin/lean update preview --target <project>`, review the plan, then `update apply`. Approve the changed gate controls through a covering HIGH review or `lean gate accept-controls`. Project records, PROJECT facts, config and trackers are kept.
