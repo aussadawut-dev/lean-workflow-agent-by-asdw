@@ -5,6 +5,8 @@
 
 # Claude local state
 .claude/settings.local.json
+# 4.x gate cache, left behind after the move to .agent-runtime/ in 5.0
+.claude/.gate-cache
 
 # Merge and patch debris, which --untracked would otherwise scan
 *.orig
