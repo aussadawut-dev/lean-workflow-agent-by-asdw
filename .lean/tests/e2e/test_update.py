@@ -154,7 +154,14 @@ class UpdateTests(unittest.TestCase):
     def test_preview_names_what_lint_will_reject_after_the_update(self):
         # Found upgrading a real 4.16 project: its own test in .lean/tests and a routed README naming 4.x paths.
         project = self.target / ".lean/PROJECT.md"
-        project.write_text(project.read_text() + "\n## Documentation routes\n\n- Setup: `README.md`\n")
+        project.write_text(project.read_text() + "\n## Documentation routes\n\n- Setup: `README.md`\n"
+                           "- Outside: `../outside.md`\n- Absolute: `/etc/outside.md`\n- Binary: `docs/blob.md`\n"
+                           "- Ignored: `docs/ignored.md`\n")
+        (self.base / "outside.md").write_text("`.lean/scripts/workflow.py`\n")
+        (self.target / "docs").mkdir(exist_ok=True)
+        (self.target / "docs/blob.md").write_bytes(b"\xff\xfe .lean/scripts/workflow.py")
+        write(self.target, "docs/ignored.md", "`.lean/scripts/takeover.py`\n")
+        (self.target / ".gitignore").write_text((self.target / ".gitignore").read_text() + "docs/ignored.md\n")
         write(self.target, "README.md", "Run `python3 .lean/scripts/submodule.py context`.\n")
         write(self.target, ".lean/tests/test_local_gate.py", "# the project's own test\n")
         commit(self.target, "project files")
@@ -162,6 +169,8 @@ class UpdateTests(unittest.TestCase):
         self.assertIn("README.md still names the 4.x path .lean/scripts/submodule.py", result.stdout)
         self.assertIn(".lean/tests/test_local_gate.py is not part of Lean but sits in a workflow-owned folder",
                       result.stdout)
+        for unseen in ("outside.md", "/etc/outside.md", "docs/blob.md", "docs/ignored.md"):
+            self.assertNotIn(f"{unseen} still names", result.stdout)
         actions = {op["path"]: op["action"] for op in plan["operations"]}
         self.assertNotIn(".lean/tests/test_local_gate.py", actions, "a project's file is never deleted")
         self.assertNotIn("README.md", actions)

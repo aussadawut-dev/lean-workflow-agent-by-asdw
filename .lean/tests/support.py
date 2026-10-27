@@ -76,6 +76,11 @@ def stop_refusal(result):
 
 
 # Files a project creates at setup, beside the registered release.
+def structure_optional():
+    from lean import structure
+    return structure.OPTIONAL_PATHS
+
+
 def structure_references(text):
     """The workflow paths a document names, as `lean lint` finds them."""
     from lean import structure
@@ -88,8 +93,8 @@ PROJECT_FILES = (".lean/PROJECT.md", ".lean/models.json", ".lean/config.json", "
 def install_release(root, init=True, source=ROOT):
     """Copy exactly the registered release plus setup's project files, with the skill discovery links.
 
-    The project files come from the installation running the tests, so the project-owned files they
-    name (a PROJECT.md naming `.lean/LOCAL-EXTENSIONS.md`) come along; nothing else of the project does."""
+    The project files come from the installation running the tests, so the project-owned files PROJECT.md
+    names (Casetodian's `.lean/LOCAL-EXTENSIONS.md`) come along; nothing else of the project does."""
     root, source = Path(root), Path(source)
     registry = json.loads((source / ".lean/assets.json").read_text())
     copied = registry["files"] + list(PROJECT_FILES)
@@ -97,11 +102,14 @@ def install_release(root, init=True, source=ROOT):
         target = root / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source / name, target)
-    pending = [reference for name in copied if name.endswith(".md")
+    # Only the project's own documents bring files along: a release document naming an unregistered file
+    # must still fail the release lint, and optional project configuration stays out of fixtures.
+    pending = [reference for name in PROJECT_FILES if name.endswith(".md")
                for reference in structure_references((source / name).read_text())]
     while pending:
         name = pending.pop()
-        if (root / name).exists() or not (source / name).is_file():
+        if (".." in Path(name).parts or name.startswith(structure_optional()) or (root / name).exists()
+                or not (source / name).is_file()):
             continue  # A reference to a missing file is lint's to report.
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source / name, root / name)

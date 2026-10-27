@@ -324,15 +324,20 @@ def preview(root, target=None, source=None, ref=None, workspace=None):
         for legacy in sorted(set(LEGACY_PATH.findall(migrated))):
             notes.append(f"PROJECT.md still names the 4.x path {legacy}; update it (lean lint reports it)")
     # Project documents PROJECT.md routes agents to are linted too, and nothing the update writes reaches them.
+    visible = set(structure.git_visible(target) or [])  # What lint reads; never a path outside the target.
     for route in structure.routed_documents(target):
         for name in (route, ".lean/" + route):
-            path = target / name
-            if path.is_file() and name not in new_files and not path.is_symlink():
-                for legacy in sorted(set(LEGACY_PATH.findall(path.read_text()))):
-                    notes.append(f"{name} still names the 4.x path {legacy}; update it (lean lint reports it)")
+            if name not in visible or name in new_files or (target / name).is_symlink():
+                continue
+            try:
+                text = (target / name).read_text()
+            except (OSError, UnicodeDecodeError):
+                continue
+            for legacy in sorted(set(LEGACY_PATH.findall(text))):
+                notes.append(f"{name} still names the 4.x path {legacy}; update it (lean lint reports it)")
     # A project's own file inside a workflow-owned folder survives the update, and lint then rejects it.
     deleted = {operation["path"] for operation in operations if operation["action"] == "delete"}
-    for name in structure.git_visible(target) or []:
+    for name in sorted(visible):
         if name.startswith(structure.WORKFLOW_DIRS) and name not in new_files and name not in deleted:
             notes.append(f"{name} is not part of Lean but sits in a workflow-owned folder; the update keeps it and "
                          "lean lint rejects it: move it out (or delete it) after review")

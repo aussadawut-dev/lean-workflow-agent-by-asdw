@@ -1,4 +1,5 @@
 """`lean lint`: a fresh copy of the release passes, and each broken invariant is named."""
+import json
 import os
 from pathlib import Path
 import sys
@@ -68,6 +69,25 @@ class LintTests(unittest.TestCase):
             install_release(copy, source=source)
             self.assertEqual(structure.check(Path(copy)), [])
             self.assertTrue((Path(copy) / ".lean/local/NOTES.md").is_file())
+            # A reference that climbs out of `.lean/` is never followed.
+            (source / "x.md").write_text("outside\n")
+            project.write_text(project.read_text() + "Also `.lean/../x.md`.\n")
+            with tempfile.TemporaryDirectory() as second:
+                install_release(second, source=source)
+                self.assertFalse((Path(second) / "x.md").exists())
+
+    def test_a_release_document_naming_an_unregistered_file_still_fails(self):
+        # Only PROJECT.md brings project files along; an omission from the registry is never papered over.
+        with tempfile.TemporaryDirectory() as other, tempfile.TemporaryDirectory() as copy:
+            source = Path(other)
+            install_release(source, init=False)
+            registry = source / ".lean/assets.json"
+            data = json.loads(registry.read_text())
+            data["files"].remove(".claude/agents/reviewer.md")
+            registry.write_text(json.dumps(data))
+            install_release(copy, source=source)
+            self.assertIn("missing .claude/agents/reviewer.md (from AGENTS.md)", structure.check(Path(copy)))
+            self.assertFalse((Path(copy) / ".lean/gate.json").exists(), "optional configuration stays out")
 
     def test_skill_links_must_point_at_canonical_skills(self):
         link = self.root / ".claude/skills/lean-task"
