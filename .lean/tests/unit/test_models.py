@@ -61,6 +61,30 @@ class ModelListTests(unittest.TestCase):
             with self.assertRaises(LeanError):
                 models.resolve(data, provider, tier)
 
+    def test_eight_sizes_in_order_and_a_four_size_list_still_works(self):
+        self.assertEqual(models.TIERS, ("3S", "2S", "S", "M", "L", "XL", "2XL", "3XL"))
+        # A project list from 5.0 defines only S/M/L/XL: still valid, and the new sizes are refused, not substituted.
+        old = copy.deepcopy(SHIPPED)
+        for provider in old["providers"].values():
+            provider["tiers"] = {tier: provider["tiers"][tier] for tier in models.REQUIRED_TIERS}
+        self.assertEqual(models.validate(old), [])
+        self.write(old)
+        data = models.load(self.root)
+        self.assertEqual(models.resolve(data, "codex", "S")[0], old["providers"]["codex"]["tiers"]["S"]["model"])
+        with self.assertRaises(LeanError) as raised:
+            models.resolve(data, "codex", "2XL")
+        self.assertIn("size 2XL is not defined for codex", str(raised.exception))
+        self.assertIn("S, M, L, XL", str(raised.exception))
+        self.assertNotIn("2XL", models.table(data))
+        # A size outside the eight is a problem; so is a missing required one.
+        bad = copy.deepcopy(SHIPPED)
+        bad["providers"]["claude"]["tiers"]["4XL"] = bad["providers"]["claude"]["tiers"]["XL"]
+        self.assertTrue(any("may add 3S, 2S, 2XL, 3XL" in problem for problem in models.validate(bad)))
+        # The shipped table lists every size, smallest first.
+        rows = [line.split()[0] for line in models.table(SHIPPED).splitlines()
+                if line.startswith("  ")][:8]
+        self.assertEqual(rows, list(models.TIERS))
+
     def test_detect_provider_from_the_runtime_environment(self):
         self.assertEqual(models.detect_provider(SHIPPED, {"CLAUDECODE": "1"}), "claude")
         self.assertEqual(models.detect_provider(SHIPPED, {"CODEX_THREAD_ID": "x"}), "codex")

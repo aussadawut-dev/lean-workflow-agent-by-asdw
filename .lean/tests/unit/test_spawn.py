@@ -77,6 +77,25 @@ class PlanTests(unittest.TestCase):
         self.assertIn("rename", planned["notes"][0])
         self.assertNotIn("feature", planned["notes"][0])
 
+    def test_new_sizes_plan_and_an_undefined_size_is_refused_not_substituted(self):
+        planned = spawn.plan(self.root, [task("find", ["x.py"], size="3S"), task("hard", ["y.py"], size="3XL")],
+                             "max", "codex")
+        chosen = {entry["id"]: (entry["model"], entry["effort"]) for wave in planned["waves"] for entry in wave}
+        self.assertEqual(chosen["find"], models.resolve(self.data, "codex", "3S"))
+        self.assertEqual(chosen["hard"], models.resolve(self.data, "codex", "3XL"))
+        self.assertIn("find", spawn.plan(self.root, [task("find", ["x.py"], size="2S")], "default", "claude")["notes"][0])
+        # A 5.0 project list (S/M/L/XL only) refuses a new size with a clear message ...
+        data = json.loads((self.root / ".lean/models.json").read_text())
+        for provider in data["providers"].values():
+            provider["tiers"] = {tier: provider["tiers"][tier] for tier in models.REQUIRED_TIERS}
+        (self.root / ".lean/models.json").write_text(json.dumps(data))
+        with self.assertRaises(LeanError) as raised:
+            spawn.plan(self.root, [task("hard", ["y.py"], size="2XL")], "max", "claude")
+        self.assertIn("size 2XL is not defined for claude", str(raised.exception))
+        # ... unless the model is named explicitly; then only its effort stays unset.
+        explicit = spawn.plan(self.root, [task("hard", ["y.py"], size="2XL")], "explicit", "claude", model="opus", count=1)
+        self.assertEqual((explicit["waves"][0][0]["model"], explicit["waves"][0][0]["effort"]), ("opus", None))
+
     def test_invalid_requests_are_refused(self):
         for args in (("explicit", "claude"), ("default", "claude", "sonnet"), ("fast", "claude"), ("max", "gemini")):
             with self.subTest(args=args), self.assertRaises(LeanError):

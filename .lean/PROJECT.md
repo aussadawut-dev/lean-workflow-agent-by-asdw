@@ -4,7 +4,7 @@ Project-owned facts and routes. Keep this map short; read the linked reference o
 
 ## Purpose
 
-Lean Workflow Baseline 5.0.2: a portable Claude/Codex/agy workflow template behind one `lean` command. This repository contains workflow files, no application code or Web/API/Database areas.
+Lean Workflow Baseline 5.1.0: a portable Claude/Codex/agy workflow template behind one `lean` command. This repository contains workflow files, no application code or Web/API/Database areas.
 
 ## Architecture
 

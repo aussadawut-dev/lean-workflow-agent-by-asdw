@@ -105,7 +105,7 @@ def build_parser(argv=()):
                       help="maintainers: regenerate .lean/assets.json from the workflow files first")
     commands.add_parser("attribution", help="refuse unpushed commits that carry AI attribution")
 
-    models_parser = commands.add_parser("models", help="per-provider model list (S/M/L/XL)")
+    models_parser = commands.add_parser("models", help="per-provider model list (sizes 3S-3XL)")
     models_actions = models_parser.add_subparsers(dest="action")
     models_actions.add_parser("list")
     models_check = models_actions.add_parser("check", help="validate the list; --live asks the provider CLIs")

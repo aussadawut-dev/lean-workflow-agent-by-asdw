@@ -13,7 +13,7 @@ Read `AGENTS.md`, `.lean/PROJECT.md`, `.lean/policy/MODELS.md` and `python3 .lea
 
 | Invocation | Level | Agents |
 |---|---|---|
-| `/lean-agents [task]` | `max` | one per task that can run in parallel, each sized S/M/L/XL |
+| `/lean-agents [task]` | `max` | one per task that can run in parallel, each sized 3S-3XL |
 | `/lean-agents <model> xN [task]` (or "use 3 sonnet") | `explicit` | up to N at once, all on that model; further tasks run as slots free up |
 
 `<model>` is a model ID or alias the provider accepts (`sonnet`, `claude-opus-5-5`, `gpt-6.1-sol`, `gemini-4-argon-high`); `xN` is the agent count.

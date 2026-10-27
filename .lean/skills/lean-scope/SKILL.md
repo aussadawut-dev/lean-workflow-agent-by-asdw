@@ -30,7 +30,7 @@ Write a concise draft with:
 - Observable acceptance criteria and relevant validation.
 - Constraints, dependencies, assumptions, and material open questions.
 - Likely affected components or files when repository evidence makes them clear; label uncertain locations as estimates.
-- For work that splits into independent parts, the task list a spawn plan would use (ids, owned files, size S/M/L/XL, dependencies), so `/lean-agents` can run it without re-planning.
+- For work that splits into independent parts, the task list a spawn plan would use (ids, owned files, size 3S-3XL, dependencies), so `/lean-agents` can run it without re-planning.
 
 Show the draft. When the request already approves it, continue with the work; a later correction amends the scope. Otherwise ask for approval or corrections and pause: silence, elapsed time or approval of a different decision is not scope approval. If the user requested analysis or a spec only, return the draft without implementing it.
 

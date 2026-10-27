@@ -4,14 +4,20 @@ Model reasoning effort is separate from procedure intensity under `SKILL-EFFORT.
 
 ## Model list
 
-`.lean/models.json` (project-owned) maps four sizes to concrete models per provider (`claude`, `codex`, `agy`), with the CLI arguments `lean spawn run` uses. `lean models` prints it; `lean models check --live` asks the provider CLIs which models exist (Codex's model cache, `agy models`; Claude has no listing, so its IDs stay unverified until used). An unavailable model is reported, never silently substituted; update the list instead.
+`.lean/models.json` (project-owned) maps sizes to concrete models per provider (`claude`, `codex`, `agy`), with the CLI arguments `lean spawn run` uses. `lean models` prints it; `lean models check --live` asks the provider CLIs which models exist (Codex's model cache, `agy models`; Claude has no listing, so its IDs stay unverified until used). An unavailable model is reported, never silently substituted; update the list instead.
 
 | Size | Work | Starting effort |
 |---|---|---|
-| `S` | Mechanical, well-specified work (locate, rename, format) | Low |
+| `3S` | Locate, read or a one-line mechanical change | Low |
+| `2S` | Small mechanical work with an exact spec (rename, format) | Low to medium |
+| `S` | A small, well-specified task | Low to medium |
 | `M` | Normal implementation or focused review | Medium |
 | `L` | Hard reasoning, conflicting evidence, complex security/data boundaries | High |
-| `XL` | Work an `L` attempt demonstrably could not do | High |
+| `XL` | Large or entangled work | High or above |
+| `2XL` | Work an `XL` attempt demonstrably could not do | High or above |
+| `3XL` | Last resort after `2XL`; slowest and most expensive | Highest |
+
+`S`, `M`, `L` and `XL` are required for every provider; `3S`, `2S`, `2XL` and `3XL` are optional, so a list written for 5.0 keeps working. A size the provider does not define is refused with a message, never replaced by another (an explicit `--model` still runs). The shipped list follows the 2026-10-27 eval (`docs/benchmarks/2026-10-27-models/`): higher effort did not raise correctness on a well-specified task and cost 4-13x the time, so start low and raise one step only after a demonstrated reasoning limit.
 
 Size each spawned task, reviewers included, by this table. Repository mode does not change model selection. Risk and quality set the required work and review depth; budget guides optional spend (`CHEAP` favors smaller sizes, `EXPENSIVE` allows justified larger ones). None removes tests, validation or required review; report an unmet floor rather than lowering it.
 

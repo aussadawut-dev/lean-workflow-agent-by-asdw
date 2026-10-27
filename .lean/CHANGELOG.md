@@ -6,6 +6,43 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
+## 5.1.0 — 2026-10-27
+
+**Token highlight:** - · **Compared with:** -
+
+Eight spawn sizes instead of four. No token or speed saving is claimed for the workflow itself; the size mapping follows the [2026-10-27 model eval](../docs/benchmarks/2026-10-27-models/README.md).
+
+**Added**
+
+- Sizes `3S`, `2S`, `S`, `M`, `L`, `XL`, `2XL`, `3XL`, smallest first: two cheaper sizes for locating and small mechanical work, two stronger ones for work `XL` could not do. `lean models`, `lean models check [--live]` and `lean spawn plan` know all eight.
+- The shipped `.lean/models.json` (checked 2026-10-27) maps them per provider. Claude: Haiku low/medium, Sonnet low/medium, Opus high/xhigh, Fable high/max. Codex: `gpt-6-luna` low, `gpt-6.1-terra` low/medium, `gpt-6.1-sol` medium/high, `gpt-6-astra` high/xhigh/max. agy: Gemini 3.8 Flash low/medium/high, Gemini 4 Argon low/medium/high (high for `XL` to `3XL`). Codex `ultra` effort is not used.
+
+**Changed**
+
+- Changed mappings in the shipped list (old → new): Claude `S` Haiku low → Sonnet low, `XL` Fable high → Opus xhigh (Fable is now `2XL`/`3XL`); Codex `S` `gpt-6-luna` low → `gpt-6.1-terra` medium (Luna is now `3S`); agy `S` Flash low → Flash high, `M` Flash high → Argon low. Every other `S`/`M`/`L`/`XL` mapping is unchanged. The old `S` is closest to the new `3S`; the old Claude `XL` is the new `2XL`.
+
+**Upgrade:** `S`, `M`, `L` and `XL` stay required and the new sizes are optional, so a project's 5.0 `models.json` keeps working; a task sized with a size the project does not define is refused with a message (an explicit `--model` still runs). To use the new sizes, copy the `tiers` you want from the release's `.lean/models.json` and run `lean models check --live`. The changed gate controls (`.lean/lean/models.py`, `spawn.py`) need a covering HIGH review or `lean gate accept-controls`.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+ขนาดของ agent ที่ spawn เพิ่มจากสี่เป็นแปด ไม่ได้อ้างว่า workflow ประหยัด token หรือเร็วขึ้น การจับคู่ขนาดกับ model อ้างอิง[ผลประเมิน model วันที่ 2026-10-27](../docs/benchmarks/2026-10-27-models/README.md)
+
+**เพิ่ม**
+
+- ขนาด `3S`, `2S`, `S`, `M`, `L`, `XL`, `2XL`, `3XL` เรียงจากเล็กไปใหญ่ เพิ่มสองขนาดที่ถูกกว่าสำหรับงานหาตำแหน่งและงานกลไกเล็กๆ และสองขนาดที่แรงกว่าสำหรับงานที่ `XL` ทำไม่ได้ `lean models`, `lean models check [--live]` และ `lean spawn plan` รู้จักครบทั้งแปด
+- `.lean/models.json` ที่มากับ release (ตรวจ 2026-10-27) จับคู่ขนาดกับ model ของแต่ละ provider: Claude ใช้ Haiku low/medium, Sonnet low/medium, Opus high/xhigh, Fable high/max; Codex ใช้ `gpt-6-luna` low, `gpt-6.1-terra` low/medium, `gpt-6.1-sol` medium/high, `gpt-6-astra` high/xhigh/max; agy ใช้ Gemini 3.8 Flash low/medium/high และ Gemini 4 Argon low/medium/high (high สำหรับ `XL` ถึง `3XL`) ไม่ใช้ effort `ultra` ของ Codex
+
+**เปลี่ยน**
+
+- การจับคู่ที่เปลี่ยนใน list ที่มากับ release (เดิม → ใหม่): Claude `S` Haiku low → Sonnet low, `XL` Fable high → Opus xhigh (Fable ย้ายไป `2XL`/`3XL`); Codex `S` `gpt-6-luna` low → `gpt-6.1-terra` medium (Luna ย้ายไป `3S`); agy `S` Flash low → Flash high, `M` Flash high → Argon low ส่วน `S`/`M`/`L`/`XL` ที่เหลือไม่เปลี่ยน `S` แบบเดิมใกล้กับ `3S` ใหม่ และ Claude `XL` แบบเดิมคือ `2XL` ใหม่
+
+**เมื่ออัปเกรด:** `S`, `M`, `L` และ `XL` ยังต้องมีทุก provider ส่วนขนาดใหม่ไม่บังคับ `models.json` ของโปรเจกต์ที่เขียนสำหรับ 5.0 จึงใช้ได้ต่อ งานที่ระบุขนาดที่โปรเจกต์ไม่ได้กำหนดจะถูกปฏิเสธพร้อมข้อความ (ถ้าระบุ `--model` เองยังรันได้) ถ้าจะใช้ขนาดใหม่ ให้ก๊อป `tiers` ที่ต้องการจาก `.lean/models.json` ของ release แล้วรัน `lean models check --live` gate controls ที่เปลี่ยน (`.lean/lean/models.py`, `spawn.py`) ต้องมี HIGH review ที่ครอบคลุม หรือ `lean gate accept-controls`
+
+</details>
+
 ## 5.0.2 — 2026-10-27
 
 **Token highlight:** - · **Compared with:** -

@@ -15,12 +15,12 @@ Policy: [.lean/policy/MODELS.md](../.lean/policy/MODELS.md). Procedure: [lean-ag
   "default_provider": "claude",
   "providers": {
     "claude": {"command": "claude", "args": ["-p", "{prompt}", "--model", "{model}", "..."],
-               "tiers": {"S": {"model": "claude-haiku-5-5", "effort": "low"}, "M": {"...": "..."}}}
+               "tiers": {"S": {"model": "claude-sonnet-5-5", "effort": "low"}, "M": {"...": "..."}}}
   }
 }
 ```
 
-Sizes: `S` mechanical work, `M` normal implementation or review, `L` hard reasoning, `XL` work an `L` attempt could not do. `lean models` prints the list; `lean models check --live` asks Codex's model cache and `agy models` which IDs exist (Claude cannot list models; its IDs are confirmed when a spawn uses them). An unavailable model is reported, never replaced silently.
+Sizes, smallest first: `3S` locate or a one-line change, `2S` small mechanical work, `S` a small well-specified task, `M` normal implementation or review, `L` hard reasoning, `XL` large or entangled work, `2XL` work an `XL` attempt could not do, `3XL` the last resort. `S`, `M`, `L` and `XL` are required per provider; the others are optional, and a size a provider does not define is refused, not replaced. `lean models` prints the list; `lean models check --live` asks Codex's model cache and `agy models` which IDs exist (Claude cannot list models; its IDs are confirmed when a spawn uses them). An unavailable model is reported, never replaced silently.
 
 ## Three levels
 

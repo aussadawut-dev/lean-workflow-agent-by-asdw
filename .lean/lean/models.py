@@ -1,4 +1,4 @@
-"""Project model list: tiers S/M/L/XL per provider, mapped to concrete model IDs and effort.
+"""Project model list: sizes 3S/2S/S/M/L/XL/2XL/3XL per provider, mapped to concrete model IDs and effort.
 
 The list is project-owned evidence. Listing and checking never change runtime or session
 settings; an unavailable model is reported, never silently substituted.
@@ -12,7 +12,8 @@ import time
 from .util import LeanError, WORKFLOW_ROOT, read_json, safe_path
 
 FILE = ".lean/models.json"
-TIERS = ("S", "M", "L", "XL")
+TIERS = ("3S", "2S", "S", "M", "L", "XL", "2XL", "3XL")  # Smallest to largest.
+REQUIRED_TIERS = ("S", "M", "L", "XL")  # Every provider defines these; the others are optional.
 PROVIDERS = ("claude", "codex", "agy")
 PLACEHOLDERS = ("{prompt}", "{model}")
 CODEX_CACHE = Path("~/.codex/models_cache.json")
@@ -57,8 +58,9 @@ def validate(data):
         elif not all(any(mark in arg for arg in args) for mark in PLACEHOLDERS):
             problems.append(f"{name}: args must use {{prompt}} and {{model}}")
         tiers = provider.get("tiers")
-        if not isinstance(tiers, dict) or set(tiers) != set(TIERS):
-            problems.append(f"{name}: tiers must be exactly {', '.join(TIERS)}")
+        if not isinstance(tiers, dict) or not set(REQUIRED_TIERS) <= set(tiers) or not set(tiers) <= set(TIERS):
+            problems.append(f"{name}: tiers must include {', '.join(REQUIRED_TIERS)} and may add "
+                            f"{', '.join(t for t in TIERS if t not in REQUIRED_TIERS)}; nothing else")
             continue
         for tier, value in tiers.items():
             if (not isinstance(value, dict) or not isinstance(value.get("model"), str) or not value["model"]
@@ -86,7 +88,11 @@ def resolve(data, provider, tier):
         raise LeanError(f"provider {provider!r} is not configured in {FILE}")
     if tier not in TIERS:
         raise LeanError(f"unknown size {tier!r}; use {', '.join(TIERS)}")
-    value = data["providers"][provider]["tiers"][tier]
+    value = data["providers"][provider]["tiers"].get(tier)
+    if value is None:  # An optional size this provider does not define: never substitute another.
+        defined = [t for t in TIERS if t in data["providers"][provider]["tiers"]]
+        raise LeanError(f"size {tier} is not defined for {provider} in {FILE}; add it there or use "
+                        f"{', '.join(defined)}")
     return value["model"], value.get("effort")
 
 
@@ -95,9 +101,9 @@ def table(data):
              f"default provider={data['default_provider']}"]
     for name, provider in data["providers"].items():
         lines.append(f"{name} ({provider['command']}):")
-        for tier in TIERS:
+        for tier in (t for t in TIERS if t in provider["tiers"]):
             value = provider["tiers"][tier]
-            lines.append(f"  {tier:<2} {value['model']}" + (f" / effort {value['effort']}" if value.get("effort") else ""))
+            lines.append(f"  {tier:<3} {value['model']}" + (f" / effort {value['effort']}" if value.get("effort") else ""))
     return "\n".join(lines)
 
 
@@ -146,7 +152,7 @@ def check(root, live=False):
             lines.append(f"{name}: {note}")
         if models is None:
             continue
-        for tier in TIERS:
+        for tier in (t for t in TIERS if t in provider["tiers"]):
             model = provider["tiers"][tier]["model"]
             if model not in models:
                 ok = False

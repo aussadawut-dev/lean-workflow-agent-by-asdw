@@ -1,7 +1,7 @@
 """Plan and run agents: waves of independent tasks with exclusive file ownership.
 
 Three levels decide how many agents run at once:
-  default   at most `max_agents` (1 unless the project raised it), each sized S/M/L/XL;
+  default   at most `max_agents` (1 unless the project raised it), each sized 3S-3XL;
   max       `/lean-agents` alone: one agent per task that can run in parallel;
   explicit  `/lean-agents <model> xN`: up to N agents, all on that model.
 `plan` only computes; `run` starts headless provider CLIs in separate git worktrees, using the
@@ -112,7 +112,10 @@ def plan(root, tasks, level="default", provider=None, model=None, count=None, ef
         entries = []
         for task in wave:
             size = task.get("size", "M")
-            tier_model, tier_effort = models.resolve(data, provider, size)
+            if model and size in models.TIERS and size not in data["providers"][provider]["tiers"]:
+                tier_model, tier_effort = None, None  # The explicit model stands; only its effort is unset.
+            else:
+                tier_model, tier_effort = models.resolve(data, provider, size)
             entries.append({"id": task["id"], "title": task.get("title", ""), "size": size, "files": task["files"],
                             "deps": task.get("deps", []), "model": model or tier_model,
                             "effort": effort if effort is not None else tier_effort,
@@ -123,9 +126,9 @@ def plan(root, tasks, level="default", provider=None, model=None, count=None, ef
         notes.append(f"requested {count} agents, but only {width} tasks can run in parallel "
                      "(dependencies or shared files); spawning {width}".replace("{width}", str(width)))
     if level == "default":
-        small = [task["id"] for task in tasks if task.get("size", "M") == "S"]
+        small = [task["id"] for task in tasks if task.get("size", "M") in ("3S", "2S", "S")]
         if small:
-            notes.append("size S tasks are usually cheaper to finish in the main session: " + ", ".join(small))
+            notes.append("size S (and 2S, 3S) tasks are usually cheaper to finish in the main session: " + ", ".join(small))
     return {"schema": 1, "level": level, "provider": provider, "concurrency": concurrency, "agents": width,
             "waves": planned, "notes": notes}
 

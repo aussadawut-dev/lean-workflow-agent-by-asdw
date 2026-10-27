@@ -4,7 +4,7 @@ I built this because I want a coding agent to understand the work, check what it
 
 It works with **Claude Code, Codex and agy (Antigravity)**, with one shared set of rules and skills and one command line, `lean`. Use it with your own stack. Everything is free: Python's standard library and Git, plus the subscriptions you already have.
 
-**Baseline 5.0.2** · [MIT License](LICENSE)
+**Baseline 5.1.0** · [MIT License](LICENSE)
 
 5.0.0 rebuilds the workflow around one `lean` command, shows progress as a bar on every surface, runs only the tests a change can affect, and spawns sized agents from a per-provider model list. It is a major release: upgrading from 4.x moves files and commands. See the [5.0.0 release notes](.lean/CHANGELOG.md#500--2026-10-27) and [migrating to v5](docs/migrating-to-v5.md).
 
@@ -21,7 +21,7 @@ The idea is simple: **agree on the work → implement → test → validate → 
 - A progress bar for each task, in the agent's replies, the Claude status line, `lean watch`, test and gate runs, and one bar per spawned agent.
 - Meaningful tests for behavior changes, and only the tests a change can affect while you work; the full suite runs in CI and at release.
 - Review at the depth the work needs, followed by a Quality Gate using your project's checks.
-- Agents sized S/M/L/XL from a per-provider model list: one at a time by default, as many as the work allows with `/lean-agents`, or exactly the ones you name.
+- Agents sized 3S to 3XL (eight sizes) from a per-provider model list: one at a time by default, as many as the work allows with `/lean-agents`, or exactly the ones you name.
 - Three modes: keep evidence in the chat, keep a workset across sessions, or add a queue with explicit ownership.
 
 ## Quick start
@@ -87,7 +87,7 @@ python3 .lean/bin/lean spawn plan --tasks tasks.json --level max
 
 ## Agents and models
 
-`.lean/models.json` maps four sizes to models for each provider. Three levels decide how many agents run:
+`.lean/models.json` maps eight sizes (`3S` to `3XL`) to models for each provider. Three levels decide how many agents run:
 
 | You say | Agents |
 |---|---|
