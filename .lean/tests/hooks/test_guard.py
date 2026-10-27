@@ -110,6 +110,32 @@ class ShellWriteTests(unittest.TestCase):
                         "python3 .lean/bin/lean log", "lean log --summary --since 2026-10-26", "lean log --json"):
             self.assertFalse(contract_guard.shell_writes(command), command)
 
+    def test_git_reflog_and_symbolic_ref_write_unless_they_only_read(self):
+        # Ported from a downstream project's local patch: both were treated as read-only in every form.
+        for command in ("git reflog", "git reflog show HEAD", "git reflog exists refs/heads/main", "git reflog -5",
+                        "git reflog list", "git reflog main", "git reflog show expire",
+                        "git symbolic-ref HEAD", "git symbolic-ref --short HEAD", "git symbolic-ref -q HEAD"):
+            with self.subTest(read=command):
+                self.assertFalse(contract_guard.shell_writes(command), command)
+        for command in ("git reflog expire --expire=now --all", "git reflog delete HEAD@{1}", "git reflog drop",
+                        "git symbolic-ref HEAD refs/heads/other", "git symbolic-ref -d HEAD",
+                        "git symbolic-ref --delete HEAD", "git symbolic-ref -m why HEAD refs/heads/x",
+                        # Review: git accepts bundled short flags and abbreviated long options.
+                        "git symbolic-ref -qd HEAD", "git symbolic-ref -dq HEAD", "git symbolic-ref --del HEAD",
+                        "git symbolic-ref --delet HEAD", "git reflog write HEAD x y z", "git reflog expire"):
+            with self.subTest(write=command):
+                self.assertTrue(contract_guard.shell_writes(command), command)
+
+    def test_lean_models_apply_and_eval_are_writes(self):
+        for command in ("python3 .lean/bin/lean models", "python3 .lean/bin/lean models list",
+                        "python3 .lean/bin/lean models check --live", "python3 .lean/bin/lean models bank"):
+            with self.subTest(read=command):
+                self.assertFalse(contract_guard.shell_writes(command), command)
+        for command in ("python3 .lean/bin/lean models apply --proposal p.json --sha256 x",
+                        "python3 .lean/bin/lean models eval --plan p.json --budget 10"):
+            with self.subTest(write=command):
+                self.assertTrue(contract_guard.shell_writes(command), command)
+
     def test_writes_runners_installers_and_invisible_commands_are_writes(self):
         receipt_call = "python3 .lean/bin/lean evidence " + "record-" + "review --verdict PASS"
         for command in ("cat a > b", "echo x >> f", "cat a >| f", "cat a &> f", "grep x f | tee out", "head f 1> y",

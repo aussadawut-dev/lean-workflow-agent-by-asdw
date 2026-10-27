@@ -409,8 +409,13 @@ def simple_commands(words):
 # to anything but a shell, or a path hidden behind `cd` is not caught, and a quoted `>` reads as a
 # redirection.
 READ_GIT = {"status", "diff", "log", "show", "ls-files", "rev-parse", "blame", "describe", "rev-list", "cat-file",
-            "ls-tree", "ls-remote", "grep", "shortlog", "reflog", "for-each-ref", "merge-base", "name-rev",
-            "check-ignore", "diff-tree", "diff-index", "count-objects", "symbolic-ref", "var", "version", "help"}
+            "ls-tree", "ls-remote", "grep", "shortlog", "for-each-ref", "merge-base", "name-rev",
+            "check-ignore", "diff-tree", "diff-index", "count-objects", "var", "version", "help"}
+# Read only in some forms. `git reflog`: its first word decides (`expire`, `delete`, `drop`, `write` rewrite the
+# log; `show`, `list`, `exists` or a ref name read). `git symbolic-ref`: one name and only the options below read;
+# anything else (a second name, `-d` alone, bundled as `-qd` or abbreviated as `--del`) may change a ref.
+REFLOG_WRITES = {"expire", "delete", "drop", "write"}
+SYMBOLIC_REF_READ_OPTIONS = {"-q", "--quiet", "--short", "--recurse", "--no-recurse"}
 GIT_LISTERS = {"branch", "tag", "remote", "stash", "worktree", "config"}  # List or change, by argument.
 GIT_LIST_FLAGS = {"-l", "--list", "-a", "-r", "--all", "--remotes", "--contains", "--no-contains", "--merged",
                   "--no-merged", "--points-at", "--show-current", "-v", "-vv", "--verbose", "-n"}
@@ -450,7 +455,8 @@ SHELL_VALUED = {"-o", "+o", "-O", "+O"}  # Shell options whose next word is an o
 PERL_VALUED = ("-M", "-m", "-I", "-e", "-E", "-x", "-C")  # Their letters are not switches.
 # `lean` command groups: True only reads (or writes ignored runtime state such as progress),
 # a set names the subcommands that only read, and a group missing here writes.
-LEAN_READS = {"status": True, "watch": True, "progress": True, "test": True, "lint": True, "models": True,
+LEAN_READS = {"status": True, "watch": True, "progress": True, "test": True, "lint": True,
+              "models": {"list", "check", "bank"},  # `apply` writes models.json; `eval` writes results.
               "log": True,
               "attribution": True, "hook": True, "version": True,
               "contract": {"declare", "current"}, "mode": {"show", "check", "context"},
@@ -458,6 +464,7 @@ LEAN_READS = {"status": True, "watch": True, "progress": True, "test": True, "li
                                                          "high-risk"},
               "gate": {"run", "status", "mode"}, "spawn": {"plan"}, "update": {"preview"},
               "target": {"context", "gate", "use"}}
+LEAN_DEFAULT_READS = {"models"}  # Groups whose bare call only prints (`lean models` lists the sizes).
 LEAN_VALUE_WRITES = {"effort": {"standard", "high", "ultra", "reset"}, "lint": {"--write-registry"},
                      "target": {"--apply", "clear"}, "log": {"--export"},
                      "gate": {"auto", "manual", "auto_fixloop", "manual_fixloop", "accept-controls"}}
@@ -477,6 +484,13 @@ def git_writes(args):
         return True
     if sub in READ_GIT:
         return False
+    if sub == "reflog":
+        words = [word for word in rest if not word.startswith("-")]
+        return bool(words) and words[0] in REFLOG_WRITES
+    if sub == "symbolic-ref":
+        names = [word for word in rest if not word.startswith("-")]
+        options = [word for word in rest if word.startswith("-")]
+        return len(names) != 1 or any(word not in SYMBOLIC_REF_READ_OPTIONS for word in options)
     if sub not in GIT_LISTERS or any(word in GIT_CHANGERS for word in rest):
         return True
     positional = [word for word in rest if not word.startswith("-")]
@@ -521,7 +535,9 @@ def lean_writes(rest):
             skip = True  # Its value is a path, not a subcommand.
         elif not word.startswith("-"):
             positional.append(word)
-    return not positional or positional[0] not in reads
+    if not positional:
+        return group not in LEAN_DEFAULT_READS
+    return positional[0] not in reads
 
 
 def redirect_writes(words):

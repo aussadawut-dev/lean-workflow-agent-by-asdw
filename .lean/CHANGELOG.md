@@ -3,6 +3,35 @@
 เลขรุ่น `MAJOR.MINOR.PATCH`: MAJOR เปลี่ยนกติกาหรือ path เดิม, MINOR เพิ่มของใหม่, PATCH แก้ไข · วิธีอัปเกรด: [CUSTOMIZING.md](CUSTOMIZING.md)
 Versions are `MAJOR.MINOR.PATCH`: MAJOR changes rules or paths, MINOR adds, PATCH fixes · Upgrading: [CUSTOMIZING.md](CUSTOMIZING.md) · 5.x technical notes: [docs/CHANGELOG-dev.md](../docs/CHANGELOG-dev.md)
 
+## 5.2.1 — 2026-10-27
+
+🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#521--2026-10-27)
+
+ปิดช่องโหว่เล็กๆ ที่โปรเจกต์จริงเคยแก้เองไว้ ก่อนย้ายมาใช้ v5 และอ่าน CHANGELOG ง่ายขึ้น
+
+**แก้ไข**
+- `git reflog expire`, `git reflog delete` และ `git symbolic-ref` ที่เปลี่ยน ref ต้องมี contract ก่อน ส่วนคำสั่งที่แค่อ่านยังรันได้เหมือนเดิม
+- `lean models apply` และ `lean models eval` ต้องมี contract ก่อน เพราะเขียนไฟล์
+- Codex ไม่เขียนไฟล์ทะลุ symlink ที่ถูกวางไว้แทนไฟล์บันทึกการปฏิเสธของ gate
+
+**มีอะไรเปลี่ยน**
+- CHANGELOG ของสาย 5.x เขียนใหม่ให้อ่านง่าย ภาษาไทยก่อน ภาษาอังกฤษตามท้าย ส่วนรายละเอียดเชิงเทคนิคย้ายไปที่ [docs/CHANGELOG-dev.md](../docs/CHANGELOG-dev.md)
+
+**ต้องทำอะไรตอนอัปเกรด**
+- `lean update preview` แล้ว `lean update apply` ไม่ต้องย้ายข้อมูล
+- ไฟล์ที่ gate ใช้ตรวจงานเปลี่ยน: ให้ reviewer ตรวจ หรือยืนยันเองด้วย `lean gate accept-controls`
+
+**English**
+
+Close small gaps a real project had patched itself before it moves to v5, and make the changelog easier to read.
+
+- `git reflog expire`, `git reflog delete` and a `git symbolic-ref` that changes a ref now need a contract first; reading commands still run as before.
+- `lean models apply` and `lean models eval` now need a contract first, because they write files.
+- Codex never writes through a symlink planted in place of a gate refusal marker.
+- Changed: the 5.x changelog is rewritten to be easy to read, Thai first and English after; technical detail moves to [docs/CHANGELOG-dev.md](../docs/CHANGELOG-dev.md).
+
+Upgrade: `lean update preview`, then `lean update apply`; no data migration. Changed gate files need a reviewer or `lean gate accept-controls`.
+
 ## 5.2.0 — 2026-10-27
 
 🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#520--2026-10-27)

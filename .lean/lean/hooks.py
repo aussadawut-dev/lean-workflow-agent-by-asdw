@@ -4,9 +4,11 @@ Both providers share the guard and the gate runner; only input and output format
 Claude refuses a Stop with JSON {"decision": "block"} on exit 0, because headless `claude -p`
 feeds a Stop reason back to the model only in that form and treats exit 2 as a hook error.
 """
+import contextlib
 import hashlib
 import json
 import os
+import stat
 from pathlib import Path
 import subprocess
 
@@ -232,52 +234,98 @@ def codex_stop(root, stdin, cache_tree):
                         fixloop=fixloop)
 
 
+@contextlib.contextmanager
+def codex_markers(root, create=False):
+    """The runtime folder as a directory descriptor, opened without following a link (raises OSError)."""
+    runtime = Path(root) / ".agent-runtime"
+    if create and not runtime.is_symlink():
+        runtime.mkdir(exist_ok=True)
+    descriptor = os.open(runtime, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        yield descriptor
+    finally:
+        os.close(descriptor)
+
+
+def marker_open(directory, name, flags):
+    """A marker opened inside `directory` only as a plain file with one link; never through a link."""
+    descriptor = os.open(name, flags | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600, dir_fd=directory)
+    info = os.fstat(descriptor)
+    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+        os.close(descriptor)
+        raise OSError(f"refusal marker {name} must be a plain file with one link")
+    return descriptor
+
+
+def marker_read(directory, name):
+    try:
+        descriptor = marker_open(directory, name, os.O_RDONLY)
+    except FileNotFoundError:
+        return ""
+    with os.fdopen(descriptor) as stream:
+        return stream.read()
+
+
+def marker_write(directory, name, value):
+    descriptor = marker_open(directory, name, os.O_WRONLY | os.O_CREAT)
+    with os.fdopen(descriptor, "w") as stream:
+        stream.truncate(0)
+        stream.write(value)
+
+
+def marker_remove(directory, name):
+    try:
+        os.unlink(name, dir_fd=directory)  # Removes a link itself, never what it points to.
+    except FileNotFoundError:
+        pass
+
+
 def clear_codex_refusals(root):
-    for name in ("codex-gate-failed", "codex-gate-refusal"):
-        try:
-            (root / ".agent-runtime" / name).unlink(missing_ok=True)
-        except OSError:
-            pass
+    try:
+        with codex_markers(root) as directory:
+            for name in ("codex-gate-failed", "codex-gate-refusal"):
+                try:  # Each on its own: one marker that cannot be removed must not keep the other.
+                    marker_remove(directory, name)
+                except OSError:
+                    pass
+    except OSError:
+        pass
 
 
 def clear_codex_session_refusals(root):
-    runtime = root / ".agent-runtime"
     try:
-        (runtime / "codex-gate-refusal").unlink(missing_ok=True)
-        failed = runtime / "codex-gate-failed"
-        if failed.is_file() and failed.read_text().startswith("c"):
-            failed.unlink(missing_ok=True)
-    except OSError:
+        with codex_markers(root) as directory:
+            marker_remove(directory, "codex-gate-refusal")
+            if marker_read(directory, "codex-gate-failed").startswith("c"):
+                marker_remove(directory, "codex-gate-failed")
+    except (OSError, ValueError):
         pass
 
 
 def codex_refuse(root, payload, detail, session="", contract="", is_contract=False, fixloop=False):
     """Block up to MAX_REFUSALS attempts; release unchanged or capped continued Stops UNVERIFIED."""
-    runtime = root / ".agent-runtime"
-    failed, refusal = runtime / "codex-gate-failed", runtime / "codex-gate-refusal"
     count = 0
     try:
-        if runtime.is_symlink():  # Its markers cannot be kept, so the count is unknown.
-            raise OSError("runtime directory is a symlink")
-        runtime.mkdir(exist_ok=True)
-        if payload.get("stop_hook_active") and failed.is_file():
-            raw = failed.read_text().strip().lstrip("c")
-            count = int(raw) if raw.isdigit() else 0
-        failed.write_text(f"{'c' if is_contract else ''}{count + 1}")
-        count += 1
-        if not is_contract and session:
-            try:
-                current = evidence.state(root)
-            except (OSError, ValueError, subprocess.CalledProcessError):
-                current = ""
-            if current:
-                reason = hashlib.sha256(detail.encode()).hexdigest()
-                fingerprint = f"{session} {current} {reason} {contract}"
-                if refusal.is_file() and refusal.read_text() == fingerprint:
-                    return 0, json.dumps({"systemMessage": "Codex Quality Gate refused again with nothing changed "
-                                          "since the last refusal; Stop released UNVERIFIED. The work is not "
-                                          "DONE; see that refusal."}), ""
-                refusal.write_text(fingerprint)
+        # A symlinked runtime folder or marker cannot be kept safely, so the count is unknown.
+        with codex_markers(root, create=True) as directory:
+            if payload.get("stop_hook_active"):
+                raw = marker_read(directory, "codex-gate-failed").strip().lstrip("c")
+                count = int(raw) if raw.isdigit() else 0
+            marker_write(directory, "codex-gate-failed", f"{'c' if is_contract else ''}{count + 1}")
+            count += 1
+            if not is_contract and session:
+                try:
+                    current = evidence.state(root)
+                except (OSError, ValueError, subprocess.CalledProcessError):
+                    current = ""
+                if current:
+                    reason = hashlib.sha256(detail.encode()).hexdigest()
+                    fingerprint = f"{session} {current} {reason} {contract}"
+                    if marker_read(directory, "codex-gate-refusal") == fingerprint:
+                        return 0, json.dumps({"systemMessage": "Codex Quality Gate refused again with nothing changed "
+                                              "since the last refusal; Stop released UNVERIFIED. The work is not "
+                                              "DONE; see that refusal."}), ""
+                    marker_write(directory, "codex-gate-refusal", fingerprint)
     except (OSError, ValueError, subprocess.CalledProcessError):
         # A marker that cannot be written leaves the count unknown: release continued Stops, not loop.
         count = gate.MAX_REFUSALS + 1 if payload.get("stop_hook_active") else 1

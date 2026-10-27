@@ -3,6 +3,18 @@
 Developer and agent notes for each 5.x release: commands, flags, rules, changed gate controls and limits.
 The user-facing summary of each release is in [`.lean/CHANGELOG.md`](../.lean/CHANGELOG.md).
 
+## 5.2.1 — 2026-10-27
+
+Hardening ported from Casetodian's local patches to its Lean 4.x tooling (compared with Lean 4.16.0), the `lean models` guard gap from 5.2.0, and the readable changelog.
+
+- **Guard, git.** `reflog` and `symbolic-ref` leave `READ_GIT`. `git reflog` writes when its first non-option word is `expire`, `delete`, `drop` or `write`; no word, `show`, `list`, `exists` or a ref name read. `git symbolic-ref` reads only with exactly one name and options from `-q`, `--quiet`, `--short`, `--recurse`, `--no-recurse` (an allowlist, because git accepts bundled `-qd` and abbreviated `--del`); anything else writes.
+- **Guard, lean.** `LEAN_READS["models"]` is `{"list", "check", "bank"}`; a bare `lean models` reads (`LEAN_DEFAULT_READS`). `apply` and `eval` need a contract.
+- **Codex refusal markers.** `codex-gate-failed` and `codex-gate-refusal` are read, written and removed through `.agent-runtime` opened with `O_DIRECTORY | O_NOFOLLOW`, each marker with `O_NOFOLLOW`, accepted only as a regular file with one link; removal unlinks the name itself. A symlinked marker or folder raises, so the Stop counts as an unusable marker: a fresh Stop blocks, a continued one is released UNVERIFIED.
+- **Changelog.** `.lean/CHANGELOG.md` 5.x entries are user-facing (Thai, then English, nothing collapsed, a first-line link here); the former English technical text of 5.0.0-5.2.0 lives below unchanged. Rules: `docs/development.md` "Writing the changelog".
+- Changed gate controls: `.lean/lean/guard.py`, `hooks.py`.
+- Tests: `hooks/test_guard.py` (`test_git_reflog_and_symbolic_ref_write_unless_they_only_read`, `test_lean_models_apply_and_eval_are_writes`), `hooks/test_gate_mode.py` (`test_a_planted_codex_marker_link_is_never_followed`); each fails on 5.2.0.
+- Not ported: Casetodian's other local patches (4.x updater `takeover.py`/`shared_assets.py`, `check_structure.py` tracker paths, `gate_mode.py` permission preservation) are replaced or already covered in v5.
+
 ## 5.2.0 — 2026-10-27
 
 

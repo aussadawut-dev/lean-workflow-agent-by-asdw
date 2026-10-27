@@ -227,6 +227,33 @@ class GateModeTests(unittest.TestCase):
         self.assertIn("UNVERIFIED", continued["systemMessage"])
         self.assertEqual(list(elsewhere.iterdir()), [], "nothing is written through the link")
 
+    def test_clearing_codex_markers_removes_each_one_independently(self):
+        from lean import hooks
+        runtime = self.root / ".agent-runtime"
+        runtime.mkdir(exist_ok=True)
+        (runtime / "codex-gate-failed").mkdir()  # Cannot be unlinked.
+        (runtime / "codex-gate-refusal").write_text("fingerprint")
+        hooks.clear_codex_refusals(self.root)
+        self.assertFalse((runtime / "codex-gate-refusal").exists())
+
+    def test_a_planted_codex_marker_link_is_never_followed(self):
+        # Ported from a downstream project's local patch: the markers were written through symlinks.
+        self.project.write_text("<!-- gate:start -->\n```sh\nfalse\n```\n<!-- gate:end -->\n")
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        victim = Path(outside.name) / "victim.txt"
+        victim.write_text("keep me")
+        runtime = self.root / ".agent-runtime"
+        runtime.mkdir(exist_ok=True)
+        for name in ("codex-gate-failed", "codex-gate-refusal"):
+            (runtime / name).unlink(missing_ok=True)
+            (runtime / name).symlink_to(victim)
+        self.assertEqual(json.loads(self.codex(payload={"stop_hook_active": False}).stdout)["decision"], "block")
+        continued = json.loads(self.codex(payload={"stop_hook_active": True}).stdout)
+        self.assertNotIn("decision", continued)
+        self.assertIn("UNVERIFIED", continued["systemMessage"])
+        self.assertEqual(victim.read_text(), "keep me", "a marker was written through a planted link")
+
     def test_codex_unchanged_refusal_blocks_once_then_releases_unverified_until_change(self):
         (self.root / ".gitignore").write_text(".agent-runtime/\ngate-runs\n")
         self.project.write_text("<!-- gate:start -->\n```sh\nfalse\n```\n<!-- gate:end -->\n")
