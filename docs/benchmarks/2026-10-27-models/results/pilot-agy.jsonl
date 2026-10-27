@@ -1,0 +1,1 @@
+{"id": "agy:gemini-3.8-flash-low:None", "provider": "agy", "model": "gemini-3.8-flash-low", "effort": null, "exit": 0, "seconds": 53.4, "tokens": 130867, "cache_read": 28321, "passed": 30, "total": 30}

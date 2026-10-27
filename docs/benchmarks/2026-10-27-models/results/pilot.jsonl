@@ -1,0 +1,2 @@
+{"id": "codex:gpt-6-luna:low", "provider": "codex", "model": "gpt-6-luna", "effort": "low", "exit": 0, "seconds": 35.7, "tokens": 10690, "cache_read": null, "passed": 29, "total": 30}
+{"id": "claude:claude-haiku-5-5:low", "provider": "claude", "model": "claude-haiku-5-5", "effort": "low", "exit": 0, "seconds": 76.3, "tokens": 43237, "cache_read": 208007, "passed": 29, "total": 30}
