@@ -1,65 +1,45 @@
-# Models and effort
+# Models, effort and spawning
 
 Model reasoning effort is separate from procedure intensity under `SKILL-EFFORT.md`; never translate standard/high/ultra procedure levels into runtime settings.
 
-Choose the least costly available model and effort likely to satisfy the Task Contract. Risk and
-quality set the required work and review depth; budget guides optional spend. Repository mode
-(`standard`, `tracker`, or `full`) does not change model selection. Do not pin provider model IDs in
-this portable policy.
+## Model list
 
-## Spawn or finish in the session
+`.lean/models.json` (project-owned) maps four sizes to concrete models per provider (`claude`, `codex`, `agy`), with the CLI arguments `lean spawn run` uses. `lean models` prints it; `lean models check --live` asks the provider CLIs which models exist (Codex's model cache, `agy models`; Claude has no listing, so its IDs stay unverified until used). An unavailable model is reported, never silently substituted; update the list instead.
 
-Spawn only when required or cheaper. Required: delegated execution, HIGH independent review, or an explicit user request for workers. Otherwise compare total cost: finishing in the active session (context already loaded) versus a spawn (brief, cold re-reads, subagent work at its price, result handed back). Finish in the session when that costs less or about the same; spawn mainly for large, read-heavy work a cheaper model can do without the session's context.
-
-## Starting point
-
-| Work | Model capability | Effort |
+| Size | Work | Starting effort |
 |---|---|---|
-| Mechanical, well-specified work (locate, rename, format) | Economical available model | Low |
-| Normal implementation or focused review | Current/default capable model | Medium |
-| Hard reasoning, conflicting evidence, or a complex security/data boundary | Capable model for that task | High when the added reasoning is useful |
+| `S` | Mechanical, well-specified work (locate, rename, format) | Low |
+| `M` | Normal implementation or focused review | Medium |
+| `L` | Hard reasoning, conflicting evidence, complex security/data boundaries | High |
+| `XL` | Work an `L` attempt demonstrably could not do | High |
 
-Size each delegated task, reviewers included, by this table and pass the chosen model and effort on every spawn whose tool accepts them. Omitted settings inherit the session defaults, which are often heavier than delegated work. Inherit the session setting only when it already matches the row or the tool cannot set it, and record that reason. Projects may map the rows to concrete models in AGENTS.md Project additions or `.lean/model-catalog.json`. The active session's own settings stay with the user: use them when the runtime cannot change them, and do not interrupt routine work to switch them. Check actual model/effort options before dispatch. Use supported effort at or above the starting point when useful, or assess the available setting against the quality floor. `CHEAP` favors economical capable options, `BALANCED` uses the normal starting point, and `EXPENSIVE` allows justified optional spend. None removes tests, validation or required review; report an unmet floor rather than lowering it.
+Size each spawned task, reviewers included, by this table. Repository mode does not change model selection. Risk and quality set the required work and review depth; budget guides optional spend (`CHEAP` favors smaller sizes, `EXPENSIVE` allows justified larger ones). None removes tests, validation or required review; report an unmet floor rather than lowering it.
 
-## Spawn context and records
+## Spawn levels
 
-Choose model and effort for the assigned work, not by copying the parent settings. Pass both explicitly when the tool accepts them, even when they match the parent. Keep project model mappings task-sized; do not replace every subagent default with the economical model, since normal and complex work still need their sized choices.
+1. **Default (no `/lean-agents`)** — at most `max_agents` agents at once (`.lean/models.json`, default `1`), each sized to its task. Spawn only when required (delegated execution, HIGH independent review, an explicit user request) or cheaper: compare finishing in this session (context already loaded) with a spawn (brief, cold re-reads, the agent's own work, the handoff). Finish here when that costs less or about the same; size `S` work usually does. If this session's reasoning falls short on a task, spawn the next larger size and record why.
+2. **`/lean-agents`** — split the work into independent tasks with exclusive file ownership and spawn one agent per task that can run in parallel; dependencies and shared files serialize tasks into later waves. `lean spawn plan --level max` computes the waves and shows the agent count before any spawn.
+3. **`/lean-agents <model> xN`** — up to N agents at once, all on the named model (sizes do not apply); further tasks run in later waves. With fewer independent tasks than N, spawn only as many as can run in parallel and say so. Natural-language requests ("use 3 sonnet") mean the same.
 
-Check the current spawn tool's context and override rules before dispatch. When a Codex tool requires a fresh context to override model or effort, use `fork_turns: "none"` and supply a self-contained brief with the contract, accepted scope, allowed files, dependencies, checks and handoff requirements. Do not assume every Codex runtime has the same fork restriction. A full-history fork is appropriate only when the inherited context is needed and its supported model/effort satisfy the task; record why. Independent HIGH review always starts fresh under `REVIEW.md`.
+`max_agents` caps only the default level; the user's explicit command sets the other two. Every agent spends the user's subscription quota, so more agents exhaust it faster.
 
-Record the concrete requested model and effort, context mode and selection reason for every dispatch; never use bare `inherited/inherited`. If the tool cannot set a value, record the known parent/default value and the limitation, or `unavailable` when unknown. Report backend settings only from runtime metadata; absent metadata stays `unavailable`, even when explicit requested settings were accepted.
+## How to spawn
+
+- **In this session** (preferred): the runtime's subagent tool. Claude's Agent tool takes `model` and `effort`; Codex's `spawn_agent` takes model and reasoning effort and needs `fork_turns: "none"` to override them (send a self-contained brief). Pass both values from the plan on every spawn, even when they match the parent; omitted settings inherit the session defaults, which are often heavier than the task needs.
+- **As separate processes**: `lean spawn run --tasks tasks.json` (or `--plan plan.json`) starts headless `claude -p`, `codex exec` or `agy -p` processes, one git worktree each, shows one progress bar per agent and leaves each worktree for the Controller to integrate. It removes metered API credentials (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` and similar) from each child so the provider CLI uses the subscription login; `--allow-api-keys` keeps them only on the user's explicit request. Logins a CLI stored itself (a Codex API-key `auth.json`, a Claude `apiKeyHelper` or Console login) are outside its reach and still bill metered credit. Commit or pass `--allow-dirty` first: worktrees start from HEAD.
+
+The task list is JSON: `{"tasks": [{"id": "api", "files": ["src/api.py"], "size": "M", "deps": [], "prompt": "..."}]}`.
+
+## Records
+
+Record every dispatch before the call: the requested model and effort, context mode (fresh or full-history, with reason), the size/level that chose them, and the agent identity. Never use bare `inherited/inherited`; when the tool cannot set a value, record the known parent/default and the limitation, or `unavailable`. Report backend settings only from runtime metadata (for Claude, the `model` field of the subagent's transcript messages; for `lean spawn run`, the command it ran); a pane header or banner that shows the session's defaults is not evidence of the agent's model. Do not store credentials, raw prompts or price assumptions.
 
 ## Independent review
 
-`HIGH` review uses an independent context with the Task Contract and diff, without author reasoning, under `REVIEW.md`. Choose the least costly capable reviewer; a stronger model is not required. Escalate only for useful boundary analysis or demonstrated reasoning limits. Report missing independence.
-
-A wording-only diff may use an economical capable available reviewer model at its default or lower effort. A diff is wording-only when it changes only instruction or documentation prose, adds or removes no rule, and leaves unchanged every normative keyword (such as must, may, never, only, required and their negations), number, limit, YAML frontmatter, import, heading/anchor, code span or block, command, path, link, identifier, table layout, list hierarchy and order, gate marker and license notice. Any change to executable code, tests, hooks or configuration disqualifies the diff. Give the reviewer a before/after rule map covering every changed sentence. The reviewer checks each condition and verifies the map against the before/after text itself, not the author's summary. It returns `REWORK` when any condition fails, when the map is missing or incomplete, or when any rule's actor, trigger, action, ordering, limit, exception or authorization changed. That `REWORK` counts as a review round. After it, review the change, edited or unchanged, with a reviewer chosen by the normal starting point; an intended meaning change also needs its own Task Contract. This lowers reviewer cost only; the HIGH floor, independence, receipt and round limits stay unchanged.
+`HIGH` review uses an independent context with the Task Contract and diff, without author reasoning, under `REVIEW.md`. Choose the smallest capable reviewer size; a stronger model is not required. A wording-only diff (instruction or documentation prose that adds or removes no rule and leaves normative keywords, numbers, paths, commands, code and structure unchanged) may use size `S` with a before/after rule map the reviewer checks against the text; any change to code, tests, hooks or configuration uses the normal size. This lowers reviewer cost only; the HIGH floor, independence, receipt and round limits stay unchanged.
 
 ## Runtime control
 
-- Claude: the session model and effort follow the user's/runtime's settings. The `reviewer`
-  subagent definition keeps `model: inherit` only as a portable fallback; pass the sized model,
-  and effort when the Agent tool accepts it, on each invocation. Raise reviewer effort only through
-  a supported runtime control; do not edit the shared subagent definition for one task.
-- Codex: follow the session settings for the main agent. For workers and independent reviews, use a
-  subagent or fresh session; when the spawn tool supports model and reasoning effort, set both by
-  the starting point. Apply the context and override rules above; use the available defaults only
-  when the tool cannot set them, and record that.
-- Never claim to have changed the main session or a subagent setting unless the runtime confirms it.
-  If a desired setting is unavailable, use a capable available option. If none can meet the floor,
-  report `BLOCKED` with the limitation. Recommend a user-controlled session change only when the
-  current setting threatens the quality floor or repeated reasoning failure warrants it.
-
-## Premium dispatch evidence
-
-Before selecting a premium model or initiating additional usage billing, record the required outcome, material constraints, cheaper available option considered and concrete task-specific evidence that it cannot meet acceptance/quality. Provider names and prices belong to runtime evidence, not portable rules. A HIGH label, preference or broad complexity claim is insufficient. Use a cheaper capable option when that evidence is absent; otherwise gather it or report the constraint. User authorization is still required for additional paid usage; a dispatch justification is not billing permission.
-
-## Escalation
-
-Classify failure first: fix implementation, context, tools or permissions at their source. For a demonstrated reasoning limit, raise one supported effort level before changing to a stronger model. Change one variable per retry, record why and obey `REVIEW.md`'s round cap. Task length alone does not justify escalation; budget never lowers quality.
-
-## Project catalog refresh
-
-Use `/lean-catalog codex|claude|all` only when requested; enable its optional maintenance discovery if needed. Research and preview a versioned project-owned catalog, then apply only accepted changes. This never changes session/global settings, reviewer definitions or billing authorization.
-
-Consult optional `.lean/model-catalog.json` alongside current runtime options. A missing catalog changes nothing. Stale, retired or unknown-availability entries require rechecking; preserve explicit model choices and report unavailable ones. Provider IDs/prices belong to evidence, not portable rules. Distinguish requested settings, observed availability and reported backend settings. Premium evidence, budget, independence and quality requirements still apply.
+- The active session's own model and effort stay with the user; never claim to have changed them, or a subagent's settings, unless the runtime confirms it.
+- If a desired model is unavailable, use a capable available option from the list. If none can meet the floor, report `BLOCKED` with the limitation.
+- Classify failure first: fix implementation, context, tools or permissions at their source. For a demonstrated reasoning limit, raise one effort level, then one size; change one variable per retry, record why and obey `REVIEW.md`'s round cap. Task length alone does not justify escalation; budget never lowers quality.

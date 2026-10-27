@@ -1,69 +1,38 @@
-# Quality, review and runtime integration
+# Quality Gate, hooks and progress
 
 [Back to README](../README.md)
 
-Run the CLI examples from the repository root.
+## The gate
 
-## One shared contract
-
-[AGENTS.md](../AGENTS.md) holds the shared rules. [CLAUDE.md](../CLAUDE.md) imports it. Both runtimes discover nine core skills through symlinks, with eight more available through the optional pack.
-
-The active agent owns the task unless the project records a different Controller. It needs evidence before reporting DONE, must keep the quality level you requested, and should spend extra effort only when it has a useful reason. Project additions have their own sections so upgrades can preserve them.
-
-## Before changing files
-
-The agent writes a one-line Task Contract with risk, quality and observable acceptance. It uses accepted decisions, researches alternatives when useful, and resolves important open decisions before work that depends on them. Routine work inside accepted scope can continue without asking again.
-
-It starts with enough context for the task and follows the policy router when it needs more. `.lean/PROJECT.md` holds actual repository facts and commands.
-
-## Tests and review
-
-Behavior changes need meaningful tests. A bug fix needs a regression test shown failing before the fix and passing afterward. Deterministic validation runs before semantic review.
-
-Review depth is the deeper of risk and the requested quality floor. HIGH-depth review uses an independent reviewer who receives the Task Contract and final diff without the author's reasoning.
-
-Review rounds are bounded. After a second REWORK, one final repair/review pass must resolve the findings or report BLOCKED. PASS ends that cycle; edits made afterward need a new contract.
-
-## Quality Gates and completion
-
-Your gate commands live in [.lean/PROJECT.md](../.lean/PROJECT.md). Both providers use the shared auto/manual policy. In auto mode, Claude Stop and a trusted, activated Codex Stop adapter run the checks. Direct calls to the shared runner execute the checks:
+`python3 .lean/bin/lean gate run` runs the commands between the gate markers in `.lean/PROJECT.md`, with a bar per check, under a per-checkout lock. It also checks the Task Contract, the review receipt a HIGH contract or a High-risk change needs, and drift in the gate's own controls. Policy: [.lean/policy/QUALITY.md](../.lean/policy/QUALITY.md).
 
 ```sh
-bash .lean/scripts/quality-gate.sh --root .
+python3 .lean/bin/lean gate run --cache-tree                       # reuse a pass for an unchanged state
+python3 .lean/bin/lean gate run --require-review --contract '...'  # validation plus receipt check
+python3 .lean/bin/lean gate status                                 # last recorded result, no run
+python3 .lean/bin/lean gate mode auto_fixloop                      # auto | manual | auto_fixloop | manual_fixloop
 ```
 
-Checks rerun by default, including continued Stops after failure. A missing or empty gate blocks completion with setup guidance. SessionStart records a change baseline; it does not validate the project.
+## Hooks per provider
 
-Both adapters retain the session's original commit boundary across resumes, new prompts and later gate passes. Committing a High-risk change does not remove its review requirement; an unchanged reviewed state can still reuse its valid receipt.
+| Event | Claude (`.claude/settings.json`) | Codex (`.codex/hooks.json`, after trust) | agy |
+|---|---|---|---|
+| Session start | records a change baseline, prints policy and onboarding notes | same, as additional context | — |
+| Prompt | a person's prompt clears the declared contract | same | — |
+| Before a tool | contract guard: writes wait for a contract | same | — |
+| Stop | gate run; refusal blocks with a reason | gate run; refusal blocks with a reason | run `lean gate run` yourself |
+| Status line | `lean status --line` | built-in items only | — |
 
-`--cache-tree` is an opt-in cache for checks whose inputs are entirely visible to Git. This repository uses it for both providers' Stop commands and for `/lean-gate`. A pass made with it, by a direct run or either Stop, is recorded for the shipping state, and a later `--cache-tree` run or Stop on that unchanged state reuses it while contract and required review checks still run. Changed files or a standing refusal trigger fresh validation, and any refusal other than a contract refusal drops the recorded pass.
+Every hook is `lean hook <provider> <event>`; the logic is shared, only input and output formats differ. A repeated, unchanged refusal is released UNVERIFIED instead of looping, and three continued refusals release the Stop so the agent can report BLOCKED; a release is never a pass.
 
-Changes to tools, environment or ignored dependencies need a fresh direct run. Downstream projects whose checks depend on those inputs should remove `--cache-tree` from their Stop commands in `.claude/settings.json` and `.codex/hooks.json`. For HIGH-depth work, include `--require-review --contract '<exact contract line>'` when validating and checking the receipt together.
+## Review receipts
 
-The Claude adapter checks contract provenance when transcript metadata is available. HIGH-review receipts bind the reported review to the contract and current shipping state. Local hashes detect gate-control changes until matching prior user approval is recorded or an independent HIGH-depth PASS review covers them. Controls that equal a trusted upstream ref listed in PROJECT.md (`<!-- trusted-control-refs: ... -->`), for example after merging a reviewed release branch, are accepted automatically; local edits still need approval or an independent HIGH-depth PASS review that covers them. See [.lean/policy/QUALITY.md](../.lean/policy/QUALITY.md) for exact commands and limits.
+The independent reviewer captures `lean evidence state`, reviews, and records `lean evidence record-review --contract '<exact line>' --reviewer '<id>' --state '<captured>' --verdict PASS|REWORK --evidence '<scope>'`. The guard refuses that call from the author's own session. Any later content change invalidates the receipt; staging or committing the whole reviewed change keeps it. Tracker files directly under `docs/tracking/` are excluded so the result can be recorded after review.
 
-These checks catch stale evidence and mistakes, but remain writable by an agent with repository access. Contract truth, regression timing, reviewer identity and record evidence still depend on following the procedure. Projects needing enforcement outside the agent should use trusted CI and protected merge permissions.
+## Protected controls
 
-All shared gate entry points hold a lock for that checkout while checks run. A busy or unavailable lock reports NOT_RUN. Retry after the owning processes exit; never delete a live lock file. Direct commands outside the runner are not serialized. The lock does not freeze edits or prove checks passed.
+The gate records its controls on first use (hook configuration, the gate mode file, the `lean` entry, every module in `.lean/lean/`, the gate block) and refuses changes until they are accepted: by an independent HIGH review that covers them, by matching a trusted remote ref listed in PROJECT.md, or by `lean gate accept-controls --reason '<user approval>'`.
 
-Pre-existing or out-of-scope failures, missing tools, and unavailable required reviewers/workers stay BLOCKED with evidence. Workflow self-tests alone cannot establish application correctness.
+## Progress surfaces
 
-## Auto, manual and fixloop modes
-
-Inspect the setting with `python3 .lean/scripts/gate_mode.py`. Add `auto`, `manual`, `auto_fixloop` or `manual_fixloop` to save an explicit choice. See [.lean/policy/QUALITY.md](../.lean/policy/QUALITY.md) for gate automation rules.
-
-Workspace-owned `.codex/quality-gate.json` stores the preference. Missing settings mean `auto`. Preferences survive upgrades and are excluded from releases. Both providers read the setting, including for a selected submodule target.
-
-`manual` and `manual_fixloop` skip automatic full checks on Stop and report NOT_RUN. Focused checks can continue. Starting a full gate run always needs applicable user authorization, reusing matching workset/batch approval or an explicit `/lean-gate` invocation. In `auto_fixloop` and `manual_fixloop`, once the full gate runs, any check failure triggers an automatic fix loop over actionable code, test and lint failures until the gate passes without asking between rounds—stopping only for genuine requirement/design questions or missing environment tools. Both Claude and Codex Stop adapters block up to three attempts (`max_refusals=3`) while state changes and release immediately as UNVERIFIED on an unchanged refusal in the same session. Until validation and review cover the final work, keep VALIDATING/BLOCKED.
-
-Explicit entry points include the shared runner, `python3 .codex/hooks/quality_gate.py run`, and `CLAUDE_GATE_FORCE=1 .claude/hooks/quality-gate.sh`. The first two print numbered check progress with elapsed times on stderr unless given `--quiet`; Stops always run quietly. For HIGH work, supply the exact `--contract` and `--require-review`. Automatic Codex Stops can reuse only a receipt verified against the current state; they cannot establish acceptance or contract provenance for a new task.
-
-Changing the mode is a protected control change. Inspect the full controls delta and record only already matching approval through the existing accept-controls procedure. The mode command cannot approve unrelated edits. Invalid policy blocks the provider adapters. Manual mode and released Stops still require the same completion evidence and review.
-
-## Runtime integration and limits
-
-Claude's `.claude/settings.json` supplies SessionStart/Stop hooks, read-only Git permissions and `.env` read denies. These settings apply to Claude. Keep secrets out of trackers, queue items and dispatch messages; local settings are not a general secret-protection guarantee. Headless Claude also needs its runtime's workspace trust and tool permissions.
-
-Codex definitions live in `.codex/hooks.json`. Activation and trust belong to the runtime and need separate verification. Until verified, follow AGENTS and run checks explicitly. Installing adapter files or passing adapter tests does not prove the hooks are active in your Desktop session. Other agents can follow the contract, but native adapters are supplied only for Claude and Codex.
-
-Workflow self-tests run locally and in GitHub Actions on Ubuntu with Python 3.9. They cover onboarding, modes, lease ownership, dependencies/evidence, downgrade guards, dry-run preservation, worker races, upgrade-back validation, canonical routing and discovery links. Smoke tests isolate reusable assets and preserve the host project's license and records. Add your application's own checks alongside them.
+One state file, `.agent-runtime/progress.json`, written by `lean progress set`, drives: the agent's replies, `lean status`, `lean watch`, `lean test`, `lean gate run`, `lean spawn run` (a bar per agent, read from each agent's own worktree), the Claude status line, Claude's Stop message after a pass and Codex's Stop message. Gap: Codex and agy cannot draw a custom line in their own window; use `lean watch` beside them.

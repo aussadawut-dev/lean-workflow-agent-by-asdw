@@ -5,8 +5,6 @@
 
 # Claude local state
 .claude/settings.local.json
-.claude/.gate-cache
-.claude/.gate-failed
 
 # Merge and patch debris, which --untracked would otherwise scan
 *.orig
@@ -15,7 +13,10 @@
 # Behavior eval transcripts and reports (evals/run_evals.py)
 evals/results/
 
-# Local workflow coordination and Python test caches
+# Local workflow state (contracts, gate cache, receipts, leases, progress, spawn worktrees) and Python caches
 .agent-runtime/
 __pycache__/
 *.pyc
+
+# v4 reference snapshot during the v5 rebuild (TCK001)
+.temp/

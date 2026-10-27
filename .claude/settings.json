@@ -11,13 +11,17 @@
       "Read(./.env.*)"
     ]
   },
+  "statusLine": {
+    "type": "command",
+    "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.lean/bin/lean status --line"
+  },
   "hooks": {
     "SessionStart": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.lean/bin/lean hook claude session-start"
           }
         ]
       }
@@ -27,7 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/quality-gate.sh --cache-tree",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.lean/bin/lean hook claude stop --cache-tree",
             "timeout": 600
           }
         ]
@@ -38,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.lean/scripts/contract_guard.py --root \"$CLAUDE_PROJECT_DIR\" pre-tool || exit 2"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.lean/bin/lean hook claude pre-tool || exit 2"
           }
         ]
       }
@@ -48,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.lean/scripts/contract_guard.py --root \"$CLAUDE_PROJECT_DIR\" prompt"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.lean/bin/lean hook claude prompt"
           }
         ]
       }

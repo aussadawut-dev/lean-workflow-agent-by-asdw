@@ -21,19 +21,19 @@ budget: BALANCED
 acceptance: go test ./... passes and printf 'a' | tally prints 1 1 1
 ```
 
-Write the contract first in the reply. In Claude, the PreToolUse guard binds it from that first text of the reply to the latest person prompt (read from the transcript), so no extra command is needed. A contract written later in the reply, in an earlier turn or by a subagent does not count. When the guard cannot read it (Codex, or no readable transcript) it denies with this hint; then declare the same contract as a command of its own. The declaration does not replace the written contract:
+Write the contract first in the reply. In Claude, the PreToolUse guard binds it from that first text of the reply to the latest person prompt (read from the transcript), so no extra command is needed. A contract written later in the reply, in an earlier turn or by a subagent does not count. When the guard cannot read it (Codex, agy, or no readable transcript) it denies with this hint; then declare the same contract as a command of its own. The declaration does not replace the written contract:
 
 ```sh
-python3 .lean/scripts/contract_guard.py declare <<'EOF'
+python3 .lean/bin/lean contract declare <<'EOF'
 Contract:
 risk: MEDIUM
 quality: STANDARD
 acceptance: go test ./... passes
 EOF
-python3 .lean/scripts/contract_guard.py declare --contract 'Contract: trivial (typo in README)'
+python3 .lean/bin/lean contract declare --contract 'Contract: trivial (typo in README)'
 ```
 
-The Claude and Codex PreToolUse hooks bind the contract to the session (subagents share it) and deny edit tools and shell commands that write until one exists: a redirection to anything but `/dev/null`, `/dev/stdout`, `/dev/stderr` or `/dev/tty`; `cp`, `mv`, `rm`, `mkdir`, `tee`, `chmod` and the other file writers; `sed`/`perl` in place; `find -delete`/`-exec`; `sort -o`; Git subcommands that change state and `git -c`; interpreter code that opens a file for writing; Lean scripts that change records or settings; a shell reading commands from stdin (`bash <<EOF`, `... | sh`, `bash -s`), `sudo`, `npx`, `make`, the install subcommands of `npm`, `pnpm`, `yarn`, `pip`, `uv`, `cargo`, `go`, `brew` and `python -m pip`, `docker` commands other than listing ones, downloads to a file (`curl -o`, `wget`) and archive extraction or creation (`tar x`, `tar c`, `unzip`); unparseable text, a backtick, or a command named by an expansion (`eval "$cmd"`, `$tool x`). Runners (`eval`, `sh -c`, `exec`, `xargs`, `env`, `nice`, `time`) are judged by the command they run. Every other tool and shell command, including reads, `cd`, `echo`, loops, `$(...)` reads, `workflow.py show|check|context`, test runs and the gate runner, runs without a contract. The check is a best-effort pattern over the parsed command, not a security boundary: an unlisted tool, interpreter or script, a write hidden in a heredoc body fed to anything but a shell, or a path hidden behind `cd` is not caught, a quoted `>` reads as a redirection, and the Stop gate still refuses changed work that has no contract. A new user prompt clears it; in Claude, a prompt typed while the agent is still working keeps it, because the transcript then shows no finished turn (`turn_duration`), person's prompt or interrupt since the binding. Codex transcripts have no Claude entries, so every Codex prompt clears it. Run outside a hook, `declare` only validates. Use a quoted heredoc or single-quoted `--contract`: the guard accepts no shell expansion or chained command in a declaration.
+The Claude and Codex PreToolUse hooks bind the contract to the session (subagents share it) and deny edit tools and shell commands that write until one exists: a redirection to anything but `/dev/null`, `/dev/stdout`, `/dev/stderr` or `/dev/tty`; `cp`, `mv`, `rm`, `mkdir`, `tee`, `chmod` and the other file writers; `sed`/`perl` in place; `find -delete`/`-exec`; `sort -o`; Git subcommands that change state and `git -c`; interpreter code that opens a file for writing; `lean` commands that change records or settings; a shell reading commands from stdin (`bash <<EOF`, `... | sh`, `bash -s`), `sudo`, `npx`, `make`, the install subcommands of `npm`, `pnpm`, `yarn`, `pip`, `uv`, `cargo`, `go`, `brew` and `python -m pip`, `docker` commands other than listing ones, downloads to a file (`curl -o`, `wget`) and archive extraction or creation (`tar x`, `tar c`, `unzip`); unparseable text, a backtick, or a command named by an expansion (`eval "$cmd"`, `$tool x`). Runners (`eval`, `sh -c`, `exec`, `xargs`, `env`, `nice`, `time`) are judged by the command they run. Every other tool and shell command, including reads, `cd`, `echo`, loops, `$(...)` reads, `lean mode show|check|context`, `lean progress`, `lean status`, test runs and `lean gate run`, runs without a contract. The check is a best-effort pattern over the parsed command, not a security boundary: an unlisted tool, interpreter or script, a write hidden in a heredoc body fed to anything but a shell, or a path hidden behind `cd` is not caught, a quoted `>` reads as a redirection, and the Stop gate still refuses changed work that has no contract. A new user prompt clears it; in Claude, a prompt typed while the agent is still working keeps it, because the transcript then shows no finished turn (`turn_duration`), person's prompt or interrupt since the binding. Codex transcripts have no Claude entries, so every Codex prompt clears it. Run outside a hook, `declare` only validates. Use a quoted heredoc or single-quoted `--contract`: the guard accepts no shell expansion or chained command in a declaration.
 
 The line is the whole contract at every risk and quality level. The fields below define what it means; write them out only if the user asks:
 
@@ -62,7 +62,7 @@ Do not ask the user for these values. Use the defaults, infer risk, and state th
 
 Scale the report to the task. A trivial task needs one line.
 
-- **Status** — `DONE | BLOCKED | FAILED`.
+- **Status** — `DONE | BLOCKED | FAILED`, with the final progress bar.
 - **Changes** — what changed and where.
 - **Evidence** — commands run and their outcomes, tests added/run, which review round the change is on, and the range that review covered against the range that ships.
 - **Not verified** — anything skipped, with reason.

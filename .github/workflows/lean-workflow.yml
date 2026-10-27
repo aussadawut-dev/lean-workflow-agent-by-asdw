@@ -1,38 +1,9 @@
 name: Lean Workflow
 
+# The full suite runs here on every push and pull request; agents run `lean test --changed` locally.
 on:
   push:
-    paths:
-      - '.lean/**'
-      - '.claude/**'
-      - '.agents/skills/**'
-      - '.codex/**'
-      - 'docs/**'
-      - 'evals/**'
-      - 'tools/**'
-      - '.github/workflows/lean-workflow.yml'
-      - '.github/pull_request_template.md'
-      - 'CLAUDE.md'
-      - 'AGENTS.md'
-      - 'CONTRIBUTING.md'
-      - 'README.md'
-      - '.gitignore'
   pull_request:
-    paths:
-      - '.lean/**'
-      - '.claude/**'
-      - '.agents/skills/**'
-      - '.codex/**'
-      - 'docs/**'
-      - 'evals/**'
-      - 'tools/**'
-      - '.github/workflows/lean-workflow.yml'
-      - '.github/pull_request_template.md'
-      - 'CLAUDE.md'
-      - 'AGENTS.md'
-      - 'CONTRIBUTING.md'
-      - 'README.md'
-      - '.gitignore'
 
 jobs:
   check:
@@ -44,39 +15,24 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # test_partial_upgrade needs the 4.17.0 commit; a shallow clone skips it
 
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install ShellCheck
-        if: runner.os == 'macOS'
-        run: command -v shellcheck || brew install shellcheck
+      - name: Configure Git for test repositories
+        run: |
+          git config --global user.name ci
+          git config --global user.email ci@example.invalid
 
-      - name: ShellCheck
-        run: shellcheck .claude/hooks/*.sh .lean/scripts/*.sh .lean/tests/*.sh
-
-      - name: Structure
-        run: .lean/scripts/check-structure.sh
-
-      - name: Hook tests
-        run: .lean/tests/test-hooks.sh
+      - name: Lint
+        run: python3 .lean/bin/lean lint
 
       - name: Mode configuration
-        run: python3 .lean/scripts/workflow.py check
+        run: python3 .lean/bin/lean mode check
 
-      - name: Project model catalog
-        run: python3 .lean/scripts/model_catalog.py check
+      - name: Model list
+        run: python3 .lean/bin/lean models check
 
-      - name: Workflow regression tests
-        run: python3 .lean/tests/run_tests.py --shards 6
-
-      - name: Eval graders and fixtures (no model calls)
-        run: |
-          python3 -m unittest discover -s evals -p 'test_*.py'
-          python3 evals/run_evals.py --dry-run
-
-      - name: Repository tool tests
-        run: python3 -m unittest discover -s tools -p 'test_*.py'
+      - name: Full test suite
+        run: python3 .lean/bin/lean test --all

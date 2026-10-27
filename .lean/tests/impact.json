@@ -1,0 +1,214 @@
+{
+  "scope": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "README.md",
+    "CONTRIBUTING.md",
+    ".gitignore",
+    ".lean/*",
+    ".claude/*",
+    ".codex/*",
+    ".agents/*",
+    ".github/*",
+    "docs/*",
+    "evals/*",
+    "LICENSE"
+  ],
+  "lint_only": [
+    "*.md",
+    "docs/*",
+    "evals/*",
+    ".github/*",
+    "LICENSE",
+    ".lean/LICENSE",
+    ".lean/config.json",
+    ".lean/gate.json",
+    ".lean/skill-effort.json"
+  ],
+  "rules": [
+    {
+      "paths": [
+        ".lean/bin/lean",
+        ".lean/lean/__init__.py",
+        ".lean/lean/cli.py",
+        ".lean/lean/util.py",
+        ".lean/tests/support.py"
+      ],
+      "tests": [
+        "unit",
+        "hooks",
+        "e2e"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/lean/guard.py"
+      ],
+      "tests": [
+        "hooks/test_guard.py",
+        "hooks/test_hook_cases.py",
+        "hooks/test_gate.py",
+        "hooks/test_target_gate.py",
+        "hooks/test_target_controls.py",
+        "hooks/test_target_lifecycle.py",
+        "hooks/test_review_pending.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/lean/evidence.py",
+        ".lean/lean/gate.py",
+        ".lean/lean/hooks.py",
+        ".claude/settings.json",
+        ".codex/hooks.json",
+        ".gitignore"
+      ],
+      "tests": [
+        "hooks",
+        "hooks/test_stop_git.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/lean/records.py",
+        ".lean/templates/tracker.md",
+        ".lean/templates/queue-item.json"
+      ],
+      "tests": [
+        "unit/test_records.py",
+        "unit/test_downgrade.py",
+        "unit/test_queue_history.py",
+        "unit/test_tracker_guards.py",
+        "e2e/test_lifecycle.py",
+        "hooks/test_target_gate.py",
+        "hooks/test_target_controls.py",
+        "hooks/test_target_lifecycle.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/lean/effort.py"
+      ],
+      "tests": [
+        "unit/test_effort.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/lean/progress.py"
+      ],
+      "tests": [
+        "unit/test_progress.py",
+        "unit/test_cli.py",
+        "hooks/test_gate.py",
+        "unit/test_activity.py",
+        "unit/test_cli_startup.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/lean/models.py",
+        ".lean/models.json"
+      ],
+      "tests": [
+        "unit/test_models.py",
+        "unit/test_spawn.py",
+        "unit/test_structure.py",
+        "e2e/test_spawn_scenarios.py",
+        "e2e/test_spawn_permissions.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/lean/spawn.py",
+        ".lean/templates/tasks.json"
+      ],
+      "tests": [
+        "unit/test_spawn.py",
+        "e2e/test_spawn_run.py",
+        "e2e/test_spawn_scenarios.py",
+        "unit/test_activity.py",
+        "e2e/test_spawn_permissions.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/lean/testsel.py",
+        ".lean/tests/impact.json"
+      ],
+      "tests": [
+        "unit/test_testsel.py",
+        "unit/test_activity.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/lean/structure.py",
+        ".lean/assets.json",
+        ".lean/skills/*",
+        ".claude/skills/*",
+        ".agents/skills/*",
+        ".claude/agents/*"
+      ],
+      "tests": [
+        "unit/test_structure.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/lean/attribution.py"
+      ],
+      "tests": [
+        "unit/test_attribution.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/lean/update.py"
+      ],
+      "tests": [
+        "e2e/test_update.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/lean/util.py"
+      ],
+      "tests": [
+        "unit/test_util.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/lean/target.py"
+      ],
+      "tests": [
+        "hooks/test_target_gate.py",
+        "hooks/test_target_controls.py",
+        "hooks/test_target_lifecycle.py",
+        "hooks/test_gate.py",
+        "hooks/test_controls.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/lean/activity.py"
+      ],
+      "tests": [
+        "unit/test_activity.py",
+        "e2e/test_spawn_scenarios.py",
+        "hooks/test_gate.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/tests/hooks/target_support.py"
+      ],
+      "tests": [
+        "hooks/test_target_gate.py",
+        "hooks/test_target_controls.py",
+        "hooks/test_target_lifecycle.py"
+      ]
+    }
+  ]
+}

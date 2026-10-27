@@ -1,0 +1,518 @@
+{
+  "measurement": "Offline sum of per-file text tokens, not actual model usage or billing.",
+  "tiktoken_version": "0.12.0",
+  "versions": {
+    "4.17.1": {
+      "ref": "v4.17.1",
+      "commit": "0824b8a3fa3c34f29f5f98d9067ca0cf1f168665"
+    },
+    "5.0.0": {
+      "ref": "working tree on feat/refactor-v4",
+      "head_commit": "100e9b87d036483ab9ad8ff956d3ed06c4f0e654",
+      "tracked_files_modified_vs_head": true
+    }
+  },
+  "file_mapping": {
+    "startup": [
+      {
+        "v4": "AGENTS.md",
+        "v5": "AGENTS.md"
+      },
+      {
+        "v4": ".lean/README.md",
+        "v5": ".lean/README.md"
+      }
+    ],
+    "task-fixed-read-set": [
+      {
+        "v4": "AGENTS.md",
+        "v5": "AGENTS.md"
+      },
+      {
+        "v4": ".lean/README.md",
+        "v5": ".lean/README.md"
+      },
+      {
+        "v4": ".lean/skills/lean-task/SKILL.md",
+        "v5": ".lean/skills/lean-task/SKILL.md"
+      },
+      {
+        "v4": ".lean/skills/lean-scope/SKILL.md",
+        "v5": ".lean/skills/lean-scope/SKILL.md"
+      },
+      {
+        "v4": ".lean/skills/lean-review/SKILL.md",
+        "v5": ".lean/skills/lean-review/SKILL.md"
+      },
+      {
+        "v4": ".lean/skills/lean-gate/SKILL.md",
+        "v5": ".lean/skills/lean-gate/SKILL.md"
+      },
+      {
+        "v4": ".lean/policy/CONTEXT.md",
+        "v5": ".lean/policy/CONTEXT.md"
+      },
+      {
+        "v4": ".lean/policy/CONTRACTS.md",
+        "v5": ".lean/policy/CONTRACTS.md"
+      },
+      {
+        "v4": ".lean/policy/TESTING.md",
+        "v5": ".lean/policy/TESTING.md"
+      },
+      {
+        "v4": ".lean/policy/REVIEW.md",
+        "v5": ".lean/policy/REVIEW.md"
+      },
+      {
+        "v4": ".lean/policy/QUALITY.md",
+        "v5": ".lean/policy/QUALITY.md"
+      }
+    ],
+    "gate-source": [
+      {
+        "v4": ".codex/hooks/quality_gate.py",
+        "v5": ".lean/lean/hooks.py",
+        "note": "Codex/Claude lifecycle adapter -> unified hook dispatcher"
+      },
+      {
+        "v4": ".lean/scripts/contract_guard.py",
+        "v5": ".lean/lean/guard.py",
+        "note": "contract guard"
+      },
+      {
+        "v4": ".lean/scripts/gate_evidence.py",
+        "v5": ".lean/lean/evidence.py",
+        "note": "gate evidence"
+      },
+      {
+        "v4": ".lean/scripts/quality-gate.sh",
+        "v5": ".lean/lean/gate.py",
+        "note": "quality gate runner (shell -> Python)"
+      },
+      {
+        "v4": ".lean/scripts/submodule.py",
+        "v5": ".lean/lean/target.py",
+        "note": "submodule/target context"
+      }
+    ],
+    "no_v5_equivalent": [
+      ".lean/skills/lean-playbook/SKILL.md (4.17 deployment-optional; not in either fixed set)"
+    ],
+    "v5_only_gate_modules": "other .lean/lean/*.py modules are listed under gate-all-v5-modules"
+  },
+  "limits": [
+    "Static inventories only: exclude system/runtime prompts, tool traffic, retries, model output and cache billing.",
+    "Fixed sets are comparable input inventories, not required reads for every task.",
+    "Gate source counts full files; focused range reads can cost less.",
+    "No causal claim about actual token, cost or speed savings, or agent correctness."
+  ],
+  "encodings": {
+    "o200k_base": {
+      "startup-required": {
+        "v4_tokens": 2213,
+        "v5_tokens": 2209,
+        "delta_tokens": -4,
+        "delta_percent": -0.2,
+        "files": [
+          {
+            "v4_path": "AGENTS.md",
+            "v5_path": "AGENTS.md",
+            "v4_tokens": 1504,
+            "v5_tokens": 1579
+          },
+          {
+            "v4_path": ".lean/README.md",
+            "v5_path": ".lean/README.md",
+            "v4_tokens": 709,
+            "v5_tokens": 630
+          }
+        ]
+      },
+      "task-fixed-read-set": {
+        "v4_tokens": 11146,
+        "v5_tokens": 9962,
+        "delta_tokens": -1184,
+        "delta_percent": -10.6,
+        "files": [
+          {
+            "v4_path": "AGENTS.md",
+            "v5_path": "AGENTS.md",
+            "v4_tokens": 1504,
+            "v5_tokens": 1579
+          },
+          {
+            "v4_path": ".lean/README.md",
+            "v5_path": ".lean/README.md",
+            "v4_tokens": 709,
+            "v5_tokens": 630
+          },
+          {
+            "v4_path": ".lean/skills/lean-task/SKILL.md",
+            "v5_path": ".lean/skills/lean-task/SKILL.md",
+            "v4_tokens": 685,
+            "v5_tokens": 669
+          },
+          {
+            "v4_path": ".lean/skills/lean-scope/SKILL.md",
+            "v5_path": ".lean/skills/lean-scope/SKILL.md",
+            "v4_tokens": 1335,
+            "v5_tokens": 913
+          },
+          {
+            "v4_path": ".lean/skills/lean-review/SKILL.md",
+            "v5_path": ".lean/skills/lean-review/SKILL.md",
+            "v4_tokens": 617,
+            "v5_tokens": 576
+          },
+          {
+            "v4_path": ".lean/skills/lean-gate/SKILL.md",
+            "v5_path": ".lean/skills/lean-gate/SKILL.md",
+            "v4_tokens": 578,
+            "v5_tokens": 433
+          },
+          {
+            "v4_path": ".lean/policy/CONTEXT.md",
+            "v5_path": ".lean/policy/CONTEXT.md",
+            "v4_tokens": 823,
+            "v5_tokens": 600
+          },
+          {
+            "v4_path": ".lean/policy/CONTRACTS.md",
+            "v5_path": ".lean/policy/CONTRACTS.md",
+            "v4_tokens": 1390,
+            "v5_tokens": 1408
+          },
+          {
+            "v4_path": ".lean/policy/TESTING.md",
+            "v5_path": ".lean/policy/TESTING.md",
+            "v4_tokens": 146,
+            "v5_tokens": 400
+          },
+          {
+            "v4_path": ".lean/policy/REVIEW.md",
+            "v5_path": ".lean/policy/REVIEW.md",
+            "v4_tokens": 1017,
+            "v5_tokens": 877
+          },
+          {
+            "v4_path": ".lean/policy/QUALITY.md",
+            "v5_path": ".lean/policy/QUALITY.md",
+            "v4_tokens": 2342,
+            "v5_tokens": 1877
+          }
+        ]
+      },
+      "gate-source-inventory": {
+        "v4_tokens": 31806,
+        "v5_tokens": 31743,
+        "delta_tokens": -63,
+        "delta_percent": -0.2,
+        "files": [
+          {
+            "v4_path": ".codex/hooks/quality_gate.py",
+            "v5_path": ".lean/lean/hooks.py",
+            "v4_tokens": 3553,
+            "v5_tokens": 2990
+          },
+          {
+            "v4_path": ".lean/scripts/contract_guard.py",
+            "v5_path": ".lean/lean/guard.py",
+            "v4_tokens": 11175,
+            "v5_tokens": 11243
+          },
+          {
+            "v4_path": ".lean/scripts/gate_evidence.py",
+            "v5_path": ".lean/lean/evidence.py",
+            "v4_tokens": 7399,
+            "v5_tokens": 7508
+          },
+          {
+            "v4_path": ".lean/scripts/quality-gate.sh",
+            "v5_path": ".lean/lean/gate.py",
+            "v4_tokens": 5702,
+            "v5_tokens": 6070
+          },
+          {
+            "v4_path": ".lean/scripts/submodule.py",
+            "v5_path": ".lean/lean/target.py",
+            "v4_tokens": 3977,
+            "v5_tokens": 3932
+          }
+        ]
+      },
+      "all-executable-source": {
+        "v4_files": 21,
+        "v5_files": 18,
+        "v4_tokens": 78751,
+        "v5_tokens": 68158,
+        "delta_tokens": -10593,
+        "delta_percent": -13.5,
+        "v4_paths": [
+          ".claude/hooks/quality-gate.sh",
+          ".claude/hooks/session-start.sh",
+          ".codex/hooks/quality_gate.py",
+          ".lean/scripts/check-structure.sh",
+          ".lean/scripts/check_structure.py",
+          ".lean/scripts/clean_repo.py",
+          ".lean/scripts/contract_guard.py",
+          ".lean/scripts/gate_evidence.py",
+          ".lean/scripts/gate_lock.py",
+          ".lean/scripts/gate_mode.py",
+          ".lean/scripts/lean_core.py",
+          ".lean/scripts/model_catalog.py",
+          ".lean/scripts/model_drift.py",
+          ".lean/scripts/quality-gate.sh",
+          ".lean/scripts/shared_assets.py",
+          ".lean/scripts/skill_effort.py",
+          ".lean/scripts/skill_pack.py",
+          ".lean/scripts/submodule.py",
+          ".lean/scripts/takeover.py",
+          ".lean/scripts/update_workflow.py",
+          ".lean/scripts/workflow.py"
+        ],
+        "v5_paths": [
+          ".lean/lean/__init__.py",
+          ".lean/lean/activity.py",
+          ".lean/lean/attribution.py",
+          ".lean/lean/cli.py",
+          ".lean/lean/effort.py",
+          ".lean/lean/evidence.py",
+          ".lean/lean/gate.py",
+          ".lean/lean/guard.py",
+          ".lean/lean/hooks.py",
+          ".lean/lean/models.py",
+          ".lean/lean/progress.py",
+          ".lean/lean/records.py",
+          ".lean/lean/spawn.py",
+          ".lean/lean/structure.py",
+          ".lean/lean/target.py",
+          ".lean/lean/testsel.py",
+          ".lean/lean/update.py",
+          ".lean/lean/util.py"
+        ],
+        "note": "supplementary: all v4 scripts/hooks vs all v5 lean package modules"
+      },
+      "skill-metadata-supplementary": {
+        "v4_skills": 18,
+        "v5_skills": 11,
+        "v4_tokens": 1025,
+        "v5_tokens": 644,
+        "delta_tokens": -381,
+        "delta_percent": -37.2,
+        "note": "frontmatter of all skills; the 4.17 retained method did not count it; v4 default discovery exposes 9 core skills, 18 with optional pack"
+      }
+    },
+    "cl100k_base": {
+      "startup-required": {
+        "v4_tokens": 2211,
+        "v5_tokens": 2207,
+        "delta_tokens": -4,
+        "delta_percent": -0.2,
+        "files": [
+          {
+            "v4_path": "AGENTS.md",
+            "v5_path": "AGENTS.md",
+            "v4_tokens": 1503,
+            "v5_tokens": 1578
+          },
+          {
+            "v4_path": ".lean/README.md",
+            "v5_path": ".lean/README.md",
+            "v4_tokens": 708,
+            "v5_tokens": 629
+          }
+        ]
+      },
+      "task-fixed-read-set": {
+        "v4_tokens": 11153,
+        "v5_tokens": 9969,
+        "delta_tokens": -1184,
+        "delta_percent": -10.6,
+        "files": [
+          {
+            "v4_path": "AGENTS.md",
+            "v5_path": "AGENTS.md",
+            "v4_tokens": 1503,
+            "v5_tokens": 1578
+          },
+          {
+            "v4_path": ".lean/README.md",
+            "v5_path": ".lean/README.md",
+            "v4_tokens": 708,
+            "v5_tokens": 629
+          },
+          {
+            "v4_path": ".lean/skills/lean-task/SKILL.md",
+            "v5_path": ".lean/skills/lean-task/SKILL.md",
+            "v4_tokens": 684,
+            "v5_tokens": 666
+          },
+          {
+            "v4_path": ".lean/skills/lean-scope/SKILL.md",
+            "v5_path": ".lean/skills/lean-scope/SKILL.md",
+            "v4_tokens": 1339,
+            "v5_tokens": 915
+          },
+          {
+            "v4_path": ".lean/skills/lean-review/SKILL.md",
+            "v5_path": ".lean/skills/lean-review/SKILL.md",
+            "v4_tokens": 616,
+            "v5_tokens": 576
+          },
+          {
+            "v4_path": ".lean/skills/lean-gate/SKILL.md",
+            "v5_path": ".lean/skills/lean-gate/SKILL.md",
+            "v4_tokens": 580,
+            "v5_tokens": 435
+          },
+          {
+            "v4_path": ".lean/policy/CONTEXT.md",
+            "v5_path": ".lean/policy/CONTEXT.md",
+            "v4_tokens": 824,
+            "v5_tokens": 602
+          },
+          {
+            "v4_path": ".lean/policy/CONTRACTS.md",
+            "v5_path": ".lean/policy/CONTRACTS.md",
+            "v4_tokens": 1393,
+            "v5_tokens": 1411
+          },
+          {
+            "v4_path": ".lean/policy/TESTING.md",
+            "v5_path": ".lean/policy/TESTING.md",
+            "v4_tokens": 146,
+            "v5_tokens": 401
+          },
+          {
+            "v4_path": ".lean/policy/REVIEW.md",
+            "v5_path": ".lean/policy/REVIEW.md",
+            "v4_tokens": 1017,
+            "v5_tokens": 879
+          },
+          {
+            "v4_path": ".lean/policy/QUALITY.md",
+            "v5_path": ".lean/policy/QUALITY.md",
+            "v4_tokens": 2343,
+            "v5_tokens": 1877
+          }
+        ]
+      },
+      "gate-source-inventory": {
+        "v4_tokens": 31569,
+        "v5_tokens": 31476,
+        "delta_tokens": -93,
+        "delta_percent": -0.3,
+        "files": [
+          {
+            "v4_path": ".codex/hooks/quality_gate.py",
+            "v5_path": ".lean/lean/hooks.py",
+            "v4_tokens": 3517,
+            "v5_tokens": 2966
+          },
+          {
+            "v4_path": ".lean/scripts/contract_guard.py",
+            "v5_path": ".lean/lean/guard.py",
+            "v4_tokens": 11076,
+            "v5_tokens": 11146
+          },
+          {
+            "v4_path": ".lean/scripts/gate_evidence.py",
+            "v5_path": ".lean/lean/evidence.py",
+            "v4_tokens": 7342,
+            "v5_tokens": 7452
+          },
+          {
+            "v4_path": ".lean/scripts/quality-gate.sh",
+            "v5_path": ".lean/lean/gate.py",
+            "v4_tokens": 5686,
+            "v5_tokens": 6006
+          },
+          {
+            "v4_path": ".lean/scripts/submodule.py",
+            "v5_path": ".lean/lean/target.py",
+            "v4_tokens": 3948,
+            "v5_tokens": 3906
+          }
+        ]
+      },
+      "all-executable-source": {
+        "v4_files": 21,
+        "v5_files": 18,
+        "v4_tokens": 78056,
+        "v5_tokens": 67639,
+        "delta_tokens": -10417,
+        "delta_percent": -13.3,
+        "v4_paths": [
+          ".claude/hooks/quality-gate.sh",
+          ".claude/hooks/session-start.sh",
+          ".codex/hooks/quality_gate.py",
+          ".lean/scripts/check-structure.sh",
+          ".lean/scripts/check_structure.py",
+          ".lean/scripts/clean_repo.py",
+          ".lean/scripts/contract_guard.py",
+          ".lean/scripts/gate_evidence.py",
+          ".lean/scripts/gate_lock.py",
+          ".lean/scripts/gate_mode.py",
+          ".lean/scripts/lean_core.py",
+          ".lean/scripts/model_catalog.py",
+          ".lean/scripts/model_drift.py",
+          ".lean/scripts/quality-gate.sh",
+          ".lean/scripts/shared_assets.py",
+          ".lean/scripts/skill_effort.py",
+          ".lean/scripts/skill_pack.py",
+          ".lean/scripts/submodule.py",
+          ".lean/scripts/takeover.py",
+          ".lean/scripts/update_workflow.py",
+          ".lean/scripts/workflow.py"
+        ],
+        "v5_paths": [
+          ".lean/lean/__init__.py",
+          ".lean/lean/activity.py",
+          ".lean/lean/attribution.py",
+          ".lean/lean/cli.py",
+          ".lean/lean/effort.py",
+          ".lean/lean/evidence.py",
+          ".lean/lean/gate.py",
+          ".lean/lean/guard.py",
+          ".lean/lean/hooks.py",
+          ".lean/lean/models.py",
+          ".lean/lean/progress.py",
+          ".lean/lean/records.py",
+          ".lean/lean/spawn.py",
+          ".lean/lean/structure.py",
+          ".lean/lean/target.py",
+          ".lean/lean/testsel.py",
+          ".lean/lean/update.py",
+          ".lean/lean/util.py"
+        ],
+        "note": "supplementary: all v4 scripts/hooks vs all v5 lean package modules"
+      },
+      "skill-metadata-supplementary": {
+        "v4_skills": 18,
+        "v5_skills": 11,
+        "v4_tokens": 1021,
+        "v5_tokens": 644,
+        "delta_tokens": -377,
+        "delta_percent": -36.9,
+        "note": "frontmatter of all skills; the 4.17 retained method did not count it; v4 default discovery exposes 9 core skills, 18 with optional pack"
+      }
+    }
+  },
+  "workflow_owned_files": {
+    "4.17.1": {
+      "files": 106,
+      "lines": 21239,
+      "files_excluding_tests": 75,
+      "lines_excluding_tests": 9785,
+      "definition": "tracked non-symlink files under .lean/ .claude/ .codex/ .agents/ plus AGENTS.md, CLAUDE.md; excludes project-owned PROJECT.md, config.json, skill-effort.json"
+    },
+    "5.0.0": {
+      "files": 84,
+      "lines": 15091,
+      "files_excluding_tests": 56,
+      "lines_excluding_tests": 8222,
+      "definition": "tracked non-symlink files under .lean/ .claude/ .codex/ .agents/ plus AGENTS.md, CLAUDE.md; excludes project-owned PROJECT.md, config.json, skill-effort.json"
+    }
+  }
+}

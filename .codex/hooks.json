@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/quality_gate.py\" session-start"
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.lean/bin/lean\" hook codex session-start"
           }
         ]
       }
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/quality_gate.py\" stop --cache-tree",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.lean/bin/lean\" hook codex stop --cache-tree",
             "timeout": 600,
             "statusMessage": "Checking Lean Quality Gate policy"
           }
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)\"/.lean/scripts/contract_guard.py --root \"$(git rev-parse --show-toplevel)\" pre-tool || exit 2",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.lean/bin/lean\" hook codex pre-tool || exit 2",
             "statusMessage": "Checking Lean Task Contract"
           }
         ]
@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)\"/.lean/scripts/contract_guard.py --root \"$(git rev-parse --show-toplevel)\" prompt"
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.lean/bin/lean\" hook codex prompt"
           }
         ]
       }
