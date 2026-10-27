@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from support import ROOT, commit, git, install_release, lean  # noqa: E402
@@ -124,6 +125,24 @@ class UpdateTests(unittest.TestCase):
                            "--workspace", str(self.base / workspace))
         self.assertEqual(result.returncode, 0, result.stderr)
         return result, json.loads((self.base / workspace / "plan.json").read_text())
+
+    def test_release_sources_are_cloned_through_the_pack_transport(self):
+        # CI flaked when a local clone copied object files while the source repository was being packed.
+        from lean import update
+        calls = []
+        real = update.git
+
+        def spy(*args, **options):
+            calls.append(args)
+            return real(*args, **options)
+
+        commit_id = git(self.source, "rev-parse", "HEAD")
+        with mock.patch.object(update, "git", spy):
+            update.checkout(str(self.source), commit_id, self.base / "clone-check")
+        self.assertEqual(git(self.base / "clone-check", "rev-parse", "HEAD"), commit_id)
+        clones = [args for args in calls if args[:1] == ("clone",)]
+        self.assertTrue(clones)
+        self.assertTrue(all("--no-local" in args for args in clones), clones)
 
     def test_preview_writes_nothing_and_lists_the_migration(self):
         before = snapshot(self.target)

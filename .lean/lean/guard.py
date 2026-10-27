@@ -470,6 +470,11 @@ LEAN_VALUE_WRITES = {"effort": {"standard", "high", "ultra", "reset"}, "lint": {
                      "gate": {"auto", "manual", "auto_fixloop", "manual_fixloop", "accept-controls"}}
 
 
+def unknown_word(word):
+    """Whether a word's value is decided only when the shell runs it: an expansion or a glob."""
+    return any(mark in word for mark in "$`*?[")
+
+
 def git_writes(args):
     """Whether a git command changes state: a subcommand outside the read set, or a lister with changing arguments."""
     index = 0
@@ -486,11 +491,12 @@ def git_writes(args):
         return False
     if sub == "reflog":
         words = [word for word in rest if not word.startswith("-")]
-        return bool(words) and words[0] in REFLOG_WRITES
+        return bool(words) and (words[0] in REFLOG_WRITES or unknown_word(words[0]))
     if sub == "symbolic-ref":
         names = [word for word in rest if not word.startswith("-")]
         options = [word for word in rest if word.startswith("-")]
-        return len(names) != 1 or any(word not in SYMBOLIC_REF_READ_OPTIONS for word in options)
+        return (len(names) != 1 or unknown_word(names[0])
+                or any(word not in SYMBOLIC_REF_READ_OPTIONS for word in options))
     if sub not in GIT_LISTERS or any(word in GIT_CHANGERS for word in rest):
         return True
     positional = [word for word in rest if not word.startswith("-")]

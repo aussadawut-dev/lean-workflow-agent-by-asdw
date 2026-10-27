@@ -126,6 +126,13 @@ class ShellWriteTests(unittest.TestCase):
             with self.subTest(write=command):
                 self.assertTrue(contract_guard.shell_writes(command), command)
 
+    def test_an_expansion_or_glob_in_the_deciding_git_word_is_a_write(self):
+        # Review of 5.2.1: `git reflog $X` read as safe though $X may be `expire`, unlike `git stash $X`.
+        for command in ("git reflog $X", 'git reflog "$X"', "git reflog $(echo expire)", "git reflog exp*",
+                        "git symbolic-ref $N", "git symbolic-ref HEA?"):
+            with self.subTest(command=command):
+                self.assertTrue(contract_guard.shell_writes(command), command)
+
     def test_lean_models_apply_and_eval_are_writes(self):
         for command in ("python3 .lean/bin/lean models", "python3 .lean/bin/lean models list",
                         "python3 .lean/bin/lean models check --live", "python3 .lean/bin/lean models bank"):

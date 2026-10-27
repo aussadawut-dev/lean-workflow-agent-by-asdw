@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Lean Workflow Baseline 5.2.1. This file is the canonical contract for all coding agents (Claude, Codex, agy).
+Lean Workflow Baseline 5.2.2. This file is the canonical contract for all coding agents (Claude, Codex, agy).
 
 **Before any task, read this file and `.lean/README.md`.** In Claude, both are already loaded through the `CLAUDE.md` imports; do not read them again.
 Explicit user instructions take precedence. The active agent owns the task unless the project records a different Controller or primary agent; no provider owns the workflow by default. Keep shared rules here. Every workflow command is `python3 .lean/bin/lean <command>` (`lean --help`).

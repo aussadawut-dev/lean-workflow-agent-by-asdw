@@ -105,7 +105,9 @@ def select(refs, requested=None):
 
 
 def checkout(source, commit, destination):
-    git("clone", "-q", "--no-checkout", "--", source, str(destination))
+    # --no-local: a local source is read through Git's pack transport, not copied file by file, so a pack or
+    # gc running in the source repository at the same time cannot leave the copy without an object.
+    git("clone", "-q", "--no-local", "--no-checkout", "--", source, str(destination))
     git("-C", str(destination), "checkout", "-q", "--detach", commit)
     if git("-C", str(destination), "rev-parse", "HEAD") != commit:
         raise LeanError("checkout revision mismatch")

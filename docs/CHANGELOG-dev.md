@@ -3,6 +3,14 @@
 Developer and agent notes for each 5.x release: commands, flags, rules, changed gate controls and limits.
 The user-facing summary of each release is in [`.lean/CHANGELOG.md`](../.lean/CHANGELOG.md).
 
+## 5.2.2 — 2026-10-27
+
+- **Update clone.** `update.checkout` clones with `--no-local`, so a local release source is read through Git's pack transport instead of copied object file by object file. CI failed repeatedly in `e2e/test_update.py` with `fatal: failed to copy file to '<release>/.git/objects/..': No such file or directory` during that copy; reruns passed. Test: `e2e/test_update.py::test_release_sources_are_cloned_through_the_pack_transport`.
+- **Guard.** `unknown_word()` (a `$`, backtick, `*`, `?` or `[` in the word) makes the deciding word of `git reflog` and the name of `git symbolic-ref` count as writing, as `git stash $X` already did. Test: `hooks/test_guard.py::test_an_expansion_or_glob_in_the_deciding_git_word_is_a_write`.
+- **Codex markers.** `clear_codex_session_refusals` handles each marker in its own try. Test: `hooks/test_gate_mode.py::test_a_new_session_clears_each_codex_marker_independently`.
+- Changed gate controls: `.lean/lean/update.py`, `guard.py`, `hooks.py`. Each new test fails on 5.2.1.
+- Correction to 5.2.1 below: its tests also include `hooks/test_gate_mode.py::test_clearing_codex_markers_removes_each_one_independently`.
+
 ## 5.2.1 — 2026-10-27
 
 Hardening ported from Casetodian's local patches to its Lean 4.x tooling (compared with Lean 4.16.0), the `lean models` guard gap from 5.2.0, and the readable changelog.

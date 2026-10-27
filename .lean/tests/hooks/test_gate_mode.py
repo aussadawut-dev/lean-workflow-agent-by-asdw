@@ -236,6 +236,15 @@ class GateModeTests(unittest.TestCase):
         hooks.clear_codex_refusals(self.root)
         self.assertFalse((runtime / "codex-gate-refusal").exists())
 
+    def test_a_new_session_clears_each_codex_marker_independently(self):
+        from lean import hooks
+        runtime = self.root / ".agent-runtime"
+        runtime.mkdir(exist_ok=True)
+        (runtime / "codex-gate-refusal").mkdir()  # Cannot be unlinked.
+        (runtime / "codex-gate-failed").write_text("c2")
+        hooks.clear_codex_session_refusals(self.root)
+        self.assertFalse((runtime / "codex-gate-failed").exists())
+
     def test_a_planted_codex_marker_link_is_never_followed(self):
         # Ported from a downstream project's local patch: the markers were written through symlinks.
         self.project.write_text("<!-- gate:start -->\n```sh\nfalse\n```\n<!-- gate:end -->\n")

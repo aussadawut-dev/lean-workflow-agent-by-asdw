@@ -295,10 +295,16 @@ def clear_codex_refusals(root):
 def clear_codex_session_refusals(root):
     try:
         with codex_markers(root) as directory:
-            marker_remove(directory, "codex-gate-refusal")
-            if marker_read(directory, "codex-gate-failed").startswith("c"):
-                marker_remove(directory, "codex-gate-failed")
-    except (OSError, ValueError):
+            try:  # Each on its own: one marker that cannot be removed must not keep the other.
+                marker_remove(directory, "codex-gate-refusal")
+            except OSError:
+                pass
+            try:
+                if marker_read(directory, "codex-gate-failed").startswith("c"):
+                    marker_remove(directory, "codex-gate-failed")
+            except (OSError, ValueError):
+                pass
+    except OSError:
         pass
 
 

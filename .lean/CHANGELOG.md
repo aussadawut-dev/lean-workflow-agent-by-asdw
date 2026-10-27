@@ -3,6 +3,31 @@
 เลขรุ่น `MAJOR.MINOR.PATCH`: MAJOR เปลี่ยนกติกาหรือ path เดิม, MINOR เพิ่มของใหม่, PATCH แก้ไข · วิธีอัปเกรด: [CUSTOMIZING.md](CUSTOMIZING.md)
 Versions are `MAJOR.MINOR.PATCH`: MAJOR changes rules or paths, MINOR adds, PATCH fixes · Upgrading: [CUSTOMIZING.md](CUSTOMIZING.md) · 5.x technical notes: [docs/CHANGELOG-dev.md](../docs/CHANGELOG-dev.md)
 
+## 5.2.2 — 2026-10-27
+
+🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#522--2026-10-27)
+
+ให้ `lean update` ดาวน์โหลด release ได้เสถียร และปิดช่องเล็กๆ ที่เหลือจาก 5.2.1
+
+**แก้ไข**
+- `lean update` ดึง release จาก repo ในเครื่องได้เสถียรขึ้น ไม่พังกลางทางเมื่อ repo ต้นทางกำลังจัดเก็บไฟล์ git อยู่
+- คำสั่ง `git reflog` หรือ `git symbolic-ref` ที่ใช้ตัวแปร shell หรือ wildcard (เช่น `git reflog $X`) ต้องมี contract ก่อน
+- Codex ล้างไฟล์บันทึกการปฏิเสธของแต่ละ session ครบ แม้จะลบบางไฟล์ไม่ได้
+
+**ต้องทำอะไรตอนอัปเกรด**
+- `lean update preview` แล้ว `lean update apply` ไม่ต้องย้ายข้อมูล
+- ไฟล์ที่ gate ใช้ตรวจงานเปลี่ยน: ให้ reviewer ตรวจ หรือยืนยันเองด้วย `lean gate accept-controls`
+
+**English**
+
+Make `lean update` fetch releases reliably, and close the last small gaps from 5.2.1.
+
+- `lean update` fetches a release from a local repository reliably, even while that repository is packing its git files.
+- `git reflog` or `git symbolic-ref` with a shell variable or wildcard (for example `git reflog $X`) now needs a contract first.
+- Codex clears each session's gate refusal markers even when one of them cannot be removed.
+
+Upgrade: `lean update preview`, then `lean update apply`; no data migration. Changed gate files need a reviewer or `lean gate accept-controls`.
+
 ## 5.2.1 — 2026-10-27
 
 🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#521--2026-10-27)

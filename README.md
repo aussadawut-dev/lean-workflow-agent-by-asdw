@@ -4,7 +4,7 @@ I built this because I want a coding agent to understand the work, check what it
 
 It works with **Claude Code, Codex and agy (Antigravity)**, with one shared set of rules and skills and one command line, `lean`. Use it with your own stack. Everything is free: Python's standard library and Git, plus the subscriptions you already have.
 
-**Baseline 5.2.1** · [MIT License](LICENSE)
+**Baseline 5.2.2** · [MIT License](LICENSE)
 
 5.0.0 rebuilds the workflow around one `lean` command, shows progress as a bar on every surface, runs only the tests a change can affect, and spawns sized agents from a per-provider model list. It is a major release: upgrading from 4.x moves files and commands. See the [5.0.0 release notes](.lean/CHANGELOG.md#500--2026-10-27) and [migrating to v5](docs/migrating-to-v5.md).
 
