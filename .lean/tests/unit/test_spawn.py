@@ -98,7 +98,7 @@ class PlanTests(unittest.TestCase):
 class EnvironmentTests(unittest.TestCase):
     def test_metered_api_credentials_are_removed_unless_allowed(self):
         parent = {"PATH": "/bin", "ANTHROPIC_API_KEY": "a", "OPENAI_API_KEY": "o", "GEMINI_API_KEY": "g",
-                  "LEAN_GATE_LOCK_FD": "7", "HOME": "/h"}
+                  "LEAN_GATE_LOCK_FD": "7", "CLAUDECODE": "1", "HOME": "/h"}
         child, removed = spawn.child_environment(environment=parent)
         self.assertEqual(sorted(removed), ["ANTHROPIC_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY"])
         self.assertEqual(child, {"PATH": "/bin", "HOME": "/h"})
@@ -106,6 +106,7 @@ class EnvironmentTests(unittest.TestCase):
         self.assertEqual(removed, [])
         self.assertEqual(kept["OPENAI_API_KEY"], "o")
         self.assertNotIn("LEAN_GATE_LOCK_FD", kept)
+        self.assertNotIn("CLAUDECODE", kept, "a Codex or agy worker must not look like Claude's shell")
 
     def test_commands_fill_the_provider_templates(self):
         data = json.loads((ROOT / ".lean/models.json").read_text())

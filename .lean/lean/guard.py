@@ -162,6 +162,26 @@ def current(root, session):
     return record.get("contract")
 
 
+def declaration_bound(root, contract, environment=None):
+    """Whether a `lean contract declare` of `contract` is bound, as far as the calling runtime can show.
+
+    Only Claude's shell (CLAUDECODE=1) runs the guard's hook before every command, which binds a pure
+    declare first; there, a contract that no session holds was not bound (a shell variable, a pipe or
+    a preceding command). Other runtimes (Codex without trust, agy) only validate. Reads the store
+    without creating it; malformed records are skipped."""
+    environment = os.environ if environment is None else environment
+    if environment.get("CLAUDECODE") != "1":
+        return True
+    path = Path(root) / RUNTIME / "contract-sessions.json"
+    try:
+        sessions = json.loads(path.read_text()).get("sessions") if not path.is_symlink() else None
+    except (OSError, ValueError, AttributeError):
+        sessions = None
+    if not isinstance(sessions, dict):
+        return False
+    return any(isinstance(record, dict) and record.get("contract") == contract for record in sessions.values())
+
+
 def baseline(root, session, value=None):
     """Read, or with `value` record, the shipping state a session last left verified or found."""
     with Store(root) as store:

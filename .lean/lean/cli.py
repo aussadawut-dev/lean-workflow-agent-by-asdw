@@ -223,6 +223,14 @@ def dispatch(root, args, parser):
         from . import guard
         if args.action == "declare":
             text, meta = guard.parse(args.contract if args.contract is not None else sys.stdin.read())
+            if not guard.declaration_bound(root, text):
+                print("lean: this contract was validated but NOT bound: no session in this checkout holds it. "
+                      "The guard binds only a declare that is its own command with a literal single-quoted "
+                      "--contract or a quoted heredoc (no shell variable, pipe or preceding command); it binds in "
+                      "the session's project, not in a checkout reached with `cd`; and it runs only if Lean's "
+                      "hooks were loaded when this Claude session started (restart after /lean-init).\n"
+                      + guard.HELP, file=sys.stderr)
+                return 2
             print(text + "".join(f"\n{name}: {value}" for name, value in meta.items()))
             return 0
         found = guard.current(root, args.session)

@@ -156,7 +156,10 @@ class UpdateTests(unittest.TestCase):
         project = self.target / ".lean/PROJECT.md"
         project.write_text(project.read_text() + "\n## Documentation routes\n\n- Setup: `README.md`\n"
                            "- Outside: `../outside.md`\n- Absolute: `/etc/outside.md`\n- Binary: `docs/blob.md`\n"
-                           "- Ignored: `docs/ignored.md`\n")
+                           "- Ignored: `docs/ignored.md`\n- Linked: `docs/linked.md`\n- Escaping: `docs/escape.md`\n")
+        write(self.target, "docs/real.md", "`.lean/scripts/gate_mode.py`\n")
+        os.symlink("real.md", self.target / "docs/linked.md")
+        os.symlink(str(self.base / "outside.md"), self.target / "docs/escape.md")
         (self.base / "outside.md").write_text("`.lean/scripts/workflow.py`\n")
         (self.target / "docs").mkdir(exist_ok=True)
         (self.target / "docs/blob.md").write_bytes(b"\xff\xfe .lean/scripts/workflow.py")
@@ -169,7 +172,9 @@ class UpdateTests(unittest.TestCase):
         self.assertIn("README.md still names the 4.x path .lean/scripts/submodule.py", result.stdout)
         self.assertIn(".lean/tests/test_local_gate.py is not part of Lean but sits in a workflow-owned folder",
                       result.stdout)
-        for unseen in ("outside.md", "/etc/outside.md", "docs/blob.md", "docs/ignored.md"):
+        self.assertIn("docs/linked.md still names the 4.x path .lean/scripts/gate_mode.py", result.stdout)
+        self.assertIn("docs/blob.md is not UTF-8 text; lean lint reports it as unreadable", result.stdout)
+        for unseen in ("outside.md", "/etc/outside.md", "docs/blob.md", "docs/ignored.md", "docs/escape.md"):
             self.assertNotIn(f"{unseen} still names", result.stdout)
         actions = {op["path"]: op["action"] for op in plan["operations"]}
         self.assertNotIn(".lean/tests/test_local_gate.py", actions, "a project's file is never deleted")

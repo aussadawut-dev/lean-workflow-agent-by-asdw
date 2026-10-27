@@ -640,6 +640,33 @@ class GuardHookTests(HookFixture):
         self.assertFalse((self.root / ".agent-runtime/contract-sessions.json").exists())
 
 
+    def test_declare_cli_fails_in_claude_when_the_hook_did_not_bind_it(self):
+        # Found in use: `C='...'; lean contract declare --contract "$C"` is not a pure declare, so the guard
+        # skips it; the command used to print the contract as if it were bound.
+        other = LINE.replace("acceptance=", "acceptance=another ")
+        claude = dict(os.environ, CLAUDECODE="1")
+        self.assertEqual(self.tool("claude", "Bash", "s-bound", command=f"{DECLARE} --contract '{LINE}'").returncode, 0)
+        unbound = lean(self.root, "contract", "declare", "--contract", other, env=claude)
+        self.assertEqual(unbound.returncode, 2, unbound.stdout)
+        self.assertIn("NOT bound", unbound.stderr)
+        self.assertEqual(lean(self.root, "contract", "current", "--session", "s-bound").stdout.strip(), LINE)
+        # Bound whenever a session holds it, however long the person took to approve the command.
+        self.assertEqual(lean(self.root, "contract", "declare", "--contract", LINE, env=claude).returncode, 0)
+        # Runtimes whose hooks may not run (agy, Codex without trust) only validate.
+        self.assertEqual(lean(self.root, "contract", "declare", "--contract", other).returncode, 0)
+        # A pure declare is bound by the hook before it runs, so the same command then succeeds in Claude.
+        self.assertEqual(self.tool("claude", "Bash", "s-bound", command=f"{DECLARE} --contract '{other}'").returncode, 0)
+        self.assertEqual(lean(self.root, "contract", "declare", "--contract", other, env=claude).returncode, 0)
+        # A malformed store is "not bound", never a traceback.
+        state = self.root / ".agent-runtime/contract-sessions.json"
+        for broken in ('{"schema": 1, "sessions": {"x": {"contract": 1, "at": [1]}}}', "[]", "{not json"):
+            with self.subTest(store=broken):
+                state.write_text(broken)
+                result = lean(self.root, "contract", "declare", "--contract", other, env=claude)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+
+
 class StopContractTests(HookFixture):
     """Claude's and Codex's Stops use the session's declared contract for changed work."""
 

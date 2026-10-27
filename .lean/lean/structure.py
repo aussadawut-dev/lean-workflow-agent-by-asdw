@@ -171,7 +171,11 @@ def check(root):
     for name in sorted(instruction_markdown(root, visible)):
         if name.startswith(HISTORY_MARKDOWN):
             continue
-        text = (root / name).read_text()
+        try:
+            text = (root / name).read_text()
+        except (OSError, UnicodeDecodeError):
+            bad(f"unreadable instruction document (not UTF-8 text?): {name}")
+            continue
         for reference in references(text):
             if reference.startswith(OPTIONAL_PATHS) or reference in OPTIONAL_PATHS + LEGACY_PATHS:
                 continue

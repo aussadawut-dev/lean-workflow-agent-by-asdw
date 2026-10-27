@@ -142,6 +142,13 @@ class LintTests(unittest.TestCase):
         agents.write_text(agents.read_text() + "\n- Run `.lean/scripts/submodule.py context` first.\n")
         self.assertFails("missing .lean/scripts/submodule.py (from AGENTS.md)")
 
+    def test_an_unreadable_routed_document_is_reported_not_a_crash(self):
+        project = self.root / ".lean/PROJECT.md"
+        project.write_text(project.read_text() + "\n## Documentation routes\n\n- Notes -> `docs/blob.md`\n")
+        (self.root / "docs").mkdir()
+        (self.root / "docs/blob.md").write_bytes(b"\xff\xfe not text")
+        self.assertFails("unreadable instruction document (not UTF-8 text?): docs/blob.md")
+
     def test_hooks_must_call_the_cli_and_never_seed_on_stop(self):
         (self.root / ".codex/hooks.json").write_text('{"hooks": {"Stop": [{"hooks": [{"command": "true"}]}]}}')
         self.assertFails("hooks must call the lean CLI: .codex/hooks.json")

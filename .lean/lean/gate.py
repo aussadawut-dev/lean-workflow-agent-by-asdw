@@ -560,8 +560,15 @@ def busy(root, message, options):
         return 2, [], [message]
     count = 0
     try:
-        counter = safe_path(root, f"{RUNTIME}/gate-busy")
+        # One counter per session, so another session's fresh Stop never restarts this one's count.
+        session = payload.get("session_id") if isinstance(payload.get("session_id"), str) else ""
+        key = "." + hashlib.sha256(session.encode()).hexdigest()[:16] if session else ""
+        counter = safe_path(root, f"{RUNTIME}/gate-busy{key}")
         counter.parent.mkdir(exist_ok=True)
+        if payload.get("stop_hook_active") is not True:  # A fresh Stop sweeps other sessions' stale counters.
+            for stale in counter.parent.glob("gate-busy.*"):
+                if stale != counter and time.time() - stale.lstat().st_mtime > 86400:
+                    stale.unlink(missing_ok=True)
         if payload.get("stop_hook_active") is True and counter.is_file():
             raw = counter.read_text().strip()
             count = int(raw) if raw.isdigit() else 0

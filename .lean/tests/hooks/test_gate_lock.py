@@ -75,6 +75,34 @@ class GateLockTests(unittest.TestCase):
         self.assertFalse((self.root / 'runs').exists())
         self.assertFalse((self.runtime / 'gate-cache').exists(), 'a busy release never records a pass')
 
+    def test_busy_counts_are_kept_per_session(self):
+        # Another session's fresh Stop must not restart this session's count.
+        from lean import gate
+        self.runtime.mkdir()
+
+        def stop(session, active):
+            result = subprocess.run([sys.executable, LEAN, '--root', str(self.root), 'hook', 'claude', 'stop'],
+                                    input=json.dumps({'session_id': session, 'stop_hook_active': active}), text=True,
+                                    capture_output=True, timeout=10, env=clean_env(CLAUDE_PROJECT_DIR=str(self.root)))
+            return json.loads(result.stdout)
+
+        with (self.runtime / 'quality-gate.lock').open('w') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            for attempt in range(gate.MAX_REFUSALS):
+                self.assertIn('decision', stop('a', attempt > 0))
+                self.assertIn('decision', stop('b', False))  # B starts fresh each time.
+            released = stop('a', True)
+            self.assertNotIn('decision', released)
+            self.assertIn('UNVERIFIED', released['systemMessage'])
+            # A fresh Stop sweeps counters older than a day; recent ones stay.
+            stale, recent = self.runtime / 'gate-busy.0000000000000000', self.runtime / 'gate-busy.1111111111111111'
+            for path in (stale, recent):
+                path.write_text('1')
+            os.utime(stale, (time.time() - 2 * 86400,) * 2)
+            stop('c', False)
+            self.assertFalse(stale.exists())
+            self.assertTrue(recent.exists())
+
     def test_busy_claude_stop_with_an_unwritable_counter_releases_continued_stops(self):
         self.runtime.mkdir()
         for blocker in ('directory', 'read-only'):

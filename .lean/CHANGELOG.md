@@ -6,6 +6,41 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
+## 5.0.2 — 2026-10-27
+
+**Token highlight:** - · **Compared with:** -
+
+Follow-ups from the 5.0.1 release work. No token or speed saving is claimed.
+
+**Fixed**
+
+- In Claude, `lean contract declare` exits 2 with "NOT bound" when no session holds the contract it was given, as when the contract comes through a shell variable or after another command and the guard's hook does not bind it. It used to print the contract as if bound while the session kept its earlier one. Other runtimes (Codex without trust, agy) still only validate, and `lean spawn run` no longer passes Claude's `CLAUDECODE` marker to its workers.
+- `lean lint` reports a routed document that is not UTF-8 text instead of stopping with a Python error.
+- `lean update preview` reads a symlinked routed document the way lint does when the link resolves inside the project, and never one that points outside it; it notes a routed document that is not UTF-8 text, which lint reports.
+- A busy-gate Stop is counted per session, so another session's fresh Stop no longer restarts this session's count; counters older than a day are removed.
+- REVIEW.md: request the HIGH review before committing changed gate controls; a receipt cannot accept a control change committed before the review began.
+
+**Upgrade:** `python3 .lean/bin/lean update preview`, review the plan, then `update apply`. The changed gate controls (`.lean/lean/gate.py`, `guard.py`, `cli.py`, `spawn.py`, `structure.py`, `update.py`) need a covering HIGH review or `lean gate accept-controls`. No configuration or data migration.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+งานต่อเนื่องจากการออก 5.0.1 ไม่ได้อ้างว่าประหยัด token หรือเร็วขึ้น
+
+**แก้ไข**
+
+- ใน Claude คำสั่ง `lean contract declare` จบด้วย exit 2 และข้อความ "NOT bound" เมื่อไม่มี session ใดถือ contract ที่ส่งมา เช่น ส่งผ่าน shell variable หรือมีคำสั่งอื่นนำหน้า ซึ่ง hook ของ guard ไม่ผูกให้ ก่อนหน้านี้คำสั่งพิมพ์ contract เหมือนผูกแล้ว ทั้งที่ session ยังใช้ contract เดิม runtime อื่น (Codex ที่ยังไม่ trust, agy) ยังตรวจรูปแบบอย่างเดียวเหมือนเดิม และ `lean spawn run` ไม่ส่งตัวแปร `CLAUDECODE` ของ Claude ต่อให้ worker อีก
+- `lean lint` รายงานเอกสาร routed ที่ไม่ใช่ข้อความ UTF-8 แทนการหยุดด้วย Python error
+- `lean update preview` อ่านเอกสาร routed ที่เป็น symlink แบบเดียวกับ lint เมื่อ link ชี้อยู่ในโปรเจกต์ และไม่อ่าน link ที่ชี้ออกนอกโปรเจกต์ และแจ้งเอกสาร routed ที่ไม่ใช่ข้อความ UTF-8 ซึ่ง lint จะรายงาน
+- Stop ที่เจอ gate busy นับแยกตาม session แล้ว Stop ใหม่ของ session อื่นจึงไม่ทำให้ตัวนับของ session นี้เริ่มใหม่ และลบตัวนับที่เก่ากว่าหนึ่งวัน
+- REVIEW.md: ให้ขอ HIGH review ก่อน commit การเปลี่ยน gate controls เพราะ receipt ยอมรับการเปลี่ยน controls ที่ commit ไปก่อนเริ่ม review ไม่ได้
+
+**เมื่ออัปเกรด:** `python3 .lean/bin/lean update preview` ตรวจแผนแล้ว `update apply` gate controls ที่เปลี่ยน (`.lean/lean/gate.py`, `guard.py`, `cli.py`, `spawn.py`, `structure.py`, `update.py`) ต้องมี HIGH review ที่ครอบคลุม หรือ `lean gate accept-controls` ไม่ต้องย้าย configuration หรือข้อมูล
+
+</details>
+
 ## 5.0.1 — 2026-10-27
 
 **Token highlight:** - · **Compared with:** -

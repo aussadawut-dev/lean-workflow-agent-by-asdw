@@ -139,8 +139,10 @@ def child_environment(allow_api_keys=False, environment=None):
             if name in environment:
                 removed.append(name)
                 del environment[name]
-    # A child must take its own gate lock and contract session, not inherit this one's.
+    # A child must take its own gate lock and contract session, not inherit this one's. CLAUDECODE marks
+    # Claude's own shell (`lean contract declare` relies on it); a Claude child sets its own.
     environment.pop("LEAN_GATE_LOCK_FD", None)
+    environment.pop("CLAUDECODE", None)
     return environment, removed
 
 

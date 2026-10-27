@@ -14,6 +14,8 @@ RUNTIME_FILES = (".gitignore", ".claude/settings.json", ".codex/hooks.json", LEA
 # Fixtures live in throwaway directories; `lean test` already keeps their bytecode out of the user's
 # cache, and so does a test file run on its own (every lean process a test starts inherits this).
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+# Tests run the same inside and outside a Claude shell; a test that needs Claude's marker sets it.
+os.environ.pop("CLAUDECODE", None)
 
 
 def install(root, extra=()):

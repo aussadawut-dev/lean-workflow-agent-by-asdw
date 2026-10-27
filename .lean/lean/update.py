@@ -327,11 +327,16 @@ def preview(root, target=None, source=None, ref=None, workspace=None):
     visible = set(structure.git_visible(target) or [])  # What lint reads; never a path outside the target.
     for route in structure.routed_documents(target):
         for name in (route, ".lean/" + route):
-            if name not in visible or name in new_files or (target / name).is_symlink():
+            if name not in visible or name in new_files:
                 continue
-            try:
+            try:  # Read what lint reads, a link included, but never a file outside the target.
+                if not (target / name).resolve().is_relative_to(target.resolve()):
+                    continue
                 text = (target / name).read_text()
-            except (OSError, UnicodeDecodeError):
+            except UnicodeDecodeError:
+                notes.append(f"{name} is not UTF-8 text; lean lint reports it as unreadable")
+                continue
+            except (OSError, RuntimeError):  # RuntimeError: a link loop before 3.13.
                 continue
             for legacy in sorted(set(LEGACY_PATH.findall(text))):
                 notes.append(f"{name} still names the 4.x path {legacy}; update it (lean lint reports it)")
