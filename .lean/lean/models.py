@@ -96,6 +96,23 @@ def resolve(data, provider, tier):
     return value["model"], value.get("effort")
 
 
+def dumps(data):
+    """The list as text in the shipped layout: one line per size, so a change shows as one line in a diff."""
+    out = ["{"] + [f"  {json.dumps(key)}: {json.dumps(data[key])}," for key in data if key != "providers"]
+    out.append('  "providers": {')
+    names = list(data["providers"])
+    for i, name in enumerate(names):
+        provider = data["providers"][name]
+        out.append(f"    {json.dumps(name)}: {{")
+        out += [f"      {json.dumps(key)}: {json.dumps(provider[key])}," for key in provider if key != "tiers"]
+        out.append('      "tiers": {')
+        sizes = [size for size in TIERS if size in provider["tiers"]]
+        out += [f"        {json.dumps(size)}: {json.dumps(provider['tiers'][size])}" + ("," if j < len(sizes) - 1 else "")
+                for j, size in enumerate(sizes)]
+        out += ["      }", "    }" + ("," if i < len(names) - 1 else "")]
+    return "\n".join(out + ["  }", "}"]) + "\n"
+
+
 def table(data):
     lines = [f"Model list ({FILE}, checked {data.get('checked', 'unknown')}); max_agents={data['max_agents']}, "
              f"default provider={data['default_provider']}"]

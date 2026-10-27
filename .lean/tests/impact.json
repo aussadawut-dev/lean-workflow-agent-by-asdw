@@ -115,7 +115,8 @@
         "unit/test_spawn.py",
         "unit/test_structure.py",
         "e2e/test_spawn_scenarios.py",
-        "e2e/test_spawn_permissions.py"
+        "e2e/test_spawn_permissions.py",
+        "e2e/test_models_eval.py"
       ]
     },
     {
@@ -208,6 +209,16 @@
         "hooks/test_target_gate.py",
         "hooks/test_target_controls.py",
         "hooks/test_target_lifecycle.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/lean/evals.py",
+        ".lean/evals/**"
+      ],
+      "tests": [
+        "e2e/test_models_eval.py",
+        "unit/test_structure.py"
       ]
     }
   ]

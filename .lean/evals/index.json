@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "tasks": {
+    "3S": {
+      "title": "Locate and fix a one-line discount bug",
+      "units": 8,
+      "baseline": 6
+    },
+    "2S": {
+      "title": "Rename a function with a deprecated alias",
+      "units": 11,
+      "baseline": 4
+    },
+    "S": {
+      "title": "SemVer 2.0.0 precedence",
+      "units": 72,
+      "baseline": 0
+    },
+    "M": {
+      "title": "Apply a unified diff",
+      "units": 30,
+      "baseline": 0
+    },
+    "L": {
+      "title": "Fix an expense report across three modules",
+      "units": 13,
+      "baseline": 6
+    },
+    "XL": {
+      "title": "Add key expiry to a key-value store and its CLI",
+      "units": 20,
+      "baseline": 3
+    },
+    "2XL": {
+      "title": "Make a rate limiter match its docs and callers",
+      "units": 11,
+      "baseline": 1
+    },
+    "3XL": {
+      "title": "Single-flight, thread-safe LRU cache",
+      "units": 10,
+      "baseline": 7
+    }
+  }
+}

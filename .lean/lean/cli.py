@@ -110,6 +110,18 @@ def build_parser(argv=()):
     models_actions.add_parser("list")
     models_check = models_actions.add_parser("check", help="validate the list; --live asks the provider CLIs")
     models_check.add_argument("--live", action="store_true")
+    models_eval = models_actions.add_parser("eval", help="run candidates on the graded task bank within a token budget")
+    models_eval.add_argument("--plan", type=Path, required=True, help='{"candidates": [{provider, model, effort}], "tasks": [sizes]}')
+    models_eval.add_argument("--budget", type=int, required=True, help="token cap: no run starts once it is spent")
+    models_eval.add_argument("--out", type=Path, help="results folder (default docs/benchmarks/<date>-model-eval)")
+    models_eval.add_argument("-j", "--jobs", type=int, default=4)
+    models_eval.add_argument("--timeout", type=int, default=900, help="seconds per run")
+    models_eval.add_argument("--estimate", type=int, help="tokens reserved per run until a real count is known "
+                             "(default 250000)")
+    models_apply = models_actions.add_parser("apply", help="write an approved eval proposal into models.json")
+    models_apply.add_argument("--proposal", type=Path, required=True)
+    models_apply.add_argument("--sha256", required=True, help="the digest `lean models eval` printed for it")
+    models_actions.add_parser("bank", help="check the task bank: references score full marks, stubs do not")
 
     spawn_parser = commands.add_parser("spawn", help="plan or run agents for independent tasks")
     spawn_actions = spawn_parser.add_subparsers(dest="action", required=True)
@@ -285,6 +297,8 @@ def dispatch(root, args, parser):
             ok, lines = models.check(root, live=args.live)
             print("\n".join(lines))
             return 0 if ok else 1
+        if args.action in ("eval", "apply", "bank"):
+            return models_eval_command(root, args)
         print(models.table(models.load(root)))
         return 0
     if command == "spawn":
@@ -404,6 +418,35 @@ def gate_command(root, args):
     if code == 0 and not args.quiet and not args.hook:
         print("Quality Gate: PASS", file=sys.stderr)
     return code
+
+
+def models_eval_command(root, args):
+    import tempfile
+    import time
+    from . import evals
+    if args.action == "bank":
+        with tempfile.TemporaryDirectory() as work:
+            report = evals.check_bank(Path(work))
+        bad = [size for size, (reference, stub, units) in report.items() if reference != units or stub >= units]
+        for size, (reference, stub, units) in report.items():
+            print(f"{size:<3} reference {reference}/{units}  stub {stub}/{units}")
+        print("task bank ok" if not bad else "task bank FAILED: " + ", ".join(bad))
+        return 1 if bad else 0
+    if args.action == "apply":
+        changes = evals.apply(root, args.proposal, args.sha256)
+        print("\n".join(changes) if changes else "no change: models.json already matches the proposal")
+        return 0
+    out = args.out or root / "docs" / "benchmarks" / time.strftime("%Y-%m-%d-model-eval")
+    print(f"runs in {evals.work_folder(out)} (for agy's write_file allow rule)")
+    rows, skipped = evals.evaluate(root, args.plan, args.budget, out, jobs=args.jobs, timeout=args.timeout,
+                                   estimate=evals.ESTIMATE if args.estimate is None else args.estimate)
+    sha = evals.write_outputs(out, rows, skipped, args.budget)
+    print(f"results: {out}/results.jsonl, {out}/summary.md")
+    print(f"proposal: {out}/proposal.json (sha256 {sha}); apply only after review and the user's approval:")
+    print(f"python3 .lean/bin/lean models apply --proposal {out}/proposal.json --sha256 {sha}")
+    if skipped:
+        print(f"{len(skipped)} run(s) skipped at the budget")
+    return 0
 
 
 def test_command(root, args):

@@ -1,0 +1,4 @@
+food: 10.05
+office: 0.15
+travel: 1,200.30
+TOTAL: 1,210.50

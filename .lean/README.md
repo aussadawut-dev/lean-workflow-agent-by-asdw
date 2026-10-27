@@ -1,6 +1,6 @@
 # Agent policy router
 
-Lean Workflow Baseline 5.1.0. See `CHANGELOG.md` for changes and migration steps.
+Lean Workflow Baseline 5.2.0. See `CHANGELOG.md` for changes and migration steps.
 
 Operating rules, not application structure; no stack or primary provider is prescribed. `AGENTS.md` is canonical and `CLAUDE.md` imports it. `python3 .lean/bin/lean` runs every workflow tool (code in `.lean/lean/`). Procedures live in `.lean/skills/`; `.claude/skills/` and `.agents/skills/` hold discovery links.
 
@@ -16,7 +16,7 @@ Direct execution is the default; delegated uses the Controller/worker procedure.
 
 ## Ownership
 
-Project-owned: `PROJECT.md`, `config.json`, `models.json`, optional `gate.json` and `skill-effort.json`. Workflow-owned, upgraded together by `/lean-update`: `bin/`, `lean/`, `policy/`, `roles/`, `skills/` (and links), `templates/`, `tests/`. Upgrades preserve project additions and local extensions (`CUSTOMIZING.md`); retain `LICENSE`.
+Project-owned: `PROJECT.md`, `config.json`, `models.json`, optional `gate.json` and `skill-effort.json`. Workflow-owned, upgraded together by `/lean-update`: `bin/`, `lean/`, `policy/`, `roles/`, `skills/` (and links), `templates/`, `tests/`, `evals/`. Upgrades preserve project additions and local extensions (`CUSTOMIZING.md`); retain `LICENSE`.
 
 ## Read when needed
 

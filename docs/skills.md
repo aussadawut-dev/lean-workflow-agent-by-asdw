@@ -2,7 +2,7 @@
 
 [Back to README](../README.md)
 
-Eleven procedures live in `.lean/skills/`; Claude finds them through `.claude/skills/` (`/name`), Codex through `.agents/skills/` (`$name`), and agy by reading the `SKILL.md`.
+Twelve procedures live in `.lean/skills/`; Claude finds them through `.claude/skills/` (`/name`), Codex through `.agents/skills/` (`$name`), and agy by reading the `SKILL.md`.
 
 | Skill | Use it to |
 |---|---|
@@ -16,6 +16,7 @@ Eleven procedures live in `.lean/skills/`; Claude finds them through `.claude/sk
 | `lean-gate` | run the Quality Gate and decide DONE, BLOCKED or FAILED |
 | `lean-effort` | set procedure intensity: `standard`, `high`, `ultra` |
 | `lean-update` | update Lean from a pinned release with a reviewed plan and rollback |
+| `lean-model-update` | refresh the model list for every size from an eval within a token cap, applied after approval |
 | `lean-target` | keep an application in its own repository as a submodule under `targets/` |
 
 Intensity deepens scope, research, grill, review and gate procedures; it never changes the model or its reasoning effort ([SKILL-EFFORT.md](../.lean/policy/SKILL-EFFORT.md)). Project-specific skills may sit beside the Lean links in either discovery folder.

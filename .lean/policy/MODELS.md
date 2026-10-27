@@ -19,6 +19,8 @@ Model reasoning effort is separate from procedure intensity under `SKILL-EFFORT.
 
 `S`, `M`, `L` and `XL` are required for every provider; `3S`, `2S`, `2XL` and `3XL` are optional, so a list written for 5.0 keeps working. A size the provider does not define is refused with a message, never replaced by another (an explicit `--model` still runs). The shipped list follows the 2026-10-27 eval (`docs/benchmarks/2026-10-27-models/`): higher effort did not raise correctness on a well-specified task and cost 4-13x the time, so start low and raise one step only after a demonstrated reasoning limit.
 
+To refresh the list, run `/lean-model-update`: research, an eval plan with a user-approved token cap, `lean models eval` on the graded task bank (`.lean/evals/`, one task per size; `lean models bank` checks it), an independent review, and `lean models apply` only for the proposal the user approved.
+
 Size each spawned task, reviewers included, by this table. Repository mode does not change model selection. Risk and quality set the required work and review depth; budget guides optional spend (`CHEAP` favors smaller sizes, `EXPENSIVE` allows justified larger ones). None removes tests, validation or required review; report an unmet floor rather than lowering it.
 
 ## Spawn levels

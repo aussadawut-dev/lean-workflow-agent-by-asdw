@@ -6,6 +6,39 @@ Older entries describe the workflow at the time. For current installation and up
 
 Token highlights come from the [historical smoke-test notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#450--2026-10-18) and [TCK303 replay notes](https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw/blob/v4.8.0/.lean/CHANGELOG.md#480--2026-10-19). Approximate percentages are calculated from the reported totals, not new benchmarks. Compare results within the same workload; they are not guaranteed savings. The original smoke-test runs were not retained. `-` means no version comparison was recorded.
 
+## 5.2.0 — 2026-10-27
+
+**Token highlight:** - · **Compared with:** -
+
+Refresh the model list from evidence. No token or speed saving is claimed for the workflow itself.
+
+**Added**
+
+- `/lean-model-update`: research the models each provider offers, agree an eval plan and a token cap with the user, run the eval, have an independent reviewer check the results, and write `.lean/models.json` only for the proposal the user approved. It never edits provider permission settings; for agy it gives the user the allow rules to add.
+- `lean models eval --plan FILE --budget TOKENS [--estimate N] [--out DIR]`: runs each candidate (provider, model, effort) on the task bank in throwaway Git copies outside the repository, with the `models.json` command shapes, eval-only flags (Claude may run `python3 -m unittest`) and metered API keys removed, and scores hidden tests per subtest. Each run reserves the larger of the largest token count seen and `--estimate` (default 250000), starts only while spent plus reservations fit the budget and otherwise waits for running ones, so only a run that uses more than its reservation can go over; a CLI that never started costs nothing and is retried, an unknown count costs exactly its run's reservation, and a run that fails in any step is recorded and releases its reservation. Tokens follow one rule for every provider (input + cache writes + output, cache reads apart; Codex reports one total); an unknown count is charged like a reservation. Writes `results.jsonl` (a rerun resumes), `summary.md`, `proposal.json` (per provider and size, the fastest candidate with a full score) and raw `logs/`. Permission denials are reported as notes.
+- `lean models apply --proposal FILE --sha256 DIGEST`: writes only the proposed sizes, refuses a proposal that changed since its digest was shown, and validates the list.
+- `lean models bank` and the task bank in `.lean/evals/` (workflow-owned, shipped with every installation): one task per size, from a one-line bug fix (3S) to a single-flight thread-safe cache (3XL), each with a reference solution that scores full marks and a stub that does not.
+
+**Upgrade:** `python3 .lean/bin/lean update preview`, review the plan, then `update apply`; `.lean/evals/` arrives with the release. The changed gate controls (`.lean/lean/evals.py`, `models.py`, `cli.py`, `structure.py`) need a covering HIGH review or `lean gate accept-controls`. No configuration or data migration.
+
+<details>
+<summary>ภาษาไทย</summary>
+
+**ผลด้าน token:** - · **เทียบกับรุ่น:** -
+
+ปรับรายชื่อ model จากหลักฐานจริง ไม่ได้อ้างว่า workflow ประหยัด token หรือเร็วขึ้น
+
+**เพิ่ม**
+
+- `/lean-model-update`: ค้นว่าแต่ละ provider มี model อะไร ตกลงแผน eval และเพดาน token กับผู้ใช้ รัน eval ให้ reviewer อิสระตรวจผล แล้วเขียน `.lean/models.json` เฉพาะข้อเสนอที่ผู้ใช้อนุมัติ skill นี้ไม่แก้ settings สิทธิ์ของ provider เอง สำหรับ agy จะให้คำสั่ง allow rule ให้ผู้ใช้เพิ่มเอง
+- `lean models eval --plan FILE --budget TOKENS [--estimate N] [--out DIR]`: รัน candidate แต่ละตัว (provider, model, effort) กับชุดงานในสำเนา Git ที่ทิ้งได้นอก repository ด้วย command แบบเดียวกับ `models.json` บวก flag เฉพาะ eval (Claude รัน `python3 -m unittest` ได้) และลบ API key ที่คิดเงินออก ให้คะแนนด้วย hidden test ราย subtest แต่ละ run จองค่าที่มากกว่าระหว่างจำนวน token สูงสุดที่เคยเห็นกับ `--estimate` (ค่าเริ่มต้น 250000) เริ่มได้เฉพาะเมื่อยอดที่ใช้บวกยอดจองยังไม่เกินงบ ไม่อย่างนั้นจะรอ run ที่กำลังทำงานอยู่ จึงเกินงบได้เฉพาะ run ที่ใช้มากกว่ายอดจอง ส่วน CLI ที่เริ่มไม่ได้จะไม่ถูกคิด token และรันใหม่ได้ จำนวนที่ไม่รู้คิดเท่ายอดจองของ run นั้นพอดี และ run ที่ error ไม่ว่าขั้นไหนจะถูกบันทึกและคืนยอดจอง นับ token แบบเดียวกันทุก provider (input + cache write + output แยก cache read; Codex รายงานยอดเดียว) ถ้าไม่รู้จำนวนจะคิดเหมือนยอดจอง เขียน `results.jsonl` (รันซ้ำแล้วทำต่อจากเดิม), `summary.md`, `proposal.json` (เลือก candidate ที่เร็วที่สุดที่ได้คะแนนเต็มต่อ provider และ size) และ `logs/` ดิบ การถูกปฏิเสธสิทธิ์รายงานเป็นหมายเหตุ
+- `lean models apply --proposal FILE --sha256 DIGEST`: เขียนเฉพาะ size ที่เสนอ ปฏิเสธข้อเสนอที่เปลี่ยนไปหลังแสดง digest และตรวจความถูกต้องของ list
+- `lean models bank` และชุดงานใน `.lean/evals/` (workflow เป็นเจ้าของ ส่งไปกับทุกการติดตั้ง): size ละหนึ่งงาน ตั้งแต่แก้บั๊กบรรทัดเดียว (3S) ถึง cache แบบ single-flight ที่ปลอดภัยต่อ thread (3XL) แต่ละงานมีเฉลยที่ได้คะแนนเต็มและ stub ที่ไม่ได้เต็ม
+
+**เมื่ออัปเกรด:** `python3 .lean/bin/lean update preview` ตรวจแผนแล้ว `update apply` โดย `.lean/evals/` มากับ release gate controls ที่เปลี่ยน (`.lean/lean/evals.py`, `models.py`, `cli.py`, `structure.py`) ต้องมี HIGH review ที่ครอบคลุม หรือ `lean gate accept-controls` ไม่ต้องย้าย configuration หรือข้อมูล
+
+</details>
+
 ## 5.1.0 — 2026-10-27
 
 **Token highlight:** - · **Compared with:** -

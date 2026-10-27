@@ -9,10 +9,10 @@ from . import models
 from .util import read_json
 
 SKILLS = ("lean-init", "lean-task", "lean-scope", "lean-research", "lean-grill", "lean-agents",
-          "lean-review", "lean-gate", "lean-effort", "lean-update", "lean-target")
+          "lean-review", "lean-gate", "lean-effort", "lean-update", "lean-target", "lean-model-update")
 # 4.x skill names whose discovery links must not linger after an upgrade.
 RETIRED_SKILLS = ("lean-audit", "lean-catalog", "lean-compress", "lean-pattern", "lean-playbook", "lean-prune",
-                  "lean-takeover", "lean-multi-agent", "lean-clean-queue", "lean-model-update",
+                  "lean-takeover", "lean-multi-agent", "lean-clean-queue",
                   "lean-takeover-workflow", "lean-use-submodule", "lean-clean-repo", "lean-update-workflow",
                   "lean-skill-effort", "lean-quality-gate-mode")
 LINK_TREES = (".claude/skills", ".agents/skills")
@@ -26,7 +26,7 @@ LEGACY_PATHS = (".codex/quality-gate.json",)  # 4.x gate mode file that `lean up
 VERSION = re.compile(r"Lean Workflow Baseline (\d+\.\d+\.\d+)")
 # Workflow-owned directories: every Git-visible file in them ships in the asset registry.
 WORKFLOW_DIRS = (".lean/bin/", ".lean/lean/", ".lean/policy/", ".lean/roles/", ".lean/skills/", ".lean/templates/",
-                 ".lean/tests/")
+                 ".lean/tests/", ".lean/evals/")
 
 
 def git_visible(root):
