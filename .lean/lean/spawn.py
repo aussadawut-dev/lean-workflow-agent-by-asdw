@@ -218,7 +218,7 @@ class Agent:
         self.process.wait()
 
     def row(self, provider, trusted=False):
-        state = progress.load(self.worktree) if self.worktree.is_dir() else None
+        state = progress.load(self.worktree, "") if self.worktree.is_dir() else None
         return {"id": self.id, "provider": provider, "model": self.entry["model"], "status": self.status,
                 "exit_code": self.code, "worktree": str(self.worktree), "branch": self.branch,
                 "log": str(self.log), "progress": state, "note": self.note, "trusted": trusted}

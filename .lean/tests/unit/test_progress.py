@@ -1,4 +1,5 @@
 """Progress state and the solid/shade bar every surface shows."""
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -77,6 +78,84 @@ class StateTests(unittest.TestCase):
         self.assertTrue(frame[2].strip().startswith(progress.render(1.0)))
         self.assertIn("api [codex/m] done", frame[2])
         self.assertTrue(frame[3].strip().startswith(progress.render(3.5 / len(progress.PHASES))))
+
+
+class SessionTests(unittest.TestCase):
+    """TCK015: one session's progress is not shown as another's."""
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        saved = {name: os.environ.pop(name, None) for name in progress.SESSION_ENV}
+        self.addCleanup(lambda: [os.environ.__setitem__(k, v) for k, v in saved.items() if v is not None])
+
+    def test_each_session_keeps_its_own_progress(self):
+        progress.update(self.root, "gate", task="other task", session="sess-b-123456")
+        progress.update(self.root, "implement", task="my task", session="sess-a-123456")
+        progress.update(self.root, "gate", task="other task", session="sess-b-123456")
+        mine = progress.load(self.root, "sess-a-123456")
+        self.assertEqual((mine["phase"], mine["task"]), ("implement", "my task"))
+        self.assertEqual(progress.load(self.root, "sess-b-123456")["phase"], "gate")
+        self.assertIn("implement — my task", progress.shown(self.root, "sess-a-123456"))
+        self.assertNotIn("session", progress.shown(self.root, "sess-a-123456"))
+
+    def test_another_sessions_progress_is_labelled(self):
+        progress.update(self.root, "gate", task="other task", session="sess-b-123456")
+        text = progress.shown(self.root, "sess-a-123456")
+        self.assertTrue(text.startswith("session sess-b-1:"), text)
+        self.assertIn("gate — other task", text)
+        self.assertIsNone(progress.shown(self.root, "sess-a-123456", others=False))
+
+    def test_environment_names_the_session_and_clear_is_per_session(self):
+        os.environ["CLAUDE_CODE_SESSION_ID"] = "env-session-1"
+        progress.update(self.root, "test", task="env task")
+        self.assertEqual(progress.load(self.root, "env-session-1")["task"], "env task")
+        self.assertEqual(progress.load(self.root)["task"], "env task")
+        progress.update(self.root, "review", task="other", session="sess-b-123456")
+        progress.clear(self.root)
+        self.assertIsNone(progress.load(self.root, "env-session-1", others=False))
+        self.assertEqual(progress.load(self.root, "sess-b-123456")["phase"], "review")
+
+    def test_a_sessions_first_update_keeps_only_an_unowned_or_own_shared_task(self):
+        progress.update(self.root, "scope", task="shared task", session="")
+        self.assertEqual(progress.update(self.root, "implement", session="sess-a-123456")["task"], "shared task")
+        progress.update(self.root, "scope", task="b task", session="sess-b-123456")
+        self.assertEqual(progress.update(self.root, "implement", session="sess-c-123456")["task"], "")
+
+    def test_hooks_show_the_payload_sessions_progress_and_label_others(self):
+        import json
+        from lean import hooks
+        progress.update(self.root, "gate", task="other task", session="sess-b-123456")
+        message = json.loads(hooks.status_message(self.root, "sess-a-123456"))["systemMessage"]
+        self.assertIn("session sess-b-1: ", message)
+        progress.update(self.root, "implement", task="my task", session="sess-a-123456")
+        message = json.loads(hooks.status_message(self.root, "sess-a-123456"))["systemMessage"]
+        self.assertIn("implement — my task", message)
+        self.assertNotIn("other task", message)
+        notices = "\n".join(hooks.notices(self.root, "sess-a-123456"))
+        self.assertIn("implement — my task", notices)
+        self.assertNotIn("other task", notices)
+
+    def test_unsafe_session_ids_fall_back_to_the_shared_state(self):
+        for bad in ("../x", "a/b", "", "x" * 200):
+            with self.subTest(session=bad):
+                state = progress.update(self.root, "scope", task="shared", session=bad)
+                self.assertEqual(state["session"], "")
+                self.assertEqual(list((self.root / ".agent-runtime").glob("progress/*")), [])
+
+    def test_status_line_reads_the_status_line_session_from_stdin(self):
+        import json, subprocess
+        progress.update(self.root, "gate", task="other task", session="sess-b-123456")
+        progress.update(self.root, "implement", task="my task", session="sess-a-123456")
+        lean = Path(__file__).resolve().parents[2] / "bin/lean"
+        env = {k: v for k, v in os.environ.items() if k not in progress.SESSION_ENV}
+        result = subprocess.run([sys.executable, str(lean), "--root", str(self.root), "status", "--line"],
+                                input=json.dumps({"session_id": "sess-a-123456"}), text=True,
+                                capture_output=True, env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("implement — my task", result.stdout)
+        self.assertNotIn("other task", result.stdout)
 
 
 if __name__ == "__main__":

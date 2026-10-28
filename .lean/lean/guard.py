@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 import shlex
 import subprocess
+import sys
 import time
 
 from .util import RUNTIME
@@ -331,8 +332,30 @@ def log_contract(root, contract, source):
         pass
 
 
+MEMORY_FILE = re.compile(r"(?P<base>.+)/projects/[^/]+/memory/[^/]+")
+PROFILE_BASE = re.compile(r".*/claude-profiles/[^/]+(?:/home)?")
+
+
+def memory_bases():
+    """Resolved Claude configuration folders whose projects/*/memory/ hold user memory."""
+    bases = set()
+    for base in (Path.home() / ".claude", os.environ.get("CLAUDE_CONFIG_DIR")):
+        if base:
+            try:
+                bases.add(Path(base).resolve().as_posix())
+            except (OSError, RuntimeError):
+                pass
+    return bases
+
+
 def external_scratch_or_memory(root, name, tool_input):
-    """Whether an Edit/Write/MultiEdit targets user memory or /tmp outside the repository."""
+    """Whether an Edit/Write/MultiEdit targets /tmp or a user memory file outside the repository.
+
+    Memory is a flat `<base>/projects/<project>/memory/<file>`, where `<base>` is ~/.claude,
+    $CLAUDE_CONFIG_DIR or a `claude-profiles/<name>` folder (optionally `/home`) under the user's
+    home; other paths that
+    only mention `.claude` or `memory` (another checkout's hooks, say) still need a contract.
+    """
     if name not in {"Write", "Edit", "MultiEdit"} or not isinstance(tool_input, dict):
         return False
     raw_path = tool_input.get("file_path") or tool_input.get("path") or ""
@@ -341,15 +364,23 @@ def external_scratch_or_memory(root, name, tool_input):
     try:
         target = Path(raw_path).resolve()
         repo_root = Path(root).resolve()
-    except OSError:
+    except (OSError, RuntimeError):
         return False
     if target == repo_root or repo_root in target.parents:
         return False
     for scratch_root in (Path("/tmp"), Path("/private/tmp"), Path("/tmp").resolve()):
         if scratch_root in target.parents:
             return True
-    posix = target.as_posix()
-    return "/memory/" in posix and ("/.claude/" in posix or "claude-profiles/" in posix)
+    match = MEMORY_FILE.fullmatch(target.as_posix())
+    if not match:
+        return False
+    base = match.group("base")
+    try:
+        home = Path.home().resolve().as_posix()
+    except (OSError, RuntimeError):
+        home = ""
+    in_home = bool(home) and base.startswith(home + "/")
+    return base in memory_bases() or (in_home and bool(PROFILE_BASE.fullmatch(base)))
 
 
 def mentions_receipt_write(words):
@@ -403,6 +434,9 @@ def pre_tool(root, payload):
     if writes_receipt(name, tool_input, PENDING):
         return ("Lean contract guard: the review-pending marker is written only by "
                 "`lean gate review-pending --contract ... --session ...`, never edited directly.")
+    if any(writes_receipt(name, tool_input, cache) for cache in GATE_CACHES):
+        return ("Lean contract guard: a gate cache is written only by the gate itself (`lean gate run`, "
+                "the Stop hook); delete it to force a rerun, never write it.")
     if external_scratch_or_memory(root, name, tool_input):
         return None
     if name in READ_ONLY or name.startswith(READ_ONLY_PREFIXES):
@@ -456,6 +490,7 @@ def shell_words(command):
 GATE_MARKER = '("record-review", ' + '"check-review")'  # Split so this file is not mistaken for one.
 RECEIPT = RUNTIME + "/review.json"
 PENDING = RUNTIME + "/review-pending.json"  # Written only by `lean gate review-pending`.
+GATE_CACHES = (RUNTIME + "/gate-cache", RUNTIME + "/target-gate-cache")  # Written only by the gate.
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit", "apply_patch"}
 
 
@@ -615,9 +650,16 @@ def lean_writes(rest):
     """Whether a `lean` call changes records or settings (an unknown group does)."""
     while rest[:1] in (["--root"], ["--workflow-root"]):
         rest = rest[2:]
-    if not rest or "-h" in rest or "--help" in rest:
+    if not rest:
         return False  # Usage text.
     group, words = rest[0], rest[1:]
+    if group == "gate" and words[:1] == ["scope"]:
+        # It runs the command after it, whose own flags (a trailing -h included) are not Lean's.
+        return words[1:] not in (["-h"], ["--help"])
+    # A help flag is Lean's only before `--`; after it the words belong to another command.
+    lean_words = rest[:rest.index("--")] if "--" in rest else rest
+    if "-h" in lean_words or "--help" in lean_words:
+        return False  # Usage text.
     if group in LEAN_VALUE_WRITES:
         if any(word.split("=", 1)[0] in LEAN_VALUE_WRITES[group] for word in words):
             return True
@@ -677,6 +719,26 @@ def nested_writes(name, args, raw, depth):
             return shell_writes(line, depth + 1)
         index += 2 if word in takes else 1
     return command_writes(args[index:], raw, depth + 1)
+
+
+PYTHON_VALUED = {"-X", "-W", "-Q"}  # Python options whose next word is a value, not the script.
+
+
+def interpreter_script(name, args, positional):
+    """The script an interpreter runs: python's valued options (`-X dev`) do not name it."""
+    if not name.startswith("python"):
+        return positional[0] if positional else ""
+    skip = False
+    for word in args:
+        if skip:
+            skip = False
+        elif word in ("-c", "-m", "-"):
+            return ""  # Inline code, a module (checked above) or stdin.
+        elif word in PYTHON_VALUED:
+            skip = True
+        elif not word.startswith("-"):
+            return word
+    return ""
 
 
 def command_writes(words, raw, depth=0):
@@ -755,7 +817,7 @@ def command_writes(words, raw, depth=0):
             module = args[args.index("-m") + 1]
             if module in MODULE_WRITES or (module in PIP_MODULES and any(word in INSTALL_WORDS for word in args)):
                 return True
-        script = positional[0] if positional else ""
+        script = interpreter_script(name, args, positional)
         if lean_cli(script):
             return lean_writes(args[args.index(script) + 1:])
         if ".lean/lean/" in script:
@@ -795,32 +857,44 @@ def writes_receipt(name, tool_input, target=RECEIPT):
     if not isinstance(tool_input, dict):
         return False
     if name in EDIT_TOOLS - {"apply_patch"}:
-        return any(str(tool_input.get(key, "")).endswith(target) for key in ("file_path", "notebook_path", "path"))
+        return any(names_target(tool_input.get(key), target) for key in ("file_path", "notebook_path", "path"))
     command = tool_input.get("command")
-    if not isinstance(command, str) or target not in command:
+    if not isinstance(command, str) or fold(Path(target).name) not in fold(command):
         return False
     if name == "apply_patch":
-        return any(line.startswith("*** ") and "File:" in line and line.rstrip().endswith(target)
-                   for line in command.splitlines())
+        return any(line.startswith("*** ") and "File:" in line
+                   and names_target(line.split("File:", 1)[1].strip(), target) for line in command.splitlines())
     if name != "Bash":
         return False
     words = shell_words(command)
     if words is None:
         return True  # Unparseable and naming the receipt: refuse rather than guess.
     for index, word in enumerate(words[:-1]):
-        if word in (">", ">>", ">|") and words[index + 1].endswith(target):
+        if word in FILE_REDIRECTS | {"<>"} and names_target(words[index + 1], target):
             return True
     for command_words in simple_commands(words):
         if not command_words:
             continue
         tool = Path(command_words[0]).name
-        targets = any(word.endswith(target) for word in command_words[1:])
+        targets = any(names_target(word, target) for word in command_words[1:])
         if targets and (tool in WRITERS or (tool == "sed" and any(w.startswith("-i") for w in command_words))):
             return True
-        if any(target in word and re.search(r"open\([^)]*['\"][wax]|write_(text|bytes)\(", word)
+        if any(fold(Path(target).name) in fold(word) and re.search(r"open\([^)]*['\"][wax]|write_(text|bytes)\(", word)
                for word in command_words):
             return True
     return False
+
+
+def fold(text):
+    """Case-folded on macOS, whose default file system ignores case; unchanged elsewhere."""
+    return text.casefold() if sys.platform == "darwin" else text
+
+
+def names_target(word, target):
+    """Whether a path word names `target` (a runtime path), after `./`, `//` and `..` normalisation."""
+    if not isinstance(word, str) or not word.strip():
+        return False
+    return fold(os.path.normpath(word.strip())).endswith(fold(os.path.normpath(target)))
 
 
 def gate_tool(word, cwd, previous=""):

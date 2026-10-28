@@ -3,6 +3,38 @@
 เลขรุ่น `MAJOR.MINOR.PATCH`: MAJOR เปลี่ยนกติกาหรือ path เดิม, MINOR เพิ่มของใหม่, PATCH แก้ไข · วิธีอัปเกรด: [CUSTOMIZING.md](CUSTOMIZING.md)
 Versions are `MAJOR.MINOR.PATCH`: MAJOR changes rules or paths, MINOR adds, PATCH fixes · Upgrading: [CUSTOMIZING.md](CUSTOMIZING.md) · 5.x technical notes: [docs/CHANGELOG-dev.md](../docs/CHANGELOG-dev.md)
 
+## 5.3.1 — 2026-10-29
+
+🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#531--2026-10-29)
+
+ปิดช่องโหว่ของ contract guard ที่พบหลังใช้ 5.3.0 จริง และ progress bar ไม่ปนกันระหว่าง session
+
+**แก้ไข**
+- `-h` หรือ `--help` ที่อยู่หลัง `--` หรือในคำสั่งที่ `lean gate scope` รัน ไม่ทำให้ guard มองว่าเป็นแค่การอ่านอีกต่อไป
+- ข้อยกเว้นให้เขียนโดยไม่มี contract เหลือเฉพาะ `/tmp` และไฟล์ memory ของผู้ใช้ (`~/.claude/projects/*/memory/`, `$CLAUDE_CONFIG_DIR` หรือโฟลเดอร์ `claude-profiles`) ไม่รวม `.claude/.../memory/` ของ checkout อื่น
+- `.agent-runtime/gate-cache` และ `target-gate-cache` เขียนเองไม่ได้ (ลบได้เพื่อบังคับรันใหม่)
+- การเขียนทับ review receipt และ gate cache ด้วย path ที่สะกดต่างกัน (`./`, `//`, ตัวพิมพ์ใหญ่เล็กบน macOS, `&>`) หรือ `python3 -X dev .lean/bin/lean ...` ถูก guard จับได้แล้ว
+- Progress แยกตาม session: status line แสดงงานของ session ตัวเอง ส่วนของ session อื่นมีป้าย `session <id>:`
+
+**ต้องทำอะไรตอนอัปเกรด**
+- `lean update preview` แล้ว `lean update apply` ไม่ต้องย้ายข้อมูล
+- ไฟล์ที่ gate ใช้ตรวจงานเปลี่ยน: ให้ reviewer ตรวจ หรือยืนยันเองด้วย `lean gate accept-controls`
+
+**English**
+
+Closes contract-guard holes found after running 5.3.0, and keeps one session's progress bar out of another's.
+
+**Fixed**
+- `-h` or `--help` after `--`, or in the command `lean gate scope` runs, no longer makes the guard treat the call as a read.
+- The no-contract exception covers only `/tmp` and user memory files (`~/.claude/projects/*/memory/`, `$CLAUDE_CONFIG_DIR` or a `claude-profiles` folder), not another checkout's `.claude/.../memory/`.
+- `.agent-runtime/gate-cache` and `target-gate-cache` cannot be written directly (deleting them to force a rerun still works).
+- Writes to the review receipt or gate caches through other spellings (`./`, `//`, case on macOS, `&>`) and `python3 -X dev .lean/bin/lean ...` calls are caught by the guard.
+- Progress is per session: the status line shows its own session's task, and another session's with a `session <id>:` label.
+
+**Upgrade**
+- `lean update preview`, then `lean update apply`; no data migration.
+- Changed gate files need a reviewer or `lean gate accept-controls`.
+
 ## 5.3.0 — 2026-10-28
 
 🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#530--2026-10-28)

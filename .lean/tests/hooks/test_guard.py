@@ -744,8 +744,8 @@ class GuardHookTests(HookFixture):
     def test_external_scratch_and_user_memory_writes_allowed_without_repo_contract(self):
         for tool_name, path in (("Write", "/tmp/claude-scratch-note.md"),
                                 ("Edit", "/private/tmp/claude-501/scratch.txt"),
-                                ("Write", "/Users/x10/.claude/projects/-Users-x10-repo/memory/MEMORY.md"),
-                                ("MultiEdit", "/Users/x10/.ccs/claude-profiles/work/projects/p/memory/note.md")):
+                                ("Write", str(Path.home().resolve() / ".claude/projects/-Users-x10-repo/memory/MEMORY.md")),
+                                ("MultiEdit", str(Path.home().resolve() / ".ccs/claude-profiles/work/projects/p/memory/note.md"))):
             with self.subTest(tool=tool_name, path=path):
                 res = self.tool("claude", tool_name, "paused-session", file_path=path)
                 self.assertEqual(res.returncode, 0, res.stderr)
@@ -901,6 +901,82 @@ class StopContractTests(HookFixture):
         review = json.loads(self.codex_event("stop", "x1").stdout)
         self.assertEqual(review["decision"], "block")
         self.assertIn("review.json", review["reason"])  # HIGH contract: no receipt, no pass.
+
+
+class AuditHolesTests(HookFixture):
+    """TCK015: holes found after 5.3.0 (help flags, memory exception, gate caches)."""
+
+    def test_help_flag_after_double_dash_or_in_gate_scope_is_still_a_write(self):
+        lean = "python3 .lean/bin/lean"
+        for command in (f"{lean} gate scope -- rm -rf src -h",
+                        f"{lean} gate scope -- sh -c \"echo x > f\" --help",
+                        f"{lean} gate scope --only 'docs/*' -- cp a b -h",
+                        f"{lean} gate scope echo hi -h",
+                        f"{lean} --root . gate scope -- touch f --help",
+                        f"{lean} evidence record-review -- -h",
+                        "python3 -X dev .lean/bin/lean gate scope -- rm x",
+                        "python3 -W ignore .lean/bin/lean gate accept-controls --reason x",
+                        "python3 -X dev -W ignore .lean/bin/lean queue add --title x"):
+            with self.subTest(write=command):
+                self.assertTrue(contract_guard.shell_writes(command), command)
+                self.assertEqual(self.tool("claude", "Bash", "no-contract", command=command).returncode, 2, command)
+        for command in (f"{lean} -h", f"{lean} gate scope -h", f"{lean} gate scope --help",
+                        f"{lean} evidence record-review --help", f"{lean} queue add -h",
+                        "python3 -X dev .lean/bin/lean status", "python3 -c 'print(1)' .lean/bin/lean"):
+            with self.subTest(read=command):
+                self.assertFalse(contract_guard.shell_writes(command), command)
+
+    def test_memory_exception_covers_only_user_memory_files(self):
+        home = Path.home().resolve()
+        allowed = (str(home / ".claude/projects/-Users-x-repo/memory/MEMORY.md"),
+                   str(home / "Library/Application Support/orca/claude-profiles/abc/home/projects/p/memory/n.md"),
+                   str(home / ".ccs/claude-profiles/work/projects/p/memory/note.md"),
+                   "/tmp/scratch.txt")
+        for path in allowed:
+            with self.subTest(allowed=path):
+                self.assertTrue(contract_guard.external_scratch_or_memory(self.root, "Write", {"file_path": path}))
+        denied = ("/Users/x/work/main/.claude/hooks/memory/x.sh",
+                  "/Users/x/work/main/.lean/lean/memory/.claude/x.py",
+                  "/Users/x/x/memory/.claude/settings.json",
+                  "/Users/x/work/repo/.claude/projects/p/memory/x.md",
+                  str(home / ".claude/projects/p/memory/sub/x.md"),
+                  str(home / ".claude/settings.json"),
+                  "/opt/x/claude-profiles/z/projects/p/memory/x.sh")
+        for path in denied:
+            with self.subTest(denied=path):
+                self.assertFalse(contract_guard.external_scratch_or_memory(self.root, "Write", {"file_path": path}))
+                self.assertEqual(self.tool("claude", "Write", "no-contract", file_path=path).returncode, 2, path)
+
+    def test_gate_caches_are_never_written_directly_even_with_a_contract(self):
+        self.assertEqual(self.tool("claude", "Bash", "s1", command=f"{DECLARE} --contract '{LINE}'").returncode, 0)
+        for cache in (".agent-runtime/gate-cache", ".agent-runtime/target-gate-cache"):
+            for name, tool_input in (("Bash", {"command": f"echo forged > {cache}"}),
+                                     ("Bash", {"command": f"cp /tmp/x {cache}"}),
+                                     ("Bash", {"command": f"python3 -c \"open('{cache}','w').write('k')\""}),
+                                     ("Write", {"file_path": str(self.root / cache), "content": "k"})):
+                with self.subTest(cache=cache, tool=name, input=tool_input):
+                    result = self.tool("claude", name, "s1", **tool_input)
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertIn("gate cache", result.stderr)
+            name = cache.rsplit("/", 1)[1]
+            spellings = [(f"Bash", {"command": f"echo k &> {cache}"}),
+                         ("Bash", {"command": f"echo k &>> {cache}"}),
+                         ("Bash", {"command": f"echo k > ./.agent-runtime/./{name}"}),
+                         ("Bash", {"command": f"echo k > .agent-runtime//{name}"}),
+                         ("Bash", {"command": f"cp x .agent-runtime/sub/../{name}"}),
+                         ("Write", {"file_path": f"{self.root}/.agent-runtime/./{name}", "content": "k"}),
+                         ("Write", {"file_path": f"{self.root}//.agent-runtime//{name}", "content": "k"})]
+            if sys.platform == "darwin":  # Case-insensitive file system: the same file.
+                spellings += [("Bash", {"command": f"echo k > .agent-runtime/{name.title()}"}),
+                              ("Write", {"file_path": f"{self.root}/.agent-runtime/{name.upper()}", "content": "k"})]
+            for name_, tool_input in spellings:
+                with self.subTest(cache=cache, spelling=tool_input):
+                    result = self.tool("claude", name_, "s1", **tool_input)
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertIn("gate cache", result.stderr)
+            for command in (f"rm -f {cache}", f"cat {cache}"):
+                with self.subTest(allowed=command):
+                    self.assertEqual(self.tool("claude", "Bash", "s1", command=command).returncode, 0, command)
 
 
 if __name__ == "__main__":

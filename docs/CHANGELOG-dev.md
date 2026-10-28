@@ -3,6 +3,17 @@
 Developer and agent notes for each 5.x release: commands, flags, rules, changed gate controls and limits.
 The user-facing summary of each release is in [`.lean/CHANGELOG.md`](../.lean/CHANGELOG.md).
 
+## 5.3.1 — 2026-10-29
+
+Findings from Casetodian's audit after applying 5.3.0 (TCK015).
+
+- **Guard help flags.** `guard.lean_writes` counts `-h`/`--help` as usage text only before `--`; `lean gate scope` with a command is always a write (only bare `lean gate scope -h|--help` reads). In 5.3.0 any `-h` made the call a read, so `lean gate scope -- <command> -h` ran `<command>` without a contract or takeover check (the 5.3.0 note that the guard treats `gate scope` as a write did not hold). Test: `hooks/test_guard.py::AuditHolesTests::test_help_flag_after_double_dash_or_in_gate_scope_is_still_a_write`.
+- **Memory exception.** `guard.external_scratch_or_memory` allows, besides `/tmp` and `/private/tmp`, only a flat `<base>/projects/<project>/memory/<file>` whose `<base>` is resolved `~/.claude`, `$CLAUDE_CONFIG_DIR` or `.../claude-profiles/<name>[/home]` under the user's home. 5.3.0 allowed any outside path containing `/memory/` and `/.claude/` (or `claude-profiles/`), such as another checkout's `.claude/hooks/memory/x.sh`. Test: `test_memory_exception_covers_only_user_memory_files`.
+- **Gate caches and runtime write checks.** `guard.GATE_CACHES` (`.agent-runtime/gate-cache`, `.agent-runtime/target-gate-cache`) take the receipt write check (`writes_receipt`), with or without a contract; `rm` and reads stay allowed. `writes_receipt` now compares targets with `names_target()` (`os.path.normpath`, case-folded on macOS), counts every file redirection (`FILE_REDIRECTS`: `&>`, `&>>`, `>>|` too), and prefilters on the file name, so `./`, `//`, `..`, case variants and `&>` no longer bypass the receipt, pending-marker and cache checks. Test: `test_gate_caches_are_never_written_directly_even_with_a_contract`.
+- **Interpreter options.** `guard.interpreter_script` skips python's valued options (`-X`, `-W`, `-Q`) and stops at `-c`/`-m`/`-`, so `python3 -X dev .lean/bin/lean gate scope -- rm x` is checked as a `lean` call (it was a read).
+- **Per-session progress.** `progress.update/load/clear` take a session (default `env_session()`: `LEAN_SESSION_ID`, `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`; ids must match `[A-Za-z0-9][A-Za-z0-9._-]{0,127}`, else shared). State goes to `.agent-runtime/progress/<session>.json` and `progress.json` (latest, with `session`); files older than 7 days are pruned on update; a session's first update keeps the task of an unowned or own shared state. `progress.shown()` labels another session's state `session <id8>:`. `lean status --line` reads `session_id` from the status-line stdin JSON; Claude SessionStart/Stop and Codex SessionStart/Stop pass the hook payload's session; `lean spawn run` reads each agent worktree's latest state. Tests: `unit/test_progress.py::SessionTests` (hook messages included).
+- Changed gate controls: `.lean/lean/__init__.py`, `guard.py`, `progress.py`, `cli.py`, `hooks.py`, `spawn.py`. Validation: `lean lint`, `lean test --changed`, gate, independent HIGH review (round 1 REWORK on cache-path spellings, fixed).
+
 ## 5.3.0 — 2026-10-28
 
 Findings from the first production run (Casetodian workspace with a submodule application target): TCK013 and TCK014.
