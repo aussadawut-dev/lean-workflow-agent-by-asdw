@@ -17,13 +17,16 @@
   "lint_only": [
     "*.md",
     "docs/*",
+    "docs/tracking/*",
     "evals/*",
     ".github/*",
     "LICENSE",
     ".lean/LICENSE",
     ".lean/config.json",
     ".lean/gate.json",
-    ".lean/skill-effort.json"
+    ".lean/skill-effort.json",
+    ".lean/targets/*",
+    ".agents/queue/*"
   ],
   "rules": [
     {

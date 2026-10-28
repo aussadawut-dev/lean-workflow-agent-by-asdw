@@ -211,6 +211,32 @@ def initial_head(root, session):
         return (store.sessions.get(session) or {}).get("initial_head")
 
 
+def takeover(root, new_session, reason=""):
+    """Mark other active contract-holding sessions as superseded by `new_session`."""
+    superseded = []
+    with Store(root) as store:
+        for other, record in store.sessions.items():
+            if other == new_session or not isinstance(record, dict) or not record.get("contract"):
+                continue
+            record["superseded_by"] = new_session
+            if reason:
+                record["superseded_reason"] = reason
+            else:
+                record.pop("superseded_reason", None)
+            superseded.append(other)
+        if superseded:
+            store.save()
+    return superseded
+
+
+def superseded_by(root, session):
+    """The controller session ID that superseded `session`, or None."""
+    with Store(root) as store:
+        record = store.sessions.get(session) or {}
+    value = record.get("superseded_by")
+    return value if isinstance(value, str) and value else None
+
+
 def text_of(content):
     """Plain text of a message body, or None when it carries tool results (not a prompt)."""
     if isinstance(content, str):
@@ -291,6 +317,8 @@ def bind_transcript(root, session, payload):
             {"contract": found[0], "meta": found[1], "source": "transcript", "at": time.time(),
              "model": payload.get("model") if isinstance(payload.get("model"), str) else None})
         store.save()
+    if str(found[1].get("topic", "")).startswith("takeover"):
+        takeover(root, session, reason=str(found[1].get("topic", "")))
     log_contract(root, found[0], "transcript")
     return found[0]
 
@@ -301,6 +329,39 @@ def log_contract(root, contract, source):
         activity.record(root, "contract", contract=contract, source=source)
     except Exception:  # noqa: BLE001 - logging never decides a tool call.
         pass
+
+
+def external_scratch_or_memory(root, name, tool_input):
+    """Whether an Edit/Write/MultiEdit targets user memory or /tmp outside the repository."""
+    if name not in {"Write", "Edit", "MultiEdit"} or not isinstance(tool_input, dict):
+        return False
+    raw_path = tool_input.get("file_path") or tool_input.get("path") or ""
+    if not isinstance(raw_path, str) or not raw_path.startswith("/"):
+        return False
+    try:
+        target = Path(raw_path).resolve()
+        repo_root = Path(root).resolve()
+    except OSError:
+        return False
+    if target == repo_root or repo_root in target.parents:
+        return False
+    for scratch_root in (Path("/tmp"), Path("/private/tmp"), Path("/tmp").resolve()):
+        if scratch_root in target.parents:
+            return True
+    posix = target.as_posix()
+    return "/memory/" in posix and ("/.claude/" in posix or "claude-profiles/" in posix)
+
+
+def mentions_receipt_write(words):
+    """Whether parsed shell words mention `record-review` outside a pure `-h`/`--help` check."""
+    if words is None:
+        return True
+    return any(
+        any("record-review" in w for w in part)
+        and not (("-h" in part or "--help" in part)
+                 and all(w == "record-review" for w in part if "record-review" in w))
+        for part in simple_commands(words)
+    )
 
 
 def pre_tool(root, payload):
@@ -323,10 +384,15 @@ def pre_tool(root, payload):
             except ValueError as error:
                 return f"Contract declaration rejected: {error}.\n{HELP}"
             with Store(root) as store:
-                store.sessions.setdefault(session, {}).update(
+                record = store.sessions.setdefault(session, {})
+                record.pop("superseded_by", None)
+                record.pop("superseded_reason", None)
+                record.update(
                     {"contract": contract, "meta": meta, "at": time.time(),
                      "model": payload.get("model") if isinstance(payload.get("model"), str) else None})
                 store.save()
+            if str(meta.get("topic", "")).startswith("takeover"):
+                takeover(root, session, reason=str(meta.get("topic", "")))
             log_contract(root, contract, "declared")
             return None
     if writes_receipt(name, tool_input):
@@ -337,6 +403,8 @@ def pre_tool(root, payload):
     if writes_receipt(name, tool_input, PENDING):
         return ("Lean contract guard: the review-pending marker is written only by "
                 "`lean gate review-pending --contract ... --session ...`, never edited directly.")
+    if external_scratch_or_memory(root, name, tool_input):
+        return None
     if name in READ_ONLY or name.startswith(READ_ONLY_PREFIXES):
         return None
     # Only write tools and writing shell commands wait for the contract; the Stop gate still refuses
@@ -344,10 +412,15 @@ def pre_tool(root, payload):
     # A command whose parsed words mention record-review is a write and takes the receipt check
     # whatever the heuristic says: a renamed copy of gate_evidence.py looks like any other script.
     words = shell_words(command) if isinstance(command, str) else []
-    mentions_receipt = isinstance(command, str) and (words is None or any("record-review" in w for w in words))
+    mentions_receipt = isinstance(command, str) and mentions_receipt_write(words)
     writing = name in EDIT_TOOLS or mentions_receipt or (isinstance(command, str) and shell_writes(command))
     if not writing:
         return None
+    superseded = superseded_by(root, session)
+    if superseded:
+        return (f"Lean contract guard: session {session} was superseded by controller session "
+                f"{superseded}; do not edit this worktree concurrently. Declare a new contract "
+                f"only if you are taking back ownership.")
     # Bind a transcript contract before any check that depends on the session's contract.
     declared = current(root, session) or bind_transcript(root, session, payload)
     cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else root
@@ -363,7 +436,9 @@ def pre_tool(root, payload):
             f"is blocked.\n{HELP}")
 
 
-OPERATORS = set(";&|<>()") | {"&&", "||", ";;", "|&", ">>", "<<", "<<<"}
+CONTROL_OPERATORS = set(";&|()") | {"&&", "||", ";;", "|&"}
+REDIRECT_OPERATORS = {"<", ">", ">>", ">|", ">>|", "&>", "&>>", "<>", "<&", ">&", "<<", "<<-", "<<<"}
+OPERATORS = CONTROL_OPERATORS | REDIRECT_OPERATORS
 
 
 def shell_words(command):
@@ -389,12 +464,18 @@ COPIERS = {"cp", "mv", "ln", "install", "rsync"}
 
 
 def simple_commands(words):
-    """Split shell words into simple commands at operators."""
+    """Split shell words into simple commands at control operators, dropping redirections and their targets."""
     command = []
+    skip_target = False
     for word in words:
-        if word in OPERATORS:
+        if word in CONTROL_OPERATORS:
             yield command
             command = []
+            skip_target = False
+        elif word in REDIRECT_OPERATORS:
+            skip_target = True
+        elif skip_target:
+            skip_target = False
         else:
             command.append(word)
     yield command
@@ -416,6 +497,9 @@ READ_GIT = {"status", "diff", "log", "show", "ls-files", "rev-parse", "blame", "
 # anything else (a second name, `-d` alone, bundled as `-qd` or abbreviated as `--del`) may change a ref.
 REFLOG_WRITES = {"expire", "delete", "drop", "write"}
 SYMBOLIC_REF_READ_OPTIONS = {"-q", "--quiet", "--short", "--recurse", "--no-recurse"}
+SUBMODULE_BARE_OPTIONS = {"-q", "--quiet", "--cached"}
+SUBMODULE_STATUS_OPTIONS = {"-q", "--quiet", "--cached", "--recursive"}
+SUBMODULE_SUMMARY_OPTIONS = {"--cached", "--files", "-n", "--summary-limit"}
 GIT_LISTERS = {"branch", "tag", "remote", "stash", "worktree", "config"}  # List or change, by argument.
 GIT_LIST_FLAGS = {"-l", "--list", "-a", "-r", "--all", "--remotes", "--contains", "--no-contains", "--merged",
                   "--no-merged", "--points-at", "--show-current", "-v", "-vv", "--verbose", "-n"}
@@ -497,6 +581,17 @@ def git_writes(args):
         options = [word for word in rest if word.startswith("-")]
         return (len(names) != 1 or unknown_word(names[0])
                 or any(word not in SYMBOLIC_REF_READ_OPTIONS for word in options))
+    if sub == "submodule":
+        positional = [word for word in rest if not word.startswith("-")]
+        options = [word for word in rest if word.startswith("-")]
+        if not positional:
+            return any(word not in SUBMODULE_BARE_OPTIONS for word in options)
+        if positional[0] == "status":
+            return any(word not in SUBMODULE_STATUS_OPTIONS for word in options)
+        if positional[0] == "summary":
+            return any(word not in SUBMODULE_SUMMARY_OPTIONS
+                       and not re.fullmatch(r"(-n|--summary-limit=)\d+", word) for word in options)
+        return True
     if sub not in GIT_LISTERS or any(word in GIT_CHANGERS for word in rest):
         return True
     positional = [word for word in rest if not word.startswith("-")]
@@ -520,7 +615,7 @@ def lean_writes(rest):
     """Whether a `lean` call changes records or settings (an unknown group does)."""
     while rest[:1] in (["--root"], ["--workflow-root"]):
         rest = rest[2:]
-    if not rest:
+    if not rest or "-h" in rest or "--help" in rest:
         return False  # Usage text.
     group, words = rest[0], rest[1:]
     if group in LEAN_VALUE_WRITES:
@@ -783,22 +878,28 @@ def records_own_receipt(command, declared, cwd=None, depth=0):
     # `grep -rn record-review gate_evidence.py` only searches: the word comes before the tool in the
     # same simple command. Across a pipe only xargs turns input into the tool's arguments.
     called = standalone and copies
-    tool = in_pipeline = in_segment = xargs = False
+    tool = in_pipeline = in_segment = xargs = segment_called = segment_help = False
     previous = ""
     for word in words:
         if word == "|":
+            called = called or (segment_called and not segment_help)
             in_pipeline, in_segment, tool, xargs = in_pipeline or in_segment, False, False, False
-        elif word in OPERATORS:
-            in_pipeline = in_segment = tool = xargs = False
+            segment_called = segment_help = False
+        elif word in CONTROL_OPERATORS:
+            called = called or (segment_called and not segment_help)
+            in_pipeline = in_segment = tool = xargs = segment_called = segment_help = False
+        elif word in ("-h", "--help") and not in_pipeline:
+            segment_help = True
         elif word == "record-review":
-            called = called or tool
+            segment_called = segment_called or tool
             in_segment = True
         elif Path(word).name == "xargs":
             xargs = True
         elif gate_tool(word, cwd, previous):
             tool = True
-            called = called or (in_pipeline and xargs)
+            segment_called = segment_called or (in_pipeline and xargs)
         previous = word
+    called = called or (segment_called and not segment_help)
     if not called:
         return False
     if not values or declared in command:

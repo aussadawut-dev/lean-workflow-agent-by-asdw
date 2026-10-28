@@ -51,6 +51,13 @@ python3 .lean/bin/lean spawn clean <run-id>
 
 The plan puts tasks into waves: a task waits for its dependencies, and two tasks that share a file never run together. In a session, pass each task's `model` and `effort` to the runtime's subagent tool. `spawn run` instead starts `claude -p`, `codex exec` or `agy -p` processes, each in its own git worktree from HEAD, with a progress bar per agent (`lean watch` shows them too). It refuses an uncommitted working tree unless `--allow-dirty`, and it integrates nothing: the Controller reviews each worktree's diff and applies it.
 
+### Batching, wave design and runtime caps
+
+- **Subagent thread cap and cohesive batching**: in-session subagent runtimes (such as Codex `spawn_agent`) enforce a cumulative per-session subagent thread limit (typically ~8–10 spawned agents per session, including completed ones). Do not over-slice repetitive work into 15–20 single-file micro-tasks; batch related files into **3–5 cohesive component or layer tasks** so the session stays below the runtime thread cap while keeping each worker within ~50 turns.
+- **Shared foundation first**: when multiple files must adopt a new shared component, shell, or helper interface, sequence a Wave 1 task to build and test the shared foundation first, then make Wave 2 consumer tasks depend on it (`deps`) and import the verified shared component rather than duplicating markup or logic.
+- **No unbounded background polling loops**: never run unbounded background shell polling loops (such as `until grep -q ...; do sleep 5; done`) without a process-liveness check (`kill -0 <pid>`) and a bounded iteration/timeout cap; use the runtime's native subagent completion notifications or bounded checks so abandoned loops never linger as multi-hour zombie processes.
+- **Controller handoff and fallback takeover**: when a Controller hands off to a fallback session (for example, switching providers when a usage quota is reached), declare the takeover (`topic: takeover` in the contract block) so prior sessions in `.agent-runtime/contract-sessions.json` are superseded and cannot resume editing the shared worktree concurrently when their quota resets.
+
 ## Permissions in headless runs
 
 A headless agent cannot ask you for permission, so it gets only what its provider settings already allow; the default `args` in `models.json` grant nothing extra. An agent that changed nothing ends as `no-changes`, not `done`, and the summary names any tool its provider reported denying.

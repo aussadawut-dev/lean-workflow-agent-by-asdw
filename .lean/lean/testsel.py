@@ -3,8 +3,8 @@
 Tests live in .lean/tests/<category>/test_*.py (unit, hooks, e2e). `.lean/tests/impact.json`
 maps changed paths to test files or categories. Only paths in its workflow `scope` can affect
 these tests (a project's own application code cannot); paths listed as lint-only (documentation,
-project settings) run lint only, a changed test file runs itself, and an in-scope path no rule
-covers runs everything, so selection never silently skips.
+project/target work records and settings) run lint only when no rule matches, a changed test file
+runs itself, and an in-scope path no rule covers runs everything, so selection never silently skips.
 """
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import fnmatch

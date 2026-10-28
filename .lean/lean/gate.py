@@ -26,6 +26,7 @@ GATE_FILE = ".lean/gate.json"
 PENDING_FILE = ".agent-runtime/review-pending.json"
 PENDING_LIMIT = 2 * 3600  # Seconds a marked review keeps Stops quiet; a longer wait blocks again.
 HIGH_REVIEW = re.compile(r"Contract: (?:risk=HIGH quality=|risk=(?:LOW|MEDIUM) quality=VERY_HIGH acceptance=)")
+PROGRESS_LINE = re.compile(r"^(?:Target )?Quality Gate: (?:check \d+ (?:started|passed)|checks reused)\b")
 
 
 # --- Gate automation mode -------------------------------------------------------------------
@@ -326,13 +327,29 @@ class Run:
         from . import target
         captured = io.StringIO()
         try:
+            paths = target.context(self.root)
+            if paths["target"] is not None:
+                self.checks += len(target.gate_commands(paths["project_file"]))
             with contextlib.redirect_stderr(captured):
-                code = target.gate(self.root, optional=True, quiet=self.quiet, session=self.session)
+                code = target.gate(self.root, optional=True, quiet=self.quiet, session=self.session,
+                                   cache_tree=self.cache_tree)
         except (OSError, ValueError, KeyError, TypeError, subprocess.CalledProcessError) as error:
-            self.say(captured.getvalue().rstrip() + ("\n" if captured.getvalue() else "") + f"target error: {error}")
+            lines = captured.getvalue().splitlines()
+            if not self.quiet:
+                for line in lines:
+                    if PROGRESS_LINE.match(line):
+                        print(line, file=sys.stderr, flush=True)
+            errors = "\n".join(line for line in lines if not PROGRESS_LINE.match(line)).rstrip()
+            self.say((errors + "\n" if errors else "") + f"target error: {error}")
             return self.refuse()
         if code:
-            self.say(captured.getvalue().rstrip())
+            lines = captured.getvalue().splitlines()
+            if not self.quiet:
+                for line in lines:
+                    if PROGRESS_LINE.match(line):
+                        print(line, file=sys.stderr, flush=True)
+            errors = "\n".join(line for line in lines if not PROGRESS_LINE.match(line)).rstrip()
+            self.say(errors or captured.getvalue().rstrip())
             return self.refuse()
         if not self.quiet:
             sys.stderr.write(captured.getvalue())
@@ -393,6 +410,12 @@ class Run:
                 if released is not None:
                     return released
             return self.refuse()
+        project = root / ".lean/PROJECT.md"
+        try:
+            configured = gate_commands(project) if project.is_file() else []
+        except LeanError:
+            configured = []
+        self.checks += len(configured)
         selection = root / ".agent-runtime/active-target.json"
         if not self.seed and (selection.exists() or selection.is_symlink()):
             self.progress("target checks started")
@@ -400,7 +423,6 @@ class Run:
             if refused is not None:
                 return refused
             self.progress("target checks passed")
-        project = root / ".lean/PROJECT.md"
         if not project.is_file():
             self.say("Quality Gate undefined: missing .lean/PROJECT.md; run /lean-init.")
             return self.refuse()
@@ -412,7 +434,6 @@ class Run:
         if not commands:
             self.say("Quality Gate undefined: configure checks in .lean/PROJECT.md; no validation passed.")
             return self.refuse()
-        self.checks = len(commands)
         # One view of the checkout serves the state and the High-risk check below; no command runs
         # in between. Each answer equals its separate Git call (util.GitView).
         view = GitView(root)
@@ -594,7 +615,8 @@ def run(root, **options):
     if not gate.seed:
         from . import activity
         result = "pass" if code == 0 and not gate.out else "released" if code == 0 else "refused"
-        reason = next((line for message in gate.err for line in message.splitlines() if line.strip()), "")
+        reason = next((line for message in gate.err for line in message.splitlines()
+                       if line.strip() and not PROGRESS_LINE.match(line)), "")
         activity.record(gate.root, "gate", result=result, checks=gate.checks, seconds=round(time.monotonic() - began, 1),
                         hook=gate.hook or None, reason=reason[:200] if code else None)
     return code, gate.out, gate.err
