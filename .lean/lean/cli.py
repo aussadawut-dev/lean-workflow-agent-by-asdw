@@ -84,6 +84,13 @@ def build_parser(argv=()):
                                       help="quiet Stops while an independent review of this exact state runs")
     pending.add_argument("--contract", required=True)
     pending.add_argument("--session", required=True)
+    gate_scope = gate_actions.add_parser(
+        "scope", help="run one gate check unless the change touches only work records (LEAN_GATE_SCOPE=full runs it)")
+    gate_scope.add_argument("--only", action="append", default=[], metavar="GLOB",
+                            help="another path that alone does not need this check (repeatable)")
+    gate_scope.add_argument("--always", action="append", default=[], metavar="GLOB",
+                            help="a path that always needs this check, even if it is a record (repeatable)")
+    gate_scope.add_argument("check", nargs=argparse.REMAINDER, help="-- <command> [args...]")
 
     evidence_parser = commands.add_parser("evidence", help="review receipts and shipping state", add_help=False)
     evidence_parser.add_argument("rest", nargs=argparse.REMAINDER)
@@ -368,6 +375,10 @@ def watch(root, args):
 
 
 def gate_command(root, args):
+    if args.action == "scope":
+        from . import testsel
+        command = args.check[1:] if args.check[:1] == ["--"] else args.check
+        return testsel.scoped(Path.cwd(), command, args.only, args.always)
     from . import evidence, gate
     if args.action == "status":
         print(gate.status(root))

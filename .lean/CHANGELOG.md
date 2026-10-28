@@ -3,6 +3,48 @@
 เลขรุ่น `MAJOR.MINOR.PATCH`: MAJOR เปลี่ยนกติกาหรือ path เดิม, MINOR เพิ่มของใหม่, PATCH แก้ไข · วิธีอัปเกรด: [CUSTOMIZING.md](CUSTOMIZING.md)
 Versions are `MAJOR.MINOR.PATCH`: MAJOR changes rules or paths, MINOR adds, PATCH fixes · Upgrading: [CUSTOMIZING.md](CUSTOMIZING.md) · 5.x technical notes: [docs/CHANGELOG-dev.md](../docs/CHANGELOG-dev.md)
 
+## 5.3.0 — 2026-10-28
+
+🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#530--2026-10-28)
+
+งานจดบันทึก (tracker, queue) ไม่ต้องรอชุดทดสอบของแอปอีกต่อไป ปรับจากการใช้งานจริงครั้งแรกใน workspace ที่มีแอปเป็น target
+
+**มีอะไรใหม่**
+- คำสั่งใน gate ห่อด้วย `lean gate scope` ได้: ถ้างานที่เปลี่ยนมีแค่ tracker หรือ queue คำสั่งนั้นจะถูกข้าม ถ้าไม่แน่ใจจะรันเสมอ
+- Target gate จำผลผ่านของแอปที่ไม่ได้เปลี่ยนได้ เมื่อเปิดใช้ cache ไม่ต้องรันชุดทดสอบของแอปซ้ำทุกครั้งที่แก้ tracker
+- กติกาใหม่: งานหลาย TCK รัน gate เต็มครั้งเดียวต่อชุด และ test ที่สงสัยว่า flaky รันซ้ำได้ไม่เกิน 2 ครั้ง
+- คู่มือ `/lean-agents` แนะนำให้รวมงานเป็นชุดละ 3-5 งาน ทำส่วนกลางก่อน และห้ามวนรอผลแบบไม่มีกำหนด
+
+**แก้ไข**
+- `lean test --changed` ไม่รันชุดทดสอบของ workflow ทั้งหมดเมื่อแก้แค่ tracker หรือ queue ของ target
+- Contract guard ไม่บล็อกคำสั่งอ่านอย่าง `lean ... --help`, `git submodule status` และการเขียนลงโฟลเดอร์ memory หรือ `/tmp` อีก
+- เมื่อ target gate ล้มเหลว log บอกสาเหตุจริงและจำนวน check ที่ถูกต้อง
+
+**ต้องทำอะไรตอนอัปเกรด**
+- `lean update preview` แล้ว `lean update apply` ไม่ต้องย้ายข้อมูล
+- ถ้าอยากให้งานจดบันทึกข้ามชุดทดสอบ ให้ห่อคำสั่งทดสอบใน PROJECT.md ด้วย `python3 .lean/bin/lean gate scope -- <คำสั่ง>`
+- ไฟล์ที่ gate ใช้ตรวจงานเปลี่ยน: ให้ reviewer ตรวจ หรือยืนยันเองด้วย `lean gate accept-controls`
+
+**English**
+
+Bookkeeping (trackers, queue items) no longer waits for application test suites; tuned from the first production run of a workspace with an application target.
+
+**What's new**
+- Gate commands can be wrapped in `lean gate scope`: when the change touches only trackers or queue items, that command is skipped; when in doubt it always runs.
+- The target gate can reuse a pass for an unchanged application when caching is on, so tracker edits do not rerun the application suites.
+- New rules: a multi-TCK batch runs one full gate, and a suspected flaky test gets at most 2 reruns.
+- The `/lean-agents` guide batches work into groups of 3-5 tasks, builds shared parts first and forbids open-ended polling.
+
+**Fixed**
+- `lean test --changed` no longer runs every workflow test when only a target's trackers or queue items change.
+- The contract guard no longer blocks reads such as `lean ... --help` and `git submodule status`, or writes to memory folders and `/tmp`.
+- A failed target gate logs its real reason and the correct check count.
+
+**Upgrade**
+- `lean update preview`, then `lean update apply`; no data migration.
+- To let bookkeeping skip test suites, wrap those commands in PROJECT.md with `python3 .lean/bin/lean gate scope -- <command>`.
+- Changed gate files need a reviewer or `lean gate accept-controls`.
+
 ## 5.2.3 — 2026-10-28
 
 🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#523--2026-10-28)

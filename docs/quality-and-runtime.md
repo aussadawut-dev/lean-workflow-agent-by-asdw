@@ -13,6 +13,8 @@ python3 .lean/bin/lean gate status                                 # last record
 python3 .lean/bin/lean gate mode auto_fixloop                      # auto | manual | auto_fixloop | manual_fixloop
 ```
 
+A gate command written as `python3 .lean/bin/lean gate scope -- <command>` is skipped when the change touches only work records (trackers and queue items), so bookkeeping does not rerun application suites; `--only`/`--always` adjust the paths and `LEAN_GATE_SCOPE=full` runs everything. A batch of tasks gets one full gate, and a suspected flaky failure at most 2 reruns ([QUALITY.md](../.lean/policy/QUALITY.md#change-scoped-checks-batches-and-flaky-failures)).
+
 ## Hooks per provider
 
 | Event | Claude (`.claude/settings.json`) | Codex (`.codex/hooks.json`, after trust) | agy |

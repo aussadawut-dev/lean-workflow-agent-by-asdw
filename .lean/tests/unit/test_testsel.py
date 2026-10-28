@@ -1,5 +1,6 @@
 """Impact selection: run only the tests a change can affect, never silently skip."""
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -198,6 +199,147 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Documentation-only change: lint only.", result.stdout)
         self.assertNotIn("test_", result.stdout)
+
+
+
+class GateScopeTests(unittest.TestCase):
+    """`lean gate scope` skips a check only when the change is work records alone; anything else runs it."""
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        install(self.root)
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+        (self.root / "src").mkdir()
+        (self.root / "src/app.py").write_text("x = 1\n")
+        for record in ("docs/tracking/TCK001.md", ".agents/queue/items/Q0001.json",
+                       ".lean/targets/app/docs/tracking/TCK002.md", ".lean/targets/app/.agents/queue/items/Q0002.json"):
+            (self.root / record).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / record).write_text("v1\n")
+        commit(self.root, "base")
+        remote = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, remote)
+        subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
+        git(self.root, "remote", "add", "origin", str(remote))
+        git(self.root, "push", "-q", "origin", "HEAD:refs/heads/main")
+        git(self.root, "fetch", "-q", "origin")
+        git(self.root, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+        self.remote = remote
+        self.marker = self.root.parent / (self.root.name + ".ran")
+        self.addCleanup(lambda: self.marker.unlink(missing_ok=True))
+
+    def scope(self, *options, env=None, cwd=None):
+        """Run a check that leaves a marker; return (result, whether the check ran)."""
+        self.marker.unlink(missing_ok=True)
+        command = [sys.executable, "-c", f"open({str(self.marker)!r}, 'w').close()"]
+        result = lean(self.root, "gate", "scope", *options, "--", *command,
+                      env=dict(os.environ, **(env or {})), cwd=cwd)
+        return result, self.marker.exists()
+
+    def test_record_only_changes_skip_and_everything_else_runs(self):
+        result, ran = self.scope()
+        self.assertEqual((result.returncode, ran), (0, True), "a clean tree is no evidence: run")
+        (self.root / "docs/tracking/TCK001.md").write_text("v2\n")
+        (self.root / ".agents/queue/items/Q0003.json").write_text("{}\n")
+        (self.root / ".lean/targets/app/docs/tracking/TCK002.md").write_text("v2\n")
+        git(self.root, "add", ".lean/targets/app/docs/tracking/TCK002.md")
+        result, ran = self.scope()
+        self.assertEqual((result.returncode, ran), (0, False), result.stdout + result.stderr)
+        self.assertIn("gate scope: skipped", result.stdout)
+        self.assertIn("3 changed path(s) are work records only", result.stdout)
+        result, ran = self.scope(env={"LEAN_GATE_SCOPE": "full"})
+        self.assertTrue(ran, "LEAN_GATE_SCOPE=full forces the check")
+        result, ran = self.scope(cwd=self.root / "docs")
+        self.assertFalse(ran, "paths are judged from the repository top, not the working directory")
+        (self.root / "src/app.py").write_text("x = 2\n")
+        result, ran = self.scope()
+        self.assertTrue(ran, "an application change beside records runs the check")
+
+    def test_unpushed_commits_and_renames_count(self):
+        (self.root / "docs/tracking/TCK001.md").write_text("v2\n")
+        commit(self.root, "records")
+        result, ran = self.scope()
+        self.assertFalse(ran, "an unpushed record-only commit still skips")
+        (self.root / "src/app.py").write_text("x = 3\n")
+        commit(self.root, "code")
+        result, ran = self.scope()
+        self.assertTrue(ran, "an unpushed code commit runs the check")
+        git(self.root, "push", "-q", "origin", "HEAD:refs/heads/main")
+        git(self.root, "fetch", "-q", "origin")
+        git(self.root, "mv", "src/app.py", "docs/tracking/app.py")
+        result, ran = self.scope()
+        self.assertTrue(ran, "a rename out of the code tree counts its source path")
+
+    def test_only_and_always_globs(self):
+        (self.root / "notes.txt").write_text("n\n")
+        result, ran = self.scope()
+        self.assertTrue(ran)
+        result, ran = self.scope("--only", "notes.txt")
+        self.assertFalse(ran, "--only adds a path that alone does not need the check")
+        (self.root / "docs/tracking/TCK001.md").write_text("v2\n")
+        result, ran = self.scope("--only", "notes.txt", "--always", "docs/tracking/TCK001.md")
+        self.assertTrue(ran, "--always wins over records and --only")
+
+    def test_undecidable_states_run_the_check(self):
+        (self.root / "docs/tracking/TCK001.md").write_text("v2\n")
+        outside = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, outside)
+        result, ran = self.scope(cwd=outside)
+        self.assertTrue(ran, "outside a repository nothing is known: run")
+        git(self.root, "remote", "remove", "origin")
+        result, ran = self.scope()
+        self.assertTrue(ran, "without a remote every tracked file counts: run")
+
+    def test_the_check_status_and_missing_commands_pass_through(self):
+        (self.root / "src/app.py").write_text("x = 2\n")
+        failed = lean(self.root, "gate", "scope", "--", sys.executable, "-c", "raise SystemExit(3)")
+        self.assertEqual(failed.returncode, 3)
+        missing = lean(self.root, "gate", "scope", "--", "lean-no-such-command")
+        self.assertEqual(missing.returncode, 127)
+        self.assertIn("command not found: lean-no-such-command", missing.stderr)
+        empty = lean(self.root, "gate", "scope")
+        self.assertEqual(empty.returncode, 2)
+        self.assertIn("needs a command", empty.stderr)
+
+    def test_pushed_unmerged_commits_still_count(self):
+        git(self.root, "checkout", "-q", "-b", "feat")
+        (self.root / "src/app.py").write_text("x = 5\n")
+        commit(self.root, "code")
+        git(self.root, "push", "-q", "origin", "feat")
+        git(self.root, "fetch", "-q", "origin")
+        (self.root / "docs/tracking/TCK001.md").write_text("v2\n")
+        result, ran = self.scope()
+        self.assertTrue(ran, "a pushed feature branch is not merged, so its code commit still counts")
+        git(self.root, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD")
+        git(self.root, "update-ref", "-d", "refs/remotes/origin/main")
+        result, ran = self.scope()
+        self.assertTrue(ran, "without a resolvable default branch: run")
+
+    def test_submodule_changes_count_whatever_the_ignore_settings(self):
+        app = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, app)
+        subprocess.run(["git", "init", "-q", str(app)], check=True)
+        (app / "main.py").write_text("x = 1\n")
+        commit(app, "app")
+        subprocess.run(["git", "-C", str(self.root), "-c", "protocol.file.allow=always", "submodule", "add", "-q",
+                        str(app), "targets/app"], check=True, capture_output=True)
+        commit(self.root, "pointer")
+        git(self.root, "push", "-q", "origin", "HEAD:refs/heads/main")
+        git(self.root, "fetch", "-q", "origin")
+        git(self.root, "config", "submodule.targets/app.ignore", "all")
+        git(self.root, "config", "diff.ignoreSubmodules", "all")
+        (self.root / "docs/tracking/TCK001.md").write_text("v2\n")
+        result, ran = self.scope()
+        self.assertFalse(ran, result.stdout + result.stderr)
+        (self.root / "targets/app/new.py").write_text("y = 1\n")
+        result, ran = self.scope()
+        self.assertTrue(ran, "an untracked file inside the submodule is an application change")
+        (self.root / "targets/app/new.py").unlink()
+        (self.root / "targets/app/main.py").write_text("x = 2\n")
+        commit(self.root / "targets/app", "app change")
+        result, ran = self.scope()
+        self.assertTrue(ran, "a new submodule commit counts even with ignore=all")
 
 
 if __name__ == "__main__":

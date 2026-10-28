@@ -3,6 +3,18 @@
 Developer and agent notes for each 5.x release: commands, flags, rules, changed gate controls and limits.
 The user-facing summary of each release is in [`.lean/CHANGELOG.md`](../.lean/CHANGELOG.md).
 
+## 5.3.0 — 2026-10-28
+
+Findings from the first production run (Casetodian workspace with a submodule application target): TCK013 and TCK014.
+
+- **`lean gate scope [--only GLOB]... [--always GLOB]... -- <command>`** (`testsel.scoped`, `scope_skip`). Runs one gate check unless every path of `testsel.scope_paths()` for the repository holding the working directory matches `testsel.RECORDS` (`docs/tracking/*`, `.agents/queue/*`, `.lean/targets/*/docs/tracking/*`, `.lean/targets/*/.agents/queue/*`) or `--only`, and none matches `--always`. A skip exits 0 and prints `gate scope: skipped <command>; N changed path(s) are work records only`. `scope_paths()` diffs the working tree and index against the merge-base with the first remote's `HEAD`, `main` or `master` (so pushed but unmerged commits count, unlike `changed()`), with `--ignore-submodules=none` (an untracked file in a submodule or a submodule commit counts despite `submodule.<name>.ignore` or `diff.ignoreSubmodules`), plus untracked files. Runs on `LEAN_GATE_SCOPE=full`, an empty change, no repository, no resolvable default branch or a Git error. The command runs without a shell in the caller's working directory; its status passes through, a missing command is 127. The guard treats `lean gate scope` as a write (it runs an arbitrary command). Tests: `unit/test_testsel.py::GateScopeTests`. Ported from Casetodian's `scripts/gate_scope.py` (TCK424), generalised from its fixed target paths.
+- **Rules** (`QUALITY.md` "Change-scoped checks, batches and flaky failures", `RECOVERY.md`, `lean-gate`): scope only code suites; a batch of TCKs runs one full gate covering every task's final state (one per published part); a suspected flaky failure gets at most 2 unchanged reruns, passes only if a rerun passes, and is recorded otherwise.
+- **Test selection** (TCK013). `impact.json` `lint_only` includes `.lean/targets/*`, `.agents/queue/*`, `docs/tracking/*`; these run lint only when no rule matches. Test: `unit/test_testsel.py::test_target_and_queue_work_records_are_lint_only`.
+- **Target gate cache** (TCK013). With `--cache-tree`, `target.gate` reuses a pass recorded in `.agent-runtime/target-gate-cache` keyed by target name, SHA-256 of the target PROJECT file and `evidence.state(target_root)`; `guard_controls` and `high_risk_changes` still run. Check counts include target checks; `activity.jsonl` records the first non-progress failure line. Tests: `hooks/test_target_gate.py`.
+- **Guard** (TCK013). Reads: `lean <group> -h/--help`, `git submodule status|summary`, input redirections (`< $var`). Writes allowed to `~/.claude/**/memory/`, `/tmp`, `/private/tmp`. Controller session supersede/takeover protection. Tests: `hooks/test_guard.py`.
+- **`/lean-agents`** (TCK013): 3-5 task batches, shared-foundation-first waves, bounded polling, controller handoff hygiene (`docs/agents-and-models.md`).
+- Changed gate controls: `.lean/lean/__init__.py`, `cli.py`, `testsel.py`, `gate.py`, `target.py`, `guard.py`. Validation: `lean lint`, `lean test --all`, gate, independent HIGH review.
+
 ## 5.2.3 — 2026-10-28
 
 Documentation only; no workflow behaviour changes.
