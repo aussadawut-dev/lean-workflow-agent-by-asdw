@@ -8,7 +8,7 @@
 contract -> scope -> implement -> test -> validate -> review -> gate -> done
 ```
 
-Each phase is a seventh of the progress bar; `--done N --total M` fills the current phase. The rules for each phase live in [.lean/policy/WORKFLOW.md](../.lean/policy/WORKFLOW.md); `/lean-task` walks them in order.
+Each phase is a seventh of the progress bar; `--done N --total M` fills the current phase. The rules for each phase live in [.lean/policy/WORKFLOW.md](../.lean/policy/WORKFLOW.md); `/lean-task` walks them in order. The [workflow map](workflow-map.md) draws every branch as a flowchart.
 
 ```sh
 python3 .lean/bin/lean progress set implement --done 2 --total 5 --task "add login"

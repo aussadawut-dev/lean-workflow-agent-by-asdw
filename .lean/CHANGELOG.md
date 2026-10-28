@@ -3,6 +3,33 @@
 เลขรุ่น `MAJOR.MINOR.PATCH`: MAJOR เปลี่ยนกติกาหรือ path เดิม, MINOR เพิ่มของใหม่, PATCH แก้ไข · วิธีอัปเกรด: [CUSTOMIZING.md](CUSTOMIZING.md)
 Versions are `MAJOR.MINOR.PATCH`: MAJOR changes rules or paths, MINOR adds, PATCH fixes · Upgrading: [CUSTOMIZING.md](CUSTOMIZING.md) · 5.x technical notes: [docs/CHANGELOG-dev.md](../docs/CHANGELOG-dev.md)
 
+## 5.2.3 — 2026-10-28
+
+🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#523--2026-10-28)
+
+ดูภาพรวมของ workflow และการ spawn agent ได้จาก flowchart แทนการไล่อ่าน policy ทีละไฟล์
+
+**มีอะไรใหม่**
+- [Workflow map](../docs/workflow-map.md): ทุกเส้นทางของงาน ตั้งแต่ contract ถึง gate พร้อมจุดที่แยกทางและผลลัพธ์ DONE, BLOCKED, UNVERIFIED
+- [Spawn map](../docs/spawn-map.md): ควร spawn เมื่อไหร่ ใช้ขนาดไหน และขยับขนาดอย่างไร มีเหตุผลกำกับทุกลูกศร
+- Spawn map แยกบันไดขนาดของ Claude, Codex และ agy ว่าแต่ละขั้นเพิ่ม effort หรือเปลี่ยน model
+- การขยับขนาดอยู่ใน provider เดิมเสมอ ไม่ข้ามไปเจ้าอื่น เพราะผู้ใช้หลายคนสมัครไว้แค่เจ้าเดียว
+
+**ต้องทำอะไรตอนอัปเกรด**
+- `lean update preview` แล้ว `lean update apply` ไม่ต้องย้ายข้อมูล พฤติกรรมของ workflow ไม่เปลี่ยน
+- ไฟล์ที่ gate ใช้ตรวจงานเปลี่ยน (เลขรุ่น): ให้ reviewer ตรวจ หรือยืนยันเองด้วย `lean gate accept-controls`
+
+**English**
+
+See the workflow and agent spawning as flowcharts instead of reading each policy file.
+
+- [Workflow map](../docs/workflow-map.md): every path a task can take from contract to gate, with each branch and the DONE, BLOCKED and UNVERIFIED outcomes.
+- [Spawn map](../docs/spawn-map.md): when to spawn, at which size, and how sizes escalate, with the reason on every arrow.
+- The spawn map shows the Claude, Codex and agy size ladders and whether each step raises effort or changes the model.
+- Escalation always stays within one provider, because many users subscribe to only one.
+
+Upgrade: `lean update preview`, then `lean update apply`; no data migration and no behaviour change. The changed gate file (the version number) needs a reviewer or `lean gate accept-controls`.
+
 ## 5.2.2 — 2026-10-27
 
 🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#522--2026-10-27)

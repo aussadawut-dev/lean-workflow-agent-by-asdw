@@ -3,6 +3,16 @@
 Developer and agent notes for each 5.x release: commands, flags, rules, changed gate controls and limits.
 The user-facing summary of each release is in [`.lean/CHANGELOG.md`](../.lean/CHANGELOG.md).
 
+## 5.2.3 — 2026-10-28
+
+Documentation only; no workflow behaviour changes.
+
+- **Workflow map.** `docs/workflow-map.md`: one Mermaid flowchart of every path through contract, scope, implement, test, validate, review and gate (trivial vs non-trivial, mode, execution, review depth and rounds, gate mode and outcomes), with notes linking WORKFLOW.md, REVIEW.md, QUALITY.md and RECOVERY.md. Linked from README.md and `docs/workflow.md`.
+- **Spawn map.** `docs/spawn-map.md`: an overview flowchart of MODELS.md spawn levels, size choice, dispatch and escalation (fix at source, fresh remainder, one effort step, then one size; 2XL and 3XL only by escalation), and one size ladder each for Claude, Codex and agy from the shipped `.lean/models.json` (checked 2026-10-27). Linked from README.md and `docs/agents-and-models.md`.
+- Escalation stays within one provider; agy past `XL` (2XL and 3XL share its model) reports BLOCKED. The maps describe the current policy and add no rule.
+- The ladders name concrete models and must be updated with `.lean/models.json` (for example after `/lean-model-update`).
+- Changed gate controls: `.lean/lean/__init__.py` (version only). Validation: `lean lint`, `lean test --all`, gate.
+
 ## 5.2.2 — 2026-10-27
 
 - **Update clone.** `update.checkout` clones with `--no-local`, so a local release source is read through Git's pack transport instead of copied object file by object file. CI failed repeatedly in `e2e/test_update.py` with `fatal: failed to copy file to '<release>/.git/objects/..': No such file or directory` during that copy; reruns passed. Test: `e2e/test_update.py::test_release_sources_are_cloned_through_the_pack_transport`.

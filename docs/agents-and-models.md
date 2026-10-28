@@ -2,7 +2,7 @@
 
 [Back to README](../README.md)
 
-Policy: [.lean/policy/MODELS.md](../.lean/policy/MODELS.md). Procedure: [lean-agents](../.lean/skills/lean-agents/SKILL.md).
+Policy: [.lean/policy/MODELS.md](../.lean/policy/MODELS.md). Procedure: [lean-agents](../.lean/skills/lean-agents/SKILL.md). Flowcharts: [spawn map](spawn-map.md).
 
 ## The model list
 
