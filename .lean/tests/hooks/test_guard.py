@@ -143,6 +143,30 @@ class ShellWriteTests(unittest.TestCase):
             with self.subTest(write=command):
                 self.assertTrue(contract_guard.shell_writes(command), command)
 
+    def test_lean_help_git_submodule_reads_and_input_redirection_are_not_writes(self):
+        for command in ("python3 .lean/bin/lean -h", "python3 .lean/bin/lean --help",
+                        "python3 .lean/bin/lean evidence record-review -h",
+                        "python3 .lean/bin/lean evidence record-review --help",
+                        "python3 .lean/bin/lean mode configure -h", "lean target clear --help",
+                        "git submodule", "git submodule -q", "git submodule --cached",
+                        "git submodule status", "git submodule status --recursive",
+                        "git submodule status --cached targets/app",
+                        "git submodule summary", "git submodule summary --cached --files",
+                        "git submodule summary -n 5", "git submodule summary --summary-limit=5",
+                        "wc -l < $L", 'wc -l < "$L"', 'cat < "$file"', "jq . < data.json", "< $L wc -l"):
+            with self.subTest(read=command):
+                self.assertFalse(contract_guard.shell_writes(command), command)
+        for command in ("git submodule update --init",
+                        "git submodule add https://example.com/repo.git targets/app",
+                        "git submodule init", "git submodule deinit targets/app",
+                        "git submodule sync", "git submodule foreach git status",
+                        "git submodule set-branch --branch main targets/app",
+                        "git submodule set-url targets/app https://example.com/repo.git",
+                        "git submodule absorbgitdirs", "git submodule $X", "git submodule stat*",
+                        "bash -s < f", "bash < f", 'bash <<< "rm x"', "wc -l < $L && touch x"):
+            with self.subTest(write=command):
+                self.assertTrue(contract_guard.shell_writes(command), command)
+
     def test_writes_runners_installers_and_invisible_commands_are_writes(self):
         receipt_call = "python3 .lean/bin/lean evidence " + "record-" + "review --verdict PASS"
         for command in ("cat a > b", "echo x >> f", "cat a >| f", "cat a &> f", "grep x f | tee out", "head f 1> y",
@@ -699,6 +723,68 @@ class GuardHookTests(HookFixture):
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertNotIn("Traceback", result.stderr)
 
+    def test_record_review_help_runs_without_contract_and_for_author_session(self):
+        word = "record-" "review"
+        for flag in ("-h", "--help"):
+            help_cmd = f"python3 .lean/bin/lean evidence {word} {flag}"
+            self.assertFalse(contract_guard.records_own_receipt(help_cmd, LINE, self.root), help_cmd)
+            self.assertEqual(self.tool("claude", "Bash", "no-contract-help", command=help_cmd).returncode, 0, help_cmd)
+        self.assertEqual(self.tool("claude", "Bash", "author-help",
+                                   command=f"{DECLARE} --contract '{LINE}'").returncode, 0)
+        for flag in ("-h", "--help"):
+            help_cmd = f"python3 .lean/bin/lean evidence {word} {flag}"
+            self.assertEqual(self.tool("claude", "Bash", "author-help", command=help_cmd).returncode, 0, help_cmd)
+        # Chaining a write or a real receipt call after -h is still blocked.
+        chained_write = f"python3 .lean/bin/lean evidence {word} -h && touch x"
+        self.assertEqual(self.tool("claude", "Bash", "no-contract-help", command=chained_write).returncode, 2)
+        chained_receipt = (f"python3 .lean/bin/lean evidence {word} -h && "
+                           f"python3 .lean/bin/lean evidence {word} --contract '{LINE}' --verdict PASS")
+        self.assertEqual(self.tool("claude", "Bash", "author-help", command=chained_receipt).returncode, 2)
+
+    def test_external_scratch_and_user_memory_writes_allowed_without_repo_contract(self):
+        for tool_name, path in (("Write", "/tmp/claude-scratch-note.md"),
+                                ("Edit", "/private/tmp/claude-501/scratch.txt"),
+                                ("Write", str(Path.home().resolve() / ".claude/projects/-Users-x10-repo/memory/MEMORY.md")),
+                                ("MultiEdit", str(Path.home().resolve() / ".ccs/claude-profiles/work/projects/p/memory/note.md"))):
+            with self.subTest(tool=tool_name, path=path):
+                res = self.tool("claude", tool_name, "paused-session", file_path=path)
+                self.assertEqual(res.returncode, 0, res.stderr)
+        # Files inside the repository (even if named .claude/.../memory/) or relative paths still require a contract.
+        for path in ("x.py", str(self.root / "x.py"), str(self.root / ".claude/projects/p/memory/MEMORY.md")):
+            with self.subTest(repo_path=path):
+                res = self.tool("claude", "Write", "paused-session", file_path=path)
+                self.assertEqual(res.returncode, 2, path)
+
+    def test_controller_takeover_supersedes_active_sessions_and_blocks_split_brain_writes(self):
+        contract_guard.start_session(self.root, "s-claude", "base-state-1")
+        self.assertEqual(self.tool("claude", "Bash", "s-claude",
+                                   command=f"{DECLARE} --contract '{LINE}'").returncode, 0)
+        self.assertEqual(self.tool("claude", "Edit", "s-claude", file_path="x.py").returncode, 0)
+        takeover_block = ("Contract:\ntopic: takeover-s-claude\nrisk: MEDIUM\nquality: HIGH\n"
+                          "acceptance: fallback controller completes work")
+        self.assertEqual(self.tool("codex", "Bash", "s-codex",
+                                   command=f"{DECLARE} <<'EOF'\n{takeover_block}\nEOF").returncode, 0)
+        sessions = json.loads((self.root / ".agent-runtime/contract-sessions.json").read_text())["sessions"]
+        self.assertEqual(sessions["s-claude"].get("superseded_by"), "s-codex")
+        self.assertEqual(sessions["s-claude"].get("baseline"), "base-state-1")
+        self.assertIn("initial_head", sessions["s-claude"])
+        # The superseded session cannot edit the worktree or run writing shell commands concurrently.
+        denied_edit = self.tool("claude", "Edit", "s-claude", file_path="x.py")
+        self.assertEqual(denied_edit.returncode, 2)
+        self.assertIn("was superseded by controller session s-codex", denied_edit.stderr)
+        denied_bash = self.tool("claude", "Bash", "s-claude", command="touch x.py")
+        self.assertEqual(denied_bash.returncode, 2)
+        self.assertIn("was superseded by controller session s-codex", denied_bash.stderr)
+        # Read-only tools and external memory/tmp notes remain allowed while superseded.
+        self.assertEqual(self.tool("claude", "Read", "s-claude", file_path="x.py").returncode, 0)
+        self.assertEqual(self.tool("claude", "Bash", "s-claude", command="git status --short").returncode, 0)
+        self.assertEqual(self.tool("claude", "Write", "s-claude",
+                                   file_path="/Users/x10/.claude/projects/p/memory/MEMORY.md").returncode, 0)
+        # Re-declaring a new contract explicitly takes back ownership and clears superseded_by.
+        self.assertEqual(self.tool("claude", "Bash", "s-claude",
+                                   command=f"{DECLARE} --contract '{LINE}'").returncode, 0)
+        self.assertEqual(self.tool("claude", "Edit", "s-claude", file_path="x.py").returncode, 0)
+
 
 class StopContractTests(HookFixture):
     """Claude's and Codex's Stops use the session's declared contract for changed work."""
@@ -815,6 +901,82 @@ class StopContractTests(HookFixture):
         review = json.loads(self.codex_event("stop", "x1").stdout)
         self.assertEqual(review["decision"], "block")
         self.assertIn("review.json", review["reason"])  # HIGH contract: no receipt, no pass.
+
+
+class AuditHolesTests(HookFixture):
+    """TCK015: holes found after 5.3.0 (help flags, memory exception, gate caches)."""
+
+    def test_help_flag_after_double_dash_or_in_gate_scope_is_still_a_write(self):
+        lean = "python3 .lean/bin/lean"
+        for command in (f"{lean} gate scope -- rm -rf src -h",
+                        f"{lean} gate scope -- sh -c \"echo x > f\" --help",
+                        f"{lean} gate scope --only 'docs/*' -- cp a b -h",
+                        f"{lean} gate scope echo hi -h",
+                        f"{lean} --root . gate scope -- touch f --help",
+                        f"{lean} evidence record-review -- -h",
+                        "python3 -X dev .lean/bin/lean gate scope -- rm x",
+                        "python3 -W ignore .lean/bin/lean gate accept-controls --reason x",
+                        "python3 -X dev -W ignore .lean/bin/lean queue add --title x"):
+            with self.subTest(write=command):
+                self.assertTrue(contract_guard.shell_writes(command), command)
+                self.assertEqual(self.tool("claude", "Bash", "no-contract", command=command).returncode, 2, command)
+        for command in (f"{lean} -h", f"{lean} gate scope -h", f"{lean} gate scope --help",
+                        f"{lean} evidence record-review --help", f"{lean} queue add -h",
+                        "python3 -X dev .lean/bin/lean status", "python3 -c 'print(1)' .lean/bin/lean"):
+            with self.subTest(read=command):
+                self.assertFalse(contract_guard.shell_writes(command), command)
+
+    def test_memory_exception_covers_only_user_memory_files(self):
+        home = Path.home().resolve()
+        allowed = (str(home / ".claude/projects/-Users-x-repo/memory/MEMORY.md"),
+                   str(home / "Library/Application Support/orca/claude-profiles/abc/home/projects/p/memory/n.md"),
+                   str(home / ".ccs/claude-profiles/work/projects/p/memory/note.md"),
+                   "/tmp/scratch.txt")
+        for path in allowed:
+            with self.subTest(allowed=path):
+                self.assertTrue(contract_guard.external_scratch_or_memory(self.root, "Write", {"file_path": path}))
+        denied = ("/Users/x/work/main/.claude/hooks/memory/x.sh",
+                  "/Users/x/work/main/.lean/lean/memory/.claude/x.py",
+                  "/Users/x/x/memory/.claude/settings.json",
+                  "/Users/x/work/repo/.claude/projects/p/memory/x.md",
+                  str(home / ".claude/projects/p/memory/sub/x.md"),
+                  str(home / ".claude/settings.json"),
+                  "/opt/x/claude-profiles/z/projects/p/memory/x.sh")
+        for path in denied:
+            with self.subTest(denied=path):
+                self.assertFalse(contract_guard.external_scratch_or_memory(self.root, "Write", {"file_path": path}))
+                self.assertEqual(self.tool("claude", "Write", "no-contract", file_path=path).returncode, 2, path)
+
+    def test_gate_caches_are_never_written_directly_even_with_a_contract(self):
+        self.assertEqual(self.tool("claude", "Bash", "s1", command=f"{DECLARE} --contract '{LINE}'").returncode, 0)
+        for cache in (".agent-runtime/gate-cache", ".agent-runtime/target-gate-cache"):
+            for name, tool_input in (("Bash", {"command": f"echo forged > {cache}"}),
+                                     ("Bash", {"command": f"cp /tmp/x {cache}"}),
+                                     ("Bash", {"command": f"python3 -c \"open('{cache}','w').write('k')\""}),
+                                     ("Write", {"file_path": str(self.root / cache), "content": "k"})):
+                with self.subTest(cache=cache, tool=name, input=tool_input):
+                    result = self.tool("claude", name, "s1", **tool_input)
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertIn("gate cache", result.stderr)
+            name = cache.rsplit("/", 1)[1]
+            spellings = [(f"Bash", {"command": f"echo k &> {cache}"}),
+                         ("Bash", {"command": f"echo k &>> {cache}"}),
+                         ("Bash", {"command": f"echo k > ./.agent-runtime/./{name}"}),
+                         ("Bash", {"command": f"echo k > .agent-runtime//{name}"}),
+                         ("Bash", {"command": f"cp x .agent-runtime/sub/../{name}"}),
+                         ("Write", {"file_path": f"{self.root}/.agent-runtime/./{name}", "content": "k"}),
+                         ("Write", {"file_path": f"{self.root}//.agent-runtime//{name}", "content": "k"})]
+            if sys.platform == "darwin":  # Case-insensitive file system: the same file.
+                spellings += [("Bash", {"command": f"echo k > .agent-runtime/{name.title()}"}),
+                              ("Write", {"file_path": f"{self.root}/.agent-runtime/{name.upper()}", "content": "k"})]
+            for name_, tool_input in spellings:
+                with self.subTest(cache=cache, spelling=tool_input):
+                    result = self.tool("claude", name_, "s1", **tool_input)
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertIn("gate cache", result.stderr)
+            for command in (f"rm -f {cache}", f"cat {cache}"):
+                with self.subTest(allowed=command):
+                    self.assertEqual(self.tool("claude", "Bash", "s1", command=command).returncode, 0, command)
 
 
 if __name__ == "__main__":

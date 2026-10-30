@@ -3,6 +3,110 @@
 เลขรุ่น `MAJOR.MINOR.PATCH`: MAJOR เปลี่ยนกติกาหรือ path เดิม, MINOR เพิ่มของใหม่, PATCH แก้ไข · วิธีอัปเกรด: [CUSTOMIZING.md](CUSTOMIZING.md)
 Versions are `MAJOR.MINOR.PATCH`: MAJOR changes rules or paths, MINOR adds, PATCH fixes · Upgrading: [CUSTOMIZING.md](CUSTOMIZING.md) · 5.x technical notes: [docs/CHANGELOG-dev.md](../docs/CHANGELOG-dev.md)
 
+## 5.4.0 — 2026-10-30
+
+🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#540--2026-10-30)
+
+รับ requirement ที่เพิ่มระหว่างทำงานได้เป็นลำดับ และปิดงานเป็น batch ที่มีขอบเขตชัดเจน
+
+**มีอะไรใหม่**
+- เก็บ requirement พร้อมงานและผลที่ต้องตรวจ แยกงานเข้าคิว งานปัจจุบัน งานที่ถูกแทน และงานที่ยกเลิกโดยไม่ทำข้อมูลหาย
+- เลือก batch หลักหนึ่งงานต่อ Controller และ checkpoint ก่อนแทรกงานอื่น โดยยังแบ่ง subtasks ให้ workers ได้
+- Freeze ขอบเขตก่อน review; การเปลี่ยนทิศทางต้องเปิด batch กลับมาแก้พร้อมเหตุผลและ contract ใหม่
+- แสดงความพร้อมของ implementation, review และ gate แยกกัน การเลื่อน gate ยังไม่ถือว่าปิดงาน
+
+**ต้องทำอะไรตอนอัปเกรด**
+- อัปเดต Lean ตามขั้นตอนเดิม ไม่ต้องย้ายข้อมูล การใช้ intake เป็นทางเลือกและยังใช้ tracker/direct ต่อได้
+- ให้ independent reviewer ตรวจไฟล์ควบคุมที่เปลี่ยนตามขั้นตอนของโปรเจกต์
+
+**English**
+
+Sequence requirements arriving during work and close batches with explicit scope boundaries.
+
+**Added**
+- Keep requirements linked to tasks and acceptance, retaining queued, active, superseded and cancelled entries.
+- Select one primary batch per Controller and checkpoint interruptions while allowing worker subtasks.
+- Freeze scope before review; redirecting work reopens the batch with a reason and a new contract.
+- Report implementation, review and gate readiness separately; a deferred gate cannot close work.
+
+**Upgrade**
+- Follow the existing Lean update procedure; no data migration. Intake is optional and tracker/direct remains available.
+- Have the changed controls independently reviewed through the project's existing workflow.
+
+## 5.3.1 — 2026-10-29
+
+🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#531--2026-10-29)
+
+ปิดช่องโหว่ของ contract guard ที่พบหลังใช้ 5.3.0 จริง และ progress bar ไม่ปนกันระหว่าง session
+
+**แก้ไข**
+- `-h` หรือ `--help` ที่อยู่หลัง `--` หรือในคำสั่งที่ `lean gate scope` รัน ไม่ทำให้ guard มองว่าเป็นแค่การอ่านอีกต่อไป
+- ข้อยกเว้นให้เขียนโดยไม่มี contract เหลือเฉพาะ `/tmp` และไฟล์ memory ของผู้ใช้ (`~/.claude/projects/*/memory/`, `$CLAUDE_CONFIG_DIR` หรือโฟลเดอร์ `claude-profiles`) ไม่รวม `.claude/.../memory/` ของ checkout อื่น
+- `.agent-runtime/gate-cache` และ `target-gate-cache` เขียนเองไม่ได้ (ลบได้เพื่อบังคับรันใหม่)
+- การเขียนทับ review receipt และ gate cache ด้วย path ที่สะกดต่างกัน (`./`, `//`, ตัวพิมพ์ใหญ่เล็กบน macOS, `&>`) หรือ `python3 -X dev .lean/bin/lean ...` ถูก guard จับได้แล้ว
+- Progress แยกตาม session: status line แสดงงานของ session ตัวเอง ส่วนของ session อื่นมีป้าย `session <id>:`
+
+**ต้องทำอะไรตอนอัปเกรด**
+- `lean update preview` แล้ว `lean update apply` ไม่ต้องย้ายข้อมูล
+- ไฟล์ที่ gate ใช้ตรวจงานเปลี่ยน: ให้ reviewer ตรวจ หรือยืนยันเองด้วย `lean gate accept-controls`
+
+**English**
+
+Closes contract-guard holes found after running 5.3.0, and keeps one session's progress bar out of another's.
+
+**Fixed**
+- `-h` or `--help` after `--`, or in the command `lean gate scope` runs, no longer makes the guard treat the call as a read.
+- The no-contract exception covers only `/tmp` and user memory files (`~/.claude/projects/*/memory/`, `$CLAUDE_CONFIG_DIR` or a `claude-profiles` folder), not another checkout's `.claude/.../memory/`.
+- `.agent-runtime/gate-cache` and `target-gate-cache` cannot be written directly (deleting them to force a rerun still works).
+- Writes to the review receipt or gate caches through other spellings (`./`, `//`, case on macOS, `&>`) and `python3 -X dev .lean/bin/lean ...` calls are caught by the guard.
+- Progress is per session: the status line shows its own session's task, and another session's with a `session <id>:` label.
+
+**Upgrade**
+- `lean update preview`, then `lean update apply`; no data migration.
+- Changed gate files need a reviewer or `lean gate accept-controls`.
+
+## 5.3.0 — 2026-10-28
+
+🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#530--2026-10-28)
+
+งานจดบันทึก (tracker, queue) ไม่ต้องรอชุดทดสอบของแอปอีกต่อไป ปรับจากการใช้งานจริงครั้งแรกใน workspace ที่มีแอปเป็น target
+
+**มีอะไรใหม่**
+- คำสั่งใน gate ห่อด้วย `lean gate scope` ได้: ถ้างานที่เปลี่ยนมีแค่ tracker หรือ queue คำสั่งนั้นจะถูกข้าม ถ้าไม่แน่ใจจะรันเสมอ
+- Target gate จำผลผ่านของแอปที่ไม่ได้เปลี่ยนได้ เมื่อเปิดใช้ cache ไม่ต้องรันชุดทดสอบของแอปซ้ำทุกครั้งที่แก้ tracker
+- กติกาใหม่: งานหลาย TCK รัน gate เต็มครั้งเดียวต่อชุด และ test ที่สงสัยว่า flaky รันซ้ำได้ไม่เกิน 2 ครั้ง
+- คู่มือ `/lean-agents` แนะนำให้รวมงานเป็นชุดละ 3-5 งาน ทำส่วนกลางก่อน และห้ามวนรอผลแบบไม่มีกำหนด
+
+**แก้ไข**
+- `lean test --changed` ไม่รันชุดทดสอบของ workflow ทั้งหมดเมื่อแก้แค่ tracker หรือ queue ของ target
+- Contract guard ไม่บล็อกคำสั่งอ่านอย่าง `lean ... --help`, `git submodule status` และการเขียนลงโฟลเดอร์ memory หรือ `/tmp` อีก
+- เมื่อ target gate ล้มเหลว log บอกสาเหตุจริงและจำนวน check ที่ถูกต้อง
+
+**ต้องทำอะไรตอนอัปเกรด**
+- `lean update preview` แล้ว `lean update apply` ไม่ต้องย้ายข้อมูล
+- ถ้าอยากให้งานจดบันทึกข้ามชุดทดสอบ ให้ห่อคำสั่งทดสอบใน PROJECT.md ด้วย `python3 .lean/bin/lean gate scope -- <คำสั่ง>`
+- ไฟล์ที่ gate ใช้ตรวจงานเปลี่ยน: ให้ reviewer ตรวจ หรือยืนยันเองด้วย `lean gate accept-controls`
+
+**English**
+
+Bookkeeping (trackers, queue items) no longer waits for application test suites; tuned from the first production run of a workspace with an application target.
+
+**What's new**
+- Gate commands can be wrapped in `lean gate scope`: when the change touches only trackers or queue items, that command is skipped; when in doubt it always runs.
+- The target gate can reuse a pass for an unchanged application when caching is on, so tracker edits do not rerun the application suites.
+- New rules: a multi-TCK batch runs one full gate, and a suspected flaky test gets at most 2 reruns.
+- The `/lean-agents` guide batches work into groups of 3-5 tasks, builds shared parts first and forbids open-ended polling.
+
+**Fixed**
+- `lean test --changed` no longer runs every workflow test when only a target's trackers or queue items change.
+- The contract guard no longer blocks reads such as `lean ... --help` and `git submodule status`, or writes to memory folders and `/tmp`.
+- A failed target gate logs its real reason and the correct check count.
+
+**Upgrade**
+- `lean update preview`, then `lean update apply`; no data migration.
+- To let bookkeeping skip test suites, wrap those commands in PROJECT.md with `python3 .lean/bin/lean gate scope -- <command>`.
+- Changed gate files need a reviewer or `lean gate accept-controls`.
+
 ## 5.2.3 — 2026-10-28
 
 🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#523--2026-10-28)

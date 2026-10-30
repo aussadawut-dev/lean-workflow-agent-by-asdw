@@ -13,6 +13,8 @@ python3 .lean/bin/lean gate status                                 # last record
 python3 .lean/bin/lean gate mode auto_fixloop                      # auto | manual | auto_fixloop | manual_fixloop
 ```
 
+A gate command written as `python3 .lean/bin/lean gate scope -- <command>` is skipped when the change touches only work records (trackers and queue items), so bookkeeping does not rerun application suites; `--only`/`--always` adjust the paths and `LEAN_GATE_SCOPE=full` runs everything. A batch of tasks gets one full gate, and a suspected flaky failure at most 2 reruns ([QUALITY.md](../.lean/policy/QUALITY.md#change-scoped-checks-batches-and-flaky-failures)).
+
 ## Hooks per provider
 
 | Event | Claude (`.claude/settings.json`) | Codex (`.codex/hooks.json`, after trust) | agy |
@@ -35,4 +37,4 @@ The gate records its controls on first use (hook configuration, the gate mode fi
 
 ## Progress surfaces
 
-One state file, `.agent-runtime/progress.json`, written by `lean progress set`, drives: the agent's replies, `lean status`, `lean watch`, `lean test`, `lean gate run`, `lean spawn run` (a bar per agent, read from each agent's own worktree), the Claude status line, Claude's Stop message after a pass and Codex's Stop message. Gap: Codex and agy cannot draw a custom line in their own window; use `lean watch` beside them.
+Progress written by `lean progress set` is kept per session in `.agent-runtime/progress/<session>.json` (session from `LEAN_SESSION_ID`, `CLAUDE_CODE_SESSION_ID` or `CODEX_THREAD_ID`; files untouched for 7 days are pruned), and `.agent-runtime/progress.json` holds the latest update of any session. A surface that knows its session (the Claude status line from its stdin, hooks from their payload, commands from the environment) shows its own bar, and another session's only labelled `session <id>:`, so concurrent sessions in one checkout do not mistake each other's progress for their own. It drives: the agent's replies, `lean status`, `lean watch`, `lean test`, `lean gate run`, `lean spawn run` (a bar per agent, read from each agent's own worktree), the Claude status line, Claude's Stop message after a pass and Codex's Stop message. Gap: Codex and agy cannot draw a custom line in their own window; use `lean watch` beside them.

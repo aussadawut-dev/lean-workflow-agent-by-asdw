@@ -52,7 +52,7 @@ def payload_of(stdin):
     return payload
 
 
-def notices(root):
+def notices(root, session=None):
     """Onboarding notes for SessionStart context; they never validate anything."""
     selection = root / ".agent-runtime/active-target.json"
     if selection.exists() or selection.is_symlink():
@@ -85,9 +85,9 @@ def notices(root):
         if "Not defined yet" in purpose:
             lines.append("Lean Workflow: .lean/PROJECT.md is not filled in yet. If the repository has code, "
                          "suggest running /lean-init once.")
-    current = progress.load(root)
+    current = progress.load(root, session)
     if current and current.get("phase") != "done":
-        lines.append("Lean progress: " + progress.line(current))
+        lines.append("Lean progress: " + progress.shown(root, session))
     return lines
 
 
@@ -99,12 +99,15 @@ def mode_context(root):
 
 def claude_session_start(root, stdin):
     # Kept quiet: this hook's stdout becomes Claude's context.
+    session = None
     try:
-        gate.run(root, hook=True, seed=True, payload=payload_of(stdin))
+        payload = payload_of(stdin)
+        session = progress.valid_session(payload.get("session_id")) or None
+        gate.run(root, hook=True, seed=True, payload=payload)
     except (OSError, ValueError, subprocess.CalledProcessError):
         pass
     try:
-        lines = [mode_context(root)] + notices(root)
+        lines = [mode_context(root)] + notices(root, session)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         return 2, "", f"Lean SessionStart: {error}; validation NOT_RUN."
     return 0, "\n".join(line for line in lines if line), ""
@@ -127,16 +130,16 @@ def claude_stop(root, stdin, cache_tree):
         return 0, block(reason), ""
     stdout = "\n".join(out)
     if code == 0 and not out:
-        stdout = status_message(root)
+        stdout = status_message(root, progress.valid_session(payload.get("session_id")) or None)
     return code, stdout, reason
 
 
-def status_message(root):
+def status_message(root, session=None):
     """A pass's systemMessage, with the progress bar when a task is being tracked."""
-    current = progress.load(root)
-    if not current:
+    text = progress.shown(root, session)
+    if not text:
         return ""
-    return json.dumps({"systemMessage": "Lean progress: " + progress.line(current)})
+    return json.dumps({"systemMessage": "Lean progress: " + text})
 
 
 # --- Codex ------------------------------------------------------------------------------------
@@ -159,7 +162,7 @@ def codex_session_start(root, stdin):
             guard.start_session(root, session, evidence.state(root))
         except (OSError, ValueError, subprocess.CalledProcessError):
             pass  # No baseline: the Stop treats any uncommitted change as this session's work.
-    context = "\n".join([gate.policy(mode)] + notices(root))
+    context = "\n".join([gate.policy(mode)] + notices(root, progress.valid_session(session) or None))
     return 0, json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": context}}), ""
 
 
@@ -226,9 +229,9 @@ def codex_stop(root, stdin, cache_tree):
             except (OSError, ValueError, subprocess.CalledProcessError):
                 pass
         message = "Quality Gate checks passed; acceptance and required semantic review remain separate."
-        current = progress.load(root)
-        if current:
-            message += "\nLean progress: " + progress.line(current)
+        text = progress.shown(root, progress.valid_session(session) or None)
+        if text:
+            message += "\nLean progress: " + text
         return 0, json.dumps({"systemMessage": message}), ""
     return codex_refuse(root, payload, "\n".join(err)[-REASON_LIMIT:], session=session, contract=contract,
                         fixloop=fixloop)

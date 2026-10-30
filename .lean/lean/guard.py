@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 import shlex
 import subprocess
+import sys
 import time
 
 from .util import RUNTIME
@@ -211,6 +212,32 @@ def initial_head(root, session):
         return (store.sessions.get(session) or {}).get("initial_head")
 
 
+def takeover(root, new_session, reason=""):
+    """Mark other active contract-holding sessions as superseded by `new_session`."""
+    superseded = []
+    with Store(root) as store:
+        for other, record in store.sessions.items():
+            if other == new_session or not isinstance(record, dict) or not record.get("contract"):
+                continue
+            record["superseded_by"] = new_session
+            if reason:
+                record["superseded_reason"] = reason
+            else:
+                record.pop("superseded_reason", None)
+            superseded.append(other)
+        if superseded:
+            store.save()
+    return superseded
+
+
+def superseded_by(root, session):
+    """The controller session ID that superseded `session`, or None."""
+    with Store(root) as store:
+        record = store.sessions.get(session) or {}
+    value = record.get("superseded_by")
+    return value if isinstance(value, str) and value else None
+
+
 def text_of(content):
     """Plain text of a message body, or None when it carries tool results (not a prompt)."""
     if isinstance(content, str):
@@ -291,6 +318,8 @@ def bind_transcript(root, session, payload):
             {"contract": found[0], "meta": found[1], "source": "transcript", "at": time.time(),
              "model": payload.get("model") if isinstance(payload.get("model"), str) else None})
         store.save()
+    if str(found[1].get("topic", "")).startswith("takeover"):
+        takeover(root, session, reason=str(found[1].get("topic", "")))
     log_contract(root, found[0], "transcript")
     return found[0]
 
@@ -301,6 +330,69 @@ def log_contract(root, contract, source):
         activity.record(root, "contract", contract=contract, source=source)
     except Exception:  # noqa: BLE001 - logging never decides a tool call.
         pass
+
+
+MEMORY_FILE = re.compile(r"(?P<base>.+)/projects/[^/]+/memory/[^/]+")
+PROFILE_BASE = re.compile(r".*/claude-profiles/[^/]+(?:/home)?")
+
+
+def memory_bases():
+    """Resolved Claude configuration folders whose projects/*/memory/ hold user memory."""
+    bases = set()
+    for base in (Path.home() / ".claude", os.environ.get("CLAUDE_CONFIG_DIR")):
+        if base:
+            try:
+                bases.add(Path(base).resolve().as_posix())
+            except (OSError, RuntimeError):
+                pass
+    return bases
+
+
+def external_scratch_or_memory(root, name, tool_input):
+    """Whether an Edit/Write/MultiEdit targets /tmp or a user memory file outside the repository.
+
+    Memory is a flat `<base>/projects/<project>/memory/<file>`, where `<base>` is ~/.claude,
+    $CLAUDE_CONFIG_DIR or a `claude-profiles/<name>` folder (optionally `/home`) under the user's
+    home; other paths that
+    only mention `.claude` or `memory` (another checkout's hooks, say) still need a contract.
+    """
+    if name not in {"Write", "Edit", "MultiEdit"} or not isinstance(tool_input, dict):
+        return False
+    raw_path = tool_input.get("file_path") or tool_input.get("path") or ""
+    if not isinstance(raw_path, str) or not raw_path.startswith("/"):
+        return False
+    try:
+        target = Path(raw_path).resolve()
+        repo_root = Path(root).resolve()
+    except (OSError, RuntimeError):
+        return False
+    if target == repo_root or repo_root in target.parents:
+        return False
+    for scratch_root in (Path("/tmp"), Path("/private/tmp"), Path("/tmp").resolve()):
+        if scratch_root in target.parents:
+            return True
+    match = MEMORY_FILE.fullmatch(target.as_posix())
+    if not match:
+        return False
+    base = match.group("base")
+    try:
+        home = Path.home().resolve().as_posix()
+    except (OSError, RuntimeError):
+        home = ""
+    in_home = bool(home) and base.startswith(home + "/")
+    return base in memory_bases() or (in_home and bool(PROFILE_BASE.fullmatch(base)))
+
+
+def mentions_receipt_write(words):
+    """Whether parsed shell words mention `record-review` outside a pure `-h`/`--help` check."""
+    if words is None:
+        return True
+    return any(
+        any("record-review" in w for w in part)
+        and not (("-h" in part or "--help" in part)
+                 and all(w == "record-review" for w in part if "record-review" in w))
+        for part in simple_commands(words)
+    )
 
 
 def pre_tool(root, payload):
@@ -323,10 +415,15 @@ def pre_tool(root, payload):
             except ValueError as error:
                 return f"Contract declaration rejected: {error}.\n{HELP}"
             with Store(root) as store:
-                store.sessions.setdefault(session, {}).update(
+                record = store.sessions.setdefault(session, {})
+                record.pop("superseded_by", None)
+                record.pop("superseded_reason", None)
+                record.update(
                     {"contract": contract, "meta": meta, "at": time.time(),
                      "model": payload.get("model") if isinstance(payload.get("model"), str) else None})
                 store.save()
+            if str(meta.get("topic", "")).startswith("takeover"):
+                takeover(root, session, reason=str(meta.get("topic", "")))
             log_contract(root, contract, "declared")
             return None
     if writes_receipt(name, tool_input):
@@ -337,6 +434,11 @@ def pre_tool(root, payload):
     if writes_receipt(name, tool_input, PENDING):
         return ("Lean contract guard: the review-pending marker is written only by "
                 "`lean gate review-pending --contract ... --session ...`, never edited directly.")
+    if any(writes_receipt(name, tool_input, cache) for cache in GATE_CACHES):
+        return ("Lean contract guard: a gate cache is written only by the gate itself (`lean gate run`, "
+                "the Stop hook); delete it to force a rerun, never write it.")
+    if external_scratch_or_memory(root, name, tool_input):
+        return None
     if name in READ_ONLY or name.startswith(READ_ONLY_PREFIXES):
         return None
     # Only write tools and writing shell commands wait for the contract; the Stop gate still refuses
@@ -344,10 +446,15 @@ def pre_tool(root, payload):
     # A command whose parsed words mention record-review is a write and takes the receipt check
     # whatever the heuristic says: a renamed copy of gate_evidence.py looks like any other script.
     words = shell_words(command) if isinstance(command, str) else []
-    mentions_receipt = isinstance(command, str) and (words is None or any("record-review" in w for w in words))
+    mentions_receipt = isinstance(command, str) and mentions_receipt_write(words)
     writing = name in EDIT_TOOLS or mentions_receipt or (isinstance(command, str) and shell_writes(command))
     if not writing:
         return None
+    superseded = superseded_by(root, session)
+    if superseded:
+        return (f"Lean contract guard: session {session} was superseded by controller session "
+                f"{superseded}; do not edit this worktree concurrently. Declare a new contract "
+                f"only if you are taking back ownership.")
     # Bind a transcript contract before any check that depends on the session's contract.
     declared = current(root, session) or bind_transcript(root, session, payload)
     cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else root
@@ -363,7 +470,9 @@ def pre_tool(root, payload):
             f"is blocked.\n{HELP}")
 
 
-OPERATORS = set(";&|<>()") | {"&&", "||", ";;", "|&", ">>", "<<", "<<<"}
+CONTROL_OPERATORS = set(";&|()") | {"&&", "||", ";;", "|&"}
+REDIRECT_OPERATORS = {"<", ">", ">>", ">|", ">>|", "&>", "&>>", "<>", "<&", ">&", "<<", "<<-", "<<<"}
+OPERATORS = CONTROL_OPERATORS | REDIRECT_OPERATORS
 
 
 def shell_words(command):
@@ -381,6 +490,7 @@ def shell_words(command):
 GATE_MARKER = '("record-review", ' + '"check-review")'  # Split so this file is not mistaken for one.
 RECEIPT = RUNTIME + "/review.json"
 PENDING = RUNTIME + "/review-pending.json"  # Written only by `lean gate review-pending`.
+GATE_CACHES = (RUNTIME + "/gate-cache", RUNTIME + "/target-gate-cache")  # Written only by the gate.
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit", "apply_patch"}
 
 
@@ -389,12 +499,18 @@ COPIERS = {"cp", "mv", "ln", "install", "rsync"}
 
 
 def simple_commands(words):
-    """Split shell words into simple commands at operators."""
+    """Split shell words into simple commands at control operators, dropping redirections and their targets."""
     command = []
+    skip_target = False
     for word in words:
-        if word in OPERATORS:
+        if word in CONTROL_OPERATORS:
             yield command
             command = []
+            skip_target = False
+        elif word in REDIRECT_OPERATORS:
+            skip_target = True
+        elif skip_target:
+            skip_target = False
         else:
             command.append(word)
     yield command
@@ -416,6 +532,9 @@ READ_GIT = {"status", "diff", "log", "show", "ls-files", "rev-parse", "blame", "
 # anything else (a second name, `-d` alone, bundled as `-qd` or abbreviated as `--del`) may change a ref.
 REFLOG_WRITES = {"expire", "delete", "drop", "write"}
 SYMBOLIC_REF_READ_OPTIONS = {"-q", "--quiet", "--short", "--recurse", "--no-recurse"}
+SUBMODULE_BARE_OPTIONS = {"-q", "--quiet", "--cached"}
+SUBMODULE_STATUS_OPTIONS = {"-q", "--quiet", "--cached", "--recursive"}
+SUBMODULE_SUMMARY_OPTIONS = {"--cached", "--files", "-n", "--summary-limit"}
 GIT_LISTERS = {"branch", "tag", "remote", "stash", "worktree", "config"}  # List or change, by argument.
 GIT_LIST_FLAGS = {"-l", "--list", "-a", "-r", "--all", "--remotes", "--contains", "--no-contains", "--merged",
                   "--no-merged", "--points-at", "--show-current", "-v", "-vv", "--verbose", "-n"}
@@ -498,6 +617,17 @@ def git_writes(args):
         options = [word for word in rest if word.startswith("-")]
         return (len(names) != 1 or unknown_word(names[0])
                 or any(word not in SYMBOLIC_REF_READ_OPTIONS for word in options))
+    if sub == "submodule":
+        positional = [word for word in rest if not word.startswith("-")]
+        options = [word for word in rest if word.startswith("-")]
+        if not positional:
+            return any(word not in SUBMODULE_BARE_OPTIONS for word in options)
+        if positional[0] == "status":
+            return any(word not in SUBMODULE_STATUS_OPTIONS for word in options)
+        if positional[0] == "summary":
+            return any(word not in SUBMODULE_SUMMARY_OPTIONS
+                       and not re.fullmatch(r"(-n|--summary-limit=)\d+", word) for word in options)
+        return True
     if sub not in GIT_LISTERS or any(word in GIT_CHANGERS for word in rest):
         return True
     positional = [word for word in rest if not word.startswith("-")]
@@ -524,6 +654,13 @@ def lean_writes(rest):
     if not rest:
         return False  # Usage text.
     group, words = rest[0], rest[1:]
+    if group == "gate" and words[:1] == ["scope"]:
+        # It runs the command after it, whose own flags (a trailing -h included) are not Lean's.
+        return words[1:] not in (["-h"], ["--help"])
+    # A help flag is Lean's only before `--`; after it the words belong to another command.
+    lean_words = rest[:rest.index("--")] if "--" in rest else rest
+    if "-h" in lean_words or "--help" in lean_words:
+        return False  # Usage text.
     if group in LEAN_VALUE_WRITES:
         if any(word.split("=", 1)[0] in LEAN_VALUE_WRITES[group] for word in words):
             return True
@@ -583,6 +720,26 @@ def nested_writes(name, args, raw, depth):
             return shell_writes(line, depth + 1)
         index += 2 if word in takes else 1
     return command_writes(args[index:], raw, depth + 1)
+
+
+PYTHON_VALUED = {"-X", "-W", "-Q"}  # Python options whose next word is a value, not the script.
+
+
+def interpreter_script(name, args, positional):
+    """The script an interpreter runs: python's valued options (`-X dev`) do not name it."""
+    if not name.startswith("python"):
+        return positional[0] if positional else ""
+    skip = False
+    for word in args:
+        if skip:
+            skip = False
+        elif word in ("-c", "-m", "-"):
+            return ""  # Inline code, a module (checked above) or stdin.
+        elif word in PYTHON_VALUED:
+            skip = True
+        elif not word.startswith("-"):
+            return word
+    return ""
 
 
 def command_writes(words, raw, depth=0):
@@ -661,7 +818,7 @@ def command_writes(words, raw, depth=0):
             module = args[args.index("-m") + 1]
             if module in MODULE_WRITES or (module in PIP_MODULES and any(word in INSTALL_WORDS for word in args)):
                 return True
-        script = positional[0] if positional else ""
+        script = interpreter_script(name, args, positional)
         if lean_cli(script):
             return lean_writes(args[args.index(script) + 1:])
         if ".lean/lean/" in script:
@@ -701,32 +858,44 @@ def writes_receipt(name, tool_input, target=RECEIPT):
     if not isinstance(tool_input, dict):
         return False
     if name in EDIT_TOOLS - {"apply_patch"}:
-        return any(str(tool_input.get(key, "")).endswith(target) for key in ("file_path", "notebook_path", "path"))
+        return any(names_target(tool_input.get(key), target) for key in ("file_path", "notebook_path", "path"))
     command = tool_input.get("command")
-    if not isinstance(command, str) or target not in command:
+    if not isinstance(command, str) or fold(Path(target).name) not in fold(command):
         return False
     if name == "apply_patch":
-        return any(line.startswith("*** ") and "File:" in line and line.rstrip().endswith(target)
-                   for line in command.splitlines())
+        return any(line.startswith("*** ") and "File:" in line
+                   and names_target(line.split("File:", 1)[1].strip(), target) for line in command.splitlines())
     if name != "Bash":
         return False
     words = shell_words(command)
     if words is None:
         return True  # Unparseable and naming the receipt: refuse rather than guess.
     for index, word in enumerate(words[:-1]):
-        if word in (">", ">>", ">|") and words[index + 1].endswith(target):
+        if word in FILE_REDIRECTS | {"<>"} and names_target(words[index + 1], target):
             return True
     for command_words in simple_commands(words):
         if not command_words:
             continue
         tool = Path(command_words[0]).name
-        targets = any(word.endswith(target) for word in command_words[1:])
+        targets = any(names_target(word, target) for word in command_words[1:])
         if targets and (tool in WRITERS or (tool == "sed" and any(w.startswith("-i") for w in command_words))):
             return True
-        if any(target in word and re.search(r"open\([^)]*['\"][wax]|write_(text|bytes)\(", word)
+        if any(fold(Path(target).name) in fold(word) and re.search(r"open\([^)]*['\"][wax]|write_(text|bytes)\(", word)
                for word in command_words):
             return True
     return False
+
+
+def fold(text):
+    """Case-folded on macOS, whose default file system ignores case; unchanged elsewhere."""
+    return text.casefold() if sys.platform == "darwin" else text
+
+
+def names_target(word, target):
+    """Whether a path word names `target` (a runtime path), after `./`, `//` and `..` normalisation."""
+    if not isinstance(word, str) or not word.strip():
+        return False
+    return fold(os.path.normpath(word.strip())).endswith(fold(os.path.normpath(target)))
 
 
 def gate_tool(word, cwd, previous=""):
@@ -784,22 +953,28 @@ def records_own_receipt(command, declared, cwd=None, depth=0):
     # `grep -rn record-review gate_evidence.py` only searches: the word comes before the tool in the
     # same simple command. Across a pipe only xargs turns input into the tool's arguments.
     called = standalone and copies
-    tool = in_pipeline = in_segment = xargs = False
+    tool = in_pipeline = in_segment = xargs = segment_called = segment_help = False
     previous = ""
     for word in words:
         if word == "|":
+            called = called or (segment_called and not segment_help)
             in_pipeline, in_segment, tool, xargs = in_pipeline or in_segment, False, False, False
-        elif word in OPERATORS:
-            in_pipeline = in_segment = tool = xargs = False
+            segment_called = segment_help = False
+        elif word in CONTROL_OPERATORS:
+            called = called or (segment_called and not segment_help)
+            in_pipeline = in_segment = tool = xargs = segment_called = segment_help = False
+        elif word in ("-h", "--help") and not in_pipeline:
+            segment_help = True
         elif word == "record-review":
-            called = called or tool
+            segment_called = segment_called or tool
             in_segment = True
         elif Path(word).name == "xargs":
             xargs = True
         elif gate_tool(word, cwd, previous):
             tool = True
-            called = called or (in_pipeline and xargs)
+            segment_called = segment_called or (in_pipeline and xargs)
         previous = word
+    called = called or (segment_called and not segment_help)
     if not called:
         return False
     if not values or declared in command:

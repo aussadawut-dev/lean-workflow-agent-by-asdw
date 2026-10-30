@@ -5,6 +5,7 @@ work records live in .lean/targets/<name>/ (the record root). One target is acti
 """
 import contextlib
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -272,19 +273,23 @@ def use(root, remote):
                 "lean_status": git(root, "status", "--short")}
 
 
-def gate(root, optional=False, quiet=False, session=""):
+def gate_commands(project_file):
+    content = Path(project_file).read_text()
+    start, end = "<!-- gate:start -->", "<!-- gate:end -->"
+    if content.count(start) != 1 or content.count(end) != 1 or content.index(start) >= content.index(end):
+        fail("target gate markers must appear once and in order")
+    block = content.split(start)[1].split(end)[0]
+    return [line for line in block.splitlines()
+            if line.strip() and not line.startswith("```") and not line.lstrip().startswith("#")]
+
+
+def gate(root, optional=False, quiet=False, session="", cache_tree=False):
     paths = context(root)
     if paths["target"] is None:
         if optional:
             return 0
         fail("no active target")
-    content = Path(paths["project_file"]).read_text()
-    start, end = "<!-- gate:start -->", "<!-- gate:end -->"
-    if content.count(start) != 1 or content.count(end) != 1 or content.index(start) >= content.index(end):
-        fail("target gate markers must appear once and in order")
-    block = content.split(start)[1].split(end)[0]
-    commands = [line for line in block.splitlines()
-                if line.strip() and not line.startswith("```") and not line.lstrip().startswith("#")]
+    commands = gate_commands(paths["project_file"])
     if not commands:
         print("Target Quality Gate is undefined; fill " + paths["project_file"], file=sys.stderr)
         return 2
@@ -293,29 +298,45 @@ def gate(root, optional=False, quiet=False, session=""):
     # Standalone runs share the workspace's controls and review receipt. Nothing from
     # the application PROJECT may execute until its recorded controls are accepted.
     from .guard import current
-    from .evidence import check_shipped, guard_controls, high_risk_changes
+    from .evidence import check_shipped, guard_controls, high_risk_changes, state as tree_state
     guard_controls(root, current(root, session) if session else None)
-    for number, command in enumerate(commands, 1):
+    cache_file = safe_path(root, ".agent-runtime/target-gate-cache")
+    cache_key = ""
+    if cache_tree:
+        target_state = tree_state(Path(paths["project_root"]))
+        if target_state:
+            project_digest = hashlib.sha256(Path(paths["project_file"]).read_bytes()).hexdigest()
+            cache_key = f"{paths['target']} {project_digest} {target_state}"
+    if cache_key and cache_file.is_file() and cache_file.read_text().strip() == cache_key:
         if not quiet:
-            print(f"Target Quality Gate: check {number} started", file=sys.stderr, flush=True)
-        # Captured, never inherited: in a hook, output on stdout would corrupt the Stop's JSON decision.
-        result = subprocess.run(["bash", "-c", command], cwd=paths["project_root"], text=True,
-                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        if result.returncode:
-            tail = "\n".join(result.stdout.splitlines()[-40:])
-            print(f"Target Quality Gate failed ({result.returncode}): {command}" + (f"\n{tail}" if tail else ""),
-                  file=sys.stderr)
-            return 2
-        if not quiet:
-            print(f"Target Quality Gate: check {number} passed", file=sys.stderr, flush=True)
+            print("Target Quality Gate: checks reused for the unchanged target state", file=sys.stderr, flush=True)
+    else:
+        for number, command in enumerate(commands, 1):
+            if not quiet:
+                print(f"Target Quality Gate: check {number} started", file=sys.stderr, flush=True)
+            # Captured, never inherited: in a hook, output on stdout would corrupt the Stop's JSON decision.
+            result = subprocess.run(["bash", "-c", command], cwd=paths["project_root"], text=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            if result.returncode:
+                cache_file.unlink(missing_ok=True)
+                tail = "\n".join(result.stdout.splitlines()[-40:])
+                print(f"Target Quality Gate failed ({result.returncode}): {command}" + (f"\n{tail}" if tail else ""),
+                      file=sys.stderr)
+                return 2
+            if not quiet:
+                print(f"Target Quality Gate: check {number} passed", file=sys.stderr, flush=True)
     # Approved deterministic checks run before semantic review, as in the shared gate.
     risky = high_risk_changes(root, session)
     if risky:
         try:
             check_shipped(root)
         except (OSError, ValueError) as error:
+            cache_file.unlink(missing_ok=True)
             fail("High-risk areas changed; HIGH independent review is required:\n"
                  + "\n".join(risky) + "\n" + str(error))
+    if cache_key:
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        cache_file.write_text(cache_key + "\n")
     return 0
 
 
@@ -333,7 +354,7 @@ def command(root, args):
                 safe_path(root, ".agent-runtime/active-target.json").unlink(missing_ok=True)
             result = context(root)
         else:
-            return gate(root, args.optional, args.quiet, args.session)
+            return gate(root, args.optional, args.quiet, args.session, getattr(args, "cache_tree", False))
         print(json.dumps(result, indent=2))
     except (ValueError, OSError, TypeError, KeyError, subprocess.CalledProcessError) as error:
         print(f"target error: {error}", file=sys.stderr)

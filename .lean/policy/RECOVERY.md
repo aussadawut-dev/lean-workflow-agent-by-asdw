@@ -2,7 +2,7 @@
 
 ## Classify the failure
 
-- **Transient execution** (network, flaky tool, timeout) -> retry unchanged, bounded.
+- **Transient execution** (network, flaky tool, timeout) -> retry unchanged, bounded; a suspected flaky test gets at most 2 reruns, then is recorded and treated as failed (`QUALITY.md`).
 - **Implementation failure** (tests/validation fail) -> rework the implementation.
 - **Review failure** (`REWORK` verdict) -> rework against the findings. Rounds are capped; see `REVIEW.md`.
 - **Pre-existing or out-of-scope failure** (fails without your change, or in code the task does not cover) -> in `auto` or `manual` mode, do not fix it; report `BLOCKED` and ask, even when a gate is blocking you. In `auto_fixloop` or `manual_fixloop` mode, once the gate runs, fix actionable code, test and lint failures and re-run until the gate passes without asking between rounds, stopping only for genuine requirement/design questions or missing environment tools.

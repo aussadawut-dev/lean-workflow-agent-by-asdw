@@ -35,7 +35,14 @@ Both providers' PreToolUse hooks run the shared contract guard (`lean hook <prov
 
 After independent HIGH review, check the receipt with `lean evidence check-review --contract '<exact contract line>'`, or run both with `lean gate run --require-review --contract '<exact contract line>'`. Hook activation/trust remains runtime-owned and must be verified separately; installing files alone does not prove activation.
 
-## Gate automation policy
+## Change-scoped checks, batches and flaky failures
+
+A PROJECT.md gate command may run through `python3 .lean/bin/lean gate scope [--only GLOB]... [--always GLOB]... -- <command>`. It skips that one check, exiting 0 with a `gate scope: skipped` line, only when every changed path of the repository it runs in (working tree, index, untracked files and every commit since the merge-base with the remote default branch, so a pushed but unmerged branch still counts; submodule content counts whatever its ignore settings) is a work record (`docs/tracking/*`, `.agents/queue/*` and the same under `.lean/targets/*/`) or matches `--only`, and none matches `--always`. No change, no repository, no remote default branch (`<remote>/HEAD`, `main` or `master`), a Git error or `LEAN_GATE_SCOPE=full` runs it. Scope only suites whose inputs are code: keep lint, mode, model and record checks unscoped, and add an application pointer (`--only targets/<name>`) only when the target gate covers that application. Scoping decides what the current change needs; it never reuses an earlier pass.
+
+A batch of tasks (several TCKs worked together) runs each task's focused tests while it is worked, then one full gate for the batch, or one per published part, instead of one per task. That run must cover the final shipping state of every task it closes; an edit after it needs a new run, and in `manual` modes one authorization may name every task in the batch.
+
+A failure suspected to be flaky (the change does not touch what the check covers) gets at most 2 unchanged reruns and counts as passed only when a rerun passes. If both fail, stop rerunning, treat the gate as failed, and record the failure output in the tracker that follows test health; a flaky failure that recurs later is recorded too.
+
 
 Optional project-owned `.lean/gate.json` contains `{"auto": true|false}` with optional `"fixloop": true|false` (`auto`, `manual`, `auto_fixloop` or `manual_fixloop`) and controls every provider. Missing settings preserve `auto`; malformed, non-boolean or duplicate settings or a symlink report NOT_RUN. `lean gate mode` inspects without writing; `lean gate mode <mode>` saves only this preference.
 

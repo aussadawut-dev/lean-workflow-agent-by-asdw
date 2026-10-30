@@ -1,4 +1,5 @@
 """High-risk floor and stale-review behavior for target gate entries."""
+import json
 from pathlib import Path
 import shlex
 import sys
@@ -125,6 +126,39 @@ class TargetGateTests(TargetFixture):
         result = self.gate_entry("shared", session="inactive-risk")
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("targets/application/app.txt", result.stderr)
+
+    def test_target_gate_failure_logs_real_reason_and_check_count_in_activity(self):
+        context = self.install()
+        self.gate_file(context, "true\necho BOOM; exit 1")
+        result = self.gate_entry("shared")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        activity_file = self.root / ".agent-runtime/activity.jsonl"
+        events = [json.loads(line) for line in activity_file.read_text().splitlines() if line.strip()]
+        gate_events = [event for event in events if event.get("event") == "gate"]
+        self.assertTrue(gate_events)
+        last = gate_events[-1]
+        self.assertEqual(last["result"], "refused")
+        self.assertEqual(last["checks"], 3)
+        self.assertTrue(last.get("reason", "").startswith("Target Quality Gate failed (1):"), last)
+
+    def test_target_gate_cache_tree_reuses_unchanged_target_across_record_updates(self):
+        context = self.install()
+        counter = self.root / ".agent-runtime/target-runs"
+        self.gate_file(context, f"printf 'run\\n' >> {shlex.quote(str(counter))}")
+        first = self.gate_entry("shared", "--cache-tree")
+        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+        self.assertEqual(counter.read_text().splitlines(), ["run"])
+
+        (Path(context["record_root"]) / "notes.md").write_text("record update outside target checkout\n")
+        second = self.gate_entry("shared", "--cache-tree")
+        self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+        self.assertEqual(counter.read_text().splitlines(), ["run"])
+        self.assertIn("Target Quality Gate: checks reused for the unchanged target state", second.stderr)
+
+        (Path(context["project_root"]) / "app.txt").write_text("modified application file\n")
+        third = self.gate_entry("shared", "--cache-tree")
+        self.assertEqual(third.returncode, 0, third.stdout + third.stderr)
+        self.assertEqual(counter.read_text().splitlines(), ["run", "run"])
 
 
 if __name__ == "__main__":

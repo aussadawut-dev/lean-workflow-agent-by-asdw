@@ -84,6 +84,13 @@ def build_parser(argv=()):
                                       help="quiet Stops while an independent review of this exact state runs")
     pending.add_argument("--contract", required=True)
     pending.add_argument("--session", required=True)
+    gate_scope = gate_actions.add_parser(
+        "scope", help="run one gate check unless the change touches only work records (LEAN_GATE_SCOPE=full runs it)")
+    gate_scope.add_argument("--only", action="append", default=[], metavar="GLOB",
+                            help="another path that alone does not need this check (repeatable)")
+    gate_scope.add_argument("--always", action="append", default=[], metavar="GLOB",
+                            help="a path that always needs this check, even if it is a record (repeatable)")
+    gate_scope.add_argument("check", nargs=argparse.REMAINDER, help="-- <command> [args...]")
 
     evidence_parser = commands.add_parser("evidence", help="review receipts and shipping state", add_help=False)
     evidence_parser.add_argument("rest", nargs=argparse.REMAINDER)
@@ -265,8 +272,7 @@ def dispatch(root, args, parser):
             state = progress.update(root, args.phase, args.done, args.total, args.task, args.note)
             print(progress.line(state))
         elif args.action == "show":
-            state = progress.load(root)
-            print(progress.line(state) if state else "no task tracked")
+            print(progress.shown(root) or "no task tracked")
         else:
             progress.clear(root)
         return 0
@@ -336,17 +342,38 @@ def dispatch(root, args, parser):
     return 2
 
 
+def status_line_session():
+    """The session a Claude status line is drawn for (its stdin JSON), else this process's session."""
+    from . import progress
+    import select
+    try:
+        if sys.stdin is None or sys.stdin.isatty():
+            return None
+        fd, chunks = sys.stdin.fileno(), []
+        # Bounded: an inherited pipe that never closes must not hang a status bar.
+        while sum(map(len, chunks)) < 1 << 20 and select.select([fd], [], [], 0.2)[0]:
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        data = json.loads(b"".join(chunks) or b"{}")
+        found = progress.valid_session(data.get("session_id")) if isinstance(data, dict) else ""
+        return found or None
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
 def status(root, args):
     from . import progress
-    state = progress.load(root)
     if args.line:  # Refreshed often: no tree hashing, and none of the gate's imports.
-        text = progress.line(state) if state else "Lean: no task tracked"
+        text = progress.shown(root, status_line_session()) or "Lean: no task tracked"
         try:
             gate_state = recorded_gate(root)
         except (OSError, ValueError):
             gate_state = "UNKNOWN"
         print(f"{text} · gate {gate_state}")
         return 0
+    state = progress.load(root)
     from . import gate, records
     config = records.config(root)
     report = {"version": __version__, "mode": config["mode"], "execution": config["execution"],
@@ -376,6 +403,10 @@ def watch(root, args):
 
 
 def gate_command(root, args):
+    if args.action == "scope":
+        from . import testsel
+        command = args.check[1:] if args.check[:1] == ["--"] else args.check
+        return testsel.scoped(Path.cwd(), command, args.only, args.always)
     from . import evidence, gate
     if args.action == "status":
         print(gate.status(root))

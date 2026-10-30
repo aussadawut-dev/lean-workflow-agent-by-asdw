@@ -3,14 +3,15 @@
 Tests live in .lean/tests/<category>/test_*.py (unit, hooks, e2e). `.lean/tests/impact.json`
 maps changed paths to test files or categories. Only paths in its workflow `scope` can affect
 these tests (a project's own application code cannot); paths listed as lint-only (documentation,
-project settings) run lint only, a changed test file runs itself, and an in-scope path no rule
-covers runs everything, so selection never silently skips.
+project/target work records and settings) run lint only when no rule matches, a changed test file
+runs itself, and an in-scope path no rule covers runs everything, so selection never silently skips.
 """
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import fnmatch
 import os
 from pathlib import Path
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -21,6 +22,10 @@ from .util import LeanError, read_json
 CATEGORIES = ("unit", "hooks", "e2e")
 TESTS = ".lean/tests"
 FAILED_NAME = re.compile(r"(?:FAIL|ERROR): \S")
+# Work records: trackers and queue items, of the workspace and of each target. A gate check scoped
+# with `lean gate scope` is skipped when the change touches nothing else.
+RECORDS = ("docs/tracking/*", ".agents/queue/*", ".lean/targets/*/docs/tracking/*", ".lean/targets/*/.agents/queue/*")
+SCOPE_ENV = "LEAN_GATE_SCOPE"
 
 
 def all_files(root, categories=CATEGORIES):
@@ -170,3 +175,73 @@ def run_files(root, files, jobs=None, show=None, reason=""):
     activity.record(root, "test", files=len(files), failed=len(failures), seconds=round(seconds, 1), selection=reason,
                     failures=[name for name, _ in failures] or None)
     return len(failures)
+
+
+def scope_paths(cwd):
+    """Every path changed since the remote default branch, or None when that branch is unknown.
+
+    Unlike changed(), pushed commits still count until they reach the default branch (a pushed
+    feature branch is not validated), and submodule changes count whatever the ignore settings
+    (untracked files inside an application submodule are application changes).
+    """
+    def git(*args):
+        return subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True,
+                              check=True).stdout
+    top = git("rev-parse", "--show-toplevel").strip()
+    cwd = top
+    base = None
+    for remote in git("remote").split():
+        for ref in (f"refs/remotes/{remote}/HEAD", f"refs/remotes/{remote}/main", f"refs/remotes/{remote}/master"):
+            if subprocess.run(["git", "-C", top, "rev-parse", "-q", "--verify", ref + "^{commit}"],
+                              capture_output=True).returncode == 0:
+                base = ref
+                break
+        if base:
+            break
+    if base is None:
+        return None
+    merge = git("merge-base", base, "HEAD").strip()
+    found = names(git("diff", "--name-only", "--no-renames", "-z", "--ignore-submodules=none", merge))
+    found |= names(git("diff", "--cached", "--name-only", "--no-renames", "-z", "--ignore-submodules=none", merge))
+    found |= names(git("ls-files", "--others", "--exclude-standard", "-z"))
+    return sorted(found)
+
+
+def scope_skip(cwd, only=(), always=()):
+    """Why a scoped gate check may be skipped, or None to run it.
+
+    The change is scope_paths() of the repository holding `cwd`. The check is skipped only when every
+    changed path is a work record (RECORDS) or matches `only`, and none matches `always`. Anything
+    undecidable runs it: LEAN_GATE_SCOPE=full, no change, no repository, no remote default branch
+    or a Git error.
+    """
+    if os.environ.get(SCOPE_ENV) == "full":
+        return None
+    try:
+        paths = scope_paths(cwd)
+    except (OSError, subprocess.CalledProcessError, LeanError):
+        return None
+    if not paths:
+        return None
+    patterns = RECORDS + tuple(only)
+    if any(matches(path, always) or not matches(path, patterns) for path in paths):
+        return None
+    return f"{len(paths)} changed path(s) are work records only"
+
+
+def scoped(cwd, command, only=(), always=()):
+    """Run one gate check unless scope_skip() allows skipping it; return its exit status."""
+    if not command:
+        raise LeanError("gate scope needs a command after --")
+    reason = scope_skip(cwd, only, always)
+    if reason:
+        print(f"gate scope: skipped {shlex.join(command)}; {reason} ({SCOPE_ENV}=full runs it)", flush=True)
+        return 0
+    try:
+        return subprocess.run(command, cwd=cwd).returncode
+    except FileNotFoundError:
+        print(f"gate scope: command not found: {command[0]}", file=sys.stderr)
+        return 127
+    except OSError as error:
+        print(f"gate scope: cannot run {command[0]}: {error}", file=sys.stderr)
+        return 126
