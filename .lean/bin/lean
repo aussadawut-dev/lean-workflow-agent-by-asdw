@@ -85,6 +85,20 @@ def repairs_package(payload):
             and all(word in ("--", "--staged") or REPAIRABLE.fullmatch(word) for word in words[2:]))
 
 
+def plain_read(stdin):
+    """A read-only tool call the guard would allow anyway: answered without loading the package."""
+    try:
+        payload = json.loads(stdin)
+    except ValueError:
+        return False
+    if not isinstance(payload, dict):
+        return False
+    session, tool_input = payload.get("session_id"), payload.get("tool_input")
+    return (isinstance(session, str) and bool(session.strip()) and "\n" not in session
+            and payload.get("tool_name") in READ_ONLY
+            and (tool_input is None or (isinstance(tool_input, dict) and "command" not in tool_input)))
+
+
 def fallback(provider, event, stdin, error):
     """The answer when the package cannot load: fail closed, but keep it repairable."""
     message = (f"Lean CLI cannot load ({error!r}); only reads and repairs of .lean/lean/ are allowed. "
@@ -124,6 +138,8 @@ def main():
         return cli(argv)
     root, provider, event = hooked
     stdin = sys.stdin.read() if not sys.stdin.isatty() else ""
+    if event == "pre-tool" and plain_read(stdin):
+        return 0  # Reads never consult the contract; skip importing the guard on every call.
     try:
         if event in ("pre-tool", "prompt"):
             from lean import guard  # Only the guard: a broken unrelated module must not block every tool.

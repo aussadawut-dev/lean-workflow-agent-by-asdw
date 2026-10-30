@@ -74,6 +74,27 @@ class StatusLineTests(Fixture):
         self.assertEqual(result.stdout.splitlines()[-1], "[]", result.stdout + result.stderr)
 
 
+class PreToolFastPathTests(Fixture):
+    """asdw-harness: every Read, Grep and MCP call paid for loading the guard (37-40 ms each)."""
+
+    def pre_tool(self, payload):
+        result = subprocess.run([sys.executable, "-X", "importtime", str(self.root / support.LEAN), "--root",
+                                 str(self.root), "hook", "claude", "pre-tool"], input=json.dumps(payload),
+                                text=True, capture_output=True, env=clean_env(HOME=str(self.tmp / "home")))
+        return result.returncode, " lean.guard" in result.stderr or "|   lean.guard" in result.stderr
+
+    def test_read_only_tools_skip_the_guard(self):
+        read = {"session_id": "s", "tool_name": "Read", "tool_input": {"file_path": "x"}}
+        self.assertEqual(self.pre_tool(read), (0, False))
+        # Anything else, a read-only tool carrying a command, or no session still goes through the guard.
+        for payload in ({"session_id": "s", "tool_name": "Edit", "tool_input": {"file_path": "x"}},
+                        {"session_id": "s", "tool_name": "Read", "tool_input": {"command": "touch x"}},
+                        {"tool_name": "Read", "tool_input": {"file_path": "x"}},
+                        {"session_id": "s", "tool_name": "mcp__fs__write", "tool_input": {"path": "x"}}):
+            with self.subTest(payload=payload):
+                self.assertTrue(self.pre_tool(payload)[1])
+
+
 class BytecodeCacheTests(Fixture):
     def pycaches(self):
         return [p for p in (self.root / ".lean").rglob("__pycache__")]
