@@ -479,6 +479,21 @@ def matching_risk(paths, areas):
     return [path for path in paths if risky(path)] if areas else []
 
 
+COVERAGE_WARNING = 0.25  # Above this share of tracked files, HIGH review stops singling out risk.
+
+
+def risk_coverage(root):
+    """How many tracked files PROJECT.md's High-risk areas cover, with a warning when it is too many."""
+    tracked = [os.fsdecode(name) for name in git(root, "ls-files", "-z").split(b"\0") if name]
+    covered = matching_risk(tracked, high_risk_areas(root))
+    share = len(covered) / len(tracked) if tracked else 0.0
+    line = f"High-risk areas cover {len(covered)} of {len(tracked)} tracked files ({share:.0%})."
+    if share > COVERAGE_WARNING:
+        line += (f"\nWarning: more than {COVERAGE_WARNING:.0%} of the tree requires HIGH review; narrow the areas "
+                 "to the paths where a mistake is costly (permissions, data loss, security, the gate itself).")
+    return line
+
+
 def target_high_risk_changes(root, paths, session=""):
     """Use the parent session's original gitlink, even after target and pointer commits.
 
@@ -769,6 +784,8 @@ def main(argv=None, root=None):
     commands.add_parser("gate-state", help="the state a gate cache and change baseline cover")
     high_risk = commands.add_parser("high-risk")
     high_risk.add_argument("--session", default="")
+    high_risk.add_argument("--coverage", action="store_true",
+                           help="report how much of the tracked tree the High-risk areas cover")
     seed = commands.add_parser("seed-session")
     seed.add_argument("--session", required=True)
     commands.add_parser("check-shipped")
@@ -798,6 +815,8 @@ def main(argv=None, root=None):
             start_session(root, args.session, state(root))
         elif args.command == "check-shipped":
             check_shipped(root)
+        elif args.command == "high-risk" and args.coverage:
+            print(risk_coverage(root))
         elif args.command == "high-risk":
             for path in high_risk_changes(root, args.session):
                 print(path)

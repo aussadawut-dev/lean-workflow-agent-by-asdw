@@ -72,6 +72,23 @@ class GateIntegrityTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(counter.read_text().splitlines(), ["run"] * 3)
 
+    def test_high_risk_coverage_warns_when_areas_cover_too_much(self):
+        # asdw-harness: High-risk globs covered most of src/, so 11 of 22 contracts that day were HIGH.
+        for name in ("src/a.py", "src/b.py", "src/c.py", "docs/x.md"):
+            (self.root / name).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / name).write_text("x\n")
+        self.git("add", ".")
+        project = self.project.read_text()
+        self.project.write_text(project + "\n## High-risk areas\n\n- `src/a.py`: auth\n")
+        narrow = self.evidence("high-risk", "--coverage")
+        self.assertEqual(narrow.returncode, 0, narrow.stderr)
+        self.assertIn("cover 1 of", narrow.stdout)
+        self.assertNotIn("warning", narrow.stdout.lower())
+        self.project.write_text(project + "\n## High-risk areas\n\n- `src/`: everything\n- `.lean/*`\n")
+        wide = self.evidence("high-risk", "--coverage")
+        self.assertEqual(wide.returncode, 0, wide.stderr)
+        self.assertIn("warning", wide.stdout.lower())
+
     def test_an_earlier_receipt_for_the_same_state_still_counts(self):
         # TCK021/TCK022: a second contract's receipt on the same state replaced the first one.
         first, second = CONTRACT, CONTRACT + " second"
