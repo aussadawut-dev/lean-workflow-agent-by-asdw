@@ -420,6 +420,7 @@ def external_scratch_or_memory(root, name, tool_input):
 SCRATCH_ROOTS = (Path("/tmp"), Path("/private/tmp"), Path("/tmp").resolve())
 SCRATCH_WRITERS = {"mkdir", "touch", "rm", "rmdir", "cp", "mv", "tee", "ln"}
 SCRATCH_FLAGS = re.compile(r"-[prRfavs]+|--")  # Value-free flags only.
+SCRATCH_TEXT = re.compile(r"[A-Za-z0-9 _./,:@%+'\"&|;<>-]+")  # One line; no expansion or pattern characters.
 
 
 def under_scratch(root, word):
@@ -441,8 +442,9 @@ def scratch_only(root, command):
     Every write redirection must target scratch, and every writing simple command must be a plain file
     writer whose arguments are all scratch paths; expansions, heredocs and any other writer disqualify it.
     """
-    # The shell rewrites braces, globs and `~` after the guard reads the words, so none may appear.
-    if any(mark in command for mark in "`${}*?[]~") or "\n" in command.strip():
+    # Bash and zsh rewrite words after the guard reads them (braces, globs, `~`, zsh qualifiers and
+    # modifiers, extglob, `=cmd`), so only plain path, flag and operator characters may appear.
+    if not SCRATCH_TEXT.fullmatch(command.strip()):
         return False
     words = shell_words(command)
     if not words:

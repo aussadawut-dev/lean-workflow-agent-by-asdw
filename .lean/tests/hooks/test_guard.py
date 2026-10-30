@@ -472,7 +472,11 @@ class GuardHookTests(HookFixture):
                   # Review 5.7 round 1: the shell rewrites these words, or an option carries the target.
                   f"touch {scratch}/{{a,../../etc/lean-x}}", f"rm -rf {scratch}/*/../x", "rm -rf ~/x",
                   f"rm {scratch}/[ab]/../../x", f"cp -t/etc/lean-x {scratch}/a",
-                  f"cp --target-directory=/etc/lean-x {scratch}/a", f"ln -s /etc/lean-x {scratch}/l -T")
+                  f"cp --target-directory=/etc/lean-x {scratch}/a", f"ln -s /etc/lean-x {scratch}/l -T",
+                  # Review 5.7 round 2: zsh glob qualifiers and modifiers, extglob and other expansions.
+                  f"cp {scratch}/a {scratch}(:s#tmp/lean-guard-scratch-test#etc/lean-x#)", f"touch {scratch}/a(:h)",
+                  f"touch {scratch}/@(a|b)", f"touch {scratch}/!(a)", f"touch {scratch}/^a",
+                  f"touch {scratch}/a#", f"touch ={scratch}/a")
         for command in allowed:
             with self.subTest(allowed=command):
                 result = self.tool("claude", "Bash", "scratch", command=command)
