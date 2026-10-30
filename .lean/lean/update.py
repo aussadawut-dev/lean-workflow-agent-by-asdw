@@ -251,14 +251,22 @@ def preview(root, target=None, source=None, ref=None, workspace=None):
             raise LeanError("tag and AGENTS.md baseline versions disagree")
     new_files, new_links = registry(release)
     old_files, old_links = registry(target) if (target / ".lean/assets.json").is_file() else ([], {})
-    previous = None
+    previous, unverified = None, ""
+    operations, notes = [], []
     provenance = target / ".lean/upstream.json"
     if provenance.is_file():
         recorded = read_json(provenance)
-        if recorded.get("source") == source and re.fullmatch(r"[0-9a-f]{40}", str(recorded.get("commit", ""))):
-            previous = workspace / "previous"
-            checkout(source, recorded["commit"], previous)
-    operations, notes = [], []
+        # The pinned commit names the installed release on its own, so the source spelling (SSH or HTTPS,
+        # a trailing .git or slash) does not matter; the base is read from the source being installed.
+        if isinstance(recorded, dict) and re.fullmatch(r"[0-9a-f]{40}", str(recorded.get("commit", ""))):
+            try:
+                checkout(source, recorded["commit"], workspace / "previous")
+                previous = workspace / "previous"
+            except LeanError:
+                shutil.rmtree(workspace / "previous", ignore_errors=True)
+                unverified = recorded["commit"][:12]
+                notes.append(f"the pinned commit {unverified} is not in {source}, so local changes cannot be "
+                             "verified; files changed upstream are conflicts (no base)")
 
     def add(path, action, content=None, link=None, mode=None, reason=""):
         operations.append({"path": path, "action": action, "content": content, "link": link, "mode": mode,
@@ -277,7 +285,8 @@ def preview(root, target=None, source=None, ref=None, workspace=None):
             add(name, "write", source_path.read_text(), mode=executable, reason="major-version migration")
         else:
             add(name, "conflict", source_path.read_text(), mode=executable,
-                reason="changed locally and upstream; kept unless --take names it")
+                reason=(f"no base: pinned commit {unverified} unavailable; " if unverified else
+                        "changed locally and upstream; ") + "kept unless --take names it")
     for name in sorted(set(old_files) - set(new_files)):
         local = target / name
         if not local.exists():

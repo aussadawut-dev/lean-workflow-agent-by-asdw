@@ -349,6 +349,40 @@ class UpdateTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("outside the target", result.stderr)
 
+    def pinned_install(self, recorded_source, recorded_commit):
+        """A current installation whose pin names `recorded_commit`, then one upstream change to TOOLS.md."""
+        pinned = self.base / "pinned"
+        install_release(pinned, source=self.source)
+        write(pinned, ".lean/upstream.json", json.dumps({"schema": 1, "source": recorded_source,
+                                                          "ref": f"refs/tags/v{VERSION}", "commit": recorded_commit}))
+        commit(pinned, "pinned install")
+        tools = self.source / ".lean/policy/TOOLS.md"
+        tools.write_text(tools.read_text() + "\nUpstream addition.\n")
+        commit(self.source, "upstream change")
+        head = git(self.source, "rev-parse", "HEAD")
+        result = self.lean("update", "preview", "--target", str(pinned), "--source", str(self.source),
+                           "--ref", head, "--workspace", str(self.base / "ws-pin"))
+        return result
+
+    def test_a_pin_recorded_under_another_spelling_of_the_source_keeps_its_base(self):
+        # asdw-harness: the pin said git@github.com:…, the update used https://github.com/…, and every
+        # upstream-changed file became a false conflict. The recorded commit identifies the base on its own.
+        previous = git(self.source, "rev-parse", "HEAD")
+        result = self.pinned_install("file://" + str(self.source) + "/", previous)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        plan = json.loads((self.base / "ws-pin/plan.json").read_text())
+        tools = [op for op in plan["operations"] if op["path"] == ".lean/policy/TOOLS.md"][0]
+        self.assertEqual((tools["action"], tools["reason"]), ("write", "unmodified locally"))
+
+    def test_a_pin_whose_commit_the_source_lacks_is_previewed_without_a_base(self):
+        result = self.pinned_install(str(self.source), "1" * 40)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        plan = json.loads((self.base / "ws-pin/plan.json").read_text())
+        tools = [op for op in plan["operations"] if op["path"] == ".lean/policy/TOOLS.md"][0]
+        self.assertEqual(tools["action"], "conflict")
+        self.assertIn("no base", tools["reason"])
+        self.assertIn("1111111", result.stdout)
+
     def test_older_releases_and_workspaces_inside_a_checkout_are_refused(self):
         inside = self.lean("update", "preview", "--target", str(self.target), "--source", str(self.source),
                            "--workspace", str(self.target / "ws"))
