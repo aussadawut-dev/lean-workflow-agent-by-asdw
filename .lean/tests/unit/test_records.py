@@ -217,6 +217,18 @@ class WorkflowModeTests(unittest.TestCase):
                 self.assertIn("Status note:", result.stderr)
         self.assertIn("Status: BLOCKED — waiting", path.read_text())
 
+    def test_tracker_status_accepts_what_check_accepts(self):
+        # Review: a valid Status line beside an example line starting with "Status:" passes check, so
+        # tracker status must update it too, and an unknown state must stay repairable.
+        self.run_cli("configure", "tracker")
+        path = self.tracker_doc()
+        path.write_text("# Workset\n\nStatus: PLANNED\n\n```\nStatus: <STATE>\n```\n\n## Evidence\n")
+        self.run_cli("check")
+        self.run_cli("tracker", "status", "--id", "TCK001", "--status", "IN_PROGRESS")
+        path.write_text("# Workset\n\nStatus: FOO\n\n## Evidence\n")
+        self.run_cli("tracker", "status", "--id", "TCK001", "--status", "PLANNED")
+        self.run_cli("check")
+
     def test_execution_selection_survives_mode_upgrade(self):
         self.run_cli("configure", "standard", "--execution", "delegated")
         self.run_cli("configure", "tracker")
