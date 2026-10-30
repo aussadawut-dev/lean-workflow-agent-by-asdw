@@ -779,7 +779,7 @@ class GuardHookTests(HookFixture):
         self.assertEqual(self.tool("claude", "Read", "s-claude", file_path="x.py").returncode, 0)
         self.assertEqual(self.tool("claude", "Bash", "s-claude", command="git status --short").returncode, 0)
         self.assertEqual(self.tool("claude", "Write", "s-claude",
-                                   file_path="/Users/x10/.claude/projects/p/memory/MEMORY.md").returncode, 0)
+                                   file_path=str(Path.home().resolve() / ".claude/projects/p/memory/MEMORY.md")).returncode, 0)
         # Re-declaring a new contract explicitly takes back ownership and clears superseded_by.
         self.assertEqual(self.tool("claude", "Bash", "s-claude",
                                    command=f"{DECLARE} --contract '{LINE}'").returncode, 0)

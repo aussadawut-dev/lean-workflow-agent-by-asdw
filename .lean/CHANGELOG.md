@@ -3,6 +3,32 @@
 เลขรุ่น `MAJOR.MINOR.PATCH`: MAJOR เปลี่ยนกติกาหรือ path เดิม, MINOR เพิ่มของใหม่, PATCH แก้ไข · วิธีอัปเกรด: [CUSTOMIZING.md](CUSTOMIZING.md)
 Versions are `MAJOR.MINOR.PATCH`: MAJOR changes rules or paths, MINOR adds, PATCH fixes · Upgrading: [CUSTOMIZING.md](CUSTOMIZING.md) · 5.x technical notes: [docs/CHANGELOG-dev.md](../docs/CHANGELOG-dev.md)
 
+## 5.4.1 — 2026-10-30
+
+🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#541--2026-10-30)
+
+เผยแพร่ intake และ bounded batches จาก 5.4.0 พร้อม test ที่ทำงานข้ามเครื่องได้
+
+**แก้ไข**
+- Test ของ controller takeover ใช้ home ของผู้ใช้จริง จึงตรวจ guard บน Linux ได้เหมือน macOS โดยไม่เปลี่ยนกฎการอนุญาตเขียน
+- รวมความสามารถ intake และ batches ตามรายละเอียด 5.4.0 ด้านล่าง; 5.4.0 มีเพียง tag สำหรับ candidate ที่ CI ไม่ผ่านและไม่ได้เผยแพร่ GitHub Release
+
+**ต้องทำอะไรตอนอัปเกรด**
+- เลือก 5.4.1 ตามขั้นตอนอัปเดตเดิม ไม่ต้องย้ายข้อมูล intake ยังเป็นทางเลือก
+- ให้ independent reviewer ตรวจไฟล์ควบคุมที่เปลี่ยนตามขั้นตอนของโปรเจกต์
+
+**English**
+
+Publishes the 5.4.0 intake and bounded-batch capabilities with a portable test suite.
+
+**Fixed**
+- The controller-takeover test uses the actual user's home, exercising the guard on Linux and macOS without changing write permissions.
+- Includes the intake and batch capabilities described below for 5.4.0. That tag remains an unsuccessful CI candidate with no published GitHub Release.
+
+**Upgrade**
+- Select 5.4.1 through the existing update procedure; no data migration. Intake remains optional.
+- Have the changed controls independently reviewed through the project's existing workflow.
+
 ## 5.4.0 — 2026-10-30
 
 🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#540--2026-10-30)

@@ -3,6 +3,15 @@
 Developer and agent notes for each 5.x release: commands, flags, rules, changed gate controls and limits.
 The user-facing summary of each release is in [`.lean/CHANGELOG.md`](../.lean/CHANGELOG.md).
 
+## 5.4.1 — 2026-10-30
+
+First published intake/batch release; 5.4.0 remains a tagged CI candidate, not a GitHub Release.
+
+- The inherited controller-takeover regression used `/Users/x10/.claude/projects/p/memory/MEMORY.md`. This correctly fails the guard on Linux, where that path is not the user's memory directory. Build the same assertion from `Path.home().resolve()` as the adjacent memory regression already does. The guard implementation and its rejection rules are unchanged.
+- Fail-before evidence: both Ubuntu Python 3.9 and 3.13 jobs in the 5.4.0 branch/tag CI runs failed at that assertion. Local macOS validation had passed, demonstrating the host-specific test assumption. CI runs: 41039552084 (tag), 41039551870 (branch).
+- Includes all compatible 5.4.0 capabilities and upstream 5.3.1 fixes. Do not move or replace the pushed 5.4.0 tag; validate and publish a fresh 5.4.1 tag.
+- Changed controls relative to 5.4.0: version metadata only. Full release tests, independent HIGH review and shared gate are required before publishing.
+
 ## 5.4.0 — 2026-10-30
 
 Compatible, opt-in requirement intake and bounded shipping batches. Includes the upstream 5.3.1 guard and per-session progress fixes.
