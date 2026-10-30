@@ -21,6 +21,7 @@ from .util import WORKFLOW_ROOT, write_text as atomic_write_text
 MODES = ("standard", "tracker", "full")
 EXECUTIONS = ("direct", "delegated")
 CONTRACT_LIFETIMES = ("prompt", "session")  # Matches guard.LIFETIMES; prompt is the default.
+TRACKER_RISKS = ("LOW", "MEDIUM", "HIGH")  # tracker_min_risk: lowest contract risk that needs a tracker.
 TRACKER_STATES = ("PLANNED", "IN_PROGRESS", "VALIDATING", "REVIEWING", "DONE", "BLOCKED", "FAILED")
 LEASE_SECONDS = 30 * 60
 ID = re.compile(r"Q[0-9]{4,}")
@@ -108,6 +109,8 @@ def config(root):
         fail("execution must be direct or delegated")
     if value.get("contract_lifetime", "prompt") not in CONTRACT_LIFETIMES:
         fail("contract_lifetime must be prompt or session")
+    if value.get("tracker_min_risk", "LOW") not in TRACKER_RISKS:
+        fail("tracker_min_risk must be LOW, MEDIUM or HIGH")
     return value
 
 
@@ -862,6 +865,8 @@ def parser_for(commands):
     setup.add_argument("--execution", choices=EXECUTIONS)
     setup.add_argument("--contract-lifetime", choices=CONTRACT_LIFETIMES,
                        help="prompt (default): a new person's prompt clears the contract; session: it is kept")
+    setup.add_argument("--tracker-min-risk", choices=TRACKER_RISKS,
+                       help="lowest contract risk that needs a tracker in tracker/full mode (default LOW)")
     lower = mode_actions.add_parser("downgrade", help="move to a lower mode, preserving records")
     lower.add_argument("mode", choices=MODES)
     choice = lower.add_mutually_exclusive_group(required=True)
@@ -911,7 +916,8 @@ def run(root, args):
     try:
         if args.command == "mode":
             if args.action == "configure":
-                configure(root, args.mode, args.execution, contract_lifetime=args.contract_lifetime)
+                configure(root, args.mode, args.execution, contract_lifetime=args.contract_lifetime,
+                          tracker_min_risk=args.tracker_min_risk)
             elif args.action == "downgrade":
                 return downgrade(root, args.mode, args.apply, args.keep_pending)
             elif args.action == "show":

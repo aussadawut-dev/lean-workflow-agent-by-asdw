@@ -9,7 +9,7 @@ Operating rules, not application structure; no stack or primary provider is pres
 Use `/lean-init` or `lean mode configure standard|tracker|full` (add `--execution direct|delegated`); `lean mode show` reads, `lean mode check` validates. Missing configuration means unconfigured standard/direct; never discard accepted choices. Downgrades, leases and records: `policy/WORKFLOW.md`.
 
 - `standard`: session contract, tests, validation, review and gate.
-- `tracker`: standard plus one workset tracker per non-trivial task.
+- `tracker`: standard plus one workset tracker per non-trivial task (optionally only from `tracker_min_risk` up).
 - `full`: tracker plus local lease-backed queue ownership.
 
 Direct execution is the default; delegated uses the Controller/worker procedure. Mode, execution, model, quality floor and review depth are separate. Supports macOS/Linux/WSL, not native Windows.

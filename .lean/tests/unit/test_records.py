@@ -229,6 +229,23 @@ class WorkflowModeTests(unittest.TestCase):
         self.run_cli("tracker", "status", "--id", "TCK001", "--status", "PLANNED")
         self.run_cli("check")
 
+    def test_optional_settings_are_saved_shown_and_validated(self):
+        # asdw-harness: short LOW tasks each needed a tracker; teams may raise the threshold.
+        self.run_cli("configure", "tracker", "--tracker-min-risk", "MEDIUM", "--contract-lifetime", "session")
+        shown = json.loads(self.run_cli("show").stdout)
+        self.assertEqual((shown["tracker_min_risk"], shown["contract_lifetime"]), ("MEDIUM", "session"))
+        self.run_cli("configure", "full")  # Later configuration keeps them.
+        self.assertEqual(json.loads(self.run_cli("show").stdout)["tracker_min_risk"], "MEDIUM")
+        config = self.root / ".lean/config.json"
+        for key, value in (("tracker_min_risk", "SOME"), ("contract_lifetime", "forever")):
+            with self.subTest(key=key):
+                data = json.loads(config.read_text())
+                original = dict(data)
+                data[key] = value
+                config.write_text(json.dumps(data))
+                self.assertIn(key, self.run_cli("check", success=False).stderr)
+                config.write_text(json.dumps(original))
+
     def test_execution_selection_survives_mode_upgrade(self):
         self.run_cli("configure", "standard", "--execution", "delegated")
         self.run_cli("configure", "tracker")
