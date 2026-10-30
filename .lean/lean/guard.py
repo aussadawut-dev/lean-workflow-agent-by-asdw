@@ -44,6 +44,7 @@ HEREDOC = re.compile(r"\s*<<-?\s*(?P<quote>['\"])(?P<word>\w+)(?P=quote)\s*\Z")
 RUNTIME_PROMPTS = ("<task-notification>", "<agent-message", "<cross-session-message", "<system-reminder>",
                    "[SYSTEM NOTIFICATION", "Stop hook feedback:")
 MAX_SESSIONS = 64
+SESSION_KEEP_SECONDS = 7 * 24 * 3600  # A session record untouched this long is dropped on the next save.
 HELP = ("Write the Task Contract as the first line of your reply, before any tool call; the guard reads it\n"
         "from the transcript once a tool result has arrived. Reads and inspection run without a contract;\n"
         "only write tools and writing shell commands wait for it. When the turn's first tool call writes\n"
@@ -153,7 +154,11 @@ class Store:
         return self
 
     def save(self):
-        newest = sorted(self.sessions.items(), key=lambda item: item[1].get("at", 0))[-MAX_SESSIONS:]
+        cutoff = time.time() - SESSION_KEEP_SECONDS
+        live = {session: record for session, record in self.sessions.items()
+                if not (isinstance(record, dict) and isinstance(record.get("at"), (int, float))
+                        and record["at"] < cutoff)}
+        newest = sorted(live.items(), key=lambda item: item[1].get("at", 0))[-MAX_SESSIONS:]
         temporary = self.path.with_suffix(".tmp")
         temporary.write_text(json.dumps({"schema": 1, "sessions": dict(newest)}, indent=2) + "\n")
         temporary.replace(self.path)

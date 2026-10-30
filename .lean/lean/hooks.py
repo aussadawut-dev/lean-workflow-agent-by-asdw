@@ -11,6 +11,7 @@ import os
 import stat
 from pathlib import Path
 import subprocess
+import time
 
 from . import evidence, gate, guard, progress
 from .util import LeanError, read_json
@@ -100,6 +101,7 @@ def mode_context(root):
 def claude_session_start(root, stdin):
     # Kept quiet: this hook's stdout becomes Claude's context.
     session = None
+    sweep_stale_markers(root)
     try:
         payload = payload_of(stdin)
         session = progress.valid_session(payload.get("session_id")) or None
@@ -147,6 +149,7 @@ def status_message(root, session=None):
 # --- Codex ------------------------------------------------------------------------------------
 
 def codex_session_start(root, stdin):
+    sweep_stale_markers(root)
     clear_codex_session_refusals(root)
     try:
         mode = gate.read_mode(root)[0]
@@ -282,6 +285,21 @@ def marker_remove(directory, name):
     try:
         os.unlink(name, dir_fd=directory)  # Removes a link itself, never what it points to.
     except FileNotFoundError:
+        pass
+
+
+def sweep_stale_markers(root):
+    """Remove Codex refusal markers left untouched for a week; a live session rewrites its own."""
+    try:
+        with codex_markers(root) as directory:
+            for name in ("codex-gate-failed", "codex-gate-refusal"):
+                try:
+                    info = os.stat(name, dir_fd=directory, follow_symlinks=False)
+                    if time.time() - info.st_mtime > progress.KEEP_SECONDS:
+                        marker_remove(directory, name)
+                except OSError:
+                    pass
+    except OSError:
         pass
 
 

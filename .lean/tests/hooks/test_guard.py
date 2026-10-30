@@ -75,6 +75,18 @@ class SessionReadTests(unittest.TestCase):
             self.assertIsNone(contract_guard.initial_head(root, "missing"))
             self.assertEqual(list(root.iterdir()), [])
 
+    def test_saving_drops_sessions_idle_longer_than_a_week(self):
+        # asdw-harness: one checkout kept every Claude and Codex session's record indefinitely.
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            now = time.time()
+            with contract_guard.Store(root) as store:
+                store.sessions.update({"old": {"contract": LINE, "at": now - 8 * 86400},
+                                       "recent": {"contract": LINE, "at": now - 86400},
+                                       "undated": {"initial_head": "abc"}})
+                store.save()
+            self.assertEqual(sorted(contract_guard.Store(root).read()), ["recent", "undated"])
+
     def test_session_reads_use_atomic_snapshot_without_creating_lock(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)

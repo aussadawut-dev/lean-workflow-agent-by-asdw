@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -97,6 +98,24 @@ class GateModeTests(unittest.TestCase):
                 self.assertNotIn("\n", message)
                 self.assertIn("NOT_RUN", message)
                 self.assertIn(mode, message)
+
+    def test_session_start_sweeps_week_old_codex_markers(self):
+        # asdw-harness: codex-gate-failed and codex-gate-refusal from days earlier stayed in the checkout.
+        runtime = self.root / ".agent-runtime"
+        runtime.mkdir(exist_ok=True)
+        old = time.time() - 8 * 86400
+        for name in ("codex-gate-failed", "codex-gate-refusal"):
+            (runtime / name).write_text("1")
+            os.utime(runtime / name, (old, old))
+        fresh = runtime / "codex-gate-refusal"
+        lean(self.root, "hook", "claude", "session-start", input=json.dumps({"session_id": "s"}),
+             env=environment(self.root))
+        self.assertFalse((runtime / "codex-gate-failed").exists())
+        self.assertFalse(fresh.exists())
+        (runtime / "codex-gate-failed").write_text("1")  # Recent markers stay.
+        lean(self.root, "hook", "claude", "session-start", input=json.dumps({"session_id": "s"}),
+             env=environment(self.root))
+        self.assertTrue((runtime / "codex-gate-failed").exists())
 
     def test_setting_a_mode_is_logged_and_asks_for_a_commit(self):
         # asdw-harness: sessions found an untracked .lean/gate.json nobody could trace.
