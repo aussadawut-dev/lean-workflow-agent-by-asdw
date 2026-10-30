@@ -35,11 +35,45 @@ class ControlCoverageTests(unittest.TestCase):
                 module.write_text(original)
                 self.assertEqual(lean(self.root, "gate", "run").returncode, 0)
 
+    def test_the_stop_tier_block_is_a_control(self):
+        # Review 5.7 round 1: an automatic Stop runs this block, so adding or editing it must be noticed.
+        project = self.root / ".lean/PROJECT.md"
+        original = project.read_text()
+        for block in ("<!-- gate:stop:start -->\n```sh\ntrue\n```\n<!-- gate:stop:end -->\n",
+                      "<!-- gate:stop:start -->\n```sh\nfalse\n```\n<!-- gate:stop:end -->\n"):
+            with self.subTest(block=block):
+                project.write_text(original + block)
+                refused = lean(self.root, "gate", "run")
+                self.assertEqual(refused.returncode, 2, refused.stdout + refused.stderr)
+                self.assertIn("Protected gate controls changed", refused.stderr)
+        project.write_text(original)
+        self.assertEqual(lean(self.root, "gate", "run").returncode, 0)  # Without the block, the baseline still holds.
+
     def test_the_impact_map_is_a_control(self):
         path = self.root / ".lean/tests/impact.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({"scope": [], "lint_only": [], "rules": []}))
         refused = lean(self.root, "gate", "run")
+        self.assertEqual(refused.returncode, 2, refused.stderr)
+        self.assertIn("Protected gate controls changed", refused.stderr)
+
+    def test_a_low_session_receipt_never_accepts_controls_beside_another_high_one(self):
+        # Review 5.7 round 1: with receipt history, a HIGH receipt for another contract plus a LOW one
+        # for the session's own contract accepted a changed control.
+        settings = self.root / ".claude/settings.json"
+        settings.write_text(settings.read_text().replace("pre-tool", "pre-tool "))
+        low, other = ("Contract: risk=LOW quality=STANDARD acceptance=settings tweak",
+                      "Contract: risk=HIGH quality=HIGH acceptance=unrelated review")
+        bound = lean(self.root, "hook", "claude", "pre-tool", input=json.dumps({
+            "session_id": "s", "tool_name": "Bash",
+            "tool_input": {"command": f"python3 .lean/bin/lean contract declare --contract '{low}'"}}))
+        self.assertEqual(bound.returncode, 0, bound.stderr)
+        state = lean(self.root, "evidence", "state").stdout.strip()
+        for contract in (other, low):
+            recorded = lean(self.root, "evidence", "record-" + "review", "--contract", contract, "--reviewer",
+                            "independent", "--evidence", "fixture", "--verdict", "PASS", "--state", state)
+            self.assertEqual(recorded.returncode, 0, recorded.stderr)
+        refused = lean(self.root, "gate", "run", "--session", "s")
         self.assertEqual(refused.returncode, 2, refused.stderr)
         self.assertIn("Protected gate controls changed", refused.stderr)
 

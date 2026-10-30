@@ -280,6 +280,9 @@ TRUSTED_REF = re.compile(r"refs/remotes/[A-Za-z0-9._/-]+")
 def project_controls(values, text):
     """Add the PROJECT.md parts that are gate controls: the gate block and any trusted refs line."""
     values["gate"] = text.split("<!-- gate:start -->", 1)[-1].split("<!-- gate:end -->", 1)[0]
+    if "<!-- gate:stop:start -->" in text or "<!-- gate:stop:end -->" in text:
+        # What an automatic Stop runs; absent unless defined, so existing baselines stay valid.
+        values["gate_stop"] = text.split("<!-- gate:stop:start -->", 1)[-1].split("<!-- gate:stop:end -->", 1)[0]
     lines = TRUSTED_LINE.findall(text)
     if lines:
         # Absent unless configured, so projects that do not use it keep their recorded baseline.
@@ -330,7 +333,7 @@ def controls_at(root, commit, extra=()):
                                                  "--", PACKAGE).split(b"\0")]
     names = list(CONTROL_NAMES) + sorted(name for name in modules if fnmatch.fnmatch(name, PACKAGE + "*.py")
                                          and "/" not in name[len(PACKAGE):])
-    names += sorted(set(extra) - set(names) - {PROJECT, "gate", "trusted_control_refs"}
+    names += sorted(set(extra) - set(names) - {PROJECT, "gate", "gate_stop", "trusted_control_refs"}
                     - {name for name in extra if TARGET_PROJECT.fullmatch(name)})
     values = {name: entry(name)[0] for name in names}
     targets = git(root, "--no-replace-objects", "ls-tree", "-r", "-z", "--name-only", commit,
@@ -692,7 +695,7 @@ def reviewed_controls(root, old, current, contract):
         return None
     try:
         check_shipped(root)
-        receipt = covering_receipt(root, contract)
+        receipt = covering_receipt(root, contract, high=True)
         if receipt is None:
             return None
         names = set(current) | set((old.get("controls") or {}))
@@ -705,7 +708,7 @@ def reviewed_controls(root, old, current, contract):
             continue
         # The reviewed diff runs from base to now, so it shows the whole change only when it starts
         # at the accepted value and Git shows the file at all (an ignored control never appears).
-        path = PROJECT if name in ("gate", "trusted_control_refs") else name
+        path = PROJECT if name in ("gate", "gate_stop", "trusted_control_refs") else name
         if base.get(name) != accepted.get(name) or not git_visible(root, path):
             return None
     return str(receipt.get("reviewer")), str(receipt.get("contract")), str(receipt.get("state", ""))
