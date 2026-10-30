@@ -23,7 +23,7 @@ DEFAULT_SOURCE = "https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw.
 VERSION_TAG = re.compile(r"v?(\d+)\.(\d+)\.(\d+)\Z")
 BASELINE = re.compile(r"Lean Workflow Baseline\s+(\d+\.\d+\.\d+)\b")
 # Version wording a Purpose may carry: "Lean Workflow Baseline 5.6.0", "Lean 5.3.1", "Lean v5.2.0".
-STATED_VERSION = re.compile(r"\bLean(?:\s+Workflow)?(?:\s+Baseline)?\s+v?(\d+\.\d+\.\d+)\b")
+STATED_VERSION = re.compile(r"\bLean(?:[ \t]+Workflow)?(?:[ \t]+Baseline)?[ \t]+v?(\d+\.\d+\.\d+)\b")
 ADDITIONS = "## Project additions"
 MERGED = ("AGENTS.md", "CLAUDE.md", ".claude/settings.json", ".codex/hooks.json")
 # What 4.x scripts became, for migration notes.
@@ -266,7 +266,7 @@ def preview(root, target=None, source=None, ref=None, workspace=None):
                 shutil.rmtree(workspace / "previous", ignore_errors=True)
                 unverified = recorded["commit"][:12]
                 notes.append(f"the pinned commit {unverified} is not in {source}, so local changes cannot be "
-                             "verified; files changed upstream are conflicts (no base)")
+                             "verified; files changed upstream are conflicts and retired files are kept (no base)")
 
     def add(path, action, content=None, link=None, mode=None, reason=""):
         operations.append({"path": path, "action": action, "content": content, "link": link, "mode": mode,
@@ -281,7 +281,7 @@ def preview(root, target=None, source=None, ref=None, workspace=None):
             add(name, "write", source_path.read_text(), mode=executable, reason="new in this release")
         elif previous and sha(local) == sha(previous / name):
             add(name, "write", source_path.read_text(), mode=executable, reason="unmodified locally")
-        elif name in old_files and not previous and as_tuple(installed)[0] < as_tuple(incoming)[0]:
+        elif name in old_files and not previous and not unverified and as_tuple(installed)[0] < as_tuple(incoming)[0]:
             add(name, "write", source_path.read_text(), mode=executable, reason="major-version migration")
         else:
             add(name, "conflict", source_path.read_text(), mode=executable,
@@ -293,6 +293,9 @@ def preview(root, target=None, source=None, ref=None, workspace=None):
             continue
         if previous and sha(local) != sha(previous / name):
             add(name, "keep", reason="retired upstream but modified locally; review and delete by hand")
+        elif unverified:
+            add(name, "keep", reason=f"retired upstream; no base (pinned commit {unverified} unavailable) to "
+                                     "show it is unmodified; review and delete by hand")
         else:
             add(name, "delete", reason="retired by this release")
     for link, destination in sorted(new_links.items()):

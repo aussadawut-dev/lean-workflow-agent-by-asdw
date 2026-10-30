@@ -385,6 +385,19 @@ class UpdateTests(unittest.TestCase):
         self.assertIn("no base", tools["reason"])
         self.assertIn("1111111", result.stdout)
 
+    def test_a_major_upgrade_without_a_base_overwrites_and_deletes_nothing(self):
+        # Review: an unavailable pin must not fall through to the major-version overwrite or delete
+        # retired files it cannot compare.
+        write(self.target, ".lean/upstream.json", json.dumps({"schema": 1, "source": str(self.source),
+                                                              "ref": "refs/tags/v4.17.0", "commit": "1" * 40}))
+        commit(self.target, "pin")
+        result, plan = self.preview()
+        actions = {op["path"]: (op["action"], op["reason"]) for op in plan["operations"]}
+        self.assertEqual(actions[".lean/policy/QUALITY.md"][0], "conflict")
+        self.assertIn("no base", actions[".lean/policy/QUALITY.md"][1])
+        self.assertEqual(actions[".lean/scripts/workflow.py"][0], "keep")
+        self.assertIn("no base", result.stdout)
+
     def test_preview_warns_for_other_stale_version_wording_and_the_pinned_commit(self):
         # asdw-harness wrote "Lean 5.3.1 uses tracker/direct" and the pinned commit; neither was noticed.
         previous = git(self.source, "rev-parse", "HEAD")
