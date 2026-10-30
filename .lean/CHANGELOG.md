@@ -3,6 +3,54 @@
 เลขรุ่น `MAJOR.MINOR.PATCH`: MAJOR เปลี่ยนกติกาหรือ path เดิม, MINOR เพิ่มของใหม่, PATCH แก้ไข · วิธีอัปเกรด: [CUSTOMIZING.md](CUSTOMIZING.md)
 Versions are `MAJOR.MINOR.PATCH`: MAJOR changes rules or paths, MINOR adds, PATCH fixes · Upgrading: [CUSTOMIZING.md](CUSTOMIZING.md) · 5.x technical notes: [docs/CHANGELOG-dev.md](../docs/CHANGELOG-dev.md)
 
+## 5.7.0 — 2026-10-31
+
+🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#570--2026-10-31)
+
+ปรับตามผลใช้งานจริงใน asdw-harness: gate เร็วพอจะเปิดอัตโนมัติ, contract และ review ไม่หายกลางงาน, อัปเดตไม่ฟ้อง conflict ปลอม
+
+**มีอะไรใหม่**
+- เพิ่มบล็อก `gate:stop` ใน PROJECT.md ได้ ถ้ามี Stop อัตโนมัติจะรันแค่การตรวจเร็วในบล็อกนี้ ส่วนการปิดงานยังต้องผ่าน `lean gate run` แบบเต็ม
+- เปิดให้ contract อยู่ตลอด session ได้ (`--contract-lifetime session`) โดย hook จะแจ้งว่าใช้ contract เดิมต่อ และกำหนดได้ว่างานระดับความเสี่ยงไหนถึงต้องมี tracker (`--tracker-min-risk`)
+- เก็บประวัติ review ในเครื่อง ผล review ของ contract หนึ่งจึงไม่ถูกผลของอีก contract ที่ตามมาเขียนทับ
+- คำสั่งเขียนไฟล์ใต้ `/tmp` และคำสั่งที่ PROJECT.md ระบุไว้ใต้หัวข้อ `## Pre-contract commands` รันได้ก่อนมี contract
+- `lean test --smoke` สำหรับโปรเจกต์ที่ใช้ Lean และ `lean evidence high-risk --coverage` บอกว่า High-risk areas ครอบไฟล์ไปกี่เปอร์เซ็นต์
+
+**แก้ไข**
+- `lean update` หาเวอร์ชันฐานจาก commit ที่ pin ไว้ได้ แม้ URL ของ source เปลี่ยนรูป ถ้าหาฐานไม่ได้จะเก็บไฟล์ไว้ ไม่เขียนทับหรือลบ
+- ขยับ pin รันแค่ lint และ preview เตือนเมื่อ PROJECT.md ยังเขียนรุ่นเก่า (เช่น "Lean 5.3.1") หรืออ้าง commit ที่ pin ไว้เดิม
+- ถ้าเครื่องมือเขียนไฟล์แต่ Claude ยังบันทึกคำตอบไม่ทัน ข้อความปฏิเสธจะสั้นลงและบอกให้ลองใหม่; Stop ในโหมด manual แสดง NOT_RUN ให้เห็น; error ของบรรทัด `Status:` บอก ไฟล์:บรรทัด
+- `lean gate mode` บันทึกการเปลี่ยนและเตือนให้ commit, `lean evidence --help` ใช้ได้, `lean contract current` ไม่ต้องใส่ `--session`, tool ที่อ่านอย่างเดียวไม่ต้องโหลด guard, กวาด session และ marker ที่เก่ากว่า 7 วัน
+
+**ต้องทำอะไรตอนอัปเกรด**
+- ใช้ขั้นตอนอัปเดตเดิมและให้ independent reviewer ตรวจไฟล์ควบคุมที่เปลี่ยน ค่าตั้งใหม่ทุกตัวเป็น opt-in ถ้าไม่ตั้ง ทุกอย่างทำงานเหมือนเดิม
+- `lean lint` จะล้มถ้าไฟล์ workflow หรือไฟล์ของโปรเจกต์ไม่มี rule ใน `.lean/tests/impact.json` ไฟล์ที่มากับ Lean ครอบไว้แล้ว
+- ถ้า gate ของโปรเจกต์รัน `lean test --changed` หรือ `--all` เพื่อทดสอบ Lean เอง ให้เปลี่ยนเป็น `lean test --smoke`
+- Dispatch record ไม่ต้องเขียน "unavailable" อีกแล้ว ถ้า runtime ไม่รายงาน model/effort ให้เว้นส่วนนั้นไว้
+
+**English**
+
+Changes from real use in asdw-harness: a gate fast enough to keep automatic, contracts and reviews that survive the work, and no false update conflicts.
+
+**Added**
+- An optional `gate:stop` block in PROJECT.md: when present, an automatic Stop runs only those fast checks; closing work still needs a full `lean gate run`.
+- An opt-in session-long contract (`--contract-lifetime session`), with a notice when it is kept, and a choice of the lowest risk that needs a tracker (`--tracker-min-risk`).
+- A local review receipt history, so one contract's review is not replaced by the next contract's.
+- Shell writes that stay under `/tmp`, and commands PROJECT.md lists under `## Pre-contract commands`, run before a contract.
+- `lean test --smoke` for projects that use Lean, and `lean evidence high-risk --coverage` to show how much of the tree High-risk areas cover.
+
+**Fixed**
+- `lean update` finds its base from the pinned commit even when the source URL changes form; without a base it keeps files instead of overwriting or deleting them.
+- Moving the pin runs lint only; the preview warns about stale "Lean 5.3.1"-style wording and the old pinned commit in PROJECT.md.
+- A short retry hint when a write races Claude's saved reply; manual-mode Stops show NOT_RUN; tracker `Status:` errors name file:line.
+- `lean gate mode` logs changes and asks for a commit; `lean evidence --help` works; `lean contract current` needs no `--session`; read-only tools skip loading the guard; week-old sessions and markers are swept.
+
+**Upgrade**
+- Follow the existing update procedure and independently review changed controls. Every new setting is opt-in; without it, behavior is unchanged.
+- `lean lint` fails when a workflow or project-owned file has no entry in `.lean/tests/impact.json`; the shipped files are covered.
+- If your gate runs `lean test --changed` or `--all` for Lean's own tests, switch it to `lean test --smoke`.
+- Dispatch records no longer need an "unavailable" line: leave out reported model/effort when the runtime reports none.
+
 ## 5.6.0 — 2026-10-30
 
 🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#560--2026-10-30)
