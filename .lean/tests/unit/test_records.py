@@ -353,6 +353,125 @@ class WorkflowModeTests(unittest.TestCase):
         self.run_cli("queue", "release", "--id", "Q0002", "--token", second["token"])
         self.assertFalse((self.root / ".agent-runtime/claims/Q0002.json").exists())
 
+    def test_path_scopes_block_equal_ancestor_and_alias_claims(self):
+        self.run_cli("configure", "full")
+        self.tracker_doc()
+        pairs = (
+            ("src", "src"), ("src/", "src/a.ts"), ("src/a.ts", "src"),
+            ("src", "src/"), ("./src//", "src/a.ts"),
+            ("src/lib/../a.ts", "src/a.ts"), ("src\\lib", "src/lib/a.ts"),
+            (".", "src/a.ts"), ("src", "."), ("src/..", "docs"),
+            ("area:api", "area:api"),
+        )
+        for held, candidate in pairs:
+            for action in ("claim", "claim-next"):
+                with self.subTest(held=held, candidate=candidate, action=action):
+                    self.item("Q0001", [held])
+                    self.item("Q0002", [candidate])
+                    self.run_cli("queue", "claim", "--id", "Q0001", "--agent", "one")
+                    args = ("queue", action, "--agent", "two")
+                    if action == "claim":
+                        args += ("--id", "Q0002")
+                    try:
+                        result = self.run_cli(*args, success=False)
+                        self.assertIn("no claimable queue item", result.stderr)
+                        self.assertFalse((self.root / ".agent-runtime/claims/Q0002.json").exists())
+                    finally:
+                        # Keep each parameter case independent even before the fix.
+                        for path in (self.root / ".agent-runtime/claims").glob("*.json"):
+                            claim = json.loads(path.read_text())
+                            self.run_cli("queue", "release", "--id", claim["id"], "--token", claim["token"])
+
+    def test_path_scopes_allow_siblings_and_distinct_opaque_labels(self):
+        self.run_cli("configure", "full")
+        self.tracker_doc()
+        pairs = (
+            ("src", "src-other/a.ts"), ("src/a.ts", "src/b.ts"),
+            ("src/A.ts", "src/a.ts"), ("area:api", "area:api/v2"),
+            ("area:api/../web", "area:web"), ("area:api", "area:web"),
+            ("area:api", "."), ("C:src", "C:src/a.ts"),
+            ("area:api/*", "area:api/a.ts"),
+        )
+        for held, candidate in pairs:
+            for action in ("claim", "claim-next"):
+                with self.subTest(held=held, candidate=candidate, action=action):
+                    self.item("Q0001", [held])
+                    self.item("Q0002", [candidate])
+                    first = json.loads(self.run_cli("queue", "claim", "--id", "Q0001", "--agent", "one").stdout)
+                    args = ("queue", action, "--agent", "two")
+                    if action == "claim":
+                        args += ("--id", "Q0002")
+                    second = json.loads(self.run_cli(*args).stdout)
+                    self.assertEqual(second["id"], "Q0002")
+                    self.run_cli("check")
+                    for claim in (first, second):
+                        self.run_cli("queue", "release", "--id", claim["id"], "--token", claim["token"])
+
+    def test_unsafe_path_scopes_are_rejected_before_claiming(self):
+        self.run_cli("configure", "full")
+        self.tracker_doc()
+        for scope in ("", " ", "/src", "\\src", "C:/src", "C:\\src", "//server/src", "../src",
+                      "src/../../outside", "src/*", "src/?.ts", "src/[ab].ts", "src\x00file"):
+            self.item("Q0001", [scope])
+            for args in (("check",), ("queue", "claim", "--id", "Q0001", "--agent", "one"),
+                         ("queue", "claim-next", "--agent", "one")):
+                with self.subTest(scope=scope, args=args):
+                    try:
+                        result = self.run_cli(*args, success=False)
+                        self.assertIn("invalid path scope", result.stderr)
+                        self.assertFalse((self.root / ".agent-runtime/claims/Q0001.json").exists())
+                    finally:
+                        path = self.root / ".agent-runtime/claims/Q0001.json"
+                        if path.exists():
+                            claim = json.loads(path.read_text())
+                            self.run_cli("queue", "release", "--id", "Q0001", "--token", claim["token"])
+
+    def test_path_scope_claim_next_skips_conflicts_and_preserves_lease_lifecycle(self):
+        self.run_cli("configure", "full")
+        self.tracker_doc()
+        self.item("Q0001", ["src/"])
+        self.item("Q0002", ["src/a.ts"])
+        self.item("Q0003", ["docs"])
+        first = json.loads(self.run_cli("queue", "claim", "--id", "Q0001", "--agent", "one",
+                                        "--request-id", "path-retry-0001").stdout)
+        for action in ("claim", "claim-next"):
+            args = ("queue", action, "--agent", "one", "--request-id", "path-retry-0001")
+            if action == "claim":
+                args += ("--id", "Q0001")
+            self.assertEqual(json.loads(self.run_cli(*args).stdout), first)
+        sibling = json.loads(self.run_cli("queue", "claim-next", "--agent", "two").stdout)
+        self.assertEqual(sibling["id"], "Q0003")
+        path = self.root / ".agent-runtime/claims/Q0001.json"
+        path.write_text(json.dumps(dict(first, expires_at=0)))
+        child = json.loads(self.run_cli("queue", "claim", "--id", "Q0002", "--agent", "three").stdout)
+        self.assertFalse(path.exists())
+        self.run_cli("queue", "release", "--id", "Q0002", "--token", child["token"])
+        renewed = json.loads(self.run_cli("queue", "claim-next", "--agent", "one").stdout)
+        self.assertEqual(renewed["id"], "Q0001")
+        self.assertNotEqual(renewed["token"], first["token"])
+        self.run_cli("check")
+
+    def test_loaded_path_scope_conflicts_reject_check_list_and_receipt_retry(self):
+        self.run_cli("configure", "full")
+        self.tracker_doc()
+        self.item("Q0001", ["src/"])
+        second_item = self.item("Q0002", ["other"])
+        self.run_cli("queue", "claim", "--id", "Q0001", "--agent", "one", "--request-id", "scope-retry-0001")
+        self.run_cli("queue", "claim", "--id", "Q0002", "--agent", "two")
+        claims = sorted((self.root / ".agent-runtime/claims").glob("*.json"))
+        before = [path.read_bytes() for path in claims]
+        for scope in ("./src//", "src/a.ts", "."):
+            self.item("Q0002", [scope])
+            for args in (("check",), ("queue", "list"),
+                         ("queue", "claim", "--id", "Q0001", "--agent", "one", "--request-id", "scope-retry-0001"),
+                         ("queue", "claim-next", "--agent", "one", "--request-id", "scope-retry-0001")):
+                with self.subTest(scope=scope, args=args):
+                    item_before = second_item.read_bytes()
+                    result = self.run_cli(*args, success=False)
+                    self.assertIn("overlapping active claim scope", result.stderr)
+                    self.assertEqual(second_item.read_bytes(), item_before)
+                    self.assertEqual([path.read_bytes() for path in claims], before)
+
     def test_worker_releases_blocked_item_and_controller_resumes_it(self):
         self.run_cli("configure", "full")
         self.tracker_doc()

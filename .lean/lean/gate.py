@@ -190,6 +190,66 @@ def acquire_lock(root):
 
 # --- Runner -----------------------------------------------------------------------------------
 
+def check_receipt(root, contract, require_review, risky):
+    """Enforce exact-contract review and the independent HIGH-depth shipping floor.
+
+    A matching LOW receipt may satisfy an explicitly requested review, but can never
+    stand in for a HIGH-depth review of changed High-risk areas.
+    """
+    try:
+        if require_review:
+            evidence.check_review(root, contract)
+        if risky:
+            evidence.check_shipped(root)
+    except (AttributeError, TypeError, json.JSONDecodeError) as error:
+        raise ValueError("Review receipt is malformed") from error
+
+
+def preflight(root, contract=None, session=None, require_review=False):
+    """Read receipt readiness only, without locks, validation or gate-control acceptance.
+
+    Return the same (code, stdout lines, stderr lines) shape as run(), but never enter
+    its runner: even a refused preflight must leave runtime markers untouched.
+    """
+    root = Path(root).resolve()
+    risky = []
+    try:
+        if session is None:
+            session = ""
+        elif not isinstance(session, str) or not session.strip() or "\n" in session or "\r" in session:
+            raise ValueError("session must be a non-empty single-line string when supplied")
+        explicit = contract is not None
+        if not explicit:
+            contract = guard.current(root, session) if session else None
+            if contract is None:
+                contract = ""
+        # A corrupt bound contract cannot silently lower the receipt requirement.
+        match = evidence.CONTRACT.fullmatch(contract) if isinstance(contract, str) else None
+        if (explicit or contract != "") and (not match or "\r" in contract):
+            source = "--contract" if explicit else "the bound session contract"
+            raise ValueError(f"a real single-line Task Contract is required for {source}")
+        require_review = require_review or bool(HIGH_REVIEW.match(contract))
+        if require_review and (not match or not match.group(1)):
+            raise ValueError("--require-review needs a usable Task Contract (--contract or a bound --session)")
+        # Validate selections even outside Git, where high_risk_changes has no delta to inspect.
+        active = safe_path(root, ".agent-runtime/active-target.json")
+        if active.exists():
+            from . import target
+            try:
+                target.context(root)
+            except (OSError, ValueError, KeyError, TypeError, subprocess.CalledProcessError) as error:
+                raise ValueError(f"invalid target selection: {error}") from error
+        risky = evidence.high_risk_changes(root, session)
+        check_receipt(root, contract, require_review, risky)
+    except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
+        errors = [f"Receipt preflight refused: {error}; validation NOT_RUN. Final gate still required."]
+        if risky:
+            errors.append("High-risk areas changed; HIGH independent review is required:\n" + "\n".join(risky))
+        return 2, [], errors
+    result = "receipt ready" if require_review or risky else "review not required"
+    return 0, [f"Receipt preflight: {result}; validation NOT_RUN. Final gate still required."], []
+
+
 def gate_commands(project):
     """Commands between the gate markers; raises LeanError for malformed markers."""
     commands, starts, ends, inside, invalid = [], 0, 0, False, False
@@ -389,7 +449,7 @@ class Run:
         # changed controls. For a hook Stop it is the session's contract; the transcript is a fallback.
         session_contract = (guard.current(root, self.session) or "") if self.session else ""
         declared = ""
-        if self.hook and not self.contract and session_contract:
+        if not self.contract and session_contract:
             declared = self.contract = session_contract
         try:
             evidence.guard_controls(root, session_contract or None)
@@ -481,13 +541,7 @@ class Run:
             """A refusal for a missing receipt, or None. A HIGH contract needs a receipt for itself;
             the High-risk floor needs only that the shipping state was reviewed at HIGH depth."""
             try:
-                if self.require_review:
-                    evidence.check_review(root, self.contract)
-                elif risky:
-                    try:
-                        evidence.check_review(root, self.contract)
-                    except (OSError, ValueError, KeyError, subprocess.CalledProcessError):
-                        evidence.check_shipped(root)
+                check_receipt(root, self.contract, self.require_review, risky)
                 return None
             except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
                 self.say(f"Gate evidence: {error}")

@@ -67,7 +67,89 @@ class DeclareCommandTests(unittest.TestCase):
             f"python3 $(touch pwned).lean/bin/lean contract declare --contract '{LINE}'"))
 
 
+class SessionReadTests(unittest.TestCase):
+    def test_session_reads_do_not_create_runtime_state(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            self.assertIsNone(contract_guard.current(root, "missing"))
+            self.assertIsNone(contract_guard.initial_head(root, "missing"))
+            self.assertEqual(list(root.iterdir()), [])
+
+    def test_session_reads_use_atomic_snapshot_without_creating_lock(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            runtime = root / ".agent-runtime"
+            runtime.mkdir()
+            path = runtime / "contract-sessions.json"
+            path.write_text(json.dumps({"schema": 1, "sessions": {
+                "session": {"contract": LINE, "initial_head": "abc"}}}))
+            before = path.read_bytes()
+            self.assertEqual(contract_guard.current(root, "session"), LINE)
+            self.assertEqual(contract_guard.initial_head(root, "session"), "abc")
+            self.assertEqual(path.read_bytes(), before)
+            self.assertEqual([p.name for p in runtime.iterdir()], [path.name])
+
+    def test_session_reads_reject_malformed_or_symlinked_state(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            runtime = root / ".agent-runtime"
+            runtime.mkdir()
+            path = runtime / "contract-sessions.json"
+            for content in ('[]', '{"schema": 9, "sessions": {}}', 'invalid JSON'):
+                path.write_text(content)
+                for read in (contract_guard.current, contract_guard.initial_head):
+                    with self.assertRaises(ValueError):
+                        read(root, "session")
+            path.unlink()
+            destination = root / "outside.json"
+            destination.write_text('{"schema": 1, "sessions": {}}')
+            for boundary in (path, runtime / "contract-sessions.lock"):
+                boundary.unlink(missing_ok=True)
+                boundary.symlink_to(destination)
+                for read in (contract_guard.current, contract_guard.initial_head):
+                    with self.assertRaises(ValueError):
+                        read(root, "session")
+                boundary.unlink()
+
+    def test_session_reads_reject_non_object_session_records(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            runtime = root / ".agent-runtime"
+            runtime.mkdir()
+            path = runtime / "contract-sessions.json"
+            for record in (None, False, [], ["bad"], "bad", 1):
+                path.write_text(json.dumps({"schema": 1, "sessions": {"session": record}}))
+                for read in (contract_guard.current, contract_guard.initial_head):
+                    with self.subTest(record=record, read=read.__name__):
+                        with self.assertRaisesRegex(ValueError, "malformed"):
+                            read(root, "session")
+
+    def test_session_reads_reject_non_string_contract_and_head(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            runtime = root / ".agent-runtime"
+            runtime.mkdir()
+            path = runtime / "contract-sessions.json"
+            for field, read in (("contract", contract_guard.current), ("initial_head", contract_guard.initial_head)):
+                for value in (False, 0, [], ["bad"], {}):
+                    path.write_text(json.dumps({"schema": 1, "sessions": {"session": {field: value}}}))
+                    with self.subTest(field=field, value=value):
+                        with self.assertRaisesRegex(ValueError, "malformed"):
+                            read(root, "session")
+
+
 class ShellWriteTests(unittest.TestCase):
+    def test_gate_preflight_reads_evidence_but_redirects_and_chains_still_write(self):
+        for command in ("python3 .lean/bin/lean gate preflight",
+                        "python3 .lean/bin/lean gate preflight --session review --require-review",
+                        "python3 .lean/bin/lean gate preflight --contract '" + LINE + "'"):
+            with self.subTest(command=command):
+                self.assertFalse(contract_guard.shell_writes(command))
+        for command in ("python3 .lean/bin/lean gate preflight > readiness.txt",
+                        "python3 .lean/bin/lean gate preflight && touch changed.txt"):
+            with self.subTest(command=command):
+                self.assertTrue(contract_guard.shell_writes(command))
+
     def test_reads_inspection_chains_loops_and_other_tools_are_not_writes(self):
         for command in ("grep -n -i regression .lean/policy/TESTING.md", "cat a.py | head -5", "ls -la src",
                         "git status --short", "git diff", "git log --oneline -3", "git show HEAD:a.py | tail -n 20",

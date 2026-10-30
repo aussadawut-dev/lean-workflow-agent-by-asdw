@@ -237,6 +237,22 @@
         "hooks/test_target_lifecycle.py",
         "hooks/test_intake_target.py"
       ]
+    },
+    {
+      "paths": [
+        ".lean/tests/hooks/test_tracker_evidence.py"
+      ],
+      "tests": [
+        "hooks/test_tracker_evidence.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/tests/hooks/test_gate_preflight.py"
+      ],
+      "tests": [
+        "hooks/test_gate_preflight.py"
+      ]
     }
   ]
 }

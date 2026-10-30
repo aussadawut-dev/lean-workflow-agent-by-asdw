@@ -31,6 +31,10 @@ Upgrades (`standard -> tracker -> full`) keep every record. Downgrades are expli
 
 Claims last 30 minutes. A worker claims with a stable random request ID and retries with the same ID after a lost response; it gets the same token. Only the token holder heartbeats, completes or releases. Completion needs evidence and DONE dependencies. Dependencies and exclusive scopes decide what `claim-next` hands out; one agent holds one claim at a time.
 
+Scopes without a colon are relative repository paths. Claims conflict when the paths are equal or one contains the other: `src/` conflicts with `src/a.ts`, while `src` and `src-other` remain separate. Path comparison normalizes separators, `.` and internal `..` lexically; it does not inspect the filesystem, follow symlinks or fold case. `src` and `src/` name the same scope, and `.` covers the repository. Absolute paths, paths escaping the repository, empty paths and wildcard path scopes are refused. Use concrete paths instead of globs. This validation also applies when retained queue records and active leases are loaded.
+
+Colon namespace labels such as `area:api` remain opaque and conflict only with that exact label. They do not implicitly own any path; workers sharing files must use overlapping path scopes or the same agreed label. Windows drive-root paths are absolute paths, not namespace labels. A path scope is an ownership declaration, not a filesystem access boundary.
+
 ## Archive and resume
 
 `lean tracker archive --dry-run|--apply` moves DONE trackers to `docs/history/agent-workflow/`; their IDs stay reserved. `lean mode context` prints a read-only summary (mode, active tracker and its next step, claims, Git status, last gate result, progress) for resuming after a break or a new session.

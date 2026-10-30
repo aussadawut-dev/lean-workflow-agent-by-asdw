@@ -489,7 +489,7 @@ class ContractCases(HookCase):
 
 
 class RiskCases(HookCase):
-    def test_low_contract_in_a_high_risk_area_needs_a_review_receipt(self):
+    def test_low_contract_in_a_high_risk_area_needs_a_high_depth_review_receipt(self):
         path = self.transcript(SAID)
         root = self.risky_fixture()
         (root / "secure").mkdir()
@@ -502,8 +502,16 @@ class RiskCases(HookCase):
                                  "--evidence", "round 1, no findings", "--verdict", "PASS",
                                  "--state", state.stdout.strip())
         self.assertEqual(recorded.returncode, 0, recorded.stderr)
+        self.assertEqual(self.run_gate(root, self.payload(path)).returncode, 2,
+                         "a matching LOW receipt cannot satisfy the independent HIGH-depth floor")
+        high = "Contract: risk=HIGH quality=HIGH acceptance=tests pass"
+        state = self.evidence(root, "state")
+        recorded = self.evidence(root, "record-review", "--contract", high, "--reviewer", "independent",
+                                 "--evidence", "HIGH-depth review, no findings", "--verdict", "PASS",
+                                 "--state", state.stdout.strip())
+        self.assertEqual(recorded.returncode, 0, recorded.stderr)
         self.assertEqual(self.run_gate(root, self.payload(path)).returncode, 0,
-                         "a matching review receipt satisfies the floor")
+                         "a current HIGH-depth receipt satisfies the floor under a LOW task contract")
 
     def test_paths_outside_high_risk_areas_keep_the_contract_depth(self):
         path = self.transcript(SAID)

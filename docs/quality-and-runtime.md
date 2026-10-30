@@ -9,11 +9,14 @@
 ```sh
 python3 .lean/bin/lean gate run --cache-tree                       # reuse a pass for an unchanged state
 python3 .lean/bin/lean gate run --require-review --contract '...'  # validation plus receipt check
+python3 .lean/bin/lean gate preflight --require-review --contract '...'  # receipt readiness only
 python3 .lean/bin/lean gate status                                 # last recorded result, no run
 python3 .lean/bin/lean gate mode auto_fixloop                      # auto | manual | auto_fixloop | manual_fixloop
 ```
 
 A gate command written as `python3 .lean/bin/lean gate scope -- <command>` is skipped when the change touches only work records (trackers and queue items), so bookkeeping does not rerun application suites; `--only`/`--always` adjust the paths and `LEAN_GATE_SCOPE=full` runs everything. A batch of tasks gets one full gate, and a suspected flaky failure at most 2 reruns ([QUALITY.md](../.lean/policy/QUALITY.md#change-scoped-checks-batches-and-flaky-failures)).
+
+After focused deterministic validation and semantic review, run `gate preflight` before starting an expensive final gate. It checks receipt readiness for the exact contract and the workspace/target High-risk floor, using `--session` to include the session's committed changes. It reads evidence without running PROJECT checks or creating a checkout lock, receipt, pass marker or gate cache. Missing, stale, wrong-contract, insufficient-depth or staged-shipping gaps return a refusal. Readiness is not validation or permission to publish; `gate run` still performs the final checks and rechecks review evidence. Changes after preflight can invalidate its result. Gate-control acceptance remains the final gate's responsibility.
 
 ## Hooks per provider
 
@@ -30,6 +33,8 @@ Every hook is `lean hook <provider> <event>`; the logic is shared, only input an
 ## Review receipts
 
 The independent reviewer captures `lean evidence state`, reviews, and records `lean evidence record-review --contract '<exact line>' --reviewer '<id>' --state '<captured>' --verdict PASS|REWORK --evidence '<scope>'`. The guard refuses that call from the author's own session. Any later content change invalidates the receipt; staging or committing the whole reviewed change keeps it. Tracker files directly under `docs/tracking/` are excluded so the result can be recorded after review.
+
+Target trackers under `.lean/targets/<name>/docs/tracking/TCKNNN[-slug].md` retain their requirements in review evidence. Recognized trackers may update a valid Status, checkbox completion in Acceptance criteria/Tasks, and Evidence/Next step bodies after review. The title, Owner, acceptance/task text, decisions and other sections remain covered. The parser requires a matching TCK title, valid Status/Owner and unique exact Acceptance criteria, Tasks, Evidence and Next step headings; their order may vary. Ambiguous or malformed records fall back to full byte coverage. Fenced examples do not become structural headings or mutable task checkboxes. New/deleted records, file metadata and unrelated documents remain covered. Staged or committed tracker content must match the same reviewed semantics. Gate fingerprints always include full tracker bytes, so a closure update can still require another gate run. Existing workspace tracker and target INTAKE exclusions are unchanged.
 
 ## Protected controls
 

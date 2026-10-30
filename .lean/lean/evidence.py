@@ -59,11 +59,127 @@ EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 
 def tracker_record(name):
-    """A tracker file directly under docs/tracking/, written after review to record its result."""
+    """Legacy whole-record exclusions; target TCK files are projected, never excluded."""
     path = Path(name)
     target_intake = (len(path.parts) == 6 and path.parts[:2] == (".lean", "targets")
                      and path.parts[3:] == ("docs", "tracking", "INTAKE.md"))
     return (path.parent == Path("docs/tracking") and path.suffix == ".md") or target_intake
+
+
+TARGET_TRACKER = re.compile(r"\.lean/targets/[^/]+/docs/tracking/(TCK[0-9]{3,})(?:-[a-zA-Z0-9_-]+)?\.md")
+TRACKER_SECTIONS = {"Acceptance criteria", "Tasks", "Evidence", "Next step"}
+
+
+def tracker_projection(name, data):
+    """Canonical target trackers minus closure bookkeeping, or None for raw coverage.
+
+    Keep every byte except a valid Status value, checklist markers in acceptance/tasks, and
+    Evidence/Next step bodies. Require the standard title, owner and unique closure/checklist
+    sections; retain other sections regardless of their names or order. Parse fenced code as
+    content, with unclosed fences and ambiguous headings failing closed to raw coverage.
+    """
+    match = TARGET_TRACKER.fullmatch(name)
+    if not match:
+        return None
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    if "\r" in text:
+        return None
+    lines = text.splitlines(keepends=True)
+    if not lines or not re.fullmatch(r"# " + match[1] + r" — \S[^\n]*\n", lines[0]):
+        return None
+    fenced, fence = set(), None
+    for index, line in enumerate(lines):
+        marker = re.match(r"^[ ]{0,3}(`{3,}|~{3,})([^\n]*)\n?$", line)
+        if fence is not None:
+            fenced.add(index)
+            if marker and marker[1][0] == fence[0] and len(marker[1]) >= len(fence) and not marker[2].strip():
+                fence = None
+        elif marker:
+            if marker[1][0] == "`" and "`" in marker[2]:
+                return None
+            fence = marker[1]
+            fenced.add(index)
+    if fence is not None:
+        return None
+    if any(index not in fenced and re.match(r"^[ \t]*#{1,2}(?!#)", line) and not line.startswith("## ")
+           for index, line in enumerate(lines[1:], 1)):
+        return None  # Extra titles and indented/malformed section headings are ambiguous.
+    from .records import TRACKER_STATES
+    statuses = [index for index, line in enumerate(lines) if index not in fenced and line.startswith("Status:")]
+    owners = [index for index, line in enumerate(lines) if index not in fenced and line.startswith("Owner:")]
+    headings = [(index, line[3:].rstrip("\n")) for index, line in enumerate(lines)
+                if index not in fenced and line.startswith("## ")]
+    if not headings or len(statuses) != 1 or len(owners) != 1:
+        return None
+    status, owner = statuses[0], owners[0]
+    if (status >= headings[0][0] or owner >= headings[0][0]
+            or lines[status] not in {f"Status: {value}\n" for value in TRACKER_STATES}
+            or not re.fullmatch(r"Owner: \S[^\n]*\n", lines[owner])):
+        return None
+    # Duplicate or misspelled mutable headings are not safe to interpret. Other sections remain
+    # meaningful and are retained verbatim, including Goal, Decisions and Evidence guidance.
+    titles = [title for _, title in headings]
+    if len(set(title.strip().casefold() for title in titles)) != len(titles):
+        return None
+    standard = {title for title in titles if title.strip().casefold() in
+                {section.casefold() for section in TRACKER_SECTIONS}}
+    if standard != TRACKER_SECTIONS:
+        return None
+    projected = list(lines)
+    projected[status] = "Status: <closure>\n"
+    for position, (index, title) in enumerate(headings):
+        end = headings[position + 1][0] if position + 1 < len(headings) else len(lines)
+        if title in ("Evidence", "Next step"):
+            projected[index + 1:end] = [""] * (end - index - 1)
+        elif title in ("Acceptance criteria", "Tasks"):
+            for number in range(index + 1, end):
+                if number not in fenced:
+                    projected[number] = re.sub(r"^([ \t]*(?:[-+*]|[0-9]+[.)])[ \t]+\[)[ xX](\])",
+                                               r"\1 \2", lines[number])
+    return "".join(projected).encode("utf-8")
+
+
+def local_tracker(root, name):
+    """Projected bytes and executable bit for a regular file without symlink ancestors."""
+    path = root / name
+    if (not TARGET_TRACKER.fullmatch(name) or path.is_symlink()
+            or any((root / parent).is_symlink() for parent in Path(name).parents)):
+        return None
+    if not path.is_file():
+        return None
+    projected = tracker_projection(name, path.read_bytes())
+    return (projected, bool(path.stat().st_mode & 0o111)) if projected is not None else None
+
+
+def tracker_matches_git(root, name, revision):
+    """Compare the same projection against stage zero or a committed blob, preserving modes."""
+    local = local_tracker(root, name)
+    if local is None:
+        return False
+    if revision == ":":
+        listed = git(root, "ls-files", "--stage", "-z", "--", name).split(b"\0")
+    else:
+        listed = git(root, "--no-replace-objects", "ls-tree", "-z", revision, "--", name).split(b"\0")
+    listed = [entry for entry in listed if entry]
+    if len(listed) != 1:
+        return False
+    meta, raw_name = listed[0].split(b"\t", 1)
+    fields = meta.decode().split()
+    if os.fsdecode(raw_name) != name or fields[0] not in ("100644", "100755"):
+        return False
+    if revision == ":":
+        mode, blob, stage = fields
+        if stage != "0":
+            return False
+    else:
+        mode, kind, blob = fields
+        if kind != "blob":
+            return False
+    projected = tracker_projection(name, git(root, "--no-replace-objects", "cat-file", "blob", blob))
+    return projected is not None and local == (projected, mode == "100755")
 
 
 def review_state(root):
@@ -71,10 +187,17 @@ def review_state(root):
 
     Git bookkeeping is left out, so staging or committing keeps this value; `shipping_gap`
     checks that the index and HEAD ship only that content. Submodules keep their full `state`,
-    HEAD included. Top-level tracker records are left out (`workflow.py check` validates them).
+    HEAD included. Legacy tracker records are left out; canonical target trackers retain their
+    semantic content and file metadata while allowing closure bookkeeping after review.
     """
     found = [entry for entry in entries(root, tracker_record)
              if entry[1] is not None]  # A missing file reads the same deleted, staged or committed.
+    for name, value in found:
+        if isinstance(value, dict) and "sha256" in value:
+            projected = local_tracker(root, name)
+            if projected is not None:
+                value["tracker"] = digest(projected[0])
+                del value["sha256"]
     return digest(json.dumps(["review", controls(root), found], ensure_ascii=True, sort_keys=True).encode())
 
 
@@ -116,12 +239,15 @@ def shipping_gap(root, base):
             if not meta.startswith(b":") or tracker_record(name):
                 continue
             deleted = set(meta.split()[3].decode()) == {"0"}
-            if (deleted and os.path.lexists(root / name)) or (not deleted and name in unstaged):
+            if ((deleted and os.path.lexists(root / name)) or (not deleted and name in unstaged)) \
+                    and not tracker_matches_git(root, name, ":"):
                 gaps.append(name)
         return f"staged content differs from the reviewed working tree: {', '.join(gaps)}" if gaps else None
     pending = keep(names("diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", "HEAD")
                    | names("diff", "--no-ext-diff", "--no-renames", "--cached", "--name-only", "-z", "HEAD")
                    | names("ls-files", "--others", "--exclude-standard", "-z"))
+    pending = [name for name in pending if not (tracker_matches_git(root, name, "HEAD")
+                                               and tracker_matches_git(root, name, ":"))]
     return (f"HEAD moved since review without the whole reviewed content: {', '.join(pending)}"
             if pending else None)
 
@@ -421,11 +547,20 @@ def high_risk_changes(root, session="", view=None):
     return sorted(set(found))
 
 
+def load_receipt(root):
+    """Read strict receipt metadata shared by readiness, shipping and controls checks."""
+    from .util import read_json
+    receipt = read_json(root / ".agent-runtime/review.json")
+    fields = ("contract", "reviewer", "evidence", "state", "base", "verdict")
+    if (not isinstance(receipt, dict) or type(receipt.get("schema")) is not int or receipt.get("schema") != 1
+            or any(not isinstance(receipt.get(field), str) or not receipt[field].strip() for field in fields)):
+        raise ValueError("Review receipt is malformed")
+    return receipt
+
+
 def check_review(root, contract):
-    receipt = json.loads((root / ".agent-runtime/review.json").read_text())
+    receipt = load_receipt(root)
     reasons = []  # Name what differs, so the reviewer can fix the receipt in one step.
-    if receipt.get("schema") != 1 or not receipt.get("reviewer") or not receipt.get("evidence"):
-        reasons.append("the receipt is malformed")
     if receipt.get("verdict") != "PASS":
         reasons.append(f"its verdict is {receipt.get('verdict')!r}, not PASS")
     if receipt.get("contract") != contract:
@@ -444,13 +579,12 @@ def check_shipped(root):
     The High-risk floor asks that the delta which ships was independently reviewed; a later
     contract that changes nothing (a status reply, say) ships that same reviewed state.
     """
-    receipt = json.loads((root / ".agent-runtime/review.json").read_text())
+    receipt = load_receipt(root)
     contract = CONTRACT.fullmatch(str(receipt.get("contract", "")))
     # Only a review at HIGH depth stands in for the floor: a PASS under a lower contract (a typo or a
     # receipt the author wrote) never required an independent reviewer.
     high = contract and (contract.group(1) == "HIGH" or contract.group(2) == "VERY_HIGH")
-    if (receipt.get("schema") != 1 or receipt.get("verdict") != "PASS" or receipt_gap(root, receipt)
-            or not high or not receipt.get("reviewer") or not receipt.get("evidence")):
+    if receipt.get("verdict") != "PASS" or receipt_gap(root, receipt) or not high:
         raise ValueError("No HIGH-depth PASS review receipt covers the current shipping state")
 
 
@@ -471,7 +605,7 @@ def reviewed_controls(root, old, current, contract):
     try:
         check_shipped(root)
         check_review(root, contract)
-        receipt = json.loads((root / ".agent-runtime" / "review.json").read_text())
+        receipt = load_receipt(root)
         names = set(current) | set((old.get("controls") or {}))
         base = comparable(controls_at(root, receipt["base"], names))
     except (OSError, ValueError, AttributeError, TypeError, KeyError, subprocess.CalledProcessError):

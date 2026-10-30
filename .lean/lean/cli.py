@@ -74,6 +74,10 @@ def build_parser(argv=()):
     gate_run.add_argument("--session", default="")
     gate_run.add_argument("--hook", action="store_true", help=argparse.SUPPRESS)  # Raw hook mode, payload on stdin.
     gate_run.add_argument("--seed", action="store_true", help=argparse.SUPPRESS)
+    preflight = gate_actions.add_parser("preflight", help="read receipt readiness without running validation")
+    preflight.add_argument("--contract", default=None)
+    preflight.add_argument("--session", default=None)
+    preflight.add_argument("--require-review", action="store_true")
     gate_actions.add_parser("status", help="last recorded gate result (never a fresh run)")
     gate_mode = gate_actions.add_parser("mode", help="show or set automation: " + ", ".join(gate_modes))
     gate_mode.add_argument("mode", nargs="?", choices=gate_modes)
@@ -408,6 +412,10 @@ def gate_command(root, args):
         command = args.check[1:] if args.check[:1] == ["--"] else args.check
         return testsel.scoped(Path.cwd(), command, args.only, args.always)
     from . import evidence, gate
+    if args.action == "preflight":
+        code, out, err = gate.preflight(root, contract=args.contract, session=args.session,
+                                        require_review=args.require_review)
+        return emit(code, "\n".join(out), "\n".join(err))
     if args.action == "status":
         print(gate.status(root))
         return 0

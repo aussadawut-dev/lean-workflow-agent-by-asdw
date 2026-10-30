@@ -127,17 +127,29 @@ class Store:
         self.directory = Path(root) / RUNTIME
         self.path = self.directory / "contract-sessions.json"
 
-    def __enter__(self):
+    def read(self):
+        """Read an atomic saved snapshot without creating directories or a lock."""
         for path in (self.directory, self.path, self.directory / "contract-sessions.lock"):
             if path.is_symlink():
                 raise ValueError("contract state must not cross a symlink boundary")
+        try:
+            data = json.loads(self.path.read_text())
+        except FileNotFoundError:
+            data = {"schema": 1, "sessions": {}}
+        if not isinstance(data, dict) or data.get("schema") != 1 or not isinstance(data.get("sessions"), dict):
+            raise ValueError("contract state is malformed; delete .agent-runtime/contract-sessions.json to reset")
+        return data["sessions"]
+
+    def __enter__(self):
+        self.read()  # Validate boundaries before opening the writer lock.
         self.directory.mkdir(parents=True, exist_ok=True)
         self.lock = (self.directory / "contract-sessions.lock").open("a")
         fcntl.flock(self.lock, fcntl.LOCK_EX)
-        data = json.loads(self.path.read_text()) if self.path.exists() else {"schema": 1, "sessions": {}}
-        if not isinstance(data, dict) or data.get("schema") != 1 or not isinstance(data.get("sessions"), dict):
-            raise ValueError("contract state is malformed; delete .agent-runtime/contract-sessions.json to reset")
-        self.sessions = data["sessions"]
+        try:
+            self.sessions = self.read()
+        except BaseException:
+            self.lock.close()
+            raise
         return self
 
     def save(self):
@@ -157,10 +169,18 @@ def session_of(payload):
     return session
 
 
+def session_record(root, session):
+    record = Store(root).read().get(session, {})
+    if not isinstance(record, dict):
+        raise ValueError("contract session record is malformed")
+    return record
+
+
 def current(root, session):
-    with Store(root) as store:
-        record = store.sessions.get(session) or {}
-    return record.get("contract")
+    value = session_record(root, session).get("contract")
+    if value is not None and not isinstance(value, str):
+        raise ValueError("session Task Contract is malformed")
+    return value
 
 
 def declaration_bound(root, contract, environment=None):
@@ -208,8 +228,10 @@ def start_session(root, session, value):
 
 def initial_head(root, session):
     """The session's immutable original HEAD; empty means it began before the first commit."""
-    with Store(root) as store:
-        return (store.sessions.get(session) or {}).get("initial_head")
+    value = session_record(root, session).get("initial_head")
+    if value is not None and not isinstance(value, str):
+        raise ValueError("session initial HEAD is malformed")
+    return value
 
 
 def takeover(root, new_session, reason=""):
@@ -582,7 +604,7 @@ LEAN_READS = {"status": True, "watch": True, "progress": True, "test": True, "li
               "intake": {"list", "check"}, "batch": {"readiness"},
               "queue": {"list", "history"}, "evidence": {"state", "gate-state", "check-review", "check-shipped",
                                                          "high-risk"},
-              "gate": {"run", "status", "mode"}, "spawn": {"plan"}, "update": {"preview"},
+              "gate": {"run", "status", "mode", "preflight"}, "spawn": {"plan"}, "update": {"preview"},
               "target": {"context", "gate", "use"}}
 LEAN_DEFAULT_READS = {"models"}  # Groups whose bare call only prints (`lean models` lists the sizes).
 LEAN_VALUE_WRITES = {"effort": {"standard", "high", "ultra", "reset"}, "lint": {"--write-registry"},

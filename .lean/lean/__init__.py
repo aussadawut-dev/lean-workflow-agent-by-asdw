@@ -1,2 +1,2 @@
 """Lean Workflow: a portable Claude/Codex/agy workflow behind one `lean` command."""
-__version__ = "5.4.1"
+__version__ = "5.5.0"

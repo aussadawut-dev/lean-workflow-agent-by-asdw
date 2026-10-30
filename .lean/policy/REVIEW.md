@@ -37,3 +37,17 @@ record tracking directory) has the same tracker-record exclusion. Its readiness
 uses the workspace's receipts and shipping fingerprint, not a separate record-root
 review. Gate fingerprints still include the ledger. This exclusion does not imply
 that acceptance or ledger declarations are independently verified.
+
+Target TCK trackers directly under `.lean/targets/<name>/docs/tracking/` use a
+semantic projection rather than a whole-file exclusion. Recognized regular files
+have a matching TCK title, one valid Status and Owner, and unique exact Acceptance
+criteria, Tasks, Evidence and Next step sections (order may vary). Only the valid
+Status value, checkbox completion markers in acceptance/tasks, and Evidence/Next
+step bodies are mutable after review. Title, Owner, requirement/task text,
+decisions and all other metadata/sections remain reviewed. Fenced examples do not
+count as structural fields or mutable task markers. Malformed or ambiguous
+records, nested paths, other docs and symlinks keep full coverage. New/deleted
+trackers and file metadata also remain covered. Index and committed content must
+match the same reviewed semantics; closure projection must not conceal staged
+requirements or a partial semantic commit. Gate state continues hashing full
+records, and legacy workspace tracker/INTAKE exclusions remain unchanged.

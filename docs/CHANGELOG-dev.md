@@ -3,6 +3,17 @@
 Developer and agent notes for each 5.x release: commands, flags, rules, changed gate controls and limits.
 The user-facing summary of each release is in [`.lean/CHANGELOG.md`](../.lean/CHANGELOG.md).
 
+## 5.5.0 — 2026-10-30
+
+Queue ownership repairs, target tracker semantic evidence, and additive receipt readiness inspection. Includes the TCK018 audit and TCK019 upstream fixes; no Casetodian application changes.
+
+- **Queue paths.** `claim`, `claim-next` and loaded active leases detect equal/ancestor overlap after lexical separator, dot and internal parent normalization. Siblings stay independent. Paths are relative and case-sensitive; no filesystem or symlink resolution. `.` owns the repository. Colon labels remain exact opaque labels, not path ownership. Empty, absolute, escaping and wildcard paths are rejected.
+- **Migration.** Before continuing full-mode queue work, replace wildcard scopes with concrete repository-relative paths, correct rejected paths, and reconcile overlapping active leases through their owners. Existing queue records are validated on load; no automatic scope or lease rewrite occurs. Labels such as `area:api` remain compatible. Tracker and intake formats require no migration.
+- **Target trackers.** Recognized regular TCK records directly under `.lean/targets/<name>/docs/tracking/` project only valid Status values, Acceptance criteria/Tasks checkbox markers, and Evidence/Next step bodies out of review hashes. Matching title, valid Status/Owner and unique required headings are mandatory; headings may vary in order. Requirement/task text, decisions, metadata, new/deleted files and modes remain covered. Malformed/ambiguous records, nested paths and symlinks retain raw coverage. Fenced examples are not structural. Index/commit checks apply the same semantics and refuse partial semantic commits; gate fingerprints still hash full records.
+- **Preflight.** `lean gate preflight [--contract '<exact line>'] [--session ID] [--require-review]` checks current receipt readiness and workspace/target HIGH floors without running PROJECT checks or writing checkout runtime locks, receipts, pass/cache markers or approvals. Missing, stale, mismatched, malformed, shallow or incomplete-shipping evidence is refused. It does not accept changed controls or authorize publication. Final gate/target gate deterministic checks still run before enforcing receipts.
+- **Guard and receipt hardening.** Session inspection uses a read-only atomic store snapshot with strict shape/symlink checks. Receipts reject duplicate JSON keys and invalid metadata. Exact LOW receipts cannot satisfy a HIGH floor. Preflight reads work before a contract, while redirects and chained writes remain guarded. Equivalent shared CLI outcomes apply to Claude, Codex and agy; agy still requires explicit final gate execution because it has no hooks.
+- **Changed controls.** `__init__.py`, `cli.py`, `evidence.py`, `gate.py`, `guard.py` and `records.py`; policy, asset registry and test-impact rules are aligned. Release validation requires `lean test --all`, deterministic project checks, fresh independent HIGH review of the whole shipping delta, and the shared gate. Detailed fail-before/pass-after evidence is retained in TCK019; release results are recorded in TCK020.
+
 ## 5.4.1 — 2026-10-30
 
 First published intake/batch release; 5.4.0 remains a tagged CI candidate, not a GitHub Release.

@@ -3,6 +3,40 @@
 เลขรุ่น `MAJOR.MINOR.PATCH`: MAJOR เปลี่ยนกติกาหรือ path เดิม, MINOR เพิ่มของใหม่, PATCH แก้ไข · วิธีอัปเกรด: [CUSTOMIZING.md](CUSTOMIZING.md)
 Versions are `MAJOR.MINOR.PATCH`: MAJOR changes rules or paths, MINOR adds, PATCH fixes · Upgrading: [CUSTOMIZING.md](CUSTOMIZING.md) · 5.x technical notes: [docs/CHANGELOG-dev.md](../docs/CHANGELOG-dev.md)
 
+## 5.5.0 — 2026-10-30
+
+🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#550--2026-10-30)
+
+ลดงานชนกันและการตรวจซ้ำก่อนปิดงาน โดยยังรักษาหลักฐาน review ของ requirement ไว้ครบ
+
+**มีอะไรใหม่**
+- ตรวจความพร้อมของหลักฐาน review ก่อนเริ่ม gate รอบสุดท้าย โดยไม่รันชุดตรวจหรือเปลี่ยนผล gate
+
+**แก้ไข**
+- Queue ปฏิเสธการถือครอง path ที่ซ้อนกัน รวมชื่อที่เขียนต่างกันแต่หมายถึง path เดียวกัน
+- ปิด target tracker ได้โดยหลักฐาน review ยังใช้ได้ เมื่อเปลี่ยนเฉพาะสถานะ เช็กลิสต์ และบันทึกผล; การแก้ requirement ยังต้อง review ใหม่
+- Gate ตรวจระดับ review ที่งานเสี่ยงสูงต้องใช้ และปฏิเสธหลักฐานที่ผิดรูปแบบ
+
+**ต้องทำอะไรตอนอัปเกรด**
+- เปลี่ยน scope ที่ใช้ wildcard เป็น path จริงภายใน repository และจัดการงานที่ถือครอง path ซ้อนกันก่อนใช้ queue ต่อ
+- อัปเดต Lean ตามขั้นตอนเดิมและให้ independent reviewer ตรวจไฟล์ควบคุมที่เปลี่ยน ไม่ต้องย้ายข้อมูล tracker
+
+**English**
+
+Reduce overlapping ownership and repeated final checks while keeping requirements covered by review evidence.
+
+**Added**
+- Inspect review-receipt readiness before the final gate without running validation or changing gate results.
+
+**Fixed**
+- Queue claims reject overlapping paths, including aliases that refer to the same relative path.
+- Target tracker closure preserves review evidence when only status, checklist completion and result notes change; requirement edits still need fresh review.
+- The gate enforces the review depth required by high-risk changes and rejects malformed receipts.
+
+**Upgrade**
+- Replace wildcard scopes with concrete repository-relative paths and resolve overlapping active ownership before continuing queue work.
+- Follow the existing Lean update procedure and independently review changed controls. No tracker data migration is needed.
+
 ## 5.4.1 — 2026-10-30
 
 🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#541--2026-10-30)

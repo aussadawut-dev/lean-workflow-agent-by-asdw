@@ -409,6 +409,8 @@ def items(root):
                 fail(f"invalid {field}: {item_id}")
         if not value["scopes"] or len(set(value["scopes"])) != len(value["scopes"]):
             fail(f"missing or repeated scope: {item_id}")
+        for scope in value["scopes"]:
+            scope_key(scope)
         if value["status"] == "DONE" and (not isinstance(value.get("evidence"), str) or not value["evidence"].strip()):
             fail(f"DONE without evidence: {item_id}")
         result[item_id] = value
@@ -568,6 +570,51 @@ def active_claims(root, cleanup=True):
     return active
 
 
+def scope_key(scope):
+    """Lexical scope identity; colon labels are opaque, paths are relative.
+
+    Both slash styles are path separators, independently of the host OS. Never
+    resolve files, symlinks or case: scopes also describe files not created yet.
+    """
+    path = scope.replace("\\", "/")
+    if (not scope.strip() or "\x00" in scope or path.startswith("/")
+            or re.match(r"^[A-Za-z]:/", path)):
+        fail(f"invalid path scope: {scope!r}")
+    if ":" in scope:
+        return "label", scope
+    if any(char in scope for char in "*?[]"):
+        fail(f"invalid path scope: {scope!r}")
+    parts = []
+    for part in path.split("/"):
+        if part in ("", "."):
+            continue
+        if part == "..":
+            if not parts:
+                fail(f"invalid path scope: {scope!r}")
+            parts.pop()
+        else:
+            parts.append(part)
+    return "path", tuple(parts)
+
+
+def overlapping_scope(occupied, candidates):
+    """Return a candidate sharing a label or a path ancestor with occupied."""
+    keys = [scope_key(scope) for scope in sorted(occupied)]
+    for scope in sorted(candidates):
+        kind, key = scope_key(scope)
+        for held_kind, held in keys:
+            if kind != held_kind:
+                continue
+            if kind == "label":
+                if key == held:
+                    return scope
+            else:
+                common = min(len(key), len(held))
+                if key[:common] == held[:common]:
+                    return scope
+    return None
+
+
 def validate_claims(all_items, claims):
     agents, scopes = set(), set()
     for item_id, claim in claims.items():
@@ -578,9 +625,9 @@ def validate_claims(all_items, claims):
         if claim["agent"].strip() in agents:
             fail(f"agent owns multiple claims: {claim['agent'].strip()}")
         agents.add(claim["agent"].strip())
-        overlap = scopes.intersection(item["scopes"])
-        if overlap:
-            fail(f"overlapping active claim scope: {sorted(overlap)[0]}")
+        overlap = overlapping_scope(scopes, item["scopes"])
+        if overlap is not None:
+            fail(f"overlapping active claim scope: {overlap}")
         scopes.update(item["scopes"])
     return scopes
 
@@ -686,7 +733,7 @@ def queue_command(root, args):
                     continue
                 if any(all_items[dep]["status"] != "DONE" for dep in item["dependencies"]):
                     continue
-                if occupied.intersection(item["scopes"]):
+                if overlapping_scope(occupied, item["scopes"]) is not None:
                     continue
                 claim = {"id": item_id, "agent": args.agent, "request_id": args.request_id,
                          "token": uuid.uuid4().hex,
