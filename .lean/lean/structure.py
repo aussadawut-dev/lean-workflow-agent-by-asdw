@@ -6,10 +6,13 @@ import re
 import subprocess
 
 from . import models
-from .util import read_json
+from .util import LeanError, read_json
 
 SKILLS = ("lean-init", "lean-task", "lean-scope", "lean-research", "lean-grill", "lean-agents",
           "lean-review", "lean-gate", "lean-effort", "lean-update", "lean-target", "lean-model-update")
+# Never replaced from upstream: the project's own facts, settings and records (`lean update` keeps them).
+PROJECT_OWNED = (".lean/PROJECT.md", ".lean/config.json", ".lean/models.json", ".lean/skill-effort.json",
+                 ".lean/gate.json", ".lean/upstream.json", ".gitignore")
 # 4.x skill names whose discovery links must not linger after an upgrade.
 RETIRED_SKILLS = ("lean-audit", "lean-catalog", "lean-compress", "lean-pattern", "lean-playbook", "lean-prune",
                   "lean-takeover", "lean-multi-agent", "lean-clean-queue",
@@ -119,6 +122,7 @@ def check(root):
         bad("missing or non-executable: .lean/bin/lean")
 
     # Portable asset registry.
+    files = []
     try:
         registry = read_json(root / ".lean/assets.json")
         files = registry["files"]
@@ -140,6 +144,22 @@ def check(root):
                 bad(f"workflow file missing from .lean/assets.json: {name}")
     except (OSError, ValueError, KeyError, TypeError):
         bad("invalid or missing portable asset registry (.lean/assets.json, schema 3)")
+
+    # Every workflow file and project-owned file `lean test --changed` sees has a rule or a lint-only entry,
+    # so changing one never silently falls back to the full suite.
+    if (root / ".lean/tests/impact.json").is_file():
+        from . import testsel
+        try:
+            data = testsel.impact(root)
+            available = set(testsel.all_files(root))
+            for name in sorted({name for name in (files if isinstance(files, list) else []) if isinstance(name, str)} | set(PROJECT_OWNED)):
+                if (not testsel.matches(name, data["scope"]) or name[len(testsel.TESTS) + 1:] in available
+                        or testsel.matches(name, data["lint_only"])
+                        or any(testsel.matches(name, rule["paths"]) for rule in data["rules"])):
+                    continue
+                bad(f"no impact rule or lint-only entry covers: {name} (.lean/tests/impact.json)")
+        except (OSError, ValueError, LeanError) as error:
+            bad(f"invalid .lean/tests/impact.json: {error}")
 
     # Skills and discovery links.
     for name in SKILLS:

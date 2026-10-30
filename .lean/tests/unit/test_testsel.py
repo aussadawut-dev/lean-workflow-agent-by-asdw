@@ -50,6 +50,10 @@ class ShippedImpactMapTests(unittest.TestCase):
         self.assertIn("unit/test_records.py", testsel.select(ROOT, [".lean/templates/queue-item.json"])[0])
         self.assertIn("unit/test_structure.py", testsel.select(ROOT, [".agents/skills/lean-task/SKILL.md"])[0])
 
+    def test_moving_the_pin_runs_lint_only(self):
+        # asdw-harness: every `lean update` pin move ran the full suite (no rule covered the pin file).
+        self.assertEqual(testsel.select(ROOT, [".lean/upstream.json"]), ([], "lint"))
+
     def test_every_workflow_code_file_is_covered(self):
         data = testsel.impact(ROOT)
         for path in sorted((ROOT / ".lean/lean").glob("*.py")):

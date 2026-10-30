@@ -16,16 +16,13 @@ import tempfile
 import time
 
 from . import structure
-from .structure import LINK_TREES, RETIRED_SKILLS
+from .structure import LINK_TREES, PROJECT_OWNED, RETIRED_SKILLS
 from .util import LeanError, read_json, write_json, write_text
 
 DEFAULT_SOURCE = "https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw.git"
 VERSION_TAG = re.compile(r"v?(\d+)\.(\d+)\.(\d+)\Z")
 BASELINE = re.compile(r"Lean Workflow Baseline\s+(\d+\.\d+\.\d+)\b")
 ADDITIONS = "## Project additions"
-# Never replaced from upstream: the project's own facts, settings and records.
-PROJECT_OWNED = (".lean/PROJECT.md", ".lean/config.json", ".lean/models.json", ".lean/skill-effort.json",
-                 ".lean/gate.json", ".lean/upstream.json", ".gitignore")
 MERGED = ("AGENTS.md", "CLAUDE.md", ".claude/settings.json", ".codex/hooks.json")
 # What 4.x scripts became, for migration notes.
 V5_COMMANDS = {"workflow.py": "`python3 .lean/bin/lean mode|tracker|queue`",

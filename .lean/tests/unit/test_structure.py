@@ -149,6 +149,17 @@ class LintTests(unittest.TestCase):
         (self.root / "docs/blob.md").write_bytes(b"\xff\xfe not text")
         self.assertFails("unreadable instruction document (not UTF-8 text?): docs/blob.md")
 
+    def test_every_workflow_and_project_owned_file_has_an_impact_entry(self):
+        impact = self.root / ".lean/tests/impact.json"
+        data = json.loads(impact.read_text())
+        data["lint_only"].remove(".lean/gate.json")
+        impact.write_text(json.dumps(data))
+        self.assertFails("no impact rule or lint-only entry covers: .lean/gate.json")
+        data["lint_only"].append(".lean/gate.json")
+        data["rules"] = [rule for rule in data["rules"] if ".lean/lean/records.py" not in rule["paths"]]
+        impact.write_text(json.dumps(data))
+        self.assertFails("no impact rule or lint-only entry covers: .lean/lean/records.py")
+
     def test_hooks_must_call_the_cli_and_never_seed_on_stop(self):
         (self.root / ".codex/hooks.json").write_text('{"hooks": {"Stop": [{"hooks": [{"command": "true"}]}]}}')
         self.assertFails("hooks must call the lean CLI: .codex/hooks.json")

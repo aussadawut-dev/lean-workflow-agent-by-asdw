@@ -24,6 +24,7 @@
     ".lean/LICENSE",
     ".lean/config.json",
     ".lean/gate.json",
+    ".lean/upstream.json",
     ".lean/skill-effort.json",
     ".lean/targets/*",
     ".agents/queue/*"
