@@ -437,6 +437,8 @@ def gate_command(root, args):
         try:
             if args.mode:
                 gate.write_mode(root, args.mode)
+                print(f"Gate mode set to {args.mode}; commit {gate.GATE_FILE} so every session and provider "
+                      "shares it.", file=sys.stderr)
             mode, _, _, configured = gate.read_mode(root)
         except (OSError, ValueError) as error:
             print(f"Gate policy invalid/unavailable: {error}; validation NOT_RUN.", file=sys.stderr)

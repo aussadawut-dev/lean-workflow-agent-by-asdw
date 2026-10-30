@@ -49,11 +49,14 @@ def write_mode(root, mode):
     if mode not in MODES:
         raise LeanError(f"unsupported gate mode: {mode}")
     with locked(root, "gate-mode.lock"):
-        read_mode(root)  # Invalid settings need investigation, not silent repair.
+        before = read_mode(root)[0]  # Invalid settings need investigation, not silent repair.
         payload = {"auto": mode.startswith("auto")}
         if mode.endswith("_fixloop"):
             payload["fixloop"] = True
         write_json(safe_path(root, GATE_FILE), payload)
+    # The file is project-owned and shared by every provider: leave a trace of who changed it.
+    from . import activity, progress
+    activity.record(root, "gate-mode", before=before, after=mode, session=progress.env_session())
 
 
 def policy(mode):

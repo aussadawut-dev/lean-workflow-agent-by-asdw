@@ -86,6 +86,20 @@ class GateModeTests(unittest.TestCase):
             self.assertEqual(self.mode(*args).returncode, 2)
             self.assertEqual(self.config.read_bytes(), original)
 
+    def test_setting_a_mode_is_logged_and_asks_for_a_commit(self):
+        # asdw-harness: sessions found an untracked .lean/gate.json nobody could trace.
+        env = dict(environment(self.root), LEAN_SESSION_ID="session-a")
+        self.auto(True)
+        result = lean(self.root, "gate", "mode", "manual_fixloop", env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout), {"mode": "manual_fixloop", "configured": True})
+        self.assertIn("commit .lean/gate.json", result.stderr)
+        events = [json.loads(line) for line in (self.root / ".agent-runtime/activity.jsonl").read_text().splitlines()]
+        logged = [event for event in events if event["event"] == "gate-mode"]
+        self.assertEqual([(event["before"], event["after"], event["session"]) for event in logged],
+                         [("auto", "manual_fixloop", "session-a")])
+        self.assertNotIn("commit", self.mode().stderr)  # Reading the mode logs and asks nothing.
+
     def test_manual_and_manual_fixloop_stops_never_run_or_claim_pass(self):
         for mode in ("manual", "manual_fixloop"):
             self.assertEqual(self.mode(mode).returncode, 0)
