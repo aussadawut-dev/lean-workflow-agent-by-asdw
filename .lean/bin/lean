@@ -144,8 +144,8 @@ def main():
         if event in ("pre-tool", "prompt"):
             from lean import guard  # Only the guard: a broken unrelated module must not block every tool.
             code, message = guard.hook(root, event, stdin)
-            if message:
-                print(message, file=sys.stderr)
+            if message:  # A passing prompt hook's output is context for the agent; anything else is a reason.
+                print(message, file=sys.stdout if event == "prompt" and code == 0 else sys.stderr)
             return code
         from lean import hooks
         code, out, err = hooks.run_hook(root, provider, event, stdin, "--cache-tree" in argv)

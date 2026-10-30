@@ -410,6 +410,35 @@ class MidTurnPromptTests(HookFixture):
                 self.submit("next task", path)
                 self.assertFalse(self.can_write())
 
+    def test_a_session_lifetime_keeps_the_contract_across_prompts_and_says_so(self):
+        # asdw-harness: 22 contracts in one day, 3 of them the same text redeclared after a new prompt.
+        (self.root / ".lean/config.json").write_text(json.dumps(
+            {"mode": "standard", "configured": True, "contract_lifetime": "session"}))
+        for provider in ("claude", "codex"):
+            with self.subTest(provider=provider):
+                session = f"keep-{provider}"
+                self.declare(provider, session)
+                payload = {"session_id": session, "prompt": "next task"}
+                if provider == "claude":
+                    payload["transcript_path"] = self.transcript(
+                        self.assistant(2), {"type": "system", "subtype": "turn_duration", "timestamp": self.at(2)})
+                result = self.hook(provider, "UserPromptSubmit", payload)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+                self.assertIn("kept", context)
+                self.assertIn("risk=", context)
+                self.assertTrue(self.can_write(provider, session))
+
+    def test_a_write_racing_the_saved_reply_gets_a_short_retry_hint(self):
+        path = self.transcript(self.assistant(-1))
+        result = self.hook("claude", "PreToolUse", {"session_id": "race", "tool_name": "Edit",
+                                                    "tool_input": {"file_path": "x.py"}, "transcript_path": path})
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("retry this call", result.stderr)
+        self.assertLessEqual(len(result.stderr.strip().splitlines()), 3, result.stderr)
+        without = self.tool("claude", "Edit", "race", file_path="x.py")
+        self.assertIn("contract declare", without.stderr)  # No transcript: the full guidance.
+
     def test_without_a_readable_transcript_every_prompt_still_clears(self):
         for provider, transcript in (("claude", None), ("claude", "/nonexistent/t.jsonl"), ("codex", None)):
             with self.subTest(provider=provider, transcript=transcript):

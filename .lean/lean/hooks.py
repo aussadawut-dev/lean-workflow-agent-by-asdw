@@ -29,6 +29,8 @@ def run_hook(root, provider, event, stdin, cache_tree=False):
     root = Path(root).resolve()
     if event in ("pre-tool", "prompt"):
         code, message = guard.hook(root, event, stdin)
+        if event == "prompt" and code == 0:
+            return code, message, ""
         return code, "", message
     if provider == "claude":
         if event == "session-start":

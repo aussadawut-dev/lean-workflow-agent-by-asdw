@@ -20,6 +20,7 @@ from .util import WORKFLOW_ROOT, write_text as atomic_write_text
 
 MODES = ("standard", "tracker", "full")
 EXECUTIONS = ("direct", "delegated")
+CONTRACT_LIFETIMES = ("prompt", "session")  # Matches guard.LIFETIMES; prompt is the default.
 TRACKER_STATES = ("PLANNED", "IN_PROGRESS", "VALIDATING", "REVIEWING", "DONE", "BLOCKED", "FAILED")
 LEASE_SECONDS = 30 * 60
 ID = re.compile(r"Q[0-9]{4,}")
@@ -105,6 +106,8 @@ def config(root):
     value.setdefault("execution", "direct")
     if value["execution"] not in EXECUTIONS:
         fail("execution must be direct or delegated")
+    if value.get("contract_lifetime", "prompt") not in CONTRACT_LIFETIMES:
+        fail("contract_lifetime must be prompt or session")
     return value
 
 
@@ -114,12 +117,12 @@ def mode_at_least(root, minimum):
         fail(f"{minimum} mode required; current mode is {mode}")
 
 
-def configure(root, mode, execution=None):
+def configure(root, mode, execution=None, **options):
     with locked(root):
-        configure_locked(root, mode, execution)
+        configure_locked(root, mode, execution, **options)
 
 
-def configure_locked(root, mode, execution=None):
+def configure_locked(root, mode, execution=None, **options):
     current = config(root)
     if MODES.index(mode) < MODES.index(current["mode"]):
         fail("mode downgrade is not automatic; resolve existing tracking and claims first")
@@ -159,6 +162,7 @@ def configure_locked(root, mode, execution=None):
     if MODES.index(mode) > MODES.index(current["mode"]):
         validate_records(root, mode)
     current.update(mode=mode, configured=True, execution=execution or current["execution"])
+    current.update({key: value for key, value in options.items() if value is not None})
     write_json(root / ".lean/config.json", current)
     print(f"mode: {mode}")
 
@@ -856,6 +860,8 @@ def parser_for(commands):
     setup = mode_actions.add_parser("configure", help="select standard, tracker or full")
     setup.add_argument("mode", choices=MODES)
     setup.add_argument("--execution", choices=EXECUTIONS)
+    setup.add_argument("--contract-lifetime", choices=CONTRACT_LIFETIMES,
+                       help="prompt (default): a new person's prompt clears the contract; session: it is kept")
     lower = mode_actions.add_parser("downgrade", help="move to a lower mode, preserving records")
     lower.add_argument("mode", choices=MODES)
     choice = lower.add_mutually_exclusive_group(required=True)
@@ -905,7 +911,7 @@ def run(root, args):
     try:
         if args.command == "mode":
             if args.action == "configure":
-                configure(root, args.mode, args.execution)
+                configure(root, args.mode, args.execution, contract_lifetime=args.contract_lifetime)
             elif args.action == "downgrade":
                 return downgrade(root, args.mode, args.apply, args.keep_pending)
             elif args.action == "show":

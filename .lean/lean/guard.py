@@ -53,7 +53,13 @@ HELP = ("Write the Task Contract as the first line of your reply, before any too
         "acceptance=<observable check>'\n"
         "(or a quoted heredoc with the block form). A new user prompt clears the declaration; in Claude,\n"
         "one typed while the agent is still working keeps it.")
-TRANSCRIPT_WAIT = 1.0  # Seconds to re-read a transcript whose current reply may not be flushed yet.
+TRANSCRIPT_WAIT = 2.5  # Seconds to re-read a transcript whose current reply may not be flushed yet.
+RETRY = ("Lean contract guard: no Task Contract is bound for this prompt yet, so this writing `{name}` call is "
+         "blocked.\nThe contract must be the first line of your reply. If it is, Claude may not have saved the reply "
+         "yet (the first tool call often races it): retry this call once.\nOtherwise, or when the turn's first tool "
+         "call writes, declare it in a command of its own: python3 .lean/bin/lean contract declare --contract "
+         "'<Contract: ... line>'.")
+LIFETIMES = ("prompt", "session")  # `contract_lifetime` in .lean/config.json; prompt is the default.
 TRANSCRIPT_TAIL = 4_000_000  # Bytes read from the end of a transcript; the current turn is near the end.
 
 
@@ -341,7 +347,8 @@ def bind_transcript(root, session, payload):
     if not found:
         return None
     with Store(root) as store:
-        store.sessions.setdefault(session, {}).update(
+        store.sessions.setdefault(session, {}).pop("carried", None)
+        store.sessions[session].update(
             {"contract": found[0], "meta": found[1], "source": "transcript", "at": time.time(),
              "model": payload.get("model") if isinstance(payload.get("model"), str) else None})
         store.save()
@@ -445,6 +452,7 @@ def pre_tool(root, payload):
                 record = store.sessions.setdefault(session, {})
                 record.pop("superseded_by", None)
                 record.pop("superseded_reason", None)
+                record.pop("carried", None)
                 record.update(
                     {"contract": contract, "meta": meta, "at": time.time(),
                      "model": payload.get("model") if isinstance(payload.get("model"), str) else None})
@@ -493,6 +501,9 @@ def pre_tool(root, payload):
                 "session's contract. Ask the reviewer to record it; if it cannot, report BLOCKED.")
     if declared:
         return None
+    transcript = payload.get("transcript_path")
+    if isinstance(transcript, str) and os.path.isfile(transcript):
+        return RETRY.format(name=name)  # Claude: the reply is usually saved by the next call.
     return (f"Lean contract guard: no Task Contract is declared for this prompt, so this writing `{name}` call "
             f"is blocked.\n{HELP}")
 
@@ -1064,24 +1075,42 @@ def still_working(path, since):
     return claude
 
 
+def contract_lifetime(root):
+    """`prompt` (a person's prompt clears the contract) unless .lean/config.json opts into `session`."""
+    try:
+        value = json.loads((Path(root) / ".lean/config.json").read_text()).get("contract_lifetime", "prompt")
+    except (OSError, ValueError, AttributeError):
+        return "prompt"
+    return value if value in LIFETIMES else "prompt"
+
+
 def prompt(root, payload):
     """A person's prompt starts a new task; runtime-injected prompts continue the current one.
 
     So does a Claude prompt typed while the agent is still working: the contract bound in that turn
     stands, and the agent declares again only if the prompt changes the task (see still_working).
+    With `contract_lifetime: session` the contract also survives a new task's prompt; the returned
+    context tells the agent it was kept, so it redeclares only when the task changed.
     """
     session = session_of(payload)
     text = payload.get("prompt")
     if isinstance(text, str) and text.lstrip().startswith(RUNTIME_PROMPTS):
-        return
+        return None
     with Store(root) as store:
         record = store.sessions.get(session)
         if record and "contract" in record:
             if still_working(payload.get("transcript_path"), record.get("at")):
-                return
+                return None
+            if contract_lifetime(root) == "session":
+                record["carried"] = True
+                store.save()
+                return (f"Lean: the Task Contract from the previous prompt is kept (contract_lifetime=session): "
+                        f"{record['contract']}\nIf this prompt changes the task, declare a new contract before "
+                        "writing.")
             for name in ("contract", "meta", "model"):
                 record.pop(name, None)
             store.save()
+    return None
 
 
 GUARD = ".lean/lean/guard.py"
@@ -1118,8 +1147,11 @@ def hook(root, event, stdin):
         if not isinstance(payload, dict):
             raise ValueError("hook input must be a JSON object")
         if event == "prompt":
-            prompt(root, payload)
-            return 0, ""
+            context = prompt(root, payload)
+            if not context:
+                return 0, ""
+            return 0, json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
+                                                         "additionalContext": context}})
         try:
             reason = pre_tool(root, payload)
         except Exception as error:  # A guard bug, not a decision: keep the guard repairable.

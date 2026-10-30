@@ -27,7 +27,7 @@ After focused deterministic validation and semantic review, run `gate preflight`
 | Event | Claude (`.claude/settings.json`) | Codex (`.codex/hooks.json`, after trust) | agy |
 |---|---|---|---|
 | Session start | records a change baseline, prints policy and onboarding notes | same, as additional context | — |
-| Prompt | a person's prompt clears the declared contract | same | — |
+| Prompt | a person's prompt clears the declared contract (kept, with a notice, under `contract_lifetime: session`) | same | — |
 | Before a tool | contract guard: writes wait for a contract | same | — |
 | Stop | gate run; refusal blocks with a reason | gate run; refusal blocks with a reason | run `lean gate run` yourself |
 | Status line | `lean status --line` | built-in items only | — |
