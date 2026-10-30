@@ -46,6 +46,18 @@ def impact(root):
     return data
 
 
+def smoke(root):
+    """The short `smoke` list from impact.json: what a project using Lean runs of Lean's own tests."""
+    listed = impact(root).get("smoke", [])
+    if not isinstance(listed, list) or not all(isinstance(name, str) for name in listed):
+        raise LeanError("impact.json \"smoke\" must be a list of test files")
+    available = set(all_files(root))
+    for name in listed:
+        if name not in available:
+            raise LeanError(f"impact.json smoke names a missing test: {name}")
+    return list(dict.fromkeys(listed))
+
+
 def names(output):
     return {line for line in output.split("\0") if line}
 

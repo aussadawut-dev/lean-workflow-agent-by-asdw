@@ -255,5 +255,11 @@
         "hooks/test_gate_preflight.py"
       ]
     }
+  ],
+  "smoke": [
+    "unit/test_cli.py",
+    "unit/test_cli_startup.py",
+    "unit/test_structure.py",
+    "unit/test_util.py"
   ]
 }

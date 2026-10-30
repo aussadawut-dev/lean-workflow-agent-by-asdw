@@ -151,6 +151,7 @@ def check(root):
         from . import testsel
         try:
             data = testsel.impact(root)
+            testsel.smoke(root)
             available = set(testsel.all_files(root))
             for name in sorted({name for name in (files if isinstance(files, list) else []) if isinstance(name, str)} | set(PROJECT_OWNED)):
                 if (not testsel.matches(name, data["scope"])

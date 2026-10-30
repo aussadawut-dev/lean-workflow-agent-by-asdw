@@ -50,6 +50,11 @@ class ShippedImpactMapTests(unittest.TestCase):
         self.assertIn("unit/test_records.py", testsel.select(ROOT, [".lean/templates/queue-item.json"])[0])
         self.assertIn("unit/test_structure.py", testsel.select(ROOT, [".agents/skills/lean-task/SKILL.md"])[0])
 
+    def test_the_shipped_smoke_set_is_small_and_real(self):
+        smoke = testsel.smoke(ROOT)
+        self.assertTrue(0 < len(smoke) <= 6, smoke)
+        self.assertTrue(set(smoke) <= set(testsel.all_files(ROOT)))
+
     def test_moving_the_pin_runs_lint_only(self):
         # asdw-harness: every `lean update` pin move ran the full suite (no rule covered the pin file).
         self.assertEqual(testsel.select(ROOT, [".lean/upstream.json"]), ([], "lint"))
@@ -196,6 +201,20 @@ class CommandTests(unittest.TestCase):
                     continue
                 self.assertEqual(refused.returncode, 2, refused.stdout)
                 self.assertIn("no such test file", refused.stderr)
+
+    def test_smoke_runs_the_listed_files_only(self):
+        # asdw-harness: a consumer gate ran Lean's self-tests for 930 s in one day.
+        impact = self.root / ".lean/tests/impact.json"
+        data = json.loads(impact.read_text())
+        listed = lean(self.root, "test", "--smoke", "--list")
+        self.assertEqual(listed.returncode, 0, listed.stderr)
+        self.assertIn("Selected 0 test file(s)", listed.stdout)  # No smoke list: nothing to run.
+        impact.write_text(json.dumps({**data, "smoke": ["unit/test_pass.py"]}))
+        listed = lean(self.root, "test", "--smoke", "--list")
+        self.assertEqual(listed.stdout.split("\n", 1)[1].strip(), "unit/test_pass.py")
+        self.assertEqual(lean(self.root, "test", "--smoke").returncode, 0)
+        impact.write_text(json.dumps({**data, "smoke": ["unit/test_missing.py"]}))
+        self.assertNotEqual(lean(self.root, "test", "--smoke").returncode, 0)
 
     def test_a_documentation_only_change_runs_lint_only(self):
         (self.root / "notes.md").write_text("words\n")

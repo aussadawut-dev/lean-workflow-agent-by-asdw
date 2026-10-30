@@ -170,6 +170,18 @@ class UpdateTests(unittest.TestCase):
         self.assertNotIn("docs/tracking/TCK001.md", actions)
         self.assertNotIn(".lean/config.json", actions)
 
+    def test_preview_suggests_the_smoke_set_for_lean_self_tests(self):
+        # asdw-harness: its gate ran Lean's own suite after every update (930 s in one day).
+        result, _ = self.preview()
+        self.assertIn("lean test --smoke", result.stdout)
+        project = self.target / ".lean/PROJECT.md"
+        project.write_text(project.read_text().replace(LEGACY_GATE, LEGACY_GATE.replace(
+            "python3 .lean/tests/run_tests.py --shards 6 test-hooks.sh test_gate_integrity.py\n", "")
+            .replace("python3 -m unittest discover -s .lean/tests -p 'test_skill_pack.py'\n", "")))
+        commit(self.target, "no Lean self-tests in the gate")
+        result, _ = self.preview("ws-no-tests")
+        self.assertNotIn("lean test --smoke", result.stdout)
+
     def test_preview_warns_for_stale_project_purpose_without_replacing_it(self):
         project = self.target / ".lean/PROJECT.md"
         project.write_text(project.read_text().replace("A shop.", "A shop on Lean Workflow Baseline 5.2.2."))

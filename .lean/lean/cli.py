@@ -108,6 +108,8 @@ def build_parser(argv=()):
     scope = test.add_mutually_exclusive_group()
     scope.add_argument("--changed", action="store_true", help="only tests the current change can affect")
     scope.add_argument("--all", action="store_true")
+    scope.add_argument("--smoke", action="store_true",
+                       help="the short smoke set from impact.json, for projects that use Lean")
     scope.add_argument("--tier", action="append", choices=("unit", "hooks", "e2e"))
     test.add_argument("--base", help="also count changes since this commit")
     test.add_argument("--list", action="store_true", help="show the selection without running it")
@@ -528,6 +530,8 @@ def test_command(root, args):
         files, reason = testsel.named(root, args.files), "named files"
     elif args.tier:
         files, reason = testsel.all_files(root, tuple(args.tier)), "tier " + ", ".join(args.tier)
+    elif args.smoke:
+        files, reason = testsel.smoke(root), "smoke set"
     elif args.changed:
         files, reason = testsel.select(root, testsel.changed(root, args.base))
     else:

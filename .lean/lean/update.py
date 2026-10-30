@@ -337,6 +337,11 @@ def preview(root, target=None, source=None, ref=None, workspace=None):
             add(".lean/PROJECT.md", "write", migrated, reason="gate block migrated to the lean CLI")
         for legacy in sorted(set(LEGACY_PATH.findall(migrated))):
             notes.append(f"PROJECT.md still names the 4.x path {legacy}; update it (lean lint reports it)")
+        gate_block = migrated.split("<!-- gate:start -->", 1)[-1].split("<!-- gate:end -->", 1)[0]
+        if re.search(r"(?m)^python3 \.lean/bin/lean test --(?:changed|all)\b", gate_block):
+            notes.append("PROJECT.md's gate runs Lean's own test suite, which every Lean update changes; a project "
+                         "that uses Lean can run `python3 .lean/bin/lean test --smoke` there instead (Lean's CI "
+                         "runs the full suite)")
     # Preserve project prose; warn about current Purpose declarations, never historical sections.
     projects = [project] + sorted((target / ".lean/targets").glob("*/.lean/PROJECT.md"))
     for document in projects:
