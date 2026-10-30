@@ -204,9 +204,13 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         root = (args.root or WORKFLOW_ROOT).resolve()
-        if args.command in ("intake", "batch"):
-            # Ledger records follow the target; shipping evidence stays in the workspace.
+        if args.command in RECORD_COMMANDS:
+            # Records follow the target; shipping evidence and shared progress stay in the workspace.
             args.evidence_root = (args.workflow_root or root).resolve()
+            if args.workflow_root is None and root.parent.name == "targets" and root.parent.parent.name == ".lean":
+                candidate = root.parents[2]
+                if (candidate / ".lean/bin/lean").is_file():
+                    args.evidence_root = candidate
         if args.root is None and args.command in RECORD_COMMANDS:
             # Workflow records follow the selected target; an invalid selection fails, never falls back.
             from . import target
@@ -380,12 +384,20 @@ def status(root, args):
     state = progress.load(root)
     from . import gate, records
     config = records.config(root)
-    report = {"version": __version__, "mode": config["mode"], "execution": config["execution"],
+    from . import target
+    context = target.context(root)
+    roots = {key: context[key] for key in ("workflow_root", "project_root", "record_root")}
+    target_mode = records.config(Path(context["record_root"])) if context["target"] is not None else None
+    report = {"scope_root": str(root), "roots": roots, "target": context["target"], "target_mode": target_mode,
+              "version": __version__, "mode": config["mode"], "execution": config["execution"],
               "gate": gate.status(root), "progress": state}
     if args.json:
         print(json.dumps(report, indent=2))
         return 0
     print(f"Lean {__version__} · mode {config['mode']}/{config['execution']} · gate {report['gate']}")
+    print(f"scope (gate/progress): {root}")
+    if target_mode:
+        print(f"target {context['target']}: mode {target_mode['mode']}/{target_mode['execution']} · records {context['record_root']}")
     print(progress.watch_frame(root))
     return 0
 

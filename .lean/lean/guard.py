@@ -512,7 +512,8 @@ def shell_words(command):
 GATE_MARKER = '("record-review", ' + '"check-review")'  # Split so this file is not mistaken for one.
 RECEIPT = RUNTIME + "/review.json"
 PENDING = RUNTIME + "/review-pending.json"  # Written only by `lean gate review-pending`.
-GATE_CACHES = (RUNTIME + "/gate-cache", RUNTIME + "/target-gate-cache")  # Written only by the gate.
+GATE_CACHES = (RUNTIME + "/gate-cache", RUNTIME + "/target-gate-cache",
+               RUNTIME + "/gate-result.json")  # Written only by the gate.
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit", "apply_patch"}
 
 

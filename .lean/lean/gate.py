@@ -23,6 +23,7 @@ MAX_REFUSALS = 3
 LOCK_ENV = "LEAN_GATE_LOCK_FD"
 FORCE_ENV = "LEAN_GATE_FORCE"
 GATE_FILE = ".lean/gate.json"
+RESULT_FILE = ".agent-runtime/gate-result.json"
 PENDING_FILE = ".agent-runtime/review-pending.json"
 PENDING_LIMIT = 2 * 3600  # Seconds a marked review keeps Stops quiet; a longer wait blocks again.
 HIGH_REVIEW = re.compile(r"Contract: (?:risk=HIGH quality=|risk=(?:LOW|MEDIUM) quality=VERY_HIGH acceptance=)")
@@ -299,6 +300,13 @@ class Run:
         self.payload = payload if payload is not None else {}
         self.show = show  # Optional callable for live progress lines.
         self.out, self.err, self.checks = [], [], 0
+        self.refused_kind = None
+        self.pass_state = ""
+        self.input_state = ""
+        self.target_input_state = ""
+        self.previous_result = None
+        self.checks_reused = False
+        self.high_risk_review = False
         runtime = self.root / ".agent-runtime"
         self.cache, self.failed = runtime / "gate-cache", runtime / "gate-failed"
         self.baseline, self.refusal = runtime / "gate-baseline", runtime / "gate-refusal"
@@ -323,6 +331,7 @@ class Run:
         refusals, or the same refusal shown again to this session, the Stop is released so the
         agent can report BLOCKED instead of looping; a release never writes a cache or receipt.
         """
+        self.refused_kind = kind
         if kind != "c" and not self.seed:
             self.cache.unlink(missing_ok=True)
         if not self.hook or self.seed:
@@ -478,6 +487,7 @@ class Run:
         self.checks += len(configured)
         selection = root / ".agent-runtime/active-target.json"
         if not self.seed and (selection.exists() or selection.is_symlink()):
+            self.target_input_state = evidence.state(root)
             self.progress("target checks started")
             refused = self.target_checks()
             if refused is not None:
@@ -499,9 +509,11 @@ class Run:
         view = GitView(root)
         git_tree = view.in_git()
         state = evidence.state(root, view) if self.hook and git_tree else ""
+        self.input_state = self.target_input_state or state or (evidence.state(root, view) if git_tree else "")
         # A direct --cache-tree run fingerprints the state only for its pass record: it never
         # compares with the session baseline, so the High-risk floor still covers it.
         pass_state = evidence.state(root, view) if (not self.hook and self.cache_tree and git_tree) else state
+        self.pass_state = pass_state
         if self.seed:
             # SessionStart records a change baseline, never a passing cache. A new session has not
             # seen any earlier refusal, so its first one blocks again.
@@ -536,6 +548,7 @@ class Run:
             self.require_review = True
         # PROJECT.md High-risk areas set a review floor that a self-declared risk cannot lower.
         risky = evidence.high_risk_changes(root, self.session, view) if (changed or self.session) else []
+        self.high_risk_review = bool(risky)
 
         def receipt_gap():
             """A refusal for a missing receipt, or None. A HIGH contract needs a receipt for itself;
@@ -559,6 +572,7 @@ class Run:
                 return refused
             if self.hook:
                 self.cache.write_text(pass_state)
+            self.checks_reused = True
             self.progress("checks reused for the unchanged shipping state")
             return 0
         fixloop = False
@@ -664,8 +678,26 @@ def run(root, **options):
     if message:
         return busy(root, message, options)
     gate = Run(root, **options)
+    try:
+        gate.previous_result = load_result(gate.root)
+    except (OSError, ValueError):
+        pass  # A new run can replace an unreadable old result; it cannot reuse its coverage.
     began = time.monotonic()
+    if not gate.seed:
+        record_result(gate, "RUNNING")
     code = gate.execute()
+    if not gate.seed:
+        result = "CONTRACT_REFUSED" if gate.refused_kind == "c" else "FAIL"
+        if code == 0 and gate.refused_kind is None and not gate.out:
+            result = "PASS"
+        elif code == 0:
+            result = "UNVERIFIED"
+        try:
+            record_result(gate, result)
+        except (OSError, ValueError, subprocess.CalledProcessError) as error:
+            gate.say(f"Gate result could not be recorded: {error}; validation UNVERIFIED.")
+            code = gate.refuse()
+            record_result(gate, "UNVERIFIED")
     if not gate.seed:
         from . import activity
         result = "pass" if code == 0 and not gate.out else "released" if code == 0 else "refused"
@@ -676,11 +708,101 @@ def run(root, **options):
     return code, gate.out, gate.err
 
 
+def record_result(run, result):
+    """Record every runner outcome without enabling check reuse or changing retry counters."""
+    from . import target
+    root = run.root
+    previous = run.previous_result
+    records = target.context(root)["record_root"] if result == "PASS" else None
+    reuse = (result == "PASS" and run.checks_reused and run.pass_state and previous and previous["status"] == "PASS"
+             and previous.get("state") == run.pass_state and previous.get("record_root") == records)
+    git_tree = result == "PASS" and not reuse and GitView(root).in_git()
+    payload = {"schema": 1, "status": result, "at": time.time(), "contract": run.contract,
+               "require_review": run.require_review, "high_risk_review": run.high_risk_review,
+               "session": run.session, "workflow_root": str(root), "checks": run.checks,
+               "state": evidence.state(root) if git_tree else None,
+               "review_state": evidence.review_state(root) if git_tree else None,
+               "base": evidence.head_tree(root) if git_tree else None,
+               "record_root": records}
+    if reuse:
+        payload.update({key: previous[key] for key in ("state", "review_state", "base")})
+    if result == "PASS" and run.input_state and payload["state"] != run.input_state:
+        raise LeanError("shipping inputs changed during validation; run the gate on the final state")
+    write_json(safe_path(root, RESULT_FILE), payload)
+
+
+def load_result(root):
+    try:
+        value = read_json(safe_path(root, RESULT_FILE))
+    except FileNotFoundError:
+        return None
+    if (not isinstance(value, dict) or value.get("schema") != 1
+            or value.get("status") not in ("PASS", "FAIL", "CONTRACT_REFUSED", "UNVERIFIED", "RUNNING")
+            or not isinstance(value.get("workflow_root"), str)
+            or not isinstance(value.get("contract"), str)
+            or type(value.get("require_review")) is not bool
+            or type(value.get("high_risk_review")) is not bool):
+        raise ValueError("invalid gate result")
+    if value["status"] == "PASS":
+        if (not isinstance(value.get("record_root"), str)
+                or any(key not in value for key in ("state", "review_state", "base"))
+                or any(value[key] is not None and (not isinstance(value[key], str)
+                                                  or not re.fullmatch(r"[0-9a-f]{40,64}", value[key]))
+                       for key in ("state", "review_state", "base"))):
+            raise ValueError("invalid gate pass coverage")
+    return value
+
+
+def check_closure(root, record_root, contract, session=""):
+    """A shared pass permits bookkeeping closure, never changed shipping content."""
+    root, record_root = Path(root).resolve(), Path(record_root).resolve()
+    busy_message = acquire_lock(root)
+    if busy_message:
+        raise LeanError(busy_message)
+    result = load_result(root)
+    if result is None or result["status"] != "PASS":
+        raise LeanError("tracker DONE requires a recorded shared gate PASS")
+    from . import target
+    if result.get("record_root") != target.context(root)["record_root"]:
+        raise LeanError("gate PASS is stale: target selection changed")
+    contract = contract or (guard.current(root, session) if session else "")
+    if not isinstance(contract, str) or not evidence.CONTRACT.fullmatch(contract):
+        raise LeanError("tracker DONE requires --contract '<exact Task Contract>' or a bound session contract")
+    if result.get("contract") != contract:
+        raise LeanError("gate PASS does not cover this exact Task Contract")
+    if result.get("workflow_root") != str(root) or (record_root != root and result.get("record_root") != str(record_root)):
+        raise LeanError("gate PASS does not cover this target's record root")
+    if not result.get("base") or result.get("review_state") != evidence.review_state(root):
+        raise LeanError("gate PASS is stale: shipping content changed; run the shared gate again")
+    gap = evidence.shipping_gap(root, result["base"])
+    if gap:
+        raise LeanError("gate PASS is stale: " + gap)
+    risky = evidence.high_risk_changes(root, session)
+    check_receipt(root, contract, bool(HIGH_REVIEW.match(contract)) or result["require_review"],
+                  risky or result["high_risk_review"])
+
+
 def status(root, verify=True):
     """Last recorded gate result from the runner's markers, never a fresh validation.
 
     Verifying hashes every Git-visible file; a status bar refreshing often passes verify=False and
     reports a recorded pass as LAST_PASS without checking it still matches."""
+    root = Path(root).resolve()
+    try:
+        result = load_result(root)
+        if result is not None:
+            if result["status"] != "PASS":
+                return result["status"]
+            if not verify:
+                return "LAST_PASS"
+            from . import target
+            if result.get("record_root") != target.context(Path(root))["record_root"]:
+                return "STALE"
+            if result.get("state") is None:
+                return "PASS"  # Non-Git runs have results but cannot authorize tracker closure.
+            return "PASS" if result["state"] == evidence.state(Path(root)) else "STALE"
+    except (OSError, ValueError, subprocess.CalledProcessError):
+        return "UNKNOWN"
     recorded = recorded_gate(root)
     if recorded != "LAST_PASS" or not verify:
         return recorded

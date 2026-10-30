@@ -123,3 +123,17 @@ def install_release(root, init=True, source=ROOT):
             os.symlink(f"../../.lean/skills/{skill}", root / tree / skill)
     if init:
         subprocess.run(["git", "init", "-q", str(root)], check=True)
+
+
+def passing_gate(root, contract="Contract: risk=LOW quality=STANDARD acceptance=fixture checks pass"):
+    """Run a real minimal gate before a fixture exercises tracker closure."""
+    root = Path(root)
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    project = root / ".lean/PROJECT.md"
+    if not project.exists():
+        project.write_text("<!-- gate:start -->\n```sh\ntrue\n```\n<!-- gate:end -->\n")
+    result = subprocess.run([sys.executable, str(ROOT / LEAN), "--root", str(root),
+                             "gate", "run", "--contract", contract], capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(result.stdout + result.stderr)
+    return contract

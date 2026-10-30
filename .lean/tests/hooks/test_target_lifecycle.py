@@ -105,6 +105,104 @@ class TargetLifecycleTests(TargetFixture):
         self.cli("clear")
         self.assertEqual(self.git(Path(context["project_root"]), "status", "--porcelain"), "")
 
+    def test_status_and_mode_context_identify_their_roots(self):
+        context = self.install()
+        self.workflow("configure", "full")
+        self.command(sys.executable, self.lean, "progress", "set", "test", "--task", "workspace progress")
+        report = json.loads(self.command(sys.executable, self.lean, "status", "--json").stdout)
+        self.assertEqual(report["mode"], "standard")
+        self.assertEqual(report["roots"], {k: context[k] for k in ("workflow_root", "project_root", "record_root")})
+        self.assertEqual(report["target_mode"]["mode"], "full")
+        resumed = json.loads(self.workflow("context").stdout)
+        self.assertEqual(resumed["progress"]["task"], "workspace progress")
+        self.assertEqual(resumed["evidence_root"], str(self.root.resolve()))
+        explicit = json.loads(self.workflow("--root", context["record_root"], "context").stdout)
+        self.assertEqual(explicit["progress"]["task"], "workspace progress")
+        scoped = json.loads(self.command(sys.executable, self.lean, "--root", context["record_root"],
+                                         "status", "--json").stdout)
+        self.assertEqual(scoped["mode"], "full")
+        self.assertIsNone(scoped["progress"])
+        self.assertEqual(scoped["scope_root"], context["record_root"])
+
+    def closure_fixture(self, high=False):
+        context = self.install()
+        self.workflow("configure", "tracker")
+        self.workflow("tracker", "new", "--id", "TCK001", "--title", "Closure")
+        tracker = Path(context["record_root"]) / "docs/tracking/TCK001.md"
+        tracker.write_text(tracker.read_text().replace("- [ ]", "- [x]"))
+        self.workflow("tracker", "new", "--id", "TCK002", "--title", "Second batch task")
+        second = tracker.with_name("TCK002.md")
+        second.write_text(second.read_text().replace("- [ ]", "- [x]"))
+        self.gate_file(context, "true")
+        self.evidence("accept-controls", "--reason", "fixture gate approved")
+        contract = f"Contract: risk={'HIGH' if high else 'LOW'} quality=HIGH acceptance=fixture closure works"
+        if high:
+            self.evidence("record-review", "--contract", contract, "--reviewer", "fixture-reviewer",
+                          "--state", self.evidence("state"), "--verdict", "PASS", "--evidence", "fixture review")
+        result = self.command(sys.executable, self.lean, "gate", "run", "--contract", contract)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return context, tracker, contract
+
+    def test_target_closure_uses_workspace_pass_and_allows_bookkeeping(self):
+        context, tracker, contract = self.closure_fixture()
+        self.workflow("tracker", "status", "--id", "TCK001", "--status", "DONE",
+                      "--contract", contract, "--evidence", "covering gate passed")
+        self.assertIn("Status: DONE", tracker.read_text())
+        self.assertEqual(tracker.stat().st_mode & 0o777, 0o644)
+        # A second workset in the same validated batch may close against the same pass.
+        self.workflow("tracker", "status", "--id", "TCK002", "--status", "DONE",
+                      "--contract", contract, "--evidence", "closure bookkeeping")
+        self.assertIn("Status: DONE", tracker.with_name("TCK002.md").read_text())
+        report = json.loads(self.workflow("context").stdout)
+        self.assertEqual(report["evidence_root"], context["workflow_root"])
+        self.assertEqual(report["gate"]["status"], "STALE")
+
+    def test_target_closure_rejects_changed_requirements_and_code(self):
+        context, tracker, contract = self.closure_fixture()
+        original = tracker.read_text()
+        tracker.write_text(original.replace("Observable result.", "A different requirement."))
+        rejected = self.workflow("tracker", "status", "--id", "TCK001", "--status", "DONE",
+                                 "--contract", contract, "--evidence", "invalid closure", success=False)
+        self.assertIn("stale", rejected.stderr)
+        tracker.write_text(original)
+        (Path(context["project_root"]) / "app.txt").write_text("changed after validation")
+        rejected = self.workflow("tracker", "status", "--id", "TCK001", "--status", "DONE",
+                                 "--contract", contract, "--evidence", "invalid closure", success=False)
+        self.assertIn("stale", rejected.stderr)
+        self.assertNotIn("Status: DONE", tracker.read_text())
+
+    def test_target_closure_rechecks_exact_contract_and_review(self):
+        context, tracker, contract = self.closure_fixture(high=True)
+        rejected = self.workflow("tracker", "status", "--id", "TCK001", "--status", "DONE",
+                                 "--contract", contract + " changed", "--evidence", "invalid", success=False)
+        self.assertIn("exact Task Contract", rejected.stderr)
+        self.evidence("record-review", "--contract", contract, "--reviewer", "fixture-reviewer",
+                      "--state", self.evidence("state"), "--verdict", "REWORK", "--evidence", "new finding")
+        rejected = self.workflow("tracker", "status", "--id", "TCK001", "--status", "DONE",
+                                 "--contract", contract, "--evidence", "invalid", success=False)
+        self.assertIn("not PASS", rejected.stderr)
+        self.assertNotIn("Status: DONE", tracker.read_text())
+
+    def test_target_closure_rejects_staged_shipping_difference(self):
+        context, tracker, contract = self.closure_fixture()
+        app = Path(context["project_root"]) / "app.txt"
+        original = app.read_text()
+        app.write_text("staged but not validated")
+        self.git(Path(context["project_root"]), "add", "app.txt")
+        app.write_text(original)
+        rejected = self.workflow("tracker", "status", "--id", "TCK001", "--status", "DONE",
+                                 "--contract", contract, "--evidence", "invalid", success=False)
+        self.assertIn("stale", rejected.stderr)
+        self.assertNotIn("Status: DONE", tracker.read_text())
+
+    def test_shared_pass_rejects_target_checks_that_change_shipping_inputs(self):
+        context = self.install()
+        self.gate_file(context, "printf changed > app.txt")
+        self.evidence("accept-controls", "--reason", "fixture control approved")
+        result = self.command(sys.executable, self.lean, "gate", "run")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("shipping inputs changed during validation", result.stderr)
+
     def test_application_gate_uses_target_directory_and_propagates_failure(self):
         context = self.install()
         self.cli("gate", success=False)  # Empty target checks must not count as a pass.

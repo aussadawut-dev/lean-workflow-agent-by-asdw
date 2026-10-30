@@ -75,6 +75,16 @@ def recorded_gate(root):
     """The gate runner's last recorded result from its markers alone, importing none of the gate:
     CONTRACT_REFUSED, FAIL, LAST_PASS or NOT_RUN (status bars call this on every refresh)."""
     folder = Path(root) / RUNTIME
+    try:
+        result = read_json(safe_path(root, RUNTIME + "/gate-result.json"))
+        if (not isinstance(result, dict) or result.get("schema") != 1
+                or result.get("status") not in ("PASS", "FAIL", "CONTRACT_REFUSED", "UNVERIFIED", "RUNNING")):
+            return "UNKNOWN"
+        return "LAST_PASS" if result["status"] == "PASS" else result["status"]
+    except FileNotFoundError:
+        pass
+    except (OSError, ValueError):
+        return "UNKNOWN"
     failed = folder / "gate-failed"
     if failed.is_file():
         # A "c" marker is a contract refusal, which says nothing about the checks.

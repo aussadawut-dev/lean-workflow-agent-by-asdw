@@ -16,7 +16,7 @@ import tempfile
 import time
 import uuid
 
-from .util import WORKFLOW_ROOT
+from .util import WORKFLOW_ROOT, write_text as atomic_write_text
 
 MODES = ("standard", "tracker", "full")
 EXECUTIONS = ("direct", "delegated")
@@ -71,10 +71,7 @@ def write_json(path, value):
 
 
 def write_text(path, value):
-    with tempfile.NamedTemporaryFile("w", dir=path.parent, delete=False) as out:
-        out.write(value)
-        temporary = Path(out.name)
-    os.replace(temporary, path)
+    atomic_write_text(path, value)
 
 
 def read_json(path):
@@ -278,6 +275,10 @@ def tracker_command(root, args):
                 linked = [item for item in items(root).values() if item["tracker"] == args.id]
                 if not linked or any(item["status"] != "DONE" for item in linked):
                     fail("all linked queue items must be DONE before the tracker")
+            if args.status == "DONE":
+                from . import gate, progress
+                gate.check_closure(getattr(args, "evidence_root", root), root,
+                                   getattr(args, "contract", None), progress.env_session())
             content = content[:matches[0].start()] + f"Status: {args.status}" + content[matches[0].end():]
             if evidence:
                 marker = "## Evidence\n"
@@ -823,9 +824,12 @@ def context_command(root, args):
             pass  # No Git available: report git as null.
         from .gate import status as gate_status
         from .progress import load as progress_state
-        report["gate"] = {"status": gate_status(root),
-                          "source": "Claude Stop markers and passes recorded by --cache-tree runs; other direct and Codex runs leave none"}
-        report["progress"] = progress_state(root)
+        evidence_root = getattr(args, "evidence_root", root)
+        report["evidence_root"] = str(evidence_root)
+        report["record_root"] = str(root)
+        report["gate"] = {"status": gate_status(evidence_root),
+                          "source": "shared gate results in workflow_root; legacy cache/hook markers when no result exists"}
+        report["progress"] = progress_state(evidence_root)
         print(json.dumps(report, indent=2))
 
 
@@ -854,6 +858,7 @@ def parser_for(commands):
     status.add_argument("--id", required=True)
     status.add_argument("--status", choices=TRACKER_STATES, required=True)
     status.add_argument("--evidence", default="")
+    status.add_argument("--contract", help="exact gate Task Contract required for DONE unless bound to this session")
     archive = tracker_actions.add_parser("archive")
     archive.add_argument("--id")
     archive_choice = archive.add_mutually_exclusive_group(required=True)

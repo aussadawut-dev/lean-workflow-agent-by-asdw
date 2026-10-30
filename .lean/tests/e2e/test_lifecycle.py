@@ -8,7 +8,7 @@ import unittest
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from support import ROOT  # noqa: E402
+from support import ROOT, passing_gate  # noqa: E402
 
 SCRIPT = ROOT / ".lean/bin/lean"
 TEMPLATES = ROOT / ".lean/templates"
@@ -103,7 +103,7 @@ class EndToEndLifecycleTests(unittest.TestCase):
         tracker = self.root / "docs/tracking/TCK001.md"
         tracker.write_text(tracker.read_text().replace("- [ ]", "- [x]"))
         self.run_cli("tracker", "status", "--id", "TCK001", "--status", "DONE",
-                     "--evidence", "lifecycle ok")
+                     "--evidence", "lifecycle ok", "--contract", passing_gate(self.root))
         self.run_cli("downgrade", "standard", "--apply", success=False)
         self.run_cli("downgrade", "standard", "--apply", "--keep-pending")
         self.assertEqual(self.show(), {"mode": "standard", "configured": True, "execution": "delegated"})

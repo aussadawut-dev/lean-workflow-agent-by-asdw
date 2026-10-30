@@ -8,7 +8,7 @@ import unittest
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from support import ROOT  # noqa: E402
+from support import ROOT, passing_gate  # noqa: E402
 
 SCRIPT = ROOT / ".lean/bin/lean"
 TEMPLATES = ROOT / ".lean/templates"
@@ -76,7 +76,7 @@ class GuardTests(unittest.TestCase):
         self.run_cli("configure", "tracker")
         self.tracker("## Acceptance criteria\n\n- [x] login works\n\n### Notes\n\n- [X] AC-02 done\n\n"
                      "## Decisions\n\n- [ ] optional idea outside the checklist")
-        self.run_cli("tracker", "status", "--id", "TCK001", "--status", "DONE", "--evidence", "checked")
+        self.run_cli("tracker", "status", "--id", "TCK001", "--status", "DONE", "--evidence", "checked", "--contract", passing_gate(self.root))
         self.run_cli("check")
 
     def test_multiline_title_and_evidence_are_rejected(self):

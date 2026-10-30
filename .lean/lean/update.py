@@ -325,6 +325,20 @@ def preview(root, target=None, source=None, ref=None, workspace=None):
             add(".lean/PROJECT.md", "write", migrated, reason="gate block migrated to the lean CLI")
         for legacy in sorted(set(LEGACY_PATH.findall(migrated))):
             notes.append(f"PROJECT.md still names the 4.x path {legacy}; update it (lean lint reports it)")
+    # Preserve project prose; warn about current Purpose declarations, never historical sections.
+    projects = [project] + sorted((target / ".lean/targets").glob("*/.lean/PROJECT.md"))
+    for document in projects:
+        relative = str(document.relative_to(target))
+        if any(part.is_symlink() for part in (document, *document.parents) if part != target):
+            continue
+        if not document.is_file():
+            continue
+        purpose = re.search(r"(?ms)^## Purpose[ \t]*\n(.*?)(?=^## |\Z)", document.read_text())
+        if purpose:
+            for version in sorted(set(BASELINE.findall(purpose.group(1)))):
+                if version != incoming:
+                    notes.append(f"{relative} Purpose names Lean Workflow Baseline {version}; incoming is {incoming}. "
+                                 "Review the project-owned wording; it is preserved.")
     # Project documents PROJECT.md routes agents to are linted too, and nothing the update writes reaches them.
     visible = set(structure.git_visible(target) or [])  # What lint reads; never a path outside the target.
     for route in structure.routed_documents(target):

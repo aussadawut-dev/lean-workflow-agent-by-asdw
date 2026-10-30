@@ -170,6 +170,23 @@ class UpdateTests(unittest.TestCase):
         self.assertNotIn("docs/tracking/TCK001.md", actions)
         self.assertNotIn(".lean/config.json", actions)
 
+    def test_preview_warns_for_stale_project_purpose_without_replacing_it(self):
+        project = self.target / ".lean/PROJECT.md"
+        project.write_text(project.read_text().replace("A shop.", "A shop on Lean Workflow Baseline 5.2.2."))
+        target_project = write(self.target, ".lean/targets/shop/.lean/PROJECT.md",
+                               "# Project\n\n## Purpose\n\nLean Workflow Baseline 5.2.2.\n\n## History\n\nLean Workflow Baseline 4.17.0.\n")
+        commit(self.target, "project baseline text")
+        before = project.read_bytes(), target_project.read_bytes()
+        result, plan = self.preview()
+        self.assertIn(".lean/PROJECT.md Purpose names Lean Workflow Baseline 5.2.2", result.stdout)
+        self.assertIn(".lean/targets/shop/.lean/PROJECT.md Purpose names Lean Workflow Baseline 5.2.2", result.stdout)
+        self.assertNotIn("Purpose names Lean Workflow Baseline 4.17.0", result.stdout)
+        self.assertEqual(before, (project.read_bytes(), target_project.read_bytes()))
+        project.write_text(project.read_text().replace("Baseline 5.2.2", f"Baseline {VERSION}"))
+        target_project.write_text(target_project.read_text().replace("Baseline 5.2.2", f"Baseline {VERSION}"))
+        result, plan = self.preview("ws-current")
+        self.assertNotIn("Purpose names Lean Workflow Baseline", result.stdout)
+
     def test_preview_names_what_lint_will_reject_after_the_update(self):
         # Found upgrading a real 4.16 project: its own test in .lean/tests and a routed README naming 4.x paths.
         project = self.target / ".lean/PROJECT.md"

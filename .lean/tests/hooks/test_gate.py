@@ -685,7 +685,7 @@ class TrustedControlRefTests(unittest.TestCase):
 
     def test_manual_codex_streams_progress_without_success_output(self):
         import select
-        self.project.write_text(self.project.read_text().replace("true", "echo hidden-check-output; while [ ! -f release ]; do sleep 0.05; done"))
+        self.project.write_text(self.project.read_text().replace("true", "echo hidden-check-output; while [ ! -f .agent-runtime/release ]; do sleep 0.05; done"))
         self.commit("slow check")
         self.upstream()
         process = subprocess.Popen([sys.executable, str(self.root / ".lean/bin/lean"), "--root", str(self.root),
@@ -706,8 +706,9 @@ class TrustedControlRefTests(unittest.TestCase):
             self.assertIn(b"Quality Gate: check 1 started", progress,
                           "progress must arrive while the check is still running")
             self.assertIsNone(process.poll())
+            self.assertEqual(lean(self.root, "gate", "status").stdout.strip(), "RUNNING")
         finally:
-            (self.root / "release").touch()
+            (self.root / ".agent-runtime/release").touch()
             out, err = process.communicate(timeout=15)
         self.assertEqual(process.returncode, 0, err)
         self.assertNotIn("hidden-check-output", out + err)

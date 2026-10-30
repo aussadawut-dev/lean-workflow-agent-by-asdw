@@ -1031,7 +1031,7 @@ class AuditHolesTests(HookFixture):
 
     def test_gate_caches_are_never_written_directly_even_with_a_contract(self):
         self.assertEqual(self.tool("claude", "Bash", "s1", command=f"{DECLARE} --contract '{LINE}'").returncode, 0)
-        for cache in (".agent-runtime/gate-cache", ".agent-runtime/target-gate-cache"):
+        for cache in (".agent-runtime/gate-cache", ".agent-runtime/target-gate-cache", ".agent-runtime/gate-result.json"):
             for name, tool_input in (("Bash", {"command": f"echo forged > {cache}"}),
                                      ("Bash", {"command": f"cp /tmp/x {cache}"}),
                                      ("Bash", {"command": f"python3 -c \"open('{cache}','w').write('k')\""}),

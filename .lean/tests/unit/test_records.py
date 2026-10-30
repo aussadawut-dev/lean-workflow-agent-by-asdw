@@ -10,7 +10,7 @@ from unittest import mock
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from support import ROOT  # noqa: E402
+from support import ROOT, passing_gate  # noqa: E402
 from lean import records as workflow  # noqa: E402
 
 SCRIPT = ROOT / ".lean/bin/lean"
@@ -254,6 +254,16 @@ class WorkflowModeTests(unittest.TestCase):
         self.assertFalse((self.root / "docs/tracking").exists())
         self.run_cli("queue", "claim-next", "--agent", "a", success=False)
 
+    def test_done_requires_a_covering_gate_pass(self):
+        self.run_cli("configure", "tracker")
+        path = self.checklist_tracker()
+        path.write_text(path.read_text().replace("- [ ]", "- [x]"))
+        before = path.read_bytes()
+        result = self.run_cli("tracker", "status", "--id", "TCK001", "--status", "DONE",
+                              "--evidence", "implementation complete", success=False)
+        self.assertIn("gate", result.stderr.lower())
+        self.assertEqual(path.read_bytes(), before)
+
     def test_tracker_creates_documents_without_queue(self):
         self.run_cli("configure", "tracker")
         self.run_cli("check")
@@ -263,7 +273,7 @@ class WorkflowModeTests(unittest.TestCase):
         tracker_path = self.root / "docs/tracking/TCK001.md"
         tracker_content = tracker_path.read_text().replace("- [ ]", "- [x]")
         tracker_path.write_text(tracker_content)
-        self.run_cli("tracker", "status", "--id", "TCK001", "--status", "DONE", "--evidence", "review passed")
+        self.run_cli("tracker", "status", "--id", "TCK001", "--status", "DONE", "--evidence", "review passed", "--contract", passing_gate(self.root))
         self.run_cli("check")
         self.assertFalse((self.root / ".agents/queue").exists())
         self.assertIn(".agent-runtime/", (self.root / ".gitignore").read_text())
@@ -712,7 +722,7 @@ class WorkflowModeTests(unittest.TestCase):
         self.run_cli("configure", "tracker")
         doc = self.checklist_tracker()
         doc.write_text(doc.read_text().replace("- [ ]", "- [x]"))
-        self.run_cli("tracker", "status", "--id", "TCK001", "--status", "DONE", "--evidence", "all done")
+        self.run_cli("tracker", "status", "--id", "TCK001", "--status", "DONE", "--evidence", "all done", "--contract", passing_gate(self.root))
 
         # Dry run does not move the file
         dry = self.run_cli("tracker", "archive", "--dry-run")
@@ -735,7 +745,7 @@ class WorkflowModeTests(unittest.TestCase):
     def done_tracker(self, tracker_id):
         """A valid DONE tracker created through the CLI (tracker mode)."""
         self.tracker_doc(f"{tracker_id}.md")
-        self.run_cli("tracker", "status", "--id", tracker_id, "--status", "DONE", "--evidence", "validated")
+        self.run_cli("tracker", "status", "--id", tracker_id, "--status", "DONE", "--evidence", "validated", "--contract", passing_gate(self.root))
         return self.root / "docs/tracking" / f"{tracker_id}.md"
 
     def snapshot(self):
@@ -760,7 +770,7 @@ class WorkflowModeTests(unittest.TestCase):
         self.item("Q0001", ["area:api"])
         claim = json.loads(self.run_cli("queue", "claim-next", "--agent", "one").stdout)
         self.run_cli("queue", "complete", "--id", "Q0001", "--token", claim["token"], "--evidence", "validated")
-        self.run_cli("tracker", "status", "--id", "TCK001", "--status", "DONE", "--evidence", "validated")
+        self.run_cli("tracker", "status", "--id", "TCK001", "--status", "DONE", "--evidence", "validated", "--contract", passing_gate(self.root))
         orphan = self.tracker_doc("TCK002.md")
         orphan.write_text("# Orphan\n\nStatus: DONE\n\n## Evidence\n\n- manual\n")
         result = self.run_cli("tracker", "archive", "--apply", success=False)
@@ -859,8 +869,8 @@ class WorkflowModeTests(unittest.TestCase):
         self.assertEqual(data["git"]["status"], "modified")
         self.assertIn("docs/", data["git"]["untracked"])
         self.assertEqual(data["gate"]["status"], "NOT_RUN")
-        # Direct runner calls leave no marker, so the report names where its status comes from.
-        self.assertIn("Claude Stop", data["gate"]["source"])
+        # The report names the shared result source and remains read-only.
+        self.assertIn("shared gate results in workflow_root", data["gate"]["source"])
 
         markers = self.root / ".agent-runtime"
         (markers / "gate-failed").write_text("c1")

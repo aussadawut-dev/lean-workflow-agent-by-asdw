@@ -3,6 +3,42 @@
 เลขรุ่น `MAJOR.MINOR.PATCH`: MAJOR เปลี่ยนกติกาหรือ path เดิม, MINOR เพิ่มของใหม่, PATCH แก้ไข · วิธีอัปเกรด: [CUSTOMIZING.md](CUSTOMIZING.md)
 Versions are `MAJOR.MINOR.PATCH`: MAJOR changes rules or paths, MINOR adds, PATCH fixes · Upgrading: [CUSTOMIZING.md](CUSTOMIZING.md) · 5.x technical notes: [docs/CHANGELOG-dev.md](../docs/CHANGELOG-dev.md)
 
+## 5.6.0 — 2026-10-30
+
+🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#560--2026-10-30)
+
+เห็นผล gate และบริบท workspace/target ชัดเจนขึ้น พร้อมป้องกันการปิด tracker ก่อนมีหลักฐานครบ
+
+**มีอะไรใหม่**
+- บันทึกผล gate ที่สั่งรันเองด้วย จึงแยกการตรวจที่ล้มเหลวออกจากการที่ยังไม่เคยรันได้
+- ปิด tracker ได้เมื่อมี gate ผ่านและ review ที่ยังครอบคลุมงาน; งานหลายรายการในชุดเดียวกันใช้ผลตรวจร่วมกันได้
+- แสดง mode ของ workspace และ target แยกกัน และแสดงความคืบหน้าจากบริบทที่ถูกต้อง
+
+**แก้ไข**
+- ไม่รับรองผลผ่านหากไฟล์ที่ใช้ตรวจเปลี่ยนระหว่าง gate และรักษาสิทธิ์ไฟล์ tracker เมื่อบันทึกผล
+- แจ้งเตือนเมื่อคำอธิบายโครงการยังระบุ Lean รุ่นเก่า โดยไม่เขียนทับเนื้อหาโครงการ
+
+**ต้องทำอะไรตอนอัปเกรด**
+- ใช้ขั้นตอนอัปเดตเดิมและให้ independent reviewer ตรวจไฟล์ควบคุมที่เปลี่ยน
+- ก่อนปิด tracker ใหม่ ให้รัน shared gate ด้วย Task Contract ของงานและระบุ contract เดียวกันตอนปิด; tracker ที่ปิดไปแล้วไม่ต้องตรวจย้อนหลัง
+
+**English**
+
+See gate outcomes and workspace/target context clearly, and require covering evidence before closing trackers.
+
+**Added**
+- Direct gate runs record outcomes, distinguishing failed validation from a gate that has not run.
+- Tracker closure requires a covering gate pass and current required review; worksets in one validated batch may share that pass.
+- Status separates workspace and target modes, and resume context reads progress from the correct root.
+
+**Fixed**
+- A gate cannot certify inputs changed during validation; tracker updates preserve file permissions.
+- Upgrade preview warns about stale project baseline descriptions without replacing project-owned text.
+
+**Upgrade**
+- Follow the existing update procedure and independently review changed controls.
+- Run the shared gate under the work's Task Contract before new tracker closures, and use that same contract to close them. Historical closed trackers need no retrospective validation.
+
 ## 5.5.0 — 2026-10-30
 
 🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#550--2026-10-30)

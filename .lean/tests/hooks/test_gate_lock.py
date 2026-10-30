@@ -31,6 +31,134 @@ class GateLockTests(unittest.TestCase):
         (self.root / '.lean/PROJECT.md').write_text('<!-- gate:start -->\n```sh\nprintf ran >> runs\n```\n<!-- gate:end -->\n')
         self.runtime = self.root / '.agent-runtime'
 
+    def test_direct_failure_is_reported_without_cache(self):
+        (self.root / '.lean/PROJECT.md').write_text('<!-- gate:start -->\n```sh\nfalse\n```\n<!-- gate:end -->\n')
+        failed = self.gate()
+        self.assertEqual(failed.returncode, 2, failed.stderr)
+        status = subprocess.run([sys.executable, LEAN, '--root', str(self.root), 'gate', 'status'],
+                                capture_output=True, text=True)
+        self.assertEqual(status.stdout.strip(), 'FAIL')
+
+    def test_direct_pass_is_recorded_without_enabling_cache(self):
+        passed = self.gate()
+        self.assertEqual(passed.returncode, 0, passed.stderr)
+        status = subprocess.run([sys.executable, LEAN, '--root', str(self.root), 'gate', 'status'],
+                                capture_output=True, text=True)
+        self.assertEqual(status.stdout.strip(), 'PASS')
+        self.assertFalse((self.runtime / 'gate-cache').exists())
+
+    def test_recorded_pass_becomes_stale_after_an_input_edit(self):
+        subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
+        (self.root / '.gitignore').write_text('.agent-runtime/\nruns\n')
+        self.assertEqual(self.gate().returncode, 0)
+        from lean import gate
+        self.assertEqual(gate.status(self.root), 'PASS')
+        (self.root / 'app.txt').write_text('changed')
+        self.assertEqual(gate.status(self.root), 'STALE')
+        self.assertEqual(gate.status(self.root, verify=False), 'LAST_PASS')
+
+    def test_gate_cannot_record_a_pass_for_inputs_changed_by_its_checks(self):
+        subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
+        (self.root / '.gitignore').write_text('.agent-runtime/\n')
+        (self.root / '.lean/PROJECT.md').write_text(
+            '<!-- gate:start -->\n```sh\nprintf changed > app.txt\n```\n<!-- gate:end -->\n')
+        result = self.gate()
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn('shipping inputs changed during validation', result.stderr)
+        from lean import gate
+        self.assertEqual(gate.status(self.root), 'UNVERIFIED')
+
+    def test_fresh_hook_rerun_cannot_reuse_previous_pass_coverage(self):
+        subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
+        (self.root / '.gitignore').write_text('.agent-runtime/\n')
+        (self.root / 'app.txt').write_text('original')
+        (self.root / '.lean/PROJECT.md').write_text(
+            '<!-- gate:start -->\n```sh\nif [ -f .agent-runtime/mutate ]; then printf changed > app.txt; fi\n```\n<!-- gate:end -->\n')
+        first = self.gate(hook=True)
+        self.assertEqual(first.returncode, 0, first.stderr)
+        (self.runtime / 'mutate').touch()
+        second = self.gate(hook=True)
+        self.assertEqual((self.root / 'app.txt').read_text(), 'changed')
+        self.assertEqual(second.returncode, 2, second.stderr)
+        self.assertIn('shipping inputs changed during validation', second.stderr)
+        from lean import gate
+        self.assertEqual(gate.status(self.root), 'UNVERIFIED')
+
+    def test_closure_retains_explicit_review_requirement(self):
+        subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
+        (self.root / '.gitignore').write_text('.agent-runtime/\nruns\n')
+        (self.root / '.lean/config.json').write_text(json.dumps(
+            {'mode': 'tracker', 'configured': True, 'execution': 'direct'}))
+        tracking = self.root / 'docs/tracking'
+        tracking.mkdir(parents=True)
+        tracker = tracking / 'TCK001.md'
+        tracker.write_text('# Workset\nStatus: VALIDATING\n\n## Evidence\n')
+
+        def cli(*args):
+            return subprocess.run([sys.executable, LEAN, '--root', str(self.root), *args],
+                                  capture_output=True, text=True, env=clean_env())
+
+        for risk in ('LOW', 'MEDIUM'):
+            contract = f'Contract: risk={risk} quality=STANDARD acceptance=explicit review required'
+            for invalid in ('REWORK', 'missing'):
+                with self.subTest(risk=risk, receipt=invalid):
+                    state = cli('evidence', 'state').stdout.strip()
+                    reviewed = cli('evidence', 'record-review', '--contract', contract,
+                                   '--reviewer', 'fixture', '--state', state, '--verdict', 'PASS',
+                                   '--evidence', 'fixture review')
+                    self.assertEqual(reviewed.returncode, 0, reviewed.stderr)
+                    passed = cli('gate', 'run', '--contract', contract, '--require-review')
+                    self.assertEqual(passed.returncode, 0, passed.stderr)
+                    if invalid == 'REWORK':
+                        reviewed = cli('evidence', 'record-review', '--contract', contract,
+                                       '--reviewer', 'fixture', '--state', state, '--verdict', 'REWORK',
+                                       '--evidence', 'new finding')
+                        self.assertEqual(reviewed.returncode, 0, reviewed.stderr)
+                    else:
+                        (self.runtime / 'review.json').unlink()
+                    before = tracker.read_bytes()
+                    closed = cli('tracker', 'status', '--id', 'TCK001', '--status', 'DONE',
+                                 '--contract', contract, '--evidence', 'invalid closure')
+                    self.assertNotEqual(closed.returncode, 0, closed.stdout + closed.stderr)
+                    self.assertEqual(tracker.read_bytes(), before)
+
+    def test_closure_retains_high_risk_review_floor_after_complete_commit(self):
+        subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
+        (self.root / '.gitignore').write_text('.agent-runtime/\n')
+        (self.root / '.lean/config.json').write_text(json.dumps(
+            {'mode': 'tracker', 'configured': True, 'execution': 'direct'}))
+        (self.root / '.lean/PROJECT.md').write_text(
+            '<!-- gate:start -->\n```sh\ntrue\n```\n<!-- gate:end -->\n\n## High-risk areas\n- `app.txt`\n')
+        (self.root / 'app.txt').write_text('shipping code')
+        tracking = self.root / 'docs/tracking'
+        tracking.mkdir(parents=True)
+        tracker = tracking / 'TCK001.md'
+        tracker.write_text('# Workset\nStatus: VALIDATING\n\n## Evidence\n')
+
+        def cli(*args):
+            return subprocess.run([sys.executable, LEAN, '--root', str(self.root), *args],
+                                  capture_output=True, text=True, env=clean_env())
+
+        low = 'Contract: risk=LOW quality=STANDARD acceptance=fixture closure'
+        high = 'Contract: risk=HIGH quality=HIGH acceptance=review shipping code'
+        reviewed = cli('evidence', 'record-review', '--contract', high, '--reviewer', 'fixture',
+                       '--state', cli('evidence', 'state').stdout.strip(), '--verdict', 'PASS',
+                       '--evidence', 'high review')
+        self.assertEqual(reviewed.returncode, 0, reviewed.stderr)
+        passed = cli('gate', 'run', '--contract', low)
+        self.assertEqual(passed.returncode, 0, passed.stderr)
+        subprocess.run(['git', '-C', str(self.root), 'add', '.'], check=True)
+        subprocess.run(['git', '-C', str(self.root), '-c', 'user.name=test', '-c',
+                        'user.email=test@example.invalid', 'commit', '-qm', 'complete fixture'], check=True)
+        reviewed = cli('evidence', 'record-review', '--contract', high, '--reviewer', 'fixture',
+                       '--state', cli('evidence', 'state').stdout.strip(), '--verdict', 'REWORK',
+                       '--evidence', 'new finding')
+        self.assertEqual(reviewed.returncode, 0, reviewed.stderr)
+        closed = cli('tracker', 'status', '--id', 'TCK001', '--status', 'DONE', '--contract', low,
+                     '--evidence', 'invalid closure')
+        self.assertNotEqual(closed.returncode, 0, closed.stdout + closed.stderr)
+        self.assertNotIn('Status: DONE', tracker.read_text())
+
     def gate(self, hook=False, **kwargs):
         command = ['hook', 'claude', 'stop'] if hook else ['gate', 'run']
         return stop_refusal(subprocess.run([sys.executable, LEAN, '--root', str(self.root), *command], input='{}',

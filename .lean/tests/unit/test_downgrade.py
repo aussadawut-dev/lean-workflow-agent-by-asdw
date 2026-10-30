@@ -11,7 +11,7 @@ from unittest.mock import patch
 from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from support import ROOT  # noqa: E402
+from support import ROOT, passing_gate  # noqa: E402
 from lean import records as workflow  # noqa: E402
 
 SCRIPT = ROOT / ".lean/bin/lean"
@@ -165,7 +165,7 @@ class DowngradeTests(unittest.TestCase):
         self.tracker()
         queue = self.item()
         self.cli('downgrade', 'tracker', '--apply', '--keep-pending')
-        self.cli('tracker', 'status', '--id', 'TCK001', '--status', 'DONE', '--evidence', 'tracker complete')
+        self.cli('tracker', 'status', '--id', 'TCK001', '--status', 'DONE', '--evidence', 'tracker complete', "--contract", passing_gate(self.root))
         before = self.snapshot()
         result = self.cli('configure', 'full', ok=False)
         self.assertIn('unfinished queue', result.stderr)

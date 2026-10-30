@@ -2,7 +2,7 @@
 
 ## Current authority
 
-Baseline 5.5.0 uses `AGENTS.md` as the shared canonical contract. `CLAUDE.md` is a runtime entrypoint that imports it; Codex and agy read `AGENTS.md` directly. The active agent leads unless project additions record a different Controller or primary agent. No provider-specific ownership, product stack or model shortlist is imposed beyond the editable `.lean/models.json`.
+Baseline 5.6.0 uses `AGENTS.md` as the shared canonical contract. `CLAUDE.md` is a runtime entrypoint that imports it; Codex and agy read `AGENTS.md` directly. The active agent leads unless project additions record a different Controller or primary agent. No provider-specific ownership, product stack or model shortlist is imposed beyond the editable `.lean/models.json`.
 
 Keep project facts, commands and gates in PROJECT; mode/execution in `config.json`; the model list and `max_agents` in `models.json`; gate automation in `gate.json`; procedure preferences in `skill-effort.json`; accepted scope and work records in the project's trackers. Project overrides go below the contract's Project additions marker. Do not edit portable policy per project without tracking that delta.
 
@@ -27,6 +27,8 @@ Use `/lean-update` (`lean update preview`, then `apply` of the reviewed plan; `r
 From 4.x, follow `docs/migrating-to-v5.md`: the preview runs from the pinned 5.0.0 release because 4.x has no `lean` command.
 
 After any upgrade: run `lean lint`, `lean mode check` and the project gate, finish an independent HIGH review over the shipping delta, and approve changed gate controls through that review or `lean gate accept-controls` with the user's approval reference.
+
+Preview warns when the Purpose section of the workspace or a retained target's PROJECT names a Lean baseline different from the incoming release. It preserves that project-owned wording; review and update current declarations locally. Baseline references in other sections, such as upgrade history, do not trigger this warning.
 
 ## Runtime limits
 
