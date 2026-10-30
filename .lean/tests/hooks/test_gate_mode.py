@@ -87,6 +87,38 @@ class GateModeTests(unittest.TestCase):
             self.assertEqual(self.mode(*args).returncode, 2)
             self.assertEqual(self.config.read_bytes(), original)
 
+    def test_a_stop_tier_runs_at_stop_and_the_full_gate_runs_explicitly(self):
+        # asdw-harness chose manual mode because its full gate (tests and build) was too slow for every Stop.
+        self.project.write_text("<!-- gate:start -->\n```sh\nprintf 'full\\n' >> gate-runs\n```\n<!-- gate:end -->\n"
+                                "<!-- gate:stop:start -->\n```sh\nprintf 'stop\\n' >> gate-runs\n```\n"
+                                "<!-- gate:stop:end -->\n")
+        result_file = self.root / ".agent-runtime/gate-result.json"
+        self.auto(True)
+        for stop in (self.claude, lambda: self.codex()):
+            self.marker.unlink(missing_ok=True)
+            result = stop()
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(self.marker.read_text().splitlines(), ["stop"])
+        self.assertFalse(result_file.exists())  # A Stop tier pass is never a full pass.
+        status = lean(self.root, "gate", "status", env=environment(self.root)).stdout
+        self.assertIn("stop tier: PASS", status)
+        self.assertNotEqual(status.splitlines()[0], "PASS")
+        self.marker.unlink()
+        explicit = lean(self.root, "gate", "run", env=environment(self.root))
+        self.assertEqual(explicit.returncode, 0, explicit.stderr)
+        self.assertEqual(self.marker.read_text().splitlines(), ["full"])
+        self.assertEqual(json.loads(result_file.read_text())["status"], "PASS")
+        self.marker.unlink()
+        fast = lean(self.root, "gate", "run", "--tier", "stop", env=environment(self.root))
+        self.assertEqual(fast.returncode, 0, fast.stderr)
+        self.assertEqual(self.marker.read_text().splitlines(), ["stop"])
+        self.assertEqual(json.loads(result_file.read_text())["status"], "PASS")  # The full result stays.
+        for broken in ("<!-- gate:stop:start -->\n", "<!-- gate:stop:start -->\n```sh\n```\n<!-- gate:stop:end -->\n"):
+            with self.subTest(broken=broken):
+                self.project.write_text("<!-- gate:start -->\n```sh\ntrue\n```\n<!-- gate:end -->\n" + broken)
+                self.assertNotEqual(lean(self.root, "gate", "run", "--tier", "stop",
+                                         env=environment(self.root)).returncode, 0)
+
     def test_claude_manual_stop_shows_one_line_instead_of_hidden_stderr(self):
         # Claude Code shows neither model nor user a Stop hook's stderr on exit 0.
         for mode in ("manual", "manual_fixloop"):

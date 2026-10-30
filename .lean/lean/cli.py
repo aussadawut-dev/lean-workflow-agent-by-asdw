@@ -73,6 +73,8 @@ def build_parser(argv=()):
     gate_run.add_argument("--quiet", action="store_true")
     gate_run.add_argument("--contract", default="")
     gate_run.add_argument("--session", default="")
+    gate_run.add_argument("--tier", choices=("full", "stop"),
+                          help="full (default) or the fast Stop tier PROJECT.md defines")
     gate_run.add_argument("--hook", action="store_true", help=argparse.SUPPRESS)  # Raw hook mode, payload on stdin.
     gate_run.add_argument("--seed", action="store_true", help=argparse.SUPPRESS)
     preflight = gate_actions.add_parser("preflight", help="read receipt readiness without running validation")
@@ -444,6 +446,9 @@ def gate_command(root, args):
         return emit(code, "\n".join(out), "\n".join(err))
     if args.action == "status":
         print(gate.status(root))
+        stop = gate.stop_status(root)
+        if stop:
+            print(f"stop tier: {stop}")
         return 0
     if args.action == "mode":
         if args.mode and args.policy:
@@ -485,7 +490,8 @@ def gate_command(root, args):
             raise LeanError("hook input must be a JSON object")
     code, out, err = gate.run(root, hook=args.hook, seed=args.seed, cache_tree=args.cache_tree,
                               require_review=args.require_review, quiet=args.quiet, contract=args.contract,
-                              session=args.session, payload=payload)
+                              session=args.session, payload=payload,
+                              tier=args.tier or (None if args.hook else "full"))
     for line in out:
         print(line)
     for line in err:

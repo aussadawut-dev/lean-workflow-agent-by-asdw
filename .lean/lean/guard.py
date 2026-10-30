@@ -595,7 +595,8 @@ GATE_MARKER = '("record-review", ' + '"check-review")'  # Split so this file is 
 RECEIPT = RUNTIME + "/review.json"
 RECEIPT_HISTORY = RUNTIME + "/review-history.jsonl"  # Earlier receipts still count, so they are guarded alike.
 PENDING = RUNTIME + "/review-pending.json"  # Written only by `lean gate review-pending`.
-GATE_CACHES = (RUNTIME + "/gate-cache", RUNTIME + "/target-gate-cache",
+GATE_CACHES = (RUNTIME + "/gate-cache", RUNTIME + "/gate-stop-cache", RUNTIME + "/gate-stop-result.json",
+               RUNTIME + "/target-gate-cache",
                RUNTIME + "/gate-result.json")  # Written only by the gate.
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit", "apply_patch"}
 

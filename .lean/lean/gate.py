@@ -24,6 +24,9 @@ LOCK_ENV = "LEAN_GATE_LOCK_FD"
 FORCE_ENV = "LEAN_GATE_FORCE"
 GATE_FILE = ".lean/gate.json"
 RESULT_FILE = ".agent-runtime/gate-result.json"
+STOP_RESULT_FILE = ".agent-runtime/gate-stop-result.json"  # The fast Stop tier; never a full pass.
+MARKERS = {"full": ("<!-- gate:start -->", "<!-- gate:end -->"),
+           "stop": ("<!-- gate:stop:start -->", "<!-- gate:stop:end -->")}
 PENDING_FILE = ".agent-runtime/review-pending.json"
 PENDING_LIMIT = 2 * 3600  # Seconds a marked review keeps Stops quiet; a longer wait blocks again.
 HIGH_REVIEW = re.compile(r"Contract: (?:risk=HIGH quality=|risk=(?:LOW|MEDIUM) quality=VERY_HIGH acceptance=)")
@@ -254,23 +257,37 @@ def preflight(root, contract=None, session=None, require_review=False):
     return 0, [f"Receipt preflight: {result}; validation NOT_RUN. Final gate still required."], []
 
 
-def gate_commands(project):
-    """Commands between the gate markers; raises LeanError for malformed markers."""
+def gate_commands(project, tier="full"):
+    """Commands between a tier's gate markers; raises LeanError for malformed markers.
+
+    The full tier (`gate:start`/`gate:end`) is required. The optional Stop tier
+    (`gate:stop:start`/`gate:stop:end`) returns None when PROJECT.md does not define it."""
+    begin, finish = MARKERS[tier]
     commands, starts, ends, inside, invalid = [], 0, 0, False, False
     for line in project.read_text().splitlines():
-        if "<!-- gate:start -->" in line:
+        if begin in line:
             starts += 1
             inside = True
             continue
-        if "<!-- gate:end -->" in line:
+        if finish in line:
             ends += 1
             invalid = invalid or not inside
             inside = False
         if inside and not line.startswith("```") and not re.match(r"[ \t]*(#|$)", line):
             commands.append(line)
+    if tier == "stop" and starts == 0 and ends == 0:
+        return None
     if starts != 1 or ends != 1 or invalid:
-        raise LeanError("Quality Gate undefined: malformed gate markers.")
+        raise LeanError(f"Quality Gate undefined: malformed {'Stop tier ' if tier == 'stop' else ''}gate markers.")
     return commands
+
+
+def has_stop_tier(project):
+    """Whether PROJECT.md defines a Stop tier; a malformed one counts, so the Stop reports it."""
+    try:
+        return project.is_file() and gate_commands(project, "stop") is not None
+    except (LeanError, OSError, ValueError):
+        return True
 
 
 def missing_tool(command, status):
@@ -294,10 +311,14 @@ class Run:
     """One gate run. `out` collects stdout (hook JSON), `err` the refusal text."""
 
     def __init__(self, root, hook=False, seed=False, cache_tree=False, require_review=False, quiet=False,
-                 contract="", session="", payload=None, show=None, stop=False):
+                 contract="", session="", payload=None, show=None, stop=False, tier=None):
         self.root = Path(root).resolve()
         self.hook, self.seed, self.cache_tree = hook, seed, cache_tree
         self.stop = (hook or stop) and not seed  # Only a provider Stop may be released for a pending review.
+        # A provider Stop runs the fast tier when PROJECT.md defines one; everything else runs the full gate.
+        if tier is None:
+            tier = "stop" if self.stop and has_stop_tier(self.root / ".lean/PROJECT.md") else "full"
+        self.tier = tier
         self.require_review, self.quiet = require_review, quiet or hook  # No one watches a Stop live.
         self.contract, self.session = contract, session
         self.payload = payload if payload is not None else {}
@@ -311,7 +332,8 @@ class Run:
         self.checks_reused = False
         self.high_risk_review = False
         runtime = self.root / ".agent-runtime"
-        self.cache, self.failed = runtime / "gate-cache", runtime / "gate-failed"
+        self.cache = runtime / ("gate-stop-cache" if self.tier == "stop" else "gate-cache")
+        self.failed = runtime / "gate-failed"
         self.baseline, self.refusal = runtime / "gate-baseline", runtime / "gate-refusal"
         self.active, self.transcript = False, ""
 
@@ -484,7 +506,7 @@ class Run:
             return self.refuse()
         project = root / ".lean/PROJECT.md"
         try:
-            configured = gate_commands(project) if project.is_file() else []
+            configured = (gate_commands(project, self.tier) or []) if project.is_file() else []
         except LeanError:
             configured = []
         self.checks += len(configured)
@@ -500,9 +522,13 @@ class Run:
             self.say("Quality Gate undefined: missing .lean/PROJECT.md; run /lean-init.")
             return self.refuse()
         try:
-            commands = gate_commands(project)
+            commands = gate_commands(project, self.tier)
         except LeanError as error:
             self.say(str(error))
+            return self.refuse()
+        if commands is None:
+            self.say("Quality Gate Stop tier undefined: add <!-- gate:stop:start --> and <!-- gate:stop:end --> "
+                     "around the fast checks in .lean/PROJECT.md.")
             return self.refuse()
         if not commands:
             self.say("Quality Gate undefined: configure checks in .lean/PROJECT.md; no validation passed.")
@@ -682,7 +708,7 @@ def run(root, **options):
         return busy(root, message, options)
     gate = Run(root, **options)
     try:
-        gate.previous_result = load_result(gate.root)
+        gate.previous_result = load_result(gate.root, result_file(gate))
     except (OSError, ValueError):
         pass  # A new run can replace an unreadable old result; it cannot reuse its coverage.
     began = time.monotonic()
@@ -707,8 +733,13 @@ def run(root, **options):
         reason = next((line for message in gate.err for line in message.splitlines()
                        if line.strip() and not PROGRESS_LINE.match(line)), "")
         activity.record(gate.root, "gate", result=result, checks=gate.checks, seconds=round(time.monotonic() - began, 1),
-                        hook=gate.hook or None, reason=reason[:200] if code else None)
+                        hook=gate.hook or None, reason=reason[:200] if code else None,
+                        tier="stop" if gate.tier == "stop" else None)
     return code, gate.out, gate.err
+
+
+def result_file(run):
+    return STOP_RESULT_FILE if getattr(run, "tier", "full") == "stop" else RESULT_FILE
 
 
 def record_result(run, result):
@@ -726,17 +757,17 @@ def record_result(run, result):
                "state": evidence.state(root) if git_tree else None,
                "review_state": evidence.review_state(root) if git_tree else None,
                "base": evidence.head_tree(root) if git_tree else None,
-               "record_root": records}
+               "record_root": records, "tier": getattr(run, "tier", "full")}
     if reuse:
         payload.update({key: previous[key] for key in ("state", "review_state", "base")})
     if result == "PASS" and run.input_state and payload["state"] != run.input_state:
         raise LeanError("shipping inputs changed during validation; run the gate on the final state")
-    write_json(safe_path(root, RESULT_FILE), payload)
+    write_json(safe_path(root, result_file(run)), payload)
 
 
-def load_result(root):
+def load_result(root, name=RESULT_FILE):
     try:
-        value = read_json(safe_path(root, RESULT_FILE))
+        value = read_json(safe_path(root, name))
     except FileNotFoundError:
         return None
     if (not isinstance(value, dict) or value.get("schema") != 1
@@ -783,6 +814,19 @@ def check_closure(root, record_root, contract, session=""):
     risky = evidence.high_risk_changes(root, session)
     check_receipt(root, contract, bool(HIGH_REVIEW.match(contract)) or result["require_review"],
                   risky or result["high_risk_review"])
+
+
+def stop_status(root):
+    """The last Stop tier result (PASS, STALE or a failure), or None when no Stop tier has run."""
+    try:
+        result = load_result(Path(root).resolve(), STOP_RESULT_FILE)
+        if result is None:
+            return None
+        if result["status"] != "PASS" or result.get("state") is None:
+            return result["status"]
+        return "PASS" if result["state"] == evidence.state(Path(root)) else "STALE"
+    except (OSError, ValueError, subprocess.CalledProcessError):
+        return "UNKNOWN"
 
 
 def status(root, verify=True):
