@@ -349,10 +349,12 @@ class UpdateTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("outside the target", result.stderr)
 
-    def pinned_install(self, recorded_source, recorded_commit):
+    def pinned_install(self, recorded_source, recorded_commit, purpose=None, name="pin"):
         """A current installation whose pin names `recorded_commit`, then one upstream change to TOOLS.md."""
-        pinned = self.base / "pinned"
+        pinned = self.base / (name + "ned")
         install_release(pinned, source=self.source)
+        if purpose:
+            write(pinned, ".lean/PROJECT.md", f"# Project\n\n## Purpose\n\n{purpose}\n")
         write(pinned, ".lean/upstream.json", json.dumps({"schema": 1, "source": recorded_source,
                                                           "ref": f"refs/tags/v{VERSION}", "commit": recorded_commit}))
         commit(pinned, "pinned install")
@@ -361,7 +363,7 @@ class UpdateTests(unittest.TestCase):
         commit(self.source, "upstream change")
         head = git(self.source, "rev-parse", "HEAD")
         result = self.lean("update", "preview", "--target", str(pinned), "--source", str(self.source),
-                           "--ref", head, "--workspace", str(self.base / "ws-pin"))
+                           "--ref", head, "--workspace", str(self.base / ("ws-" + name)))
         return result
 
     def test_a_pin_recorded_under_another_spelling_of_the_source_keeps_its_base(self):
@@ -382,6 +384,18 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(tools["action"], "conflict")
         self.assertIn("no base", tools["reason"])
         self.assertIn("1111111", result.stdout)
+
+    def test_preview_warns_for_other_stale_version_wording_and_the_pinned_commit(self):
+        # asdw-harness wrote "Lean 5.3.1 uses tracker/direct" and the pinned commit; neither was noticed.
+        previous = git(self.source, "rev-parse", "HEAD")
+        result = self.pinned_install(str(self.source), previous,
+                                     f"Lean 5.3.1 uses tracker/direct; Lean v5.2.0 before; commit {previous[:8]}.")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(".lean/PROJECT.md Purpose names Lean 5.3.1", result.stdout)
+        self.assertIn(".lean/PROJECT.md Purpose names Lean v5.2.0", result.stdout)
+        self.assertIn(f".lean/PROJECT.md Purpose names the pinned commit {previous[:8]}", result.stdout)
+        current = self.pinned_install(str(self.source), previous, f"Lean {VERSION} uses tracker/direct.", "now")
+        self.assertNotIn("Purpose names", current.stdout)
 
     def test_older_releases_and_workspaces_inside_a_checkout_are_refused(self):
         inside = self.lean("update", "preview", "--target", str(self.target), "--source", str(self.source),

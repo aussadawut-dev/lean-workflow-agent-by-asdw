@@ -22,6 +22,8 @@ from .util import LeanError, read_json, write_json, write_text
 DEFAULT_SOURCE = "https://github.com/aussadawut-dev/lean-workflow-agent-by-asdw.git"
 VERSION_TAG = re.compile(r"v?(\d+)\.(\d+)\.(\d+)\Z")
 BASELINE = re.compile(r"Lean Workflow Baseline\s+(\d+\.\d+\.\d+)\b")
+# Version wording a Purpose may carry: "Lean Workflow Baseline 5.6.0", "Lean 5.3.1", "Lean v5.2.0".
+STATED_VERSION = re.compile(r"\bLean(?:\s+Workflow)?(?:\s+Baseline)?\s+v?(\d+\.\d+\.\d+)\b")
 ADDITIONS = "## Project additions"
 MERGED = ("AGENTS.md", "CLAUDE.md", ".claude/settings.json", ".codex/hooks.json")
 # What 4.x scripts became, for migration notes.
@@ -248,7 +250,7 @@ def preview(root, target=None, source=None, ref=None, workspace=None):
             raise LeanError("tag and AGENTS.md baseline versions disagree")
     new_files, new_links = registry(release)
     old_files, old_links = registry(target) if (target / ".lean/assets.json").is_file() else ([], {})
-    previous, unverified = None, ""
+    previous, unverified, pinned = None, "", ""
     operations, notes = [], []
     provenance = target / ".lean/upstream.json"
     if provenance.is_file():
@@ -256,6 +258,7 @@ def preview(root, target=None, source=None, ref=None, workspace=None):
         # The pinned commit names the installed release on its own, so the source spelling (SSH or HTTPS,
         # a trailing .git or slash) does not matter; the base is read from the source being installed.
         if isinstance(recorded, dict) and re.fullmatch(r"[0-9a-f]{40}", str(recorded.get("commit", ""))):
+            pinned = recorded["commit"]
             try:
                 checkout(source, recorded["commit"], workspace / "previous")
                 previous = workspace / "previous"
@@ -341,9 +344,13 @@ def preview(root, target=None, source=None, ref=None, workspace=None):
             continue
         purpose = re.search(r"(?ms)^## Purpose[ \t]*\n(.*?)(?=^## |\Z)", document.read_text())
         if purpose:
-            for version in sorted(set(BASELINE.findall(purpose.group(1)))):
-                if version != incoming:
-                    notes.append(f"{relative} Purpose names Lean Workflow Baseline {version}; incoming is {incoming}. "
+            for stated in sorted({match.group(0) for match in STATED_VERSION.finditer(purpose.group(1))}):
+                if STATED_VERSION.fullmatch(stated).group(1) != incoming:
+                    notes.append(f"{relative} Purpose names {stated}; incoming is {incoming}. "
+                                 "Review the project-owned wording; it is preserved.")
+            for named in sorted(set(re.findall(r"\b[0-9a-f]{7,40}\b", purpose.group(1)))):
+                if pinned.startswith(named) and not commit.startswith(named):
+                    notes.append(f"{relative} Purpose names the pinned commit {named}; incoming is {commit[:12]}. "
                                  "Review the project-owned wording; it is preserved.")
     # Project documents PROJECT.md routes agents to are linted too, and nothing the update writes reaches them.
     visible = set(structure.git_visible(target) or [])  # What lint reads; never a path outside the target.
