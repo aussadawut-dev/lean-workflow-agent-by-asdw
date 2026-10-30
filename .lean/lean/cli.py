@@ -57,7 +57,8 @@ def build_parser(argv=()):
     declare = contract_actions.add_parser("declare", help="validate a contract (the hook binds it to the session)")
     declare.add_argument("--contract", help="one-line contract; omit to read a block from stdin")
     current = contract_actions.add_parser("current", help="print the session's declared contract")
-    current.add_argument("--session", required=True)
+    current.add_argument("--session", help="defaults to this process's session (LEAN_SESSION_ID, "
+                                           "CLAUDE_CODE_SESSION_ID or CODEX_THREAD_ID)")
 
     hook = commands.add_parser("hook", help="provider lifecycle hook entry (reads the hook JSON on stdin)")
     hook.add_argument("provider", choices=("claude", "codex"))
@@ -201,7 +202,13 @@ def build_parser(argv=()):
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     parser = build_parser(argv)
-    args = parser.parse_args(argv)
+    # `evidence` hands everything after it to its own parser; argparse leaves a leading option such as
+    # --help out of the REMAINDER, so pass any such leftovers on instead of refusing them.
+    args, unknown = parser.parse_known_args(argv)
+    if unknown and args.command != "evidence":
+        parser.error("unrecognized arguments: " + " ".join(unknown))
+    if unknown:
+        args.rest = unknown + args.rest
     try:
         root = (args.root or WORKFLOW_ROOT).resolve()
         if args.command in RECORD_COMMANDS:
@@ -268,7 +275,12 @@ def dispatch(root, args, parser):
                 return 2
             print(text + "".join(f"\n{name}: {value}" for name, value in meta.items()))
             return 0
-        found = guard.current(root, args.session)
+        from . import progress
+        session = args.session or progress.env_session()
+        if not session:
+            print("lean contract current: no session in the environment; pass --session", file=sys.stderr)
+            return 2
+        found = guard.current(root, session)
         if not found:
             print("No Task Contract declared for this session", file=sys.stderr)
             return 1

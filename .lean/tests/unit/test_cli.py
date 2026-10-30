@@ -1,5 +1,6 @@
 """The command line: help, version, status surfaces and read-only behavior."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -85,6 +86,23 @@ class CliTests(unittest.TestCase):
         result = lean(self.root, "spawn", "plan")
         self.assertEqual(result.returncode, 2)
         self.assertIn("--tasks is required", result.stderr)
+
+
+    def test_evidence_help_is_shown_not_refused(self):
+        result = lean(self.root, "evidence", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("usage: lean evidence", result.stdout)
+        self.assertNotEqual(lean(self.root, "status", "--bogus").returncode, 0)  # Other commands stay strict.
+
+    def test_contract_current_reads_the_session_from_the_environment(self):
+        env = {key: value for key, value in os.environ.items()
+               if key not in ("LEAN_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID")}
+        missing = lean(self.root, "contract", "current", env=env)
+        self.assertEqual(missing.returncode, 2)
+        self.assertIn("--session", missing.stderr)
+        result = lean(self.root, "contract", "current", env=dict(env, LEAN_SESSION_ID="session-a"))
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("No Task Contract declared for this session", result.stderr)
 
 
 if __name__ == "__main__":
