@@ -153,7 +153,8 @@ def check(root):
             data = testsel.impact(root)
             available = set(testsel.all_files(root))
             for name in sorted({name for name in (files if isinstance(files, list) else []) if isinstance(name, str)} | set(PROJECT_OWNED)):
-                if (not testsel.matches(name, data["scope"]) or name[len(testsel.TESTS) + 1:] in available
+                if (not testsel.matches(name, data["scope"])
+                        or (name.startswith(testsel.TESTS + "/") and name[len(testsel.TESTS) + 1:] in available)
                         or testsel.matches(name, data["lint_only"])
                         or any(testsel.matches(name, rule["paths"]) for rule in data["rules"])):
                     continue
