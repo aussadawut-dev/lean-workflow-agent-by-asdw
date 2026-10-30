@@ -204,6 +204,19 @@ class WorkflowModeTests(unittest.TestCase):
         self.run_cli("check")
         self.assertIn("Status: FAILED", (self.root / "docs/tracking/TCK001.md").read_text())
 
+    def test_a_status_line_with_a_note_names_the_line_and_the_convention(self):
+        # asdw-harness: `Status: DONE — note` failed mode check with only "invalid tracker status: <path>".
+        self.run_cli("configure", "tracker")
+        path = self.tracker_doc()
+        path.write_text("# Workset\n\nStatus: BLOCKED — waiting on review\n\n## Evidence\n")
+        for args in (("check",), ("tracker", "status", "--id", "TCK001", "--status", "IN_PROGRESS")):
+            with self.subTest(args=args):
+                result = self.run_cli(*args, success=False)
+                self.assertIn("TCK001.md:3", result.stderr)
+                self.assertIn("Status: BLOCKED — waiting on review", result.stderr)
+                self.assertIn("Status note:", result.stderr)
+        self.assertIn("Status: BLOCKED — waiting", path.read_text())
+
     def test_execution_selection_survives_mode_upgrade(self):
         self.run_cli("configure", "standard", "--execution", "delegated")
         self.run_cli("configure", "tracker")

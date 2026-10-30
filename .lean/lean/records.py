@@ -234,6 +234,22 @@ def unchecked_tracker_items(content):
     return unchecked
 
 
+def status_problem(name, content):
+    """Why a tracker's Status line is invalid, naming file:line, or None when it is one valid line."""
+    found = [(number, line) for number, line in enumerate(content.splitlines(), 1)
+             if line.startswith("Status:") and not line.startswith("Status note:")]
+    valid = [line for _, line in found if re.fullmatch(r"Status: ([A-Z_]+)", line)
+             and line[len("Status: "):] in TRACKER_STATES]
+    if len(found) == 1 and len(valid) == 1:
+        return None
+    convention = (f"a tracker needs exactly one `Status: <STATE>` line ({', '.join(TRACKER_STATES)}); "
+                  "put notes on a separate `Status note:` line")
+    if not found:
+        return f"invalid tracker status: {name}: no Status line; {convention}"
+    return "invalid tracker status: " + "; ".join(f"{name}:{number}: {line!r}" for number, line in found) + \
+        f"; {convention}"
+
+
 def single_line(value, name):
     """Reject line breaks that would forge Status or Evidence lines in a tracker."""
     if "".join(value.splitlines()) != value:
@@ -265,8 +281,9 @@ def tracker_command(root, args):
             evidence = single_line(args.evidence, "evidence")
             content = path.read_text()
             matches = list(re.finditer(r"(?m)^Status: [A-Z_]+$", content))
-            if len(matches) != 1:
-                fail(f"expected one Status line: {args.id}")
+            problem = status_problem(path.name, content)
+            if len(matches) != 1 or problem:
+                fail(problem or f"expected one Status line: {args.id}")
             if args.status == "DONE" and not evidence:
                 fail("DONE requires evidence")
             if args.status == "DONE" and unchecked_tracker_items(content):
@@ -456,7 +473,7 @@ def validate_records(root, mode, include_retained=False):
                 fail(f"invalid tracker filename: {path}")
             statuses = re.findall(r"(?m)^Status: ([A-Z_]+)$", path.read_text())
             if len(statuses) != 1 or statuses[0] not in TRACKER_STATES:
-                fail(f"invalid tracker status: {path}")
+                fail(status_problem(path.relative_to(root), path.read_text()) or f"invalid tracker status: {path}")
             tracker_id = path.stem.split("-", 1)[0]
             if tracker_id in tracker_statuses:
                 fail(f"duplicate tracker id: {tracker_id}")
