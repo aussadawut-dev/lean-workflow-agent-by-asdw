@@ -468,7 +468,11 @@ class GuardHookTests(HookFixture):
         denied = (f"cp x.py {scratch}/x", f"mv {scratch}/a x.py", f"touch {scratch}/a && touch x.py",
                   f"mkdir {scratch}/$HOME", f"rm -rf {scratch}/../../{self.root.name}/x", f"echo > {self.root}/f",
                   f"mkdir -m 700 {scratch}/x", f"python3 -c 'open(\"{scratch}/f\", \"w\")'",
-                  f"git -C {scratch} init", f"mkdir {scratch}/x\ntouch x.py")
+                  f"git -C {scratch} init", f"mkdir {scratch}/x\ntouch x.py",
+                  # Review 5.7 round 1: the shell rewrites these words, or an option carries the target.
+                  f"touch {scratch}/{{a,../../etc/lean-x}}", f"rm -rf {scratch}/*/../x", "rm -rf ~/x",
+                  f"rm {scratch}/[ab]/../../x", f"cp -t/etc/lean-x {scratch}/a",
+                  f"cp --target-directory=/etc/lean-x {scratch}/a", f"ln -s /etc/lean-x {scratch}/l -T")
         for command in allowed:
             with self.subTest(allowed=command):
                 result = self.tool("claude", "Bash", "scratch", command=command)

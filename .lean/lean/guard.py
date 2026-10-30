@@ -419,6 +419,7 @@ def external_scratch_or_memory(root, name, tool_input):
 
 SCRATCH_ROOTS = (Path("/tmp"), Path("/private/tmp"), Path("/tmp").resolve())
 SCRATCH_WRITERS = {"mkdir", "touch", "rm", "rmdir", "cp", "mv", "tee", "ln"}
+SCRATCH_FLAGS = re.compile(r"-[prRfavs]+|--")  # Value-free flags only.
 
 
 def under_scratch(root, word):
@@ -440,7 +441,8 @@ def scratch_only(root, command):
     Every write redirection must target scratch, and every writing simple command must be a plain file
     writer whose arguments are all scratch paths; expansions, heredocs and any other writer disqualify it.
     """
-    if "`" in command or "$" in command or "\n" in command.strip():
+    # The shell rewrites braces, globs and `~` after the guard reads the words, so none may appear.
+    if any(mark in command for mark in "`${}*?[]~") or "\n" in command.strip():
         return False
     words = shell_words(command)
     if not words:
@@ -456,7 +458,11 @@ def scratch_only(root, command):
     for part in simple_commands(words):
         if not part or not command_writes(list(part), command):
             continue
+        options = [word for word in part[1:] if word.startswith("-")]
         arguments = [word for word in part[1:] if not word.startswith("-")]
+        # Only bare flags: an option can carry a target (`cp -t DIR`, `--target-directory=DIR`).
+        if not all(SCRATCH_FLAGS.fullmatch(option) for option in options):
+            return False
         if (Path(part[0]).name not in SCRATCH_WRITERS or not arguments
                 or not all(under_scratch(root, word) for word in arguments)):
             return False
@@ -545,17 +551,18 @@ def pre_tool(root, payload):
     # whatever the heuristic says: a renamed copy of gate_evidence.py looks like any other script.
     words = shell_words(command) if isinstance(command, str) else []
     mentions_receipt = isinstance(command, str) and mentions_receipt_write(words)
-    if isinstance(command, str) and not mentions_receipt and (
-            scratch_only(root, command) or command.strip() in pre_contract_commands(root)):
-        return None  # Scratch-only writes, and commands the project lists as safe before a contract.
     writing = name in EDIT_TOOLS or mentions_receipt or (isinstance(command, str) and shell_writes(command))
     if not writing:
         return None
+    exempt = isinstance(command, str) and not mentions_receipt and (
+        scratch_only(root, command) or command.strip() in pre_contract_commands(root))
     superseded = superseded_by(root, session)
-    if superseded:
+    if superseded and not (exempt and scratch_only(root, command)):
         return (f"Lean contract guard: session {session} was superseded by controller session "
                 f"{superseded}; do not edit this worktree concurrently. Declare a new contract "
                 f"only if you are taking back ownership.")
+    if exempt:
+        return None  # Scratch-only writes, and commands the project lists as safe before a contract.
     # Bind a transcript contract before any check that depends on the session's contract.
     declared = current(root, session) or bind_transcript(root, session, payload)
     cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else root
