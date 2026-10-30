@@ -61,7 +61,9 @@ EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 def tracker_record(name):
     """A tracker file directly under docs/tracking/, written after review to record its result."""
     path = Path(name)
-    return path.parent == Path("docs/tracking") and path.suffix == ".md"
+    target_intake = (len(path.parts) == 6 and path.parts[:2] == (".lean", "targets")
+                     and path.parts[3:] == ("docs", "tracking", "INTAKE.md"))
+    return (path.parent == Path("docs/tracking") and path.suffix == ".md") or target_intake
 
 
 def review_state(root):

@@ -460,6 +460,7 @@ LEAN_READS = {"status": True, "watch": True, "progress": True, "test": True, "li
               "log": True,
               "attribution": True, "hook": True, "version": True,
               "contract": {"declare", "current"}, "mode": {"show", "check", "context"},
+              "intake": {"list", "check"}, "batch": {"readiness"},
               "queue": {"list", "history"}, "evidence": {"state", "gate-state", "check-review", "check-shipped",
                                                          "high-risk"},
               "gate": {"run", "status", "mode"}, "spawn": {"plan"}, "update": {"preview"},

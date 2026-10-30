@@ -60,3 +60,23 @@ Trivial tasks use the one-word contract and skip formal review. They still need 
 Failure states: `BLOCKED`, `FAILED`. Both are supported by tracker tooling; queue item states remain `READY`, `BLOCKED`, `DONE`. See `RECOVERY.md`.
 
 DONE is set only by the Quality Gate, never by the worker's own claim.
+
+## Continuing requirements and batch boundaries
+
+In every mode, optionally use `lean intake` / `lean batch` as described in
+`docs/workflow.md`. Keep one primary workset per Controller; workers are subtasks,
+not competing primary work. Record every requirement as clarification, acceptance
+blocker, replacement direction or queued feature, with a task and acceptance check.
+Retain superseded/cancelled entries. The model proposes ambiguity resolution,
+priority and dependencies; Lean checks deterministic invariants; the user decides
+material trade-offs. Selection order: explicit user priority, blockers,
+dependencies, finish current, next feature. Feature approval alone does not
+interrupt active work; explicit interruption needs a checkpoint.
+
+Freeze the shipping batch at review entry. Fix findings within acceptance; queue
+new features. A user redirect reopens the batch, records a reason and invalidates
+readiness; freeze again under a new contract. Keep implementation, review and gate
+readiness separate: deferred gate is NOT_RUN, never implementation failure or DONE.
+Review and gate must cover the final whole shipping checkout; do not claim isolated
+task coverage. Optional ledger commands do not enforce adoption through hooks or
+replace tracker acceptance evidence and the shared gate.

@@ -39,3 +39,7 @@ Show the draft. When the request already approves it, continue with the work; a 
 Once accepted, record the scope in the owning tracker before implementation when tracker mode requires it, and keep a simple scope ledger against the approved goal and acceptance criteria. Continue with routine implementation choices that fit the scope. If a necessary change would add behavior, alter acceptance, expand affected areas materially, or change a recorded decision, stop that dependent work and ask first: state the proposed delta, why it is needed, its impact on effort or risk, and a recommended option. Independent work within scope may continue. When the user approves a scope change, update the tracker before continuing. At completion, map each acceptance criterion to evidence and name any deferred work.
 
 This skill defines and guards scope; it does not authorize publication, deployment or unrelated external writes.
+
+## Continuing intake
+
+When requirements arrive during work, use the bounded intake and batch rules in `.lean/policy/WORKFLOW.md`: classify and trace each request, queue new features, checkpoint explicit interruptions, freeze scope for review, and keep implementation/review/gate readiness separate. Keep tracker/direct as the starting path; the optional ledger does not require full mode or authorize material trade-offs.

@@ -18,3 +18,7 @@ Run `python3 .lean/bin/lean progress set <phase>` on entering each phase below a
 5. **validate** — run the deterministic checks from PROJECT.
 6. **review** — synchronize tracker/session progress first, so review covers it. Review at the deeper of risk and quality. HIGH depth requires an independent reviewer: Claude's `reviewer` subagent, or a Codex/agy subagent or fresh session, given contract and diff without author reasoning, with model/effort sized under `.lean/policy/MODELS.md`. Report BLOCKED if independent review cannot run. Follow the bounded rounds in `.lean/policy/REVIEW.md`.
 7. **gate** — verify claim completion and evidence when applicable and record the review result and status in the tracker/session records (tracker edits under `docs/tracking/` keep the receipt valid). Run `/lean-gate`, then `lean progress set done`, and report the Result Contract with the final bar, validation/review evidence and unverified work. Worker completion alone does not mark the task DONE.
+
+## Continuing intake
+
+When requirements arrive during work, use the bounded intake and batch rules in `.lean/policy/WORKFLOW.md`: classify and trace each request, queue new features, checkpoint explicit interruptions, freeze scope for review, and keep implementation/review/gate readiness separate. Keep tracker/direct as the starting path; the optional ledger does not require full mode or authorize material trade-offs.

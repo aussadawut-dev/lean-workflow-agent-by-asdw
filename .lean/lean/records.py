@@ -439,6 +439,8 @@ def items(root):
 
 def validate_records(root, mode, include_retained=False):
     """Read-only validation; callers hold the workflow lock when applying changes."""
+    from . import intake
+    intake.validate(intake.load(root))
     tracker_statuses, all_items, claims = {}, {}, {}
     if mode in ("tracker", "full") or include_retained:
         if ".agent-runtime/" not in (root / ".gitignore").read_text().splitlines():

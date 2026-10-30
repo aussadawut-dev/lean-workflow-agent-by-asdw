@@ -89,6 +89,8 @@ def build_parser(argv=()):
     evidence_parser.add_argument("rest", nargs=argparse.REMAINDER)
 
     records.parser_for(commands)
+    from . import intake
+    intake.parser_for(commands)
 
     test = commands.add_parser("test", help="run categorised tests; --changed selects by impact")
     scope = test.add_mutually_exclusive_group()
@@ -191,6 +193,9 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         root = (args.root or WORKFLOW_ROOT).resolve()
+        if args.command in ("intake", "batch"):
+            # Ledger records follow the target; shipping evidence stays in the workspace.
+            args.evidence_root = (args.workflow_root or root).resolve()
         if args.root is None and args.command in RECORD_COMMANDS:
             # Workflow records follow the selected target; an invalid selection fails, never falls back.
             from . import target
@@ -211,7 +216,7 @@ def main(argv=None):
 
 
 # Commands whose state belongs to the selected target's record root.
-RECORD_COMMANDS = ("mode", "tracker", "queue", "effort", "models")
+RECORD_COMMANDS = ("mode", "tracker", "queue", "effort", "models", "intake", "batch")
 
 
 def emit(code, out, err):
@@ -224,6 +229,9 @@ def emit(code, out, err):
 
 def dispatch(root, args, parser):
     command = args.command
+    if command in ("intake", "batch"):
+        from . import intake
+        return intake.command(root, args)
     if command == "version":
         print(__version__)
         return 0

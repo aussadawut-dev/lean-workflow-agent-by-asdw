@@ -31,3 +31,9 @@ This receipt detects stale coverage. Its identity and findings are attestations;
 - Report concrete findings: location, problem, severity, fix.
 - No praise, no style nits unless they change meaning.
 - Verdict is `PASS` or `REWORK`.
+
+The optional target intake ledger (INTAKE.md directly under a selected target's
+record tracking directory) has the same tracker-record exclusion. Its readiness
+uses the workspace's receipts and shipping fingerprint, not a separate record-root
+review. Gate fingerprints still include the ledger. This exclusion does not imply
+that acceptance or ledger declarations are independently verified.

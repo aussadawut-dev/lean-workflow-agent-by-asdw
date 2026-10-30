@@ -82,7 +82,9 @@
         "e2e/test_lifecycle.py",
         "hooks/test_target_gate.py",
         "hooks/test_target_controls.py",
-        "hooks/test_target_lifecycle.py"
+        "hooks/test_target_lifecycle.py",
+        "unit/test_intake.py",
+        "hooks/test_intake_target.py"
       ]
     },
     {
@@ -219,6 +221,18 @@
       "tests": [
         "e2e/test_models_eval.py",
         "unit/test_structure.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/lean/intake.py"
+      ],
+      "tests": [
+        "unit/test_intake.py",
+        "unit/test_records.py",
+        "hooks/test_guard.py",
+        "hooks/test_target_lifecycle.py",
+        "hooks/test_intake_target.py"
       ]
     }
   ]
