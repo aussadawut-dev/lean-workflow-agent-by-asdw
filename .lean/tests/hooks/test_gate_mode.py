@@ -86,6 +86,18 @@ class GateModeTests(unittest.TestCase):
             self.assertEqual(self.mode(*args).returncode, 2)
             self.assertEqual(self.config.read_bytes(), original)
 
+    def test_claude_manual_stop_shows_one_line_instead_of_hidden_stderr(self):
+        # Claude Code shows neither model nor user a Stop hook's stderr on exit 0.
+        for mode in ("manual", "manual_fixloop"):
+            with self.subTest(mode=mode):
+                self.assertEqual(self.mode(mode).returncode, 0)
+                result = self.claude()
+                self.assertEqual((result.returncode, result.stderr), (0, ""))
+                message = json.loads(result.stdout)["systemMessage"]
+                self.assertNotIn("\n", message)
+                self.assertIn("NOT_RUN", message)
+                self.assertIn(mode, message)
+
     def test_setting_a_mode_is_logged_and_asks_for_a_commit(self):
         # asdw-harness: sessions found an untracked .lean/gate.json nobody could trace.
         env = dict(environment(self.root), LEAN_SESSION_ID="session-a")
@@ -103,10 +115,13 @@ class GateModeTests(unittest.TestCase):
     def test_manual_and_manual_fixloop_stops_never_run_or_claim_pass(self):
         for mode in ("manual", "manual_fixloop"):
             self.assertEqual(self.mode(mode).returncode, 0)
-            for result in (self.codex(), self.claude()):
+            codex, claude = self.codex(), self.claude()
+            for result in (codex, claude):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn("NOT_RUN", result.stdout + result.stderr)
                 self.assertNotIn("checks passed", result.stdout + result.stderr)
+            # Claude's Stop shows one line; its SessionStart carries the full policy (tested below).
+            for result in (codex,):
                 if mode == "manual_fixloop":
                     self.assertIn("auto-loop", result.stdout + result.stderr)
                     self.assertIn("user authorization", result.stdout + result.stderr)

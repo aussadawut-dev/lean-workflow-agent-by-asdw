@@ -119,7 +119,9 @@ def claude_stop(root, stdin, cache_tree):
     except (OSError, ValueError) as error:
         return 0, block(f"Gate policy invalid/unavailable: {error}; validation NOT_RUN."), ""
     if not auto and not os.environ.get(gate.FORCE_ENV):
-        return 0, "", gate.policy(mode)
+        # Claude shows a Stop hook's stderr to no one on exit 0; the full policy arrives at SessionStart.
+        return 0, json.dumps({"systemMessage": f"Lean Quality Gate NOT_RUN ({mode}): run `python3 .lean/bin/lean "
+                                               "gate run` once the user authorizes it."}), ""
     try:
         payload = payload_of(stdin)
     except LeanError as error:
