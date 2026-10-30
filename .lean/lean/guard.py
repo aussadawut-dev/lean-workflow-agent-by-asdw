@@ -417,6 +417,69 @@ def external_scratch_or_memory(root, name, tool_input):
     return base in memory_bases() or (in_home and bool(PROFILE_BASE.fullmatch(base)))
 
 
+SCRATCH_ROOTS = (Path("/tmp"), Path("/private/tmp"), Path("/tmp").resolve())
+SCRATCH_WRITERS = {"mkdir", "touch", "rm", "rmdir", "cp", "mv", "tee", "ln"}
+
+
+def under_scratch(root, word):
+    """Whether an absolute path resolves under /tmp and outside the repository."""
+    if not isinstance(word, str) or not word.startswith("/"):
+        return False
+    try:
+        target, repo_root = Path(word).resolve(), Path(root).resolve()
+    except (OSError, RuntimeError):
+        return False
+    if target == repo_root or repo_root in target.parents:
+        return False
+    return any(scratch in target.parents for scratch in SCRATCH_ROOTS)
+
+
+def scratch_only(root, command):
+    """Whether a one-line shell command writes nowhere but under /tmp (as Write there is already allowed).
+
+    Every write redirection must target scratch, and every writing simple command must be a plain file
+    writer whose arguments are all scratch paths; expansions, heredocs and any other writer disqualify it.
+    """
+    if "`" in command or "$" in command or "\n" in command.strip():
+        return False
+    words = shell_words(command)
+    if not words:
+        return False
+    for index, word in enumerate(words):
+        target = words[index + 1] if index + 1 < len(words) else ""
+        if word in ("<<", "<<-", "<<<"):
+            return False
+        if (word in FILE_REDIRECTS | {"<>", ">&"} and target not in DEV_SINKS
+                and not (word == ">&" and (target.isdigit() or target == "-"))
+                and not under_scratch(root, target)):
+            return False
+    for part in simple_commands(words):
+        if not part or not command_writes(list(part), command):
+            continue
+        arguments = [word for word in part[1:] if not word.startswith("-")]
+        if (Path(part[0]).name not in SCRATCH_WRITERS or not arguments
+                or not all(under_scratch(root, word) for word in arguments)):
+            return False
+    return True
+
+
+def pre_contract_commands(root):
+    """Exact commands PROJECT.md lists under `## Pre-contract commands`, one backticked command per bullet."""
+    try:
+        text = (Path(root) / ".lean/PROJECT.md").read_text()
+    except (OSError, UnicodeDecodeError):
+        return set()
+    found, inside = set(), False
+    for line in text.splitlines():
+        if line.startswith("## "):
+            inside = line.strip() == "## Pre-contract commands"
+            continue
+        match = re.fullmatch(r"\s*[-*]\s+`([^`\n]+)`.*", line) if inside else None
+        if match and match.group(1).strip():
+            found.add(match.group(1).strip())
+    return found
+
+
 def mentions_receipt_write(words):
     """Whether parsed shell words mention `record-review` outside a pure `-h`/`--help` check."""
     if words is None:
@@ -482,6 +545,9 @@ def pre_tool(root, payload):
     # whatever the heuristic says: a renamed copy of gate_evidence.py looks like any other script.
     words = shell_words(command) if isinstance(command, str) else []
     mentions_receipt = isinstance(command, str) and mentions_receipt_write(words)
+    if isinstance(command, str) and not mentions_receipt and (
+            scratch_only(root, command) or command.strip() in pre_contract_commands(root)):
+        return None  # Scratch-only writes, and commands the project lists as safe before a contract.
     writing = name in EDIT_TOOLS or mentions_receipt or (isinstance(command, str) and shell_writes(command))
     if not writing:
         return None

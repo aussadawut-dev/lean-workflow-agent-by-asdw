@@ -460,6 +460,35 @@ class MidTurnPromptTests(HookFixture):
 
 
 class GuardHookTests(HookFixture):
+    def test_shell_writes_only_under_scratch_need_no_contract(self):
+        # asdw-harness: `mkdir -p <Claude scratchpad>/x` was blocked although Write there was allowed.
+        scratch = "/tmp/lean-guard-scratch-test"
+        allowed = (f"mkdir -p {scratch}/x", f"touch {scratch}/a {scratch}/b", f"echo hi > {scratch}/f",
+                   f"rm -rf {scratch}/x && mkdir {scratch}/y", f"cat x.py | tee {scratch}/copy")
+        denied = (f"cp x.py {scratch}/x", f"mv {scratch}/a x.py", f"touch {scratch}/a && touch x.py",
+                  f"mkdir {scratch}/$HOME", f"rm -rf {scratch}/../../{self.root.name}/x", f"echo > {self.root}/f",
+                  f"mkdir -m 700 {scratch}/x", f"python3 -c 'open(\"{scratch}/f\", \"w\")'",
+                  f"git -C {scratch} init", f"mkdir {scratch}/x\ntouch x.py")
+        for command in allowed:
+            with self.subTest(allowed=command):
+                result = self.tool("claude", "Bash", "scratch", command=command)
+                self.assertEqual(result.returncode, 0, result.stderr)
+        for command in denied:
+            with self.subTest(denied=command):
+                self.assertEqual(self.tool("claude", "Bash", "scratch", command=command).returncode, 2)
+
+    def test_project_listed_commands_run_before_a_contract(self):
+        # asdw-harness: `pnpm build` was blocked while `pnpm test`, which also writes, ran.
+        self.assertEqual(self.tool("claude", "Bash", "list", command="pnpm build").returncode, 2)
+        project = self.root / ".lean/PROJECT.md"
+        project.write_text("# Project\n\n## Pre-contract commands\n\n- `pnpm build`\n- `make docs`\n\n## Other\n\n- `make`\n")
+        for command in ("pnpm build", "  make docs "):
+            with self.subTest(allowed=command):
+                self.assertEqual(self.tool("claude", "Bash", "list", command=command).returncode, 0)
+        for command in ("pnpm build && rm -rf x", "pnpm build > out", "make", "pnpm install"):
+            with self.subTest(denied=command):
+                self.assertEqual(self.tool("claude", "Bash", "list", command=command).returncode, 2)
+
     def test_both_providers_deny_writes_until_declared_then_reset_on_a_person_prompt(self):
         for provider, write, shell in (("claude", ("Edit", {"file_path": "x.py"}), "Bash"),
                                        ("codex", ("apply_patch", {"command": "*** Begin Patch"}), "Bash")):
