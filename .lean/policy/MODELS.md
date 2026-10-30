@@ -40,7 +40,7 @@ The task list is JSON: `{"tasks": [{"id": "api", "files": ["src/api.py"], "size"
 
 ## Records
 
-Record every dispatch before the call: the requested model and effort, context mode (fresh or full-history, with reason), the size/level that chose them, and the agent identity. Never use bare `inherited/inherited`; when the tool cannot set a value, record the known parent/default and the limitation, or `unavailable`. Report backend settings only from runtime metadata (for Claude, the `model` field of the subagent's transcript messages; for `lean spawn run`, the command it ran); a pane header or banner that shows the session's defaults is not evidence of the agent's model. Do not store credentials, raw prompts or price assumptions.
+Record every dispatch before the call: the requested model and effort, context mode (fresh or full-history, with reason), the size/level that chose them, and the agent identity. Never use bare `inherited/inherited`; when the tool cannot set a value, record the known parent/default and the limitation, or `unavailable`. Report backend settings only from runtime metadata (for Claude, the `model` field of the subagent's transcript messages; for `lean spawn run`, the command it ran); a pane header or banner that shows the session's defaults is not evidence of the agent's model. When the runtime reports no backend settings, leave the reported part out; no `unavailable` line is needed. Do not store credentials, raw prompts or price assumptions.
 
 ## Independent review
 

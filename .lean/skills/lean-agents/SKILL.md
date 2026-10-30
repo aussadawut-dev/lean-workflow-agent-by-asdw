@@ -37,10 +37,10 @@ Read `AGENTS.md`, `.lean/PROJECT.md`, `.lean/policy/MODELS.md` and `python3 .lea
 Use the owning tracker Evidence section, or a user-visible session record for standard/trivial work:
 
 ```text
-Dispatch TASK-01 [queue ID] | level=default|max|explicit | size=M | requested model/effort=<model>/<effort> | context=fresh or full-history (reason) | agent=<runtime identity or worktree> | reported model/effort=<from runtime metadata, or unavailable>
+Dispatch TASK-01 [queue ID] | level=default|max|explicit | size=M | requested model/effort=<model>/<effort> | context=fresh or full-history (reason) | agent=<runtime identity or worktree> | reported model/effort=<from runtime metadata; omit when the runtime reports none>
 ```
 
-Never use bare `inherited/inherited`. Requested settings are not proof of backend settings: report a model only from runtime metadata (a subagent transcript's `model` field, the command `spawn run` executed), not from a pane banner that shows session defaults. Do not store credentials, raw prompts or price assumptions.
+Never use bare `inherited/inherited`. Requested settings are not proof of backend settings: report a model only from runtime metadata (a subagent transcript's `model` field, the command `spawn run` executed), not from a pane banner that shows session defaults. When the runtime reports nothing, omit the reported field. Do not store credentials, raw prompts or price assumptions.
 
 ## Worker
 
