@@ -558,7 +558,82 @@ def load_receipt(root):
     return receipt
 
 
+HISTORY = ".agent-runtime/review-history.jsonl"  # Every recorded receipt, oldest first; written only here.
+HISTORY_LIMIT = 50
+
+
+def valid_receipt(receipt):
+    fields = ("contract", "reviewer", "evidence", "state", "base", "verdict")
+    return (isinstance(receipt, dict) and type(receipt.get("schema")) is int and receipt.get("schema") == 1
+            and all(isinstance(receipt.get(field), str) and receipt[field].strip() for field in fields))
+
+
+def receipt_history(root):
+    """Recorded receipts, newest first: the history file plus the latest receipt, or none without it."""
+    path = Path(root) / HISTORY
+    found = []
+    if not (path.is_symlink() or path.parent.is_symlink()):
+        try:
+            for line in path.read_text().splitlines():
+                try:
+                    entry = json.loads(line)
+                except ValueError:
+                    continue
+                if valid_receipt(entry):
+                    found.append(entry)
+        except OSError:
+            pass
+    try:
+        latest = load_receipt(root)
+    except (OSError, ValueError):
+        return []  # No current receipt withdraws them all: deleting review.json still resets review.
+    if not found or found[-1] != latest:
+        return [latest]  # Older install or a receipt changed outside record-review: trust only the latest.
+    return list(reversed(found))
+
+
+def covering_receipt(root, contract=None, high=False):
+    """The newest receipt per contract that is a PASS covering exactly the current shipping state, or None.
+
+    Only each contract's newest receipt counts, so a later REWORK withdraws an earlier PASS for it;
+    `high` also requires a HIGH-risk or VERY_HIGH-quality contract.
+    """
+    seen, state = set(), None
+    for receipt in receipt_history(root):
+        if receipt["contract"] in seen:
+            continue
+        seen.add(receipt["contract"])
+        if receipt["verdict"] != "PASS" or (contract is not None and receipt["contract"] != contract):
+            continue
+        match = CONTRACT.fullmatch(receipt["contract"])
+        if high and not (match and (match.group(1) == "HIGH" or match.group(2) == "VERY_HIGH")):
+            continue
+        state = review_state(root) if state is None else state
+        if receipt["state"] == state and receipt_gap(root, receipt) is None:
+            return receipt
+    return None
+
+
+def remember_receipt(root, receipt):
+    """Append a just-saved receipt to the bounded history."""
+    path = Path(root) / HISTORY
+    if path.is_symlink() or path.parent.is_symlink():
+        raise ValueError("Evidence state must not cross a symlink boundary")
+    try:
+        lines = path.read_text().splitlines()
+    except FileNotFoundError:
+        lines = []
+    lines = (lines + [json.dumps(receipt, ensure_ascii=False)])[-HISTORY_LIMIT:]
+    temporary = path.with_suffix(".tmp")
+    if temporary.is_symlink():
+        raise ValueError("Evidence state must not cross a symlink boundary")
+    temporary.write_text("\n".join(lines) + "\n")
+    temporary.replace(path)
+
+
 def check_review(root, contract):
+    if covering_receipt(root, contract) is not None:
+        return  # The newest receipt for this contract covers the current state, even if another came later.
     receipt = load_receipt(root)
     reasons = []  # Name what differs, so the reviewer can fix the receipt in one step.
     if receipt.get("verdict") != "PASS":
@@ -579,12 +654,10 @@ def check_shipped(root):
     The High-risk floor asks that the delta which ships was independently reviewed; a later
     contract that changes nothing (a status reply, say) ships that same reviewed state.
     """
-    receipt = load_receipt(root)
-    contract = CONTRACT.fullmatch(str(receipt.get("contract", "")))
     # Only a review at HIGH depth stands in for the floor: a PASS under a lower contract (a typo or a
     # receipt the author wrote) never required an independent reviewer.
-    high = contract and (contract.group(1) == "HIGH" or contract.group(2) == "VERY_HIGH")
-    if receipt.get("verdict") != "PASS" or receipt_gap(root, receipt) or not high:
+    if covering_receipt(root, high=True) is None:
+        load_receipt(root)  # No receipt at all reads as before (missing or malformed file).
         raise ValueError("No HIGH-depth PASS review receipt covers the current shipping state")
 
 
@@ -604,8 +677,9 @@ def reviewed_controls(root, old, current, contract):
         return None
     try:
         check_shipped(root)
-        check_review(root, contract)
-        receipt = load_receipt(root)
+        receipt = covering_receipt(root, contract)
+        if receipt is None:
+            return None
         names = set(current) | set((old.get("controls") or {}))
         base = comparable(controls_at(root, receipt["base"], names))
     except (OSError, ValueError, AttributeError, TypeError, KeyError, subprocess.CalledProcessError):
@@ -750,9 +824,10 @@ def main(argv=None, root=None):
                     raise ValueError("Shipping state or HEAD changed since review began; review the new delta "
                                      "(capture it with `lean evidence state`)")
                 current, base = review_state(root), head_tree(root)
-                save(root / ".agent-runtime/review.json", {"schema": 1, "contract": args.contract,
-                     "state": current, "base": base, "reviewer": args.reviewer, "verdict": args.verdict,
-                     "evidence": args.evidence})
+                receipt = {"schema": 1, "contract": args.contract, "state": current, "base": base,
+                           "reviewer": args.reviewer, "verdict": args.verdict, "evidence": args.evidence}
+                save(root / ".agent-runtime/review.json", receipt)
+                remember_receipt(root, receipt)
                 from . import activity
                 activity.record(root, "review", verdict=args.verdict, reviewer=args.reviewer, contract=args.contract)
             else:

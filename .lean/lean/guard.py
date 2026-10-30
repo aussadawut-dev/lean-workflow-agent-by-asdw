@@ -524,7 +524,7 @@ def pre_tool(root, payload):
                 takeover(root, session, reason=str(meta.get("topic", "")))
             log_contract(root, contract, "declared")
             return None
-    if writes_receipt(name, tool_input):
+    if writes_receipt(name, tool_input) or writes_receipt(name, tool_input, RECEIPT_HISTORY):
         # Only gate_evidence.py writes the receipt, so its state and contract checks always apply.
         return ("Lean contract guard: the review receipt is written only by the reviewer through "
                 "`lean evidence record-review`, never edited directly. If the reviewer cannot record it, "
@@ -593,6 +593,7 @@ def shell_words(command):
 # Text unique to the evidence command, so a renamed or copied script is still recognised.
 GATE_MARKER = '("record-review", ' + '"check-review")'  # Split so this file is not mistaken for one.
 RECEIPT = RUNTIME + "/review.json"
+RECEIPT_HISTORY = RUNTIME + "/review-history.jsonl"  # Earlier receipts still count, so they are guarded alike.
 PENDING = RUNTIME + "/review-pending.json"  # Written only by `lean gate review-pending`.
 GATE_CACHES = (RUNTIME + "/gate-cache", RUNTIME + "/target-gate-cache",
                RUNTIME + "/gate-result.json")  # Written only by the gate.

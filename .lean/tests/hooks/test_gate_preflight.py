@@ -179,8 +179,9 @@ class GatePreflightTests(TargetFixture):
     def test_require_review_checks_exact_low_contract_when_requested(self):
         self.reviewed(LOW)
         self.ready(self.preflight("--require-review", "--contract", LOW))
-        self.reviewed(HIGH)
-        self.refused(self.preflight("--require-review", "--contract", LOW), "exact contract")
+        self.reviewed(HIGH)  # 5.7: a later receipt for another contract no longer replaces this one.
+        self.ready(self.preflight("--require-review", "--contract", LOW))
+        self.refused(self.preflight("--require-review", "--contract", LOW + " other"), "exact contract")
 
     def test_workspace_risk_rejects_exact_matching_low_receipt(self):
         self.project(risk=True)

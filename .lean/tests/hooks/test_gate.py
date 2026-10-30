@@ -72,6 +72,25 @@ class GateIntegrityTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(counter.read_text().splitlines(), ["run"] * 3)
 
+    def test_an_earlier_receipt_for_the_same_state_still_counts(self):
+        # TCK021/TCK022: a second contract's receipt on the same state replaced the first one.
+        first, second = CONTRACT, CONTRACT + " second"
+        for contract in (first, second):
+            self.assertEqual(self.evidence("record-review", "--contract", contract, "--reviewer", "independent-test",
+                                           "--evidence", "fixture", "--verdict", "PASS").returncode, 0)
+        for contract in (first, second):
+            with self.subTest(contract=contract):
+                checked = self.evidence("check-review", "--contract", contract)
+                self.assertEqual(checked.returncode, 0, checked.stderr)
+        self.assertEqual(self.gate("--contract", first, "--require-review").returncode, 0)
+        rework = CONTRACT + " third"
+        for verdict in ("PASS", "REWORK"):  # A later REWORK for the same contract wins over its earlier PASS.
+            self.evidence("record-review", "--contract", rework, "--reviewer", "independent-test",
+                          "--evidence", "fixture", "--verdict", verdict)
+        self.assertNotEqual(self.evidence("check-review", "--contract", rework).returncode, 0)
+        (self.root / "code.txt").write_text("changed\n")  # A changed state needs a new review for every contract.
+        self.assertNotEqual(self.evidence("check-review", "--contract", first).returncode, 0)
+
     def test_configured_stop_cache_still_checks_current_contract_and_review(self):
         self.assertEqual(self.configured_stop().returncode, 0)
         path = self.transcript([self.user("high task"), self.assistant(CONTRACT)])

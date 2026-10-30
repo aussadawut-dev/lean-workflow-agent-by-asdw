@@ -631,7 +631,10 @@ class GuardHookTests(HookFixture):
             self.assertFalse(contract_guard.records_own_receipt(command, LINE, self.root), command)
         # The receipt file is written only by record-review, never by an edit tool or a shell write.
         receipt = ".agent-runtime/review.json"
-        for provider, name, tool_input in (("claude", "Write", {"file_path": f"{self.root}/{receipt}"}),
+        history = ".agent-runtime/review-history.jsonl"  # Earlier receipts count too, so they are guarded alike.
+        for provider, name, tool_input in (("claude", "Write", {"file_path": f"{self.root}/{history}"}),
+                                           ("codex", "Bash", {"command": f"echo '{{}}' >> {history}"}),
+                                           ("claude", "Write", {"file_path": f"{self.root}/{receipt}"}),
                                            ("claude", "Edit", {"file_path": receipt}),
                                            ("codex", "apply_patch", {"command": f"*** Update File: {receipt}"}),
                                            ("codex", "Bash", {"command": f"cp fake.json {receipt}"}),
