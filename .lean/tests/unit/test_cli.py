@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from support import ROOT, install, lean  # noqa: E402
 from lean import __version__  # noqa: E402
 
-COMMANDS = ("version", "status", "watch", "progress", "contract", "hook", "gate", "evidence", "mode", "tracker",
+COMMANDS = ("version", "status", "watch", "progress", "contract", "hook", "gate", "evidence", "mode", "tracker", "plan",
             "queue", "test", "lint", "attribution", "models", "spawn", "effort", "update")
 
 
@@ -59,6 +59,38 @@ class CliTests(unittest.TestCase):
     def test_claude_status_line_is_wired_to_the_cli(self):
         settings = json.loads((ROOT / ".claude/settings.json").read_text())
         self.assertIn(".lean/bin/lean status --line", settings["statusLine"]["command"])
+
+    def test_log_filters_task_and_session_across_all_event_types(self):
+        runtime = self.root / ".agent-runtime"
+        runtime.mkdir()
+        events = [
+            {"at": "2026-10-31T00:00:00Z", "event": "test", "task": "A", "session": "one", "files": 1},
+            {"at": "2026-10-31T00:00:01Z", "event": "gate", "task": "B", "session": "one", "result": "PASS"},
+            {"at": "2026-10-31T00:00:02Z", "event": "test", "task": "A", "session": "two", "files": 2},
+            {"at": "2026-10-31T00:00:03Z", "event": "test", "files": 3},
+        ]
+        (runtime / "activity.jsonl").write_text("".join(json.dumps(event) + "\n" for event in events))
+        result = lean(self.root, "log", "--task", "A", "--session", "one", "--json")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout), events[:1])
+        unfiltered = lean(self.root, "log", "--json")
+        self.assertEqual(json.loads(unfiltered.stdout), events)
+
+    def test_plan_cli_explains_without_running_project_commands(self):
+        project = self.root / ".lean/PROJECT.md"
+        project.write_text("<!-- gate:start -->\n```sh\ntouch must-not-run\n```\n<!-- gate:end -->\n")
+        tests = self.root / ".lean/tests"
+        tests.mkdir()
+        (tests / "impact.json").write_text(json.dumps({"scope": ["*"], "lint_only": ["*"], "rules": []}))
+        before = {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        result = lean(self.root, "plan", "--explain")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("touch must-not-run", result.stdout)
+        structured = lean(self.root, "plan", "--json")
+        self.assertEqual(structured.returncode, 0, structured.stderr)
+        self.assertIsInstance(json.loads(structured.stdout), dict)
+        after = {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        self.assertEqual(before, after)
 
     def test_option_abbreviations_are_refused(self):
         # The guard reads exact option names; an abbreviation could otherwise hide a write.

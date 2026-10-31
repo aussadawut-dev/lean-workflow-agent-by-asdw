@@ -15,6 +15,42 @@ python3 .lean/bin/lean progress set implement --done 2 --total 5 --task "add log
 # ███████░░░░░░░░░░░░░ 34% implement 2/5 — add login
 ```
 
+## Measure and explain work
+
+Use the local activity log to find repeat checks and expensive phases before
+changing the workflow. Task and session filters apply to all attributed events;
+old events without that attribution remain visible in the unfiltered log.
+
+```sh
+python3 .lean/bin/lean log --summary
+python3 .lean/bin/lean log --task "add login" --session SESSION_ID --summary
+python3 .lean/bin/lean log --json
+python3 .lean/bin/lean plan --explain
+python3 .lean/bin/lean plan --tier stop --json
+```
+
+Activity includes individual workflow gate checks and test files as well as their
+parent runs. Their durations overlap: a test can run inside a gate check and test
+files can run in parallel. Do not add these categories to estimate elapsed work
+time. Phase intervals can include human idle time. Token usage is unknown when no
+usage observation is available; the log does not estimate subscription cost.
+Logging is best effort and local, so missing observations are not zero cost and
+the log never serves as acceptance evidence.
+
+`lean plan` is a read-only preview of the existing selection rules and configured
+gate commands. `--base COMMIT` adds workflow changes since that commit;
+`--contract 'Contract: ...'` supplies the review floor, and `--session ID` selects
+the session whose context is inspected. `--json` returns structured output.
+Application target commands and roots are reported separately: Lean's own impact
+map cannot select an application's tests. Undefined checks and unassessed reuse
+conditions stay explicit. An explicit Stop tier needs its own gate block;
+automatic Stop hooks choose the full tier when that block is absent.
+
+The preview runs no checks, accepts no control changes and records no PASS.
+Recheck the actual gate after editing: a preview is an observation, not a promise
+that its inputs will remain unchanged. These commands work through the shared CLI
+for Claude, Codex and agy. They do not enable per-check caching or model routing.
+
 ## Modes
 
 | Mode | Keeps | Commands |
@@ -38,6 +74,20 @@ Colon namespace labels such as `area:api` remain opaque and conflict only with t
 ## Archive and resume
 
 `lean tracker archive --dry-run|--apply` moves DONE trackers to `docs/history/agent-workflow/`; their IDs stay reserved. `lean mode context` prints a read-only summary (mode, active tracker and its next step, claims, Git status, last gate result, progress) for resuming after a break or a new session.
+
+For a smaller handoff, use `lean mode context --compact --tracker TCK001`.
+The compact report includes source paths and a content digest observed when it
+was generated, the selected tracker's unresolved acceptance, decisions and next
+action. It is a sourced snapshot, not a new memory store or a validation result.
+Regenerate it after source changes. The gate field still reports the current
+shared evidence status, which can be stale even when the context was just read.
+
+`--max-chars N` sets the compact output budget (default 6000 characters).
+Optional text may be truncated with an explicit indication. If mandatory
+acceptance/next-action content cannot fit, the command fails with a source
+reference instead of silently dropping obligations; increase the budget or read
+the tracker. With several unfinished trackers, choose one using `--tracker`.
+The original `lean mode context` JSON remains available without `--compact`.
 
 ## Optional intake and bounded batches (all modes)
 

@@ -153,9 +153,15 @@ def named(root, names):
 def run_files(root, files, jobs=None, show=None, reason=""):
     """Run each test file in its own process, several at a time; return the number of failures."""
     root = Path(root)
+    from . import activity
+    attribution = activity.run_context(root)
     show = show or (lambda text: print(text, flush=True))
     base = root / TESTS
     environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+    environment["LEAN_ACTIVITY_PARENT_RUN_ID"] = attribution["run_id"]
+    # The gate's override belongs to this test run. Test processes can create independent
+    # workflow fixtures/sessions; keep their runtime session environments authoritative.
+    environment.pop("LEAN_ACTIVITY_SESSION_ID", None)
     jobs = jobs or os.cpu_count() or 1
 
     def one(name):
@@ -173,6 +179,9 @@ def run_files(root, files, jobs=None, show=None, reason=""):
         futures = [pool.submit(one, name) for name in files]
         for future in as_completed(futures):
             name, code, seconds, output = future.result()
+            activity.record(root, "test-file", **attribution, file=name,
+                            file_id=f"{attribution['run_id']}:{name}",
+                            result="pass" if code == 0 else "fail", seconds=round(seconds, 3))
             done += 1
             verdict = "ok" if code == 0 else "FAIL"
             show(f"Tests {render(done / len(files), width=20)} {done}/{len(files)} {name} {verdict} ({seconds:.1f}s)")
@@ -183,8 +192,7 @@ def run_files(root, files, jobs=None, show=None, reason=""):
     seconds = time.monotonic() - began
     named = "; failed: " + ", ".join(sorted(name for name, _ in failures)) if failures else ""
     show(f"{len(files) - len(failures)}/{len(files)} test files passed in {seconds:.1f}s{named}")
-    from . import activity
-    activity.record(root, "test", files=len(files), failed=len(failures), seconds=round(seconds, 1), selection=reason,
+    activity.record(root, "test", **attribution, files=len(files), failed=len(failures), seconds=round(seconds, 3), selection=reason,
                     failures=[name for name, _ in failures] or None)
     return len(failures)
 

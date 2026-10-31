@@ -213,6 +213,20 @@ def tracker_document_counts(root, requested):
     return counts
 
 
+def tracker_lines(content):
+    """Yield tracker lines with a code-fence flag, respecting fence kind and length."""
+    fence = None
+    for line in content.splitlines():
+        marker = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+        in_code = fence is not None
+        if fence is not None:
+            if marker and marker[1][0] == fence[0] and len(marker[1]) >= len(fence) and not marker[2].strip():
+                fence = None
+        elif marker and (marker[1][0] != "`" or "`" not in marker[2]):
+            fence, in_code = marker[1], True
+        yield line, in_code
+
+
 def unchecked_tracker_items(content):
     """Return unchecked items under Acceptance criteria/Tasks headings and their subheadings.
 
@@ -220,12 +234,9 @@ def unchecked_tracker_items(content):
     unconventional format cannot hide open work. Legacy trackers without these
     sections remain valid.
     """
-    unchecked, level, fenced = [], None, False
-    for line in content.splitlines():
-        if re.match(r"[ \t]*(```|~~~)", line):
-            fenced = not fenced
-            continue
-        if fenced:
+    unchecked, level = [], None
+    for line, in_code in tracker_lines(content):
+        if in_code:
             continue
         heading = re.fullmatch(r"(#{1,6})[ \t]+(.*?)[ \t#]*", line)
         if heading:
@@ -768,7 +779,103 @@ def queue_command(root, args):
             fail("no claimable queue item")
 
 
+def resume_sections(content):
+    """Keep complete tracker sections, including nested headings and continuation lines."""
+    sections, current, level = {}, None, 0
+    for line, in_code in tracker_lines(content):
+        if in_code:
+            if current is not None:
+                sections[current].append(line)
+            continue
+        heading = re.fullmatch(r"(#{1,6})[ \t]+(.*?)[ \t#]*", line)
+        if heading and (current is None or len(heading.group(1)) <= level):
+            name = heading.group(2).lower()
+            wanted = name in ("decisions", "next step") or re.match(r"acceptance criteri(?:a|on)\b", name)
+            current, level = (name if wanted else None), len(heading.group(1))
+            if current is not None:
+                sections.setdefault(current, [])
+        elif current is not None:
+            sections[current].append(line)
+    return {name: "\n".join(lines).strip() for name, lines in sections.items()}
+
+
+def compact_context(root, args, report, trackers):
+    """Derived read-only snapshot; mandatory context is never silently shortened."""
+    budget = args.max_chars if args.max_chars is not None else 6000
+    if budget <= 0:
+        fail("--max-chars must be positive")
+    selected = None
+    if args.tracker:
+        path = tracker_file(root, args.tracker)
+        selected = next((entry for entry in trackers if entry["filename"] == path.name), None)
+        if selected is None:
+            fail(f"invalid tracker status: {path}")
+    else:
+        unfinished = [entry for entry in trackers if entry["status"] != "DONE"]
+        if len(unfinished) > 1:
+            fail("ambiguous resume tracker; use --tracker: " + ", ".join(entry["id"] for entry in unfinished))
+        if unfinished:
+            selected = unfinished[0]
+            path = root / "docs/tracking" / selected["filename"]
+            tracker_file(root, selected["id"])  # Refuse duplicate IDs, including history collisions.
+
+    evidence_root = Path(report["evidence_root"])
+    from . import progress
+    source_paths = [root / ".lean/config.json", evidence_root / ".agent-runtime/gate-result.json",
+                    evidence_root / ".agent-runtime/gate-cache", evidence_root / ".agent-runtime/gate-failed",
+                    progress.path(evidence_root)]
+    session = progress.env_session()
+    if session:
+        source_paths.append(progress.session_path(evidence_root, session))
+    tracker = None
+    if selected:
+        if selected["status"] not in TRACKER_STATES:
+            fail(f"invalid tracker status: {path}")
+        content = path.read_bytes()
+        source_paths.append(path)
+        sections = resume_sections(content.decode())
+        acceptance = "\n\n".join(text for name, text in sections.items()
+                                 if re.match(r"acceptance criteri(?:a|on)\b", name))
+        tracker = {"id": selected["id"], "status": selected["status"], "source": str(path),
+                   "decisions": sections.get("decisions", ""), "acceptance": acceptance,
+                   "unresolved_items": unchecked_tracker_items(content.decode()),
+                   "next_action": sections.get("next step") or selected["next_step"]}
+    sources = []
+    for source in source_paths:
+        # Use the exact bytes parsed above for the selected tracker.
+        data = content if selected and source == path else source.read_bytes() if source.is_file() else None
+        sources.append({"path": str(source), "sha256": hashlib.sha256(data).hexdigest() if data is not None else None})
+    snapshot = {"generated_at": utc_now(),
+                "freshness": "Read during generation, not atomic or permanently current. Regenerate after changes; gate is persisted evidence checked separately.",
+                "content_digest": hashlib.sha256(json.dumps(sources, sort_keys=True).encode()).hexdigest(),
+                "sources": sources}
+    result = {"mode": report["mode"], "execution": report["execution"],
+              "record_root": str(root), "evidence_root": str(evidence_root),
+              "snapshot": snapshot, "tracker": tracker, "git": report["git"],
+              "gate": report["gate"], "progress": report["progress"],
+              "truncation": {"fields": []}}
+    encode = lambda: json.dumps(result, ensure_ascii=False, separators=(",", ":"))
+    output = encode()
+    if len(output) + 1 > budget and tracker and tracker["decisions"]:
+        original = tracker["decisions"]
+        result["truncation"] = {"fields": ["tracker.decisions"], "decisions_original_chars": len(original)}
+        tracker["decisions"] = ""
+        available = max(0, budget - len(encode()) - 1)
+        tracker["decisions"] = original[:available]
+        # JSON escaping may use more than one character for a source character.
+        while len(encode()) + 1 > budget and tracker["decisions"]:
+            tracker["decisions"] = tracker["decisions"][:max(0, len(tracker["decisions"]) - (len(encode()) + 1 - budget))]
+        output = encode()
+    if len(output) + 1 > budget:
+        source = str(path) if selected else str(root / "docs/tracking")
+        fail(f"compact context exceeds --max-chars {budget}; needs at least {len(output) + 1} characters; "
+             f"acceptance and next action were not truncated; source: {source}; increase the budget")
+    print(output)
+
+
 def context_command(root, args):
+    if not getattr(args, "compact", False) and (getattr(args, "tracker", None) or getattr(args, "max_chars", None) is not None):
+        fail("--tracker and --max-chars require --compact")
     with locked(root, read_only=True):
         cfg = config(root)
         report = {
@@ -781,8 +888,8 @@ def context_command(root, args):
             "gate": None,
         }
         tracking_dir = root / "docs/tracking"
+        trackers_found = []
         if tracking_dir.is_dir():
-            trackers_found = []
             for path in sorted(tracking_dir.glob("TCK*.md")):
                 if not re.fullmatch(r"TCK[0-9]{3,}(?:-[a-zA-Z0-9_-]+)?", path.stem):
                     continue
@@ -853,6 +960,9 @@ def context_command(root, args):
         report["gate"] = {"status": gate_status(evidence_root),
                           "source": "shared gate results in workflow_root; legacy cache/hook markers when no result exists"}
         report["progress"] = progress_state(evidence_root)
+        if getattr(args, "compact", False):
+            compact_context(root, args, report, trackers_found)
+            return
         print(json.dumps(report, indent=2))
 
 
@@ -875,7 +985,10 @@ def parser_for(commands):
     lower.add_argument("--keep-pending", action="store_true")
     mode_actions.add_parser("show", help="print mode and execution as JSON")
     mode_actions.add_parser("check", help="validate the mode and its records")
-    mode_actions.add_parser("context", help="read-only summary for resuming work")
+    context = mode_actions.add_parser("context", help="read-only summary for resuming work")
+    context.add_argument("--compact", action="store_true", help="bounded sourced resume snapshot")
+    context.add_argument("--tracker", help="select a tracker explicitly (requires --compact)")
+    context.add_argument("--max-chars", type=int, help="compact output character budget including newline (default 6000)")
     tracker = commands.add_parser("tracker", help="workset trackers (tracker and full modes)")
     tracker_actions = tracker.add_subparsers(dest="action", required=True)
     new = tracker_actions.add_parser("new")

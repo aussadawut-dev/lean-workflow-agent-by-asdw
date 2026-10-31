@@ -321,6 +321,8 @@ class Run:
         self.tier = tier
         self.require_review, self.quiet = require_review, quiet or hook  # No one watches a Stop live.
         self.contract, self.session = contract, session
+        from . import activity
+        self.activity_context = activity.run_context(self.root, session or None)
         self.payload = payload if payload is not None else {}
         self.show = show  # Optional callable for live progress lines.
         self.out, self.err, self.checks = [], [], 0
@@ -479,6 +481,11 @@ class Run:
             self.session = value or self.session
             if self.session:
                 guard.start_session(root, self.session, evidence.state(root))
+        # Hook payloads can override the process environment's session. Resolve
+        # attribution only after that override, preserving this run's identity.
+        from . import activity
+        if self.session:
+            self.activity_context.update(activity.context(root, self.session))
         # The contract the session declared through the guard; only a receipt for it can accept
         # changed controls. For a hook Stop it is the session's contract; the transcript is a fallback.
         session_contract = (guard.current(root, self.session) or "") if self.session else ""
@@ -610,12 +617,21 @@ class Run:
         except (OSError, ValueError):
             pass
         environment = dict(os.environ)
+        environment["LEAN_ACTIVITY_PARENT_RUN_ID"] = self.activity_context["run_id"]
+        environment["LEAN_ACTIVITY_SESSION_ID"] = self.activity_context["session"]
         for number, command in enumerate(commands, 1):
             self.progress(f"check {number} started ({number}/{len(commands)}) {bar(number - 1, len(commands))}")
             started = time.monotonic()
             result = subprocess.run(["bash", "-c", command], cwd=root, env=environment, text=True,
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                     pass_fds=lock_fds())
+            if not self.seed:
+                from . import activity
+                activity.record(root, "gate-check", **self.activity_context, number=number,
+                                check_id=f"{self.activity_context['run_id']}:{number}",
+                                command_digest=hashlib.sha256(command.encode()).hexdigest(),
+                                result="pass" if result.returncode == 0 else "fail",
+                                returncode=result.returncode, seconds=round(time.monotonic() - started, 3))
             if result.returncode == 0:
                 self.progress(f"check {number} passed ({int(time.monotonic() - started)}s) "
                               f"{bar(number, len(commands))}")
@@ -732,7 +748,10 @@ def run(root, **options):
         result = "pass" if code == 0 and not gate.out else "released" if code == 0 else "refused"
         reason = next((line for message in gate.err for line in message.splitlines()
                        if line.strip() and not PROGRESS_LINE.match(line)), "")
-        activity.record(gate.root, "gate", result=result, checks=gate.checks, seconds=round(time.monotonic() - began, 1),
+        # Error lines can embed the complete shell command; the activity log needs only the category.
+        reason = reason.split(":", 1)[0] + (": [details omitted]" if ":" in reason else "")
+        activity.record(gate.root, "gate", **gate.activity_context, result=result, checks=gate.checks,
+                        reused=gate.checks_reused, seconds=round(time.monotonic() - began, 3),
                         hook=gate.hook or None, reason=reason[:200] if code else None,
                         tier="stop" if gate.tier == "stop" else None)
     return code, gate.out, gate.err

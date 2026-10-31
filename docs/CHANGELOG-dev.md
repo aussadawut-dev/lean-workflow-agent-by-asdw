@@ -3,6 +3,15 @@
 Developer and agent notes for each 5.x release: commands, flags, rules, changed gate controls and limits.
 The user-facing summary of each release is in [`.lean/CHANGELOG.md`](../.lean/CHANGELOG.md).
 
+## 5.8.0 — 2026-10-31
+
+- Add `lean plan --explain|--json`: existing test selection, review floors, workspace/target gate commands and recorded evidence; never executes checks or grants cache eligibility.
+- Add `lean log --session` and exact task filters; persist workflow gate-check/test-file timing with run relationships. Unknown usage stays unknown; nested timings are not elapsed-time totals.
+- Add `lean mode context --compact --tracker ID --max-chars N` with source digests, full acceptance and explicit truncation/overflow. Default context output remains compatible.
+- Resolve Claude hook payload sessions before attributing telemetry; permit read-only plan through both providers' guards. Share fence-aware tracker parsing.
+- Individual application-target check timing, per-check caching and model routing remain outside this release. No performance percentage is claimed.
+- Validation: feature tests 37/37 files, affected regression checks, independent HIGH review; release validation recorded in TCK027.
+
 ## 5.7.0 — 2026-10-31
 
 Fixes and accepted design changes from the asdw-harness 5.5.0 dogfood report (`docs/analysis/2026-10-31-asdw-harness-dogfood.md`; triage TCK023, design TCK024). Every new setting is opt-in.

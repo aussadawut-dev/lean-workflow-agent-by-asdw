@@ -6,9 +6,13 @@ each phase took; `lean log --export` keeps a copy in the repository for later re
 """
 from datetime import datetime, timezone
 import json
+import math
+import os
 from pathlib import Path
+import time
+import uuid
 
-from .util import RUNTIME, write_text
+from .util import LeanError, RUNTIME, write_text
 
 FILE = "activity.jsonl"
 MAX_BYTES = 5_000_000  # Rotated to activity.1.jsonl beyond this, so the log never grows without bound.
@@ -31,9 +35,38 @@ def path(root):
     return Path(root) / RUNTIME / FILE
 
 
+def context(root, session=None):
+    """Attribution from this session only; capture once for a run with many child events."""
+    resolved = ""
+    try:
+        from . import progress
+        resolved = progress.env_session() if session is None else progress.valid_session(session)
+        session = resolved
+        state = progress.load(root, session=session, others=False) or {}
+        # The sessionless state can be the latest update of another session.
+        task = state.get("task", "") if state.get("session", "") == session else ""
+        return {"session": session, "task": task}
+    except Exception:
+        return {"session": resolved, "task": ""}  # Telemetry must never block the workflow.
+
+
+def run_context(root, session=None):
+    """Fresh run identity plus optional nesting; ids contain no commands or credentials."""
+    try:
+        if session is None and "LEAN_ACTIVITY_SESSION_ID" in os.environ:
+            session = os.environ["LEAN_ACTIVITY_SESSION_ID"]
+        return dict(context(root, session), run_id=uuid.uuid4().hex,
+                    parent_run_id=os.environ.get("LEAN_ACTIVITY_PARENT_RUN_ID", ""))
+    except Exception:
+        return {"session": "", "task": "", "run_id": f"{os.getpid()}-{time.monotonic_ns()}", "parent_run_id": ""}
+
+
 def record(root, event, **fields):
     """Append one event; never raise (the log is a convenience, not a gate)."""
     try:
+        if "task" not in fields or "session" not in fields:
+            attribution = context(root, fields.get("session"))
+            fields = dict(attribution, **fields)
         runtime = Path(root) / RUNTIME
         if runtime.is_symlink():
             return
@@ -47,12 +80,12 @@ def record(root, event, **fields):
         entry.update({key: value for key, value in fields.items() if value not in (None, "")})
         with log.open("a") as out:
             out.write(json.dumps(entry, ensure_ascii=False) + "\n")
-    except (OSError, ValueError, TypeError):
+    except (OSError, ValueError, TypeError, LeanError):
         pass
 
 
-def load(root, since=None, task=None):
-    """Events in order, skipping unreadable lines; optionally only after `since` or for one task."""
+def load(root, since=None, task=None, session=None):
+    """Readable events in order, with exact task/session attribution filters when supplied."""
     events = []
     for name in ("activity.1.jsonl", FILE):
         try:
@@ -69,18 +102,22 @@ def load(root, since=None, task=None):
     if since is not None:
         boundary = parse_time(since)
         events = [entry for entry in events if boundary is None or parse_time(entry["at"]) >= boundary]
-    if task:
-        events = [entry for entry in events if entry.get("task") == task or entry.get("event") != "phase"]
+    if task is not None:
+        events = [entry for entry in events if entry.get("task", "") == task]
+    if session is not None:
+        events = [entry for entry in events if entry.get("session", "") == session]
     return events
 
 
 def phase_durations(events):
-    """{task: [(phase, seconds or None while still open)]} from consecutive phase events of each task."""
+    """Durations by task/session label; legacy events retain their original task labels."""
     found, last = {}, {}
     for entry in events:
         if entry.get("event") != "phase":
             continue
         task = entry.get("task") or "(no task)"
+        if entry.get("session"):
+            task += f" [session {entry['session']}]"
         when = parse_time(entry["at"])
         if task in last:
             phase, began = last[task]
@@ -108,6 +145,18 @@ def duration(seconds):
     return f"{hours}h{minutes:02d}m"
 
 
+def cost_duration(events):
+    """Observed work time with an explicit count of missing or invalid legacy measurements."""
+    observed = [entry["seconds"] for entry in events
+                if isinstance(entry.get("seconds"), (int, float))
+                and math.isfinite(entry["seconds"]) and entry["seconds"] >= 0]
+    unknown = len(events) - len(observed)
+    if unknown and not observed:
+        return "unknown"
+    measured = duration(sum(observed))
+    return f"{measured} observed, {unknown} unknown" if unknown else measured
+
+
 def describe(entry):
     kind = entry.get("event")
     if kind == "phase":
@@ -120,6 +169,10 @@ def describe(entry):
     if kind == "test":
         return (f"tests {entry.get('files', 0)} files, {entry.get('failed', 0)} failed "
                 f"({duration(entry.get('seconds'))}): {entry.get('selection', '')}")
+    if kind == "gate-check":
+        return f"gate check {entry.get('number')} {entry.get('result')} ({duration(entry.get('seconds'))})"
+    if kind == "test-file":
+        return f"test file {entry.get('file')} {entry.get('result')} ({duration(entry.get('seconds'))})"
     if kind == "spawn":
         return (f"agent {entry.get('id')} [{entry.get('provider')}/{entry.get('model')}] {entry.get('status')} "
                 f"({duration(entry.get('seconds'))})")
@@ -147,17 +200,35 @@ def summary(events):
         for entry in gates:
             results[entry.get("result")] = results.get(entry.get("result"), 0) + 1
         lines.append("gate runs: " + ", ".join(f"{count} {result}" for result, count in sorted(results.items())))
+        lines.append(f"  {cost_duration(gates)} gate wall time")
     tests = [entry for entry in events if entry.get("event") == "test"]
     if tests:
         lines.append(f"test runs: {len(tests)} ({sum(entry.get('failed', 0) > 0 for entry in tests)} with failures), "
-                     f"{duration(sum(entry.get('seconds', 0) for entry in tests))} total")
+                     f"{cost_duration(tests)} test wall time")
+    for kind, label in (("gate-check", "gate checks"), ("test-file", "test files")):
+        children = [entry for entry in events if entry.get("event") == kind]
+        if children:
+            lines.append(f"{label}: {len(children)}, "
+                         f"{cost_duration(children)} nested work time")
+    if gates or tests:
+        lines.append("timings overlap: nested checks/tests are not additional elapsed wall time")
+        groups = {}
+        for entry in gates + tests:
+            key = (entry.get("task") or "UNKNOWN task", entry.get("session") or "UNKNOWN session")
+            counts = groups.setdefault(key, {"gate": [], "test": []})
+            counts[entry["event"]].append(entry)
+        for (task, session), counts in sorted(groups.items()):
+            lines.append(f"costs {task} [{session}]: gates {len(counts['gate'])} ({cost_duration(counts['gate'])} wall), "
+                         f"tests {len(counts['test'])} ({cost_duration(counts['test'])} wall)")
     agents = [entry for entry in events if entry.get("event") == "spawn"]
     if agents:
         lines.append(f"agents: {len(agents)} ({sum(entry.get('status') == 'done' for entry in agents)} done), "
-                     f"{duration(sum(entry.get('seconds', 0) or 0 for entry in agents))} agent time")
+                     f"{cost_duration(agents)} agent time")
     reviews = [entry for entry in events if entry.get("event") == "review"]
     if reviews:
         lines.append("reviews: " + ", ".join(entry.get("verdict", "?") for entry in reviews))
+    if events:
+        lines.append("token usage: unknown (provider usage unavailable; no estimate)")
     return lines or ["no activity recorded"]
 
 

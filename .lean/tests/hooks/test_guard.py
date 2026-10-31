@@ -345,6 +345,14 @@ class MidTurnPromptTests(HookFixture):
 
     WRITES = {"claude": ("Edit", {"file_path": "x.py"}), "codex": ("apply_patch", {"command": "*** Begin Patch"})}
 
+    def test_plan_preview_is_read_only_before_contract_for_both_providers(self):
+        for provider in ("claude", "codex"):
+            for flag in ("--explain", "--json"):
+                with self.subTest(provider=provider, flag=flag):
+                    result = self.tool(provider, "Bash", command="python3 .lean/bin/lean plan " + flag)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIsNone(contract_guard.current(self.root, "s1"))
+
     def declare(self, provider="claude", session="s1"):
         declared = self.tool(provider, "Bash", session, command=f"{DECLARE} <<'EOF'\n{BLOCK}\nEOF")
         self.assertEqual(declared.returncode, 0, declared.stderr)

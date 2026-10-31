@@ -137,7 +137,8 @@ def update(root, phase, done=None, total=None, task=None, note=None, session=Non
         write_json(session_path(root, session), state)
     write_json(path(root), state)
     from . import activity
-    activity.record(root, "phase", phase=phase, task=state["task"], done=done, total=total, note=note)
+    activity.record(root, "phase", phase=phase, task=state["task"], session=session,
+                    done=done, total=total, note=note)
     return state
 
 

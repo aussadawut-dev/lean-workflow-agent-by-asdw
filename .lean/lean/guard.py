@@ -692,7 +692,7 @@ PERL_VALUED = ("-M", "-m", "-I", "-e", "-E", "-x", "-C")  # Their letters are no
 # a set names the subcommands that only read, and a group missing here writes.
 LEAN_READS = {"status": True, "watch": True, "progress": True, "test": True, "lint": True,
               "models": {"list", "check", "bank"},  # `apply` writes models.json; `eval` writes results.
-              "log": True,
+              "log": True, "plan": True,
               "attribution": True, "hook": True, "version": True,
               "contract": {"declare", "current"}, "mode": {"show", "check", "context"},
               "intake": {"list", "check"}, "batch": {"readiness"},

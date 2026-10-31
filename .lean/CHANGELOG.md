@@ -3,6 +3,38 @@
 เลขรุ่น `MAJOR.MINOR.PATCH`: MAJOR เปลี่ยนกติกาหรือ path เดิม, MINOR เพิ่มของใหม่, PATCH แก้ไข · วิธีอัปเกรด: [CUSTOMIZING.md](CUSTOMIZING.md)
 Versions are `MAJOR.MINOR.PATCH`: MAJOR changes rules or paths, MINOR adds, PATCH fixes · Upgrading: [CUSTOMIZING.md](CUSTOMIZING.md) · 5.x technical notes: [docs/CHANGELOG-dev.md](../docs/CHANGELOG-dev.md)
 
+## 5.8.0 — 2026-10-31
+
+🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#580--2026-10-31)
+
+มองเห็นต้นทุนงานและแผนตรวจชัดขึ้น พร้อมบริบทสำหรับกลับมาทำงานต่อ
+
+**มีอะไรใหม่**
+- สรุปเวลาทำงานแยกตามงานและ session พร้อมแยกเวลาตรวจที่ซ้อนกัน
+- ดูแผนตรวจและเหตุผลก่อนเริ่ม โดยไม่รันการตรวจจริง
+- สรุปบริบทแบบกระชับพร้อมแหล่งข้อมูลและข้อกำหนดที่ยังค้าง
+
+**แก้ไข**
+- การอ่านงานค้างรองรับตัวอย่าง Markdown ที่มี code fence ซ้อนกัน
+
+**ต้องทำอะไรตอนอัปเกรด**
+- ไม่ต้องทำอะไร ความสามารถใหม่เรียกใช้ได้เมื่อต้องการ
+
+**English**
+
+See work costs and validation plans, and resume with sourced context.
+
+**Added**
+- Task/session timing with overlapping validation costs shown separately.
+- Read-only validation previews with selection reasons.
+- Compact resume context with sources and outstanding acceptance criteria.
+
+**Fixed**
+- Outstanding-item parsing handles nested Markdown code-fence examples.
+
+**Upgrade**
+- No action required; new capabilities are available on demand.
+
 ## 5.7.0 — 2026-10-31
 
 🔧 สำหรับนักพัฒนา / For developers: [technical notes](../docs/CHANGELOG-dev.md#570--2026-10-31)

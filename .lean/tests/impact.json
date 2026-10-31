@@ -69,7 +69,8 @@
       ],
       "tests": [
         "hooks",
-        "hooks/test_stop_git.py"
+        "hooks/test_stop_git.py",
+        "unit/test_planning.py"
       ]
     },
     {
@@ -145,7 +146,8 @@
       ],
       "tests": [
         "unit/test_testsel.py",
-        "unit/test_activity.py"
+        "unit/test_activity.py",
+        "unit/test_planning.py"
       ]
     },
     {
@@ -194,7 +196,8 @@
         "hooks/test_target_controls.py",
         "hooks/test_target_lifecycle.py",
         "hooks/test_gate.py",
-        "hooks/test_controls.py"
+        "hooks/test_controls.py",
+        "unit/test_planning.py"
       ]
     },
     {
@@ -253,6 +256,15 @@
       ],
       "tests": [
         "hooks/test_gate_preflight.py"
+      ]
+    },
+    {
+      "paths": [
+        ".lean/lean/planning.py"
+      ],
+      "tests": [
+        "unit/test_planning.py",
+        "unit/test_cli.py"
       ]
     }
   ],

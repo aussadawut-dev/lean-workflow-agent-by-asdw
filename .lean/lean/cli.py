@@ -118,6 +118,15 @@ def build_parser(argv=()):
     test.add_argument("-j", "--jobs", type=int)
     test.add_argument("files", nargs="*", help="tiers (unit, hooks, e2e) or <tier>/test_<name>.py files")
 
+    plan = commands.add_parser("plan", help="explain validation selection without running checks or recording evidence")
+    plan_output = plan.add_mutually_exclusive_group()
+    plan_output.add_argument("--explain", action="store_true", help="human-readable plan (default)")
+    plan_output.add_argument("--json", action="store_true", help="structured plan")
+    plan.add_argument("--base", help="also count workflow changes since this commit")
+    plan.add_argument("--tier", choices=("full", "stop"), default="full")
+    plan.add_argument("--contract", help="Task Contract used to determine the review floor")
+    plan.add_argument("--session", help="session to inspect (default: current process's session)")
+
     lint = commands.add_parser("lint", help="static workflow checks")
     lint.add_argument("--write-registry", action="store_true",
                       help="maintainers: regenerate .lean/assets.json from the workflow files first")
@@ -164,7 +173,8 @@ def build_parser(argv=()):
     spawn_clean.add_argument("run")
 
     log = commands.add_parser("log", help="development activity: timeline, phase durations, export")
-    log.add_argument("--task", help="only this task's phases")
+    log.add_argument("--task", help="only events attributed to this task")
+    log.add_argument("--session", help="only events attributed to this session")
     log.add_argument("--since", help="ISO time, e.g. 2026-10-26T08:00:00Z")
     log.add_argument("--summary", action="store_true", help="durations and counts instead of the timeline")
     log.add_argument("--json", action="store_true")
@@ -314,6 +324,12 @@ def dispatch(root, args, parser):
         return records.run(root, args)
     if command == "test":
         return test_command(root, args)
+    if command == "plan":
+        from . import planning, progress
+        report = planning.plan(root, base=args.base, tier=args.tier, contract=args.contract,
+                               session=args.session if args.session is not None else progress.env_session())
+        print(json.dumps(report, indent=2, ensure_ascii=False) if args.json else planning.explain(report))
+        return 0
     if command == "lint":
         from . import structure
         if args.write_registry:
@@ -353,7 +369,7 @@ def dispatch(root, args, parser):
         return target.command(root, args)
     if command == "log":
         from . import activity
-        events = activity.load(root, args.since, args.task)
+        events = activity.load(root, args.since, args.task, session=args.session)
         if args.export:
             print(f"exported {len(events)} events to {activity.export(root, args.export, events)}")
         elif args.json:

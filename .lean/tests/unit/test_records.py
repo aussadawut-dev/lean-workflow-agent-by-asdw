@@ -760,6 +760,102 @@ class WorkflowModeTests(unittest.TestCase):
         self.assertEqual(data2["active_tracker"]["id"], "TCK001")
         self.assertEqual(data2["active_tracker"]["status"], "IN_PROGRESS")
 
+    def test_compact_context_is_sourced_and_reflects_source_changes(self):
+        self.run_cli("configure", "tracker")
+        doc = self.checklist_tracker()
+        doc.write_text(doc.read_text() + "\n## Decisions\n\nUse local evidence.\n\n## Next step\n\nRun checks.\n")
+        first = json.loads(self.run_cli("context", "--compact", "--tracker", "TCK001").stdout)
+        tracker = first["tracker"]
+        self.assertEqual(tracker["source"], str(doc.resolve()))
+        self.assertEqual(tracker["decisions"], "Use local evidence.")
+        self.assertEqual(tracker["next_action"], "Run checks.")
+        self.assertIn("- [ ] AC-01: acceptance", tracker["acceptance"])
+        self.assertEqual(tracker["unresolved_items"], ["AC-01", "TASK-01"])
+        self.assertIn("not atomic", first["snapshot"]["freshness"])
+        self.assertEqual(first["gate"]["status"], "NOT_RUN")
+        doc.write_text(doc.read_text().replace("acceptance", "updated acceptance"))
+        second = json.loads(self.run_cli("context", "--compact").stdout)
+        self.assertNotEqual(first["snapshot"]["content_digest"], second["snapshot"]["content_digest"])
+        self.assertIn("updated acceptance", second["tracker"]["acceptance"])
+
+    def test_compact_context_selection_errors_and_empty_context(self):
+        empty = json.loads(self.run_cli("context", "--compact").stdout)
+        self.assertIsNone(empty["tracker"])
+        self.assertIn("found 0", self.run_cli("context", "--compact", "--tracker", "TCK999", success=False).stderr)
+        self.run_cli("configure", "tracker")
+        self.tracker_doc()
+        blocked = self.tracker_doc("TCK002.md")
+        blocked.write_text(blocked.read_text().replace("PLANNED", "BLOCKED"))
+        self.assertIn("ambiguous", self.run_cli("context", "--compact", success=False).stderr)
+        chosen = json.loads(self.run_cli("context", "--compact", "--tracker", "TCK002").stdout)
+        self.assertEqual(chosen["tracker"]["status"], "BLOCKED")
+        self.assertIn("require --compact", self.run_cli("context", "--tracker", "TCK001", success=False).stderr)
+        self.assertIn("require --compact", self.run_cli("context", "--max-chars", "100", success=False).stderr)
+        self.assertIn("must be positive", self.run_cli("context", "--compact", "--max-chars", "0", success=False).stderr)
+
+    def test_compact_context_preserves_acceptance_after_nested_fence_examples(self):
+        self.run_cli("configure", "tracker")
+        doc = self.checklist_tracker()
+        example = "````markdown\n```\n## Next step\nexample only\n```\n````\n- [ ] AC-02: retain this obligation\n"
+        doc.write_text(doc.read_text().replace("## Tasks", example + "\n## Tasks")
+                       + "\n## Next step\n\nActual next action.\n")
+        result = json.loads(self.run_cli("context", "--compact").stdout)
+        self.assertIn("AC-02: retain this obligation", result["tracker"]["acceptance"])
+        self.assertIn(example.strip(), result["tracker"]["acceptance"])
+        self.assertIn("AC-02", result["tracker"]["unresolved_items"])
+        self.assertEqual(result["tracker"]["next_action"], "Actual next action.")
+
+    def test_compact_context_budget_truncates_decisions_but_preserves_acceptance(self):
+        self.run_cli("configure", "tracker")
+        doc = self.checklist_tracker()
+        acceptance = "- [ ] AC-02: " + "required detail " * 20 + "\n    continuation must remain."
+        doc.write_text(doc.read_text().replace("## Tasks", acceptance + "\n\n### Nested acceptance\n\n- [ ] nested blocker\n\n## Tasks")
+                       + "\n## Decisions\n\n" + 'quoted "choice"\\\n' * 1000 + "\n## Next step\n\nRun checks.\n")
+        result = self.run_cli("context", "--compact", "--max-chars", "4000")
+        self.assertLessEqual(len(result.stdout), 4000)
+        data = json.loads(result.stdout)
+        self.assertIn(acceptance, data["tracker"]["acceptance"])
+        self.assertIn("nested blocker", data["tracker"]["acceptance"])
+        self.assertEqual(data["tracker"]["next_action"], "Run checks.")
+        self.assertEqual(data["truncation"]["fields"], ["tracker.decisions"])
+        doc.write_text(doc.read_text().replace(acceptance, acceptance * 100))
+        error = self.run_cli("context", "--compact", "--max-chars", "4000", success=False)
+        self.assertIn("acceptance and next action were not truncated", error.stderr)
+        self.assertIn(str(doc), error.stderr)
+        self.assertEqual(error.stdout, "")
+
+    def test_compact_context_target_roots_and_read_only_runtime_and_index(self):
+        self.run_cli("configure", "full")
+        self.tracker_doc()
+        self.item("Q0001", ["area:api"])
+        self.run_cli("queue", "claim-next", "--agent", "one")
+        claim = self.root / ".agent-runtime/claims/Q0001.json"
+        expired = json.loads(claim.read_text())
+        expired["expires_at"] = 0
+        claim.write_text(json.dumps(expired))
+        subprocess.run(["git", "-C", str(self.root), "init", "-q"], check=True)
+        subprocess.run(["git", "-C", str(self.root), "add", ".gitignore"], check=True)
+        before = {str(path): path.read_bytes() for path in self.root.rglob("*") if path.is_file()}
+        with tempfile.TemporaryDirectory() as shared:
+            evidence = Path(shared)
+            (evidence / ".agent-runtime").mkdir()
+            (evidence / ".agent-runtime/gate-failed").write_text("2")
+            result = self.run_cli("--workflow-root", str(evidence), "mode", "context", "--compact")
+            data = json.loads(result.stdout)
+            self.assertEqual(data["record_root"], str(self.root.resolve()))
+            self.assertEqual(data["evidence_root"], str(evidence.resolve()))
+            self.assertEqual(data["gate"]["status"], "FAIL")
+            sources = [entry["path"] for entry in data["snapshot"]["sources"]]
+            self.assertIn(str(evidence.resolve() / ".agent-runtime/gate-failed"), sources)
+            self.assertIn(str(self.root.resolve() / "docs/tracking/TCK001.md"), sources)
+        self.assertEqual(before, {str(path): path.read_bytes() for path in self.root.rglob("*") if path.is_file()})
+
+    def test_compact_context_creates_no_runtime_or_lock_in_fresh_root(self):
+        before = self.snapshot()
+        self.run_cli("context", "--compact")
+        self.assertEqual(self.snapshot(), before)
+        self.assertFalse((self.root / ".agent-runtime").exists())
+
     def test_tracker_archive_dry_run_and_apply(self):
         self.run_cli("configure", "tracker")
         doc = self.checklist_tracker()

@@ -100,6 +100,14 @@ class SessionTests(unittest.TestCase):
         self.assertIn("implement — my task", progress.shown(self.root, "sess-a-123456"))
         self.assertNotIn("session", progress.shown(self.root, "sess-a-123456"))
 
+    def test_phase_events_keep_the_explicit_session_even_when_environment_differs(self):
+        from lean import activity
+        os.environ["LEAN_SESSION_ID"] = "environment-session"
+        self.addCleanup(os.environ.pop, "LEAN_SESSION_ID", None)
+        progress.update(self.root, "implement", task="explicit task", session="explicit-session")
+        event = activity.load(self.root)[-1]
+        self.assertEqual((event["task"], event["session"]), ("explicit task", "explicit-session"))
+
     def test_another_sessions_progress_is_labelled(self):
         progress.update(self.root, "gate", task="other task", session="sess-b-123456")
         text = progress.shown(self.root, "sess-a-123456")
