@@ -174,6 +174,12 @@ class LintTests(unittest.TestCase):
         router.write_text(router.read_text().replace(f"Baseline {__version__}", "Baseline 0.0.1"))
         self.assertFails("workflow version differs")
 
+    def test_the_customizing_guide_states_the_same_version(self):
+        # 5.7.0 release review: the bump missed .lean/CUSTOMIZING.md and lint did not notice.
+        guide = self.root / ".lean/CUSTOMIZING.md"
+        guide.write_text(guide.read_text().replace(f"Baseline {__version__}", "Baseline 0.0.1"))
+        self.assertFails(".lean/CUSTOMIZING.md=0.0.1")
+
     def test_gate_markers_model_list_and_runtime_ignore(self):
         project = self.root / ".lean/PROJECT.md"
         project.write_text(project.read_text() + "\n<!-- gate:start -->\n")

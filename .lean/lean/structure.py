@@ -261,6 +261,10 @@ def check(root):
         path = root / name
         match = VERSION.search(path.read_text()) if path.is_file() else None
         found[name] = match.group(1) if match else None
+    guide = root / ".lean/CUSTOMIZING.md"  # Shipped with the workflow; checked when present.
+    if guide.is_file():
+        match = re.search(r"\bBaseline (\d+\.\d+\.\d+)", guide.read_text())
+        found[".lean/CUSTOMIZING.md"] = match.group(1) if match else None
     changelog = root / ".lean/CHANGELOG.md"
     match = re.search(r"(?m)^## (\d+\.\d+\.\d+)", changelog.read_text()) if changelog.is_file() else None
     found[".lean/CHANGELOG.md"] = match.group(1) if match else None
