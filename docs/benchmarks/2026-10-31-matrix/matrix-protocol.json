@@ -1,0 +1,545 @@
+{
+  "identity": {
+    "app_head": "d2ef08cf1a84aaaf5db527ea44a62a1c811c7701",
+    "task_bank_sha256": "ea4598b7236fe1b2656d8fd024c30a21dd554b639dc6d66585f12f0cbaeecb2c",
+    "profile_sha256": "5db6ae4250421b8ba036dbd0fb12417c1c57237c65c9519df56e744179934114",
+    "project_sha256": "a6352c1aff9e21d2b0663cbabd70d603e595e07bbb30d202100ae0d1818d347e",
+    "runner_sha256": "e7671268afbf9307de5f373498f1b5c80460e0ed790b7d0e45cb27f8b06025c3",
+    "workflow_commits": {
+      "v4.17.0": "9b6252d4d32dd5d7e693d8087d66154278973c28",
+      "v5.8.0": "8731463a3069a141e5ca4fccc16281d99dae9b60"
+    },
+    "packet_tool_sha256": "71ea54e3ec827a7c70547f325f95f69a648b13bd7b63a4bea6ca4fb09d324cc7",
+    "packet_runner_sha256": "5b2032df993223fa783256e1668eb69915f45bfca024d5326f1826eeecf5406f"
+  },
+  "started_at": "2026-10-31T08:30:39.696923+00:00",
+  "schedule": [
+    {
+      "id": "low-r1-protocol",
+      "task": "low",
+      "repeat": 1,
+      "arm": "protocol"
+    },
+    {
+      "id": "medium-r1-protocol",
+      "task": "medium",
+      "repeat": 1,
+      "arm": "protocol"
+    },
+    {
+      "id": "high-r1-protocol",
+      "task": "high",
+      "repeat": 1,
+      "arm": "protocol"
+    },
+    {
+      "id": "critical-r1-protocol",
+      "task": "critical",
+      "repeat": 1,
+      "arm": "protocol"
+    },
+    {
+      "id": "critical-r2-protocol",
+      "task": "critical",
+      "repeat": 2,
+      "arm": "protocol"
+    },
+    {
+      "id": "high-r2-protocol",
+      "task": "high",
+      "repeat": 2,
+      "arm": "protocol"
+    },
+    {
+      "id": "medium-r2-protocol",
+      "task": "medium",
+      "repeat": 2,
+      "arm": "protocol"
+    },
+    {
+      "id": "low-r2-protocol",
+      "task": "low",
+      "repeat": 2,
+      "arm": "protocol"
+    }
+  ],
+  "runs": [
+    {
+      "id": "low-r1-protocol",
+      "task": "low",
+      "repeat": 1,
+      "arm": "protocol",
+      "started_at": "2026-10-31T08:30:42.867228+00:00",
+      "ended_at": "2026-10-31T08:31:38.704156+00:00",
+      "elapsed_s": 55.84,
+      "model_requested": "gpt-6.1-sol",
+      "effort_requested": "medium",
+      "size": "M",
+      "workflow_commit": "8731463a3069a141e5ca4fccc16281d99dae9b60",
+      "exit_code": 0,
+      "timed_out": false,
+      "prompt_sha256": "d55e25b4e97761057df3c0b537d0f531c135b67031886026f92330c964596149",
+      "fixture_changes": "",
+      "usage": {
+        "input_tokens": 178098,
+        "cached_input_tokens": 135040,
+        "output_tokens": 1608,
+        "reasoning_output_tokens": 100,
+        "cache_write_input_tokens": 0
+      },
+      "usage_events": 1,
+      "malformed_events": 0,
+      "command_count": 5,
+      "command_exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "tool_output_bytes": 46341,
+      "total_tokens": 179706,
+      "uncached_input_tokens": 43058,
+      "answer_sha256": "e9b68bff07360bd40e239ed16372add6628bdf83531fceb1a5004fb9f76fcad8",
+      "raw_answer_sha256": "f1ba568be7c0d38cbe9852f459b0726a814f9e4ecd3088059ea9214aa41607d8",
+      "trace_sha256": "1d3adfd0c408dc8b7a4211465b25586c2d3f92522d8748f2a23015e3bf3da7e7",
+      "runtime_errors": [],
+      "answer_words": 398,
+      "valid_completion": true,
+      "source_packet": {
+        "sha256": "790e2d5f57d745739d09f7d44461a035334d0f27dd082d8c493029cbaf3673c3",
+        "entries": [
+          "apps/api/src/modules/users/navigation-pins.controller.ts",
+          "packages/contracts/src/navigation-pins.ts"
+        ],
+        "stats": {
+          "files": 10,
+          "lines": 322,
+          "omitted": 0,
+          "unresolved": 3
+        }
+      }
+    },
+    {
+      "id": "medium-r1-protocol",
+      "task": "medium",
+      "repeat": 1,
+      "arm": "protocol",
+      "started_at": "2026-10-31T08:31:42.441437+00:00",
+      "ended_at": "2026-10-31T08:32:39.990705+00:00",
+      "elapsed_s": 57.55,
+      "model_requested": "gpt-6.1-sol",
+      "effort_requested": "medium",
+      "size": "M",
+      "workflow_commit": "8731463a3069a141e5ca4fccc16281d99dae9b60",
+      "exit_code": 0,
+      "timed_out": false,
+      "prompt_sha256": "0237db6cebd06a40c07822af70ae97781181cf19fca87fd706131257ecb211d5",
+      "fixture_changes": "",
+      "usage": {
+        "input_tokens": 262991,
+        "cached_input_tokens": 218624,
+        "output_tokens": 1904,
+        "reasoning_output_tokens": 193,
+        "cache_write_input_tokens": 0
+      },
+      "usage_events": 1,
+      "malformed_events": 0,
+      "command_count": 6,
+      "command_exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "tool_output_bytes": 142839,
+      "total_tokens": 264895,
+      "uncached_input_tokens": 44367,
+      "answer_sha256": "04f330ecc6d86bed7c3de94568f1306e482c41b940486ebd3c3ac849a1290468",
+      "raw_answer_sha256": "2ff20b9900c8098586d53b209e818f87e4fffecc9b897d181647a0949dfb03f0",
+      "trace_sha256": "da967216dde8b74af976900fc1720de630b78e40f6b508612b3c41f0d881bb0d",
+      "runtime_errors": [],
+      "answer_words": 308,
+      "valid_completion": true,
+      "source_packet": {
+        "sha256": "3bf0644cf189ecaca4ce73c971cc917bd61cc3b2abf846156cdd4f629ecbe1ae",
+        "entries": [
+          "apps/api/src/routes/gmail-removed.test.ts",
+          "prisma/migrations/20261030100000_remove_gmail_connector_secrets/migration.sql"
+        ],
+        "stats": {
+          "files": 6,
+          "lines": 777,
+          "omitted": 0,
+          "unresolved": 0
+        }
+      }
+    },
+    {
+      "id": "high-r1-protocol",
+      "task": "high",
+      "repeat": 1,
+      "arm": "protocol",
+      "started_at": "2026-10-31T08:32:43.716857+00:00",
+      "ended_at": "2026-10-31T08:34:25.102847+00:00",
+      "elapsed_s": 101.38,
+      "model_requested": "gpt-6.1-sol",
+      "effort_requested": "high",
+      "size": "L",
+      "workflow_commit": "8731463a3069a141e5ca4fccc16281d99dae9b60",
+      "exit_code": 0,
+      "timed_out": false,
+      "prompt_sha256": "46072e0f96ba33667e48c6640f4a2216ee18ece87bd2f27c6208f087481a3d1e",
+      "fixture_changes": "",
+      "usage": {
+        "input_tokens": 373274,
+        "cached_input_tokens": 320128,
+        "output_tokens": 3525,
+        "reasoning_output_tokens": 680,
+        "cache_write_input_tokens": 0
+      },
+      "usage_events": 1,
+      "malformed_events": 0,
+      "command_count": 13,
+      "command_exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "tool_output_bytes": 171234,
+      "total_tokens": 376799,
+      "uncached_input_tokens": 53146,
+      "answer_sha256": "973a00e4808c9973ad7758e888f26b22766d888050e13db68a99f171ffd92737",
+      "raw_answer_sha256": "dd40ebd58a958fa7c069766eb23838e9a6e58a2b4cb198f0282856bd5f0342ba",
+      "trace_sha256": "bb5cb9da365a0135dd3f905e60937ad45c8621c97bf496ac90fc90c0d273e449",
+      "runtime_errors": [],
+      "answer_words": 386,
+      "valid_completion": true,
+      "source_packet": {
+        "sha256": "364578c1fbdbb99cf0cf5b13b31a1d3b308fc6eee67d8682afa0959a59181f8d",
+        "entries": [
+          "packages/server/src/infrastructure/providers/smtp-outbound-policy.ts",
+          "packages/server/src/infrastructure/providers/smtp-client.ts"
+        ],
+        "stats": {
+          "files": 7,
+          "lines": 745,
+          "omitted": 0,
+          "unresolved": 0
+        }
+      }
+    },
+    {
+      "id": "critical-r1-protocol",
+      "task": "critical",
+      "repeat": 1,
+      "arm": "protocol",
+      "started_at": "2026-10-31T08:34:31.595703+00:00",
+      "ended_at": "2026-10-31T08:36:54.282248+00:00",
+      "elapsed_s": 142.69,
+      "model_requested": "gpt-6.1-sol",
+      "effort_requested": "high",
+      "size": "L",
+      "workflow_commit": "8731463a3069a141e5ca4fccc16281d99dae9b60",
+      "exit_code": 0,
+      "timed_out": false,
+      "prompt_sha256": "a3ecf0345ee6d69715779e02e640c9d6ed67e0677b8c4201239639834e949d51",
+      "fixture_changes": "",
+      "usage": {
+        "input_tokens": 538409,
+        "cached_input_tokens": 456576,
+        "output_tokens": 4552,
+        "reasoning_output_tokens": 1637,
+        "cache_write_input_tokens": 0
+      },
+      "usage_events": 1,
+      "malformed_events": 0,
+      "command_count": 14,
+      "command_exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        2,
+        0
+      ],
+      "tool_output_bytes": 289072,
+      "total_tokens": 542961,
+      "uncached_input_tokens": 81833,
+      "answer_sha256": "7997ed7428b7023f1c0bbbbf380f4aac283032670cd408850c049084e727d730",
+      "raw_answer_sha256": "83e2f7382d1dcb48787eb775c4842c36b7b0c1eece36b1b8fbfd56e653421331",
+      "trace_sha256": "c0fa42923f03378bef24bb5606eff21f52b3a8238f4fef39dfc55bb6b51aab0b",
+      "runtime_errors": [],
+      "answer_words": 431,
+      "valid_completion": true,
+      "source_packet": {
+        "sha256": "e326933a284f1259bc21d42d95339ea06ef65feb248a50252460a2da187393ba",
+        "entries": [
+          "packages/server/src/modules/external-identities/external-identity-admin.usecases.ts",
+          "packages/server/src/modules/external-identities/prisma-external-identity-admin.repository.ts"
+        ],
+        "stats": {
+          "files": 17,
+          "lines": 1129,
+          "omitted": 0,
+          "unresolved": 1
+        }
+      }
+    },
+    {
+      "id": "critical-r2-protocol",
+      "task": "critical",
+      "repeat": 2,
+      "arm": "protocol",
+      "started_at": "2026-10-31T08:36:58.121389+00:00",
+      "ended_at": "2026-10-31T08:39:07.244321+00:00",
+      "elapsed_s": 129.12,
+      "model_requested": "gpt-6.1-sol",
+      "effort_requested": "high",
+      "size": "L",
+      "workflow_commit": "8731463a3069a141e5ca4fccc16281d99dae9b60",
+      "exit_code": 0,
+      "timed_out": false,
+      "prompt_sha256": "a3ecf0345ee6d69715779e02e640c9d6ed67e0677b8c4201239639834e949d51",
+      "fixture_changes": "",
+      "usage": {
+        "input_tokens": 489798,
+        "cached_input_tokens": 398592,
+        "output_tokens": 4580,
+        "reasoning_output_tokens": 1399,
+        "cache_write_input_tokens": 0
+      },
+      "usage_events": 1,
+      "malformed_events": 0,
+      "command_count": 8,
+      "command_exit_codes": [
+        0,
+        0,
+        0,
+        2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "tool_output_bytes": 341111,
+      "total_tokens": 494378,
+      "uncached_input_tokens": 91206,
+      "answer_sha256": "2cac237153b36b62558ad4d31432699e2fb0718e754b97631f2cd12554b10072",
+      "raw_answer_sha256": "b47719efe9adf1e437b5a4efabd9132241a82d865ba163863308eea05796e5e3",
+      "trace_sha256": "670c9b9261725b7ee6a2d0e681d8a2f3f84b73ba52d6cd2896b0bb92d1a79a1d",
+      "runtime_errors": [],
+      "answer_words": 427,
+      "valid_completion": true,
+      "source_packet": {
+        "sha256": "e326933a284f1259bc21d42d95339ea06ef65feb248a50252460a2da187393ba",
+        "entries": [
+          "packages/server/src/modules/external-identities/external-identity-admin.usecases.ts",
+          "packages/server/src/modules/external-identities/prisma-external-identity-admin.repository.ts"
+        ],
+        "stats": {
+          "files": 17,
+          "lines": 1129,
+          "omitted": 0,
+          "unresolved": 1
+        }
+      }
+    },
+    {
+      "id": "high-r2-protocol",
+      "task": "high",
+      "repeat": 2,
+      "arm": "protocol",
+      "started_at": "2026-10-31T08:39:11.077903+00:00",
+      "ended_at": "2026-10-31T08:40:44.504799+00:00",
+      "elapsed_s": 93.43,
+      "model_requested": "gpt-6.1-sol",
+      "effort_requested": "high",
+      "size": "L",
+      "workflow_commit": "8731463a3069a141e5ca4fccc16281d99dae9b60",
+      "exit_code": 0,
+      "timed_out": false,
+      "prompt_sha256": "46072e0f96ba33667e48c6640f4a2216ee18ece87bd2f27c6208f087481a3d1e",
+      "fixture_changes": "",
+      "usage": {
+        "input_tokens": 287428,
+        "cached_input_tokens": 239616,
+        "output_tokens": 3924,
+        "reasoning_output_tokens": 1013,
+        "cache_write_input_tokens": 0
+      },
+      "usage_events": 1,
+      "malformed_events": 0,
+      "command_count": 9,
+      "command_exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "tool_output_bytes": 175981,
+      "total_tokens": 291352,
+      "uncached_input_tokens": 47812,
+      "answer_sha256": "ccc1892c717d400a1fea3831d06362984abc2425e805b19f760f3d2860b6c974",
+      "raw_answer_sha256": "5c478f610cae4d6ce1e025a8734702fcccf4082fa3c995df4195f8c8fa059fe2",
+      "trace_sha256": "88559d6c6f89ac1bb2fdd8f00ddf20582def117f50e5f6a15b056cffbf21b7a0",
+      "runtime_errors": [],
+      "answer_words": 376,
+      "valid_completion": true,
+      "source_packet": {
+        "sha256": "364578c1fbdbb99cf0cf5b13b31a1d3b308fc6eee67d8682afa0959a59181f8d",
+        "entries": [
+          "packages/server/src/infrastructure/providers/smtp-outbound-policy.ts",
+          "packages/server/src/infrastructure/providers/smtp-client.ts"
+        ],
+        "stats": {
+          "files": 7,
+          "lines": 745,
+          "omitted": 0,
+          "unresolved": 0
+        }
+      }
+    },
+    {
+      "id": "medium-r2-protocol",
+      "task": "medium",
+      "repeat": 2,
+      "arm": "protocol",
+      "started_at": "2026-10-31T08:40:48.546587+00:00",
+      "ended_at": "2026-10-31T08:41:54.227615+00:00",
+      "elapsed_s": 65.68,
+      "model_requested": "gpt-6.1-sol",
+      "effort_requested": "medium",
+      "size": "M",
+      "workflow_commit": "8731463a3069a141e5ca4fccc16281d99dae9b60",
+      "exit_code": 0,
+      "timed_out": false,
+      "prompt_sha256": "0237db6cebd06a40c07822af70ae97781181cf19fca87fd706131257ecb211d5",
+      "fixture_changes": "",
+      "usage": {
+        "input_tokens": 197059,
+        "cached_input_tokens": 157824,
+        "output_tokens": 1627,
+        "reasoning_output_tokens": 83,
+        "cache_write_input_tokens": 0
+      },
+      "usage_events": 1,
+      "malformed_events": 0,
+      "command_count": 5,
+      "command_exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "tool_output_bytes": 135237,
+      "total_tokens": 198686,
+      "uncached_input_tokens": 39235,
+      "answer_sha256": "42ab06bc50e14491757277a6bedf6dd51a26106f3effd5112cbc28ddb1055196",
+      "raw_answer_sha256": "0ccfdb6d2304d00330e22fd557cf910b20315bd03753426846094686a46f9b0f",
+      "trace_sha256": "0fac8ecb912b26f2aae1e888e869ecd5ffd4e2a002f2950ef1e3e9c7f4c500dc",
+      "runtime_errors": [],
+      "answer_words": 354,
+      "valid_completion": true,
+      "source_packet": {
+        "sha256": "3bf0644cf189ecaca4ce73c971cc917bd61cc3b2abf846156cdd4f629ecbe1ae",
+        "entries": [
+          "apps/api/src/routes/gmail-removed.test.ts",
+          "prisma/migrations/20261030100000_remove_gmail_connector_secrets/migration.sql"
+        ],
+        "stats": {
+          "files": 6,
+          "lines": 777,
+          "omitted": 0,
+          "unresolved": 0
+        }
+      }
+    },
+    {
+      "id": "low-r2-protocol",
+      "task": "low",
+      "repeat": 2,
+      "arm": "protocol",
+      "started_at": "2026-10-31T08:41:57.867306+00:00",
+      "ended_at": "2026-10-31T08:42:44.423775+00:00",
+      "elapsed_s": 46.56,
+      "model_requested": "gpt-6.1-sol",
+      "effort_requested": "medium",
+      "size": "M",
+      "workflow_commit": "8731463a3069a141e5ca4fccc16281d99dae9b60",
+      "exit_code": 0,
+      "timed_out": false,
+      "prompt_sha256": "d55e25b4e97761057df3c0b537d0f531c135b67031886026f92330c964596149",
+      "fixture_changes": "",
+      "usage": {
+        "input_tokens": 135340,
+        "cached_input_tokens": 115584,
+        "output_tokens": 1547,
+        "reasoning_output_tokens": 119,
+        "cache_write_input_tokens": 0
+      },
+      "usage_events": 1,
+      "malformed_events": 0,
+      "command_count": 5,
+      "command_exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "tool_output_bytes": 47762,
+      "total_tokens": 136887,
+      "uncached_input_tokens": 19756,
+      "answer_sha256": "5505da7f16493a326321653112d22c9ea19a7dcf049e3c55396f9fa4c54b58e2",
+      "raw_answer_sha256": "3d793c8ef43c866f40f912379cfe0c96359ccf2f1e5512ece90da39c460241ec",
+      "trace_sha256": "5347d3d9bdd403ee85c7ce9065c75061e337d9ec0a8c9097187317bdd0ce7681",
+      "runtime_errors": [],
+      "answer_words": 380,
+      "valid_completion": true,
+      "source_packet": {
+        "sha256": "790e2d5f57d745739d09f7d44461a035334d0f27dd082d8c493029cbaf3673c3",
+        "entries": [
+          "apps/api/src/modules/users/navigation-pins.controller.ts",
+          "packages/contracts/src/navigation-pins.ts"
+        ],
+        "stats": {
+          "files": 10,
+          "lines": 322,
+          "omitted": 0,
+          "unresolved": 3
+        }
+      }
+    }
+  ],
+  "method": "Third exploratory intervention: actionable single-pass protocol plus unchanged deterministic exact-source packet. Controls reused, not interleaved with this intervention. Same source/task/model; 2 reversed task-order repeats.",
+  "app_unchanged": true,
+  "last_checkpoint_at": "2026-10-31T08:42:45.042370+00:00",
+  "ended_at": "2026-10-31T08:42:45.043251+00:00"
+}

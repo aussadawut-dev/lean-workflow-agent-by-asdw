@@ -1,0 +1,14 @@
+## Single-pass protocol for this source-only child
+
+The parent owns the shipping workset, tests, semantic review and full gate. Your authorized child deliverable is only the source investigation in PROJECT and the user question. Keep all applicable safety and evidence requirements; no application test or deployment claim is authorized.
+
+Use this concrete sequence, expanding only if a material requested conclusion still lacks evidence:
+
+1. Read `AGENTS.md .lean/README.md .lean/PROJECT.md source-context.md` together. Set the reading tool's `max_output_tokens` to 35000 so the packet is actually visible; if it reports truncation, retrieve the omitted part before making claims. The packet has complete original modules/tests and path:line numbers, not a summary or the grading rubric.
+2. Declare the exact contract from the question once, using this release's standalone contract command. Do not chain that declaration.
+3. In one subsequent shell/tool call, run `python3 .lean/bin/lean mode show` and `python3 .lean/bin/lean progress set scope --task 'Source investigation'`, plus any genuinely missing decisive source reads. The valid phase names are `contract scope implement test validate review gate done`; do not invent inspect/investigate phases. This analysis makes no product changes, so implementation/test/full-gate phases do not apply to the child. Never imply that source inspection is test execution.
+4. Check the evidence held against every requested question and its material boundary. Retrieve missing implementation/test blocks together if necessary. Then set `python3 .lean/bin/lean progress set review --task 'Check source evidence and limitations'` in the same tool call as those checks, and give the evidence-based final answer. Do not mark whole-project DONE.
+
+This is a sequence, not a hard tool-call cap: correctness and missing material security evidence require expansion. The required phase vocabulary, contract, scope and completion boundary are given above; load WORKFLOW/CONTEXT policy bodies only for a real unresolved rule, conflict or procedure, not to re-read already available instructions. Keep independent reads batched and reuse unchanged source already visible.
+
+Bound each claim to the actual question. A handler contract can establish caller-ID selection and tested validation without re-auditing the full shared authorization/entitlement stack; state that dependency rather than asserting universal safety. For a question about tenant, network or concurrency boundaries, inspect the material implementation and relevant interleavings. Describe any unproven exposure/configuration/deployment assumptions honestly. Do not expand a bounded source conclusion into an exhaustive audit of adjacent features, or fetch additional text merely to lengthen the answer. The original source remains available; packet depth/omission notes are not evidence of absence.

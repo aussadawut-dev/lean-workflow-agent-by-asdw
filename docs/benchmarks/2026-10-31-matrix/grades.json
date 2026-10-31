@@ -1,0 +1,739 @@
+{
+  "method": "Fresh independent model, randomized answer identifiers, no arm/token data; frozen rubric and pinned source",
+  "model_requested": "gpt-6.1-sol",
+  "effort_requested": "high",
+  "size": "L",
+  "packet_sha256": "4b10fde2e45939274dc60ed1e8c02341041d5a7ca7047b40c0f257e3f977f259",
+  "auditor_usage": {
+    "input_tokens": 1370826,
+    "cached_input_tokens": 1235584,
+    "output_tokens": 14122,
+    "reasoning_output_tokens": 3444,
+    "cache_write_input_tokens": 0
+  },
+  "trace_sha256": "3f4aa399bbec7ee476cf1c908c3c439e364745324d04156ca857bfd624fde0e6",
+  "grades": [
+    {
+      "id": "low-r1-v4.17.0",
+      "answer_sha256": "f39721a797080cbf95deedee119100baf73b5172b44c12130ed12b6d8089c716",
+      "criteria": {
+        "L1": 1,
+        "L2": 1,
+        "L3": 1,
+        "L4": 1,
+        "L5": 1,
+        "L6": 1
+      },
+      "evidence": "Verified against application/apps/api/src/modules/users/navigation-pins.controller.ts:6, application/packages/contracts/src/navigation-pins.ts:3 and application/apps/api/src/routes/navigation-pins.test.ts:22. Correctly bounds unexecuted evidence. Qualification to frozen L5: missing-member 404 applies to replacement; GET returns null and DELETE tolerates absence (application/packages/server/src/modules/navigation-pins/usecases/navigation-pins.ts:6,24).",
+      "unsupported_claims": []
+    },
+    {
+      "id": "low-r1-v5.8.0",
+      "answer_sha256": "748e70abcce8dce9177380ee1b4ab401a7a40ac0199d2b9f062175b69a374558",
+      "criteria": {
+        "L1": 1,
+        "L2": 1,
+        "L3": 1,
+        "L4": 1,
+        "L5": 1,
+        "L6": 1
+      },
+      "evidence": "Accurately covers controller, strict contract, workspace repository and test boundaries: application/apps/api/src/modules/users/navigation-pins.controller.ts:6; application/packages/contracts/src/navigation-pins.ts:3; application/apps/api/src/routes/navigation-pins.test.ts:22. Explicitly distinguishes mocked HTTP assertions from executed or deployed behavior.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "low-r1-packet",
+      "answer_sha256": "462f26e3e4ace3a83ecb919719fd011415652ee0c1f963e52326732f0fff474d",
+      "criteria": {
+        "L1": 1,
+        "L2": 1,
+        "L3": 1,
+        "L4": 1,
+        "L5": 1,
+        "L6": 1
+      },
+      "evidence": "Contract and error descriptions agree with application/packages/contracts/src/navigation-pins.ts:3 and application/apps/api/src/modules/users/navigation-pins.controller.ts:6. Correctly identifies the duplicated oversized HTTP fixture and independent count coverage in application/packages/contracts/src/navigation-pins.test.ts:9. Execution limitations are explicit.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "low-r1-focused",
+      "answer_sha256": "3ea996dcf676664defb355cfe01692676a8223e42cb66901e06859c37ad876c0",
+      "criteria": {
+        "L1": 1,
+        "L2": 1,
+        "L3": 1,
+        "L4": 1,
+        "L5": 0,
+        "L6": 1
+      },
+      "evidence": "L5: omits the explicit unauthenticated 401 behavior and successful self-service changes across all four roles. These are asserted in application/apps/api/src/routes/navigation-pins.test.ts:22,38. Other contract and persistence descriptions match the inspected implementation.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "low-r2-v4.17.0",
+      "answer_sha256": "4a661b51c3ea52a7505b044cfce7e3d5d03cf40a0907ce195ec1945badf2fe5c",
+      "criteria": {
+        "L1": 1,
+        "L2": 1,
+        "L3": 1,
+        "L4": 1,
+        "L5": 1,
+        "L6": 1
+      },
+      "evidence": "Accurate contract, validation, replacement-specific 404 and access qualifications: application/packages/contracts/src/navigation-pins.ts:3; application/packages/server/src/modules/navigation-pins/usecases/navigation-pins.ts:17; application/apps/api/src/routes/navigation-pins.test.ts:22,38. Mock and execution limitations are stated.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "low-r2-late",
+      "answer_sha256": "5e45cf3c613e8b5ba4ae6ef79ddc528c88c17d2cb9579f8cf099c8eef4c2c425",
+      "criteria": {
+        "L1": 1,
+        "L2": 1,
+        "L3": 1,
+        "L4": 1,
+        "L5": 1,
+        "L6": 1
+      },
+      "evidence": "Matches application/apps/api/src/modules/users/navigation-pins.controller.ts:6, application/packages/contracts/src/navigation-pins.ts:3 and application/apps/api/src/routes/navigation-pins.test.ts:22,38,82. Correctly limits conclusions about mocked persistence and deployed authentication.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "low-r1-protocol",
+      "answer_sha256": "e9b68bff07360bd40e239ed16372add6628bdf83531fceb1a5004fb9f76fcad8",
+      "criteria": {
+        "L1": 1,
+        "L2": 1,
+        "L3": 1,
+        "L4": 1,
+        "L5": 1,
+        "L6": 1
+      },
+      "evidence": "Accurate methods, caller selection, null/empty distinction and validation: application/apps/api/src/modules/users/navigation-pins.controller.ts:6; application/packages/contracts/src/navigation-pins.ts:3. Error and role assertions match application/apps/api/src/routes/navigation-pins.test.ts:22,38,82; no execution is claimed.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "low-r2-v5.8.0",
+      "answer_sha256": "4086a06a54a542e424be117f441a3cc88264d5d371204f60b9a2e1abe28344ec",
+      "criteria": {
+        "L1": 1,
+        "L2": 1,
+        "L3": 1,
+        "L4": 1,
+        "L5": 1,
+        "L6": 1
+      },
+      "evidence": "Correctly distinguishes missing-preference GET/DELETE from replacement 404: application/packages/server/src/modules/navigation-pins/usecases/navigation-pins.ts:6,17,24. Contract and HTTP evidence agree with application/packages/contracts/src/navigation-pins.ts:3 and application/apps/api/src/routes/navigation-pins.test.ts:22,38. Limitations are appropriately bounded.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "low-r2-focused",
+      "answer_sha256": "d86fa180dc481df56e74453c871c2ad8ae159134c9c0715fb7d466549f1ece05",
+      "criteria": {
+        "L1": 1,
+        "L2": 1,
+        "L3": 1,
+        "L4": 1,
+        "L5": 1,
+        "L6": 1
+      },
+      "evidence": "Verified contract, caller targeting, errors and role coverage against application/packages/contracts/src/navigation-pins.ts:3 and application/apps/api/src/routes/navigation-pins.test.ts:22,38,68,82. Stored-value filtering matches application/packages/server/src/modules/navigation-pins/usecases/navigation-pins.ts:6. No runtime proof is claimed.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "low-r2-protocol",
+      "answer_sha256": "5505da7f16493a326321653112d22c9ea19a7dcf049e3c55396f9fa4c54b58e2",
+      "criteria": {
+        "L1": 1,
+        "L2": 1,
+        "L3": 1,
+        "L4": 1,
+        "L5": 1,
+        "L6": 1
+      },
+      "evidence": "Accurate completed deliverable despite retained progress text. Implementation and assertions agree at application/apps/api/src/modules/users/navigation-pins.controller.ts:6, application/packages/contracts/src/navigation-pins.ts:3 and application/apps/api/src/routes/navigation-pins.test.ts:22,38,82. Tests are explicitly unexecuted.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "low-r2-packet",
+      "answer_sha256": "5bea63c9fc377e881fd0bf75c57c2dc8fce15e5bed53aafd2763c6899a246a20",
+      "criteria": {
+        "L1": 1,
+        "L2": 1,
+        "L3": 1,
+        "L4": 1,
+        "L5": 1,
+        "L6": 1
+      },
+      "evidence": "Accurately covers all required facts and distinguishes independent count validation from the HTTP fixture: application/packages/contracts/src/navigation-pins.test.ts:9; application/apps/api/src/routes/navigation-pins.test.ts:49. Controller and error claims match application/apps/api/src/modules/users/navigation-pins.controller.ts:6. Mock and execution limits are explicit.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "low-r1-late",
+      "answer_sha256": "ffdd1371e54122142b14b3533058c2e12a42bd96b102e64a90f9a1d4e9020b42",
+      "criteria": {
+        "L1": 1,
+        "L2": 1,
+        "L3": 1,
+        "L4": 1,
+        "L5": 1,
+        "L6": 1
+      },
+      "evidence": "Methods, principal selection, strict validation and error/test evidence match application/apps/api/src/modules/users/navigation-pins.controller.ts:6, application/packages/contracts/src/navigation-pins.ts:3 and application/apps/api/src/routes/navigation-pins.test.ts:22,38,82. Correctly limits the 404 discussion to replacement context.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "medium-r1-focused",
+      "answer_sha256": "748e76eddf820b43015dd93a245da20e9c24bc06f847189fe536228943a1500e",
+      "criteria": {
+        "M1": 1,
+        "M2": 1,
+        "M3": 1,
+        "M4": 1,
+        "M5": 1,
+        "M6": 1
+      },
+      "evidence": "All five routes match application/apps/api/src/routes/gmail-removed.test.ts:11. Cleanup scope and fixture limits match application/prisma/migrations/20261030100000_remove_gmail_connector_secrets/migration.sql:2 and application/prisma/gmail-secret-cleanup.test.ts:15. SMTP dispatch and early rejection match application/packages/server/src/infrastructure/providers/smtp-client.ts:185,194 and application/packages/server/src/smtp-gmail-host.test.ts:10. Remote revocation and execution are correctly unproven.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "medium-r2-late",
+      "answer_sha256": "8d14ca0b9b84559fcc603b0960a327b6fe1533993563c8439df27f96509cb45b",
+      "criteria": {
+        "M1": 1,
+        "M2": 1,
+        "M3": 1,
+        "M4": 0,
+        "M5": 1,
+        "M6": 1
+      },
+      "evidence": "M4: accurately describes preservation and the narrow fixture, but omits the material distinction between deleting stored secrets and revoking provider-side OAuth grants. The complete migration only deletes local rows: application/prisma/migrations/20261030100000_remove_gmail_connector_secrets/migration.sql:2.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "medium-r1-v5.8.0",
+      "answer_sha256": "902179e3f4c5496e927c17026b3eb10ef6d02452c4265c3c6e70d197ea0e0f2c",
+      "criteria": {
+        "M1": 1,
+        "M2": 1,
+        "M3": 1,
+        "M4": 0,
+        "M5": 1,
+        "M6": 1
+      },
+      "evidence": "M4: preservation and one-workspace/type coverage are accurate, but provider-side revocation is not addressed. Local secret deletion does not establish remote grant revocation: application/prisma/migrations/20261030100000_remove_gmail_connector_secrets/migration.sql:2.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "medium-r1-packet",
+      "answer_sha256": "1bad5912c4403999c0b0120906289915857d94284a47df8e2886d3549b9a2bbb",
+      "criteria": {
+        "M1": 1,
+        "M2": 1,
+        "M3": 1,
+        "M4": 0,
+        "M5": 1,
+        "M6": 1
+      },
+      "evidence": "M4: omits the required provider-revocation boundary while correctly explaining preserved fields and fixture scope. The migration contains only a local DELETE: application/prisma/migrations/20261030100000_remove_gmail_connector_secrets/migration.sql:2.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "medium-r1-v4.17.0",
+      "answer_sha256": "46c56b9e4959afb40fcd598a328bbef0019d9f51d3557d1246d76a98ba9b0ee0",
+      "criteria": {
+        "M1": 1,
+        "M2": 1,
+        "M3": 1,
+        "M4": 0,
+        "M5": 1,
+        "M6": 1
+      },
+      "evidence": "M4: does not distinguish local credential cleanup from provider-side token revocation. Its preservation and fixture descriptions otherwise agree with application/prisma/gmail-secret-cleanup.test.ts:15. The migration's entire operation is local deletion at application/prisma/migrations/20261030100000_remove_gmail_connector_secrets/migration.sql:2.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "medium-r2-v5.8.0",
+      "answer_sha256": "709d96db5672557dfde8f8cb7d43b1bf8d893a1ac6204717971ea807d725ae54",
+      "criteria": {
+        "M1": 1,
+        "M2": 1,
+        "M3": 1,
+        "M4": 1,
+        "M5": 1,
+        "M6": 1
+      },
+      "evidence": "Accurately enumerates routes, field-only deletion, preservation, limited fixture and absence of provider-token revocation: application/apps/api/src/routes/gmail-removed.test.ts:11; application/prisma/migrations/20261030100000_remove_gmail_connector_secrets/migration.sql:2; application/prisma/gmail-secret-cleanup.test.ts:15. SMTP analysis matches application/packages/server/src/infrastructure/providers/smtp-client.ts:185,194.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "medium-r2-v4.17.0",
+      "answer_sha256": "373e44f804078d59c2a75058d3be61e60e2f49269c95012b3b566864167849f1",
+      "criteria": {
+        "M1": 1,
+        "M2": 1,
+        "M3": 1,
+        "M4": 0,
+        "M5": 1,
+        "M6": 1
+      },
+      "evidence": "M4: omits the provider-side revocation distinction despite accurately bounding preservation and fixture coverage. application/prisma/migrations/20261030100000_remove_gmail_connector_secrets/migration.sql:2 only deletes stored rows; it contains no remote revocation operation.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "medium-r2-protocol",
+      "answer_sha256": "42ab06bc50e14491757277a6bedf6dd51a26106f3effd5112cbc28ddb1055196",
+      "criteria": {
+        "M1": 1,
+        "M2": 1,
+        "M3": 1,
+        "M4": 0,
+        "M5": 1,
+        "M6": 1
+      },
+      "evidence": "M4: does not address whether provider grants are revoked. The described cleanup is solely local row deletion, as shown by the complete statement in application/prisma/migrations/20261030100000_remove_gmail_connector_secrets/migration.sql:2. Other preservation and fixture facts are accurate.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "medium-r1-protocol",
+      "answer_sha256": "04f330ecc6d86bed7c3de94568f1306e482c41b940486ebd3c3ac849a1290468",
+      "criteria": {
+        "M1": 1,
+        "M2": 1,
+        "M3": 1,
+        "M4": 0,
+        "M5": 1,
+        "M6": 1
+      },
+      "evidence": "M4: describes the six fields and AI connector type, but does not bound cleanup-test coverage to one workspace. That fixture creates one workspace and inserts all six rows there: application/prisma/gmail-secret-cleanup.test.ts:15,19. Its statement that provider-token revocation was not verified is appropriately cautious.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "medium-r2-packet",
+      "answer_sha256": "880b233fe4f03dab15aa5365da94e931b68bc5a176ea69e4bb3358bc653417e1",
+      "criteria": {
+        "M1": 1,
+        "M2": 1,
+        "M3": 1,
+        "M4": 0,
+        "M5": 1,
+        "M6": 1
+      },
+      "evidence": "M4: correctly explains preserved fields and limited test scope but omits the provider-revocation boundary. application/prisma/migrations/20261030100000_remove_gmail_connector_secrets/migration.sql:2 performs local deletion only.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "medium-r2-focused",
+      "answer_sha256": "d348325919e322b2765d8684be3137172b77313ca7c5d0d2af3b27c15cc55ba0",
+      "criteria": {
+        "M1": 1,
+        "M2": 1,
+        "M3": 1,
+        "M4": 0,
+        "M5": 1,
+        "M6": 1
+      },
+      "evidence": "M4: fails to distinguish stored-secret deletion from revoking remote OAuth grants. The complete cleanup statement at application/prisma/migrations/20261030100000_remove_gmail_connector_secrets/migration.sql:2 contains no provider operation. Preservation and fixture limitations are otherwise accurate.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "medium-r1-late",
+      "answer_sha256": "2366e98fee4460b205fd8556ffccd9403bab9505281cf56b8de575f9ff6d6da9",
+      "criteria": {
+        "M1": 1,
+        "M2": 1,
+        "M3": 1,
+        "M4": 1,
+        "M5": 1,
+        "M6": 1
+      },
+      "evidence": "Accurate endpoint, SQL, preservation and one-workspace/type evidence: application/apps/api/src/routes/gmail-removed.test.ts:11; application/prisma/migrations/20261030100000_remove_gmail_connector_secrets/migration.sql:2; application/prisma/gmail-secret-cleanup.test.ts:15. Correctly bounds credential-revocation and SMTP-delivery conclusions; dispatch/early rejection match application/packages/server/src/infrastructure/providers/smtp-client.ts:185,194.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "high-r1-v5.8.0",
+      "answer_sha256": "f1205b2b2c7024257bf7b014145fbd4757e47f30ad0bfb7042bab442ae39f144",
+      "criteria": {
+        "H1": 1,
+        "H2": 1,
+        "H3": 1,
+        "H4": 1,
+        "H5": 1,
+        "H6": 1,
+        "H7": 1,
+        "H8": 1
+      },
+      "evidence": "Verified policy details at application/packages/server/src/infrastructure/providers/smtp-outbound-policy.ts:3,34,84,124 and numeric connection/TLS identity at application/packages/server/src/infrastructure/providers/smtp-client.ts:92,113,218. Test descriptions and evidence limitations match application/packages/server/src/smtp-outbound-policy.test.ts:27,81,105 and application/packages/server/src/smtp-connector.test.ts:673,915.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "high-r2-packet",
+      "answer_sha256": "5f88bfc14049303895a4d12a7589a2c1f746d1b9f002636c423604fd1c194183",
+      "criteria": {
+        "H1": 1,
+        "H2": 1,
+        "H3": 1,
+        "H4": 1,
+        "H5": 1,
+        "H6": 1,
+        "H7": 1,
+        "H8": 1
+      },
+      "evidence": "Accurately covers ports, embedded IPv4, whole-answer vetting, failures and override precedence: application/packages/server/src/infrastructure/providers/smtp-outbound-policy.ts:3,84,124. Connection analysis matches application/packages/server/src/infrastructure/providers/smtp-client.ts:92,113,218. Correctly treats tests as unexecuted and identifies the confounded loopback test at application/packages/server/src/smtp-connector.test.ts:915.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "high-r1-protocol",
+      "answer_sha256": "973a00e4808c9973ad7758e888f26b22766d888050e13db68a99f171ffd92737",
+      "criteria": {
+        "H1": 1,
+        "H2": 1,
+        "H3": 1,
+        "H4": 1,
+        "H5": 1,
+        "H6": 1,
+        "H7": 1,
+        "H8": 1
+      },
+      "evidence": "Policy and connection facts agree with application/packages/server/src/infrastructure/providers/smtp-outbound-policy.ts:3,34,84,124 and application/packages/server/src/infrastructure/providers/smtp-client.ts:92,113,218. Correctly distinguishes plaintext single-resolution coverage from TLS gaps: application/packages/server/src/smtp-connector.test.ts:744. No blanket safety or execution claim.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "high-r1-v4.17.0",
+      "answer_sha256": "e30ccdca7d6b5f1e9e4a8f78bba253f84e7115489cca460e4171a9a4ea4f3fcd",
+      "criteria": {
+        "H1": 1,
+        "H2": 1,
+        "H3": 1,
+        "H4": 1,
+        "H5": 1,
+        "H6": 1,
+        "H7": 1,
+        "H8": 1
+      },
+      "evidence": "Accurate source-based policy, override and connection explanation: application/packages/server/src/infrastructure/providers/smtp-outbound-policy.ts:3,34,84,124; application/packages/server/src/infrastructure/providers/smtp-client.ts:92,113,218. Identified missing cases and the port-confounded test agree with application/packages/server/src/smtp-outbound-policy.test.ts:27 and application/packages/server/src/smtp-connector.test.ts:915.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "high-r2-focused",
+      "answer_sha256": "fe4475baf93e26ec5da57a2f61e854e29783dd6222cc5eea2538a590af984a76",
+      "criteria": {
+        "H1": 1,
+        "H2": 1,
+        "H3": 1,
+        "H4": 1,
+        "H5": 1,
+        "H6": 1,
+        "H7": 1,
+        "H8": 1
+      },
+      "evidence": "All required policy facts match application/packages/server/src/infrastructure/providers/smtp-outbound-policy.ts:3,84,124. Save-time validation is supported at application/packages/server/src/modules/connectors/connector-settings.usecases.ts:284. Numeric TCP/TLS and socket wrapping match application/packages/server/src/infrastructure/providers/smtp-client.ts:92,113,218. Test limitations are accurately bounded.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "high-r1-packet",
+      "answer_sha256": "21668e711acbf7459f24ff91475a8884dbdd6ef453a93ec1ef7ee5e39436e4d0",
+      "criteria": {
+        "H1": 1,
+        "H2": 1,
+        "H3": 1,
+        "H4": 1,
+        "H5": 1,
+        "H6": 1,
+        "H7": 1,
+        "H8": 1
+      },
+      "evidence": "Matches classification, DNS and relaxation implementation at application/packages/server/src/infrastructure/providers/smtp-outbound-policy.ts:34,84,124. Connection and hostname preservation match application/packages/server/src/infrastructure/providers/smtp-client.ts:92,113,218. Policy and integration assertions are correctly described as unexecuted, with explicit deployment and coverage gaps.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "high-r1-focused",
+      "answer_sha256": "3ec9e476195c017ec9cefc1c48d76f4d8d6ce33bc6413275f60f6d7c290c649b",
+      "criteria": {
+        "H1": 1,
+        "H2": 1,
+        "H3": 1,
+        "H4": 1,
+        "H5": 1,
+        "H6": 1,
+        "H7": 1,
+        "H8": 1
+      },
+      "evidence": "Verified against application/packages/server/src/infrastructure/providers/smtp-outbound-policy.ts:3,34,84,124 and application/packages/server/src/infrastructure/providers/smtp-client.ts:92,113,218. Correctly identifies absent environment guards and recipient-only HTTP forwarding. Evidence-gap analysis agrees with application/packages/server/src/smtp-connector.test.ts:858,915.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "high-r2-protocol",
+      "answer_sha256": "ccc1892c717d400a1fea3831d06362984abc2425e805b19f760f3d2860b6c974",
+      "criteria": {
+        "H1": 1,
+        "H2": 1,
+        "H3": 1,
+        "H4": 1,
+        "H5": 1,
+        "H6": 1,
+        "H7": 1,
+        "H8": 1
+      },
+      "evidence": "Accurate port bypass, address classes, DNS failures and overrides: application/packages/server/src/infrastructure/providers/smtp-outbound-policy.ts:3,84,124. TLS trust and hostname discussion matches application/packages/server/src/infrastructure/providers/smtp-client.ts:113. Correctly bounds finite classifier and unexecuted integration evidence.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "high-r2-v5.8.0",
+      "answer_sha256": "2ed70c4425c5d3574d869bb5003c2a110be554e4a904fd027b12d0e76f2d0fe2",
+      "criteria": {
+        "H1": 1,
+        "H2": 1,
+        "H3": 1,
+        "H4": 1,
+        "H5": 1,
+        "H6": 1,
+        "H7": 1,
+        "H8": 1
+      },
+      "evidence": "Policy details match application/packages/server/src/infrastructure/providers/smtp-outbound-policy.ts:3,34,84,124; connection pinning and identity match application/packages/server/src/infrastructure/providers/smtp-client.ts:92,113,218. Correctly describes limitations of the unrelated listener counters in application/packages/server/src/smtp-connector.test.ts:869.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "high-r2-v4.17.0",
+      "answer_sha256": "31933bf63860320721c7d9349df35576210378ac7f3862fc46a5f456f363b35a",
+      "criteria": {
+        "H1": 1,
+        "H2": 1,
+        "H3": 1,
+        "H4": 1,
+        "H5": 1,
+        "H6": 1,
+        "H7": 1,
+        "H8": 1
+      },
+      "evidence": "Accurately explains the implementation at application/packages/server/src/infrastructure/providers/smtp-outbound-policy.ts:3,34,84,124 and application/packages/server/src/infrastructure/providers/smtp-client.ts:92,113,218. Test descriptions agree with application/packages/server/src/smtp-outbound-policy.test.ts:81,105 and application/packages/server/src/smtp-connector.test.ts:673,915. No complete-safety claim.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "high-r2-late",
+      "answer_sha256": "3333045567dee82fb3df76edb3ff69ce1e21a183f8aa61542a8013ebd93b3d61",
+      "criteria": {
+        "H1": 1,
+        "H2": 1,
+        "H3": 1,
+        "H4": 1,
+        "H5": 1,
+        "H6": 1,
+        "H7": 1,
+        "H8": 1
+      },
+      "evidence": "Port, classification, DNS and override conclusions match application/packages/server/src/infrastructure/providers/smtp-outbound-policy.ts:3,34,84,124. Numeric connection/TLS preservation matches application/packages/server/src/infrastructure/providers/smtp-client.ts:92,113,218. Residual-classification and integration-test limitations are source-supported.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "high-r1-late",
+      "answer_sha256": "c5dfb388e5867a46481cf9100a74be427099a6e6d72fbe738deca829d69e73c2",
+      "criteria": {
+        "H1": 1,
+        "H2": 1,
+        "H3": 1,
+        "H4": 1,
+        "H5": 1,
+        "H6": 1,
+        "H7": 1,
+        "H8": 1
+      },
+      "evidence": "Accurate policy and connection analysis: application/packages/server/src/infrastructure/providers/smtp-outbound-policy.ts:3,34,84,124; application/packages/server/src/infrastructure/providers/smtp-client.ts:92,113,218. Recipient-only schema is confirmed at application/packages/contracts/src/connector-settings.ts:299. Correctly separates plaintext pinning coverage from missing TLS-specific assertions.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "critical-r2-protocol",
+      "answer_sha256": "2cac237153b36b62558ad4d31432699e2fb0718e754b97631f2cd12554b10072",
+      "criteria": {
+        "C1": 1,
+        "C2": 0,
+        "C3": 0,
+        "C4": 1,
+        "C5": 0,
+        "C6": 1,
+        "C7": 0,
+        "C8": 1
+      },
+      "evidence": "C2: omits active/nonempty filtering, 1000 cap and truncation (application/packages/server/src/modules/external-identities/prisma-external-identity-admin.repository.ts:13; application/packages/server/src/modules/external-identities/external-identity-admin.usecases.ts:29). C3: omits schema/different-ID validation and 404/409 outcomes (same usecases.ts:36,44). C5: omits composite account selection, missing/singleton refusals and complete fresh-identity split behavior (repository.ts:32; usecases.ts:57,62). C7: does not substantively identify the permission-override regression (application/packages/server/src/external-identities.test.ts:229). C6's changed-owner hypothesis is accurately bounded by usecases.ts:59.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "critical-r2-v4.17.0",
+      "answer_sha256": "db2b3619b062482c56f30aa0cd3c2e79c7b7db8fa18cfdb89cbd0f3780b0e738",
+      "criteria": {
+        "C1": 1,
+        "C2": 0,
+        "C3": 0,
+        "C4": 1,
+        "C5": 0,
+        "C6": 1,
+        "C7": 1,
+        "C8": 1
+      },
+      "evidence": "C2: omits the 1000-result cap and truncation flag (application/packages/server/src/modules/external-identities/external-identity-admin.usecases.ts:29). C3: omits request validation, same-ID rejection and explicit missing/retired error outcomes (same file:36,44). C5: omits missing/singleton refusal and complete fresh-identity split semantics (same file:57,62). Changed-owner locking analysis agrees with its lock/re-read sequence at :59.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "critical-r1-protocol",
+      "answer_sha256": "7997ed7428b7023f1c0bbbbf380f4aac283032670cd408850c049084e727d730",
+      "criteria": {
+        "C1": 1,
+        "C2": 0,
+        "C3": 0,
+        "C4": 1,
+        "C5": 0,
+        "C6": 1,
+        "C7": 0,
+        "C8": 1
+      },
+      "evidence": "C2: omits nonempty filtering, cap and truncation (application/packages/server/src/modules/external-identities/prisma-external-identity-admin.repository.ts:13; application/packages/server/src/modules/external-identities/external-identity-admin.usecases.ts:29). C3: omits schema/different-ID validation and 404/409 outcomes (usecases.ts:36,44). C5: omits composite-key details and missing/singleton refusal (repository.ts:32; usecases.ts:57,62). C7: generic permission-denial discussion does not cover the administrator permission-override regression (application/packages/server/src/external-identities.test.ts:229). Privacy caveats and bounded concurrency analysis are supported.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "critical-r1-packet",
+      "answer_sha256": "04ac323e15e4a47b8abf66c01ed2562303c9b433438be0ffee0aaa721ee7ac05",
+      "criteria": {
+        "C1": 1,
+        "C2": 0,
+        "C3": 0,
+        "C4": 1,
+        "C5": 0,
+        "C6": 1,
+        "C7": 1,
+        "C8": 1
+      },
+      "evidence": "C2: gives the cap but omits truncation reporting (application/packages/server/src/modules/external-identities/external-identity-admin.usecases.ts:30). C3: omits request/different-ID validation and explicit 404/409 outcomes (same file:36,44). C5: omits missing/singleton refusal and complete fresh-identity movement semantics (same file:57,62). Correctly identifies ordered workspace locks and the changed-owner limitation (application/packages/server/src/modules/external-identities/prisma-external-identity-admin.repository.ts:18; usecases.ts:59).",
+      "unsupported_claims": []
+    },
+    {
+      "id": "critical-r2-late",
+      "answer_sha256": "918aa0057cf706dcc0cca1642220850d80f66ec110f4a18706d231403ea1cadc",
+      "criteria": {
+        "C1": 1,
+        "C2": 1,
+        "C3": 0,
+        "C4": 1,
+        "C5": 0,
+        "C6": 1,
+        "C7": 0,
+        "C8": 1
+      },
+      "evidence": "C3: omits schema/different-ID validation and explicit missing/retired 404/409 behavior (application/packages/server/src/modules/external-identities/external-identity-admin.usecases.ts:36,44). C5: omits missing/singleton refusal and complete fresh-identity split behavior (same file:57,62). C7: discusses cross-workspace denials and manager access but omits substantive permission-override test coverage (application/packages/server/src/external-identities.test.ts:229). C6 is a valid bounded account of the lock/re-read behavior.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "critical-r1-v4.17.0",
+      "answer_sha256": "28ecb6328f080239922575c02b40121e27acf4cd9b59539bf2b2da104202f48c",
+      "criteria": {
+        "C1": 1,
+        "C2": 1,
+        "C3": 0,
+        "C4": 1,
+        "C5": 0,
+        "C6": 1,
+        "C7": 0,
+        "C8": 1
+      },
+      "evidence": "C3: omits schema/different-ID validation and explicit 404/409 outcomes (application/packages/server/src/modules/external-identities/external-identity-admin.usecases.ts:36,44). C5: omits missing/singleton refusal and fresh-identity movement details (same file:57,62). C7: test discussion covers unauthorized roles and foreign IDs but omits the separate permission-override regression (application/packages/server/src/external-identities.test.ts:229). Concurrency and privacy caveats remain source-supported.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "critical-r2-v5.8.0",
+      "answer_sha256": "8c491573c280c1e9e75edd803672ebbbeacb53e0c3a235273e63da7c8de15816",
+      "criteria": {
+        "C1": 1,
+        "C2": 0,
+        "C3": 0,
+        "C4": 1,
+        "C5": 0,
+        "C6": 1,
+        "C7": 0,
+        "C8": 1
+      },
+      "evidence": "C2: omits active/nonempty list filtering, cap and truncation (application/packages/server/src/modules/external-identities/prisma-external-identity-admin.repository.ts:13; application/packages/server/src/modules/external-identities/external-identity-admin.usecases.ts:29). C3: omits schema/different-ID validation and missing/retired error outcomes (usecases.ts:36,44). C5: omits composite-key details and missing/singleton refusal (repository.ts:32; usecases.ts:57,62). C7: generic tenant/permission-denial assertions do not substantively cover the administrator policy override (application/packages/server/src/external-identities.test.ts:229).",
+      "unsupported_claims": []
+    },
+    {
+      "id": "critical-r2-packet",
+      "answer_sha256": "333821189a4c3c0efe05d34a39e1cfb62cf640d71f754afae6f927c0a74507c4",
+      "criteria": {
+        "C1": 1,
+        "C2": 0,
+        "C3": 0,
+        "C4": 1,
+        "C5": 0,
+        "C6": 1,
+        "C7": 1,
+        "C8": 1
+      },
+      "evidence": "C2: omits active/nonempty filtering, cap and truncation (application/packages/server/src/modules/external-identities/prisma-external-identity-admin.repository.ts:13; application/packages/server/src/modules/external-identities/external-identity-admin.usecases.ts:29). C3: omits schema/different-ID validation and distinct 404/409 outcomes (usecases.ts:36,44). C5: explains the two-account threshold and allocation, but omits missing-account refusal before and after the lock (usecases.ts:58,61). Changed-owner concurrency analysis is accurately bounded.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "critical-r2-focused",
+      "answer_sha256": "6fbde7f365b8a95f08150d827d57ea0b2fc282ce7b9f45aefea75ef4f052ce63",
+      "criteria": {
+        "C1": 1,
+        "C2": 0,
+        "C3": 0,
+        "C4": 1,
+        "C5": 0,
+        "C6": 1,
+        "C7": 1,
+        "C8": 1
+      },
+      "evidence": "C2: omits the truncation flag despite stating the cap (application/packages/server/src/modules/external-identities/external-identity-admin.usecases.ts:30). C3: omits schema/different-ID validation and explicit 404/409 outcomes (same file:36,44). C5: describes fresh-identity movement but omits missing/singleton refusal (same file:58,61,62). Ordered locking, changed-owner limitation and policy/privacy test qualifications are supported.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "critical-r1-v5.8.0",
+      "answer_sha256": "70095e4f348d7f845f544038e1b70808851ab9ae20b295bef912a693bebc5323",
+      "criteria": {
+        "C1": 0,
+        "C2": 0,
+        "C3": 0,
+        "C4": 0,
+        "C5": 0,
+        "C6": 0,
+        "C7": 0,
+        "C8": 0
+      },
+      "evidence": "Incomplete: answers-critical.json records completed=false. Its partial text is not a completed deliverable; all criteria fail under the fixed protocol. Relevant implementation spans application/packages/server/src/modules/external-identities/external-identity-admin.usecases.ts:18,26,35,52, with locking at application/packages/server/src/modules/external-identities/prisma-external-identity-admin.repository.ts:18 and regression evidence at application/apps/api/src/routes/external-identities.test.ts:36.",
+      "unsupported_claims": [],
+      "reviewed_answer_sha256": "0ca5cb34c92a05094cb21e94c688beb65fed7bdd72e988a37dad084144d99c5c",
+      "publication_normalization": "EOF whitespace only after audit; incomplete deliverable remains failed; no criterion changed."
+    },
+    {
+      "id": "critical-r1-late",
+      "answer_sha256": "26084fc9c747990e97ca42b85a53574c73d7726cb650a2562e023ee2d5c6d2dc",
+      "criteria": {
+        "C1": 1,
+        "C2": 1,
+        "C3": 0,
+        "C4": 1,
+        "C5": 0,
+        "C6": 1,
+        "C7": 1,
+        "C8": 1
+      },
+      "evidence": "C3: mentions strict-body tests but omits same-ID rejection and distinct missing/retired outcomes (application/packages/server/src/modules/external-identities/external-identity-admin.usecases.ts:39,44,45). C5: omits composite account-key details, missing/singleton refusal and fresh-identity allocation behavior (application/packages/server/src/modules/external-identities/prisma-external-identity-admin.repository.ts:32; usecases.ts:57,62,63). C6 correctly distinguishes a supported interleaving concern from a demonstrated anomaly.",
+      "unsupported_claims": []
+    },
+    {
+      "id": "critical-r1-focused",
+      "answer_sha256": "352aaa4ee20d4ab1372067a547a986937707ff9007249de3139e3934d6a56eae",
+      "criteria": {
+        "C1": 1,
+        "C2": 1,
+        "C3": 0,
+        "C4": 1,
+        "C5": 0,
+        "C6": 1,
+        "C7": 1,
+        "C8": 1
+      },
+      "evidence": "C3: omits schema/different-ID validation and distinct 404/409 outcomes (application/packages/server/src/modules/external-identities/external-identity-admin.usecases.ts:36,44). C5: describes checking a count and creating/moving, but omits the composite account selector and missing/singleton refusal (application/packages/server/src/modules/external-identities/prisma-external-identity-admin.repository.ts:32; usecases.ts:58,61,62). Concurrency and malformed-owner privacy limitations are accurately bounded.",
+      "unsupported_claims": []
+    }
+  ]
+}

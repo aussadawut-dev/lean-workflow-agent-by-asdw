@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "tasks": [
+    {
+      "id": "low",
+      "size": "M",
+      "model": "gpt-6.1-sol",
+      "effort": "medium",
+      "question": "Explain the navigation pins HTTP contract: supported methods, which member is read or changed, what pins:null versus pins:[] means, allowed identifiers/count/duplicates/extra properties, and error/test evidence. Start from apps/api/src/modules/users/navigation-pins.controller.ts and packages/contracts/src/navigation-pins.ts, following relevant imports/tests. Do not audit unrelated navigation UI. Cite source lines and state what has not been executed.",
+      "criteria": [
+        {"id":"L1","expected":"GET, PUT and DELETE /api/v1/me/navigation-pins; scopedPrincipal.userId, not caller body, selects member","hard":true},
+        {"id":"L2","expected":"null is no customization/role defaults; [] is valid explicit empty list; DELETE resets to null","hard":false},
+        {"id":"L3","expected":"nine allowed IDs include knowledge; MAX_NAVIGATION_PINS=8","hard":false},
+        {"id":"L4","expected":"array values must be enum members and unique; strict request object rejects extra userId/workspaceId, malformed or null payload","hard":true},
+        {"id":"L5","expected":"400 INVALID_BODY validation, 401 unauthenticated, 404 missing member; VIEWER/AGENT/ADMIN/PLATFORM_ADMIN can change own pins","hard":true},
+        {"id":"L6","expected":"implementation plus relevant schema/HTTP tests cited; mock persistence is not real DB proof; no claim of executing tests","hard":true}
+      ]
+    },
+    {
+      "id": "medium",
+      "size": "M",
+      "model": "gpt-6.1-sol",
+      "effort": "medium",
+      "question": "Investigate removal of the Gmail OAuth/API connector: enumerate removed HTTP endpoints, exact stored-secret cleanup predicate and preservation, and ordinary smtp.gmail.com behavior even with GMAIL_API_ENABLED=1. Start from apps/api/src/routes/gmail-removed.test.ts and prisma/migrations/20261030100000_remove_gmail_connector_secrets/migration.sql. Inspect implementation and relevant tests. Cite lines and distinguish source conclusions from executed/deployed behavior.",
+      "criteria": [
+        {"id":"M1","expected":"all five GET callback, GET/PATCH gmail, POST gmail/oauth/start and DELETE gmail/account endpoints expected 404","hard":false},
+        {"id":"M2","expected":"implementation app registration/fallback agrees with removal; status-only authenticated test is not deployed behavior proof","hard":true},
+        {"id":"M3","expected":"DELETE connector_secrets fields gmail-settings, gmail-grant, LIKE gmail-state:% without connector-type/workspace restriction","hard":true},
+        {"id":"M4","expected":"smtpPassword/emailApiKey and other nonmatching fields survive; cleanup test only one workspace/type and six fields; not provider-side revocation","hard":true},
+        {"id":"M5","expected":"SMTP path ignores Gmail host/flag; config.emailApi explicitly selects separate transport; missing-password/no-fetch test exits before connection","hard":true},
+        {"id":"M6","expected":"implementation and tests cited; no claim of test execution, migration deployment or successful SMTP delivery","hard":true}
+      ]
+    },
+    {
+      "id": "high",
+      "size": "L",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "question": "Audit SMTP outbound SSRF defenses, without sending traffic. Explain port rules, address classification including IPv4 embedded in IPv6, mixed DNS replies, DNS failure/empty answers, test-only/environment relaxations, and whether the actual TCP/TLS connection uses the vetted address while preserving TLS hostname identity. Start from packages/server/src/infrastructure/providers/smtp-outbound-policy.ts and smtp-client.ts. Inspect relevant tests and identify remaining evidence gaps, without claiming complete SSRF safety.",
+      "criteria": [
+        {"id":"H1","expected":"ports 25/465/587/2525 by default, integer validation and explicit allowAnyPort override","hard":true},
+        {"id":"H2","expected":"denied metadata/link-local/multicast/reserved classes distinct from loopback/private; zone IDs invalid; IPv4 mapped/compatible IPv6 classified by embedded IPv4","hard":true},
+        {"id":"H3","expected":"all DNS answers vetted; any disallowed address rejects, not just first; hostname resolve once and IP literal bypasses DNS","hard":true},
+        {"id":"H4","expected":"DNS exception or empty addresses => SMTP_TARGET_REFUSED; selected first vetted address","hard":true},
+        {"id":"H5","expected":"allowLoopback relaxes loopback only; exact env SMTP_ALLOW_PRIVATE_HOSTS=true allows private, explicit allowPrivate overrides env; always-denied addresses still denied","hard":true},
+        {"id":"H6","expected":"TCP and TLS connect to vetted numeric address; TLS servername uses original hostname, STARTTLS wraps established socket; no second hostname lookup asserted from code","hard":true},
+        {"id":"H7","expected":"implementation and policy tests cited with mapped address/mixed DNS/override cases; no tests or network executed","hard":true},
+        {"id":"H8","expected":"no blanket safety claim; policy tests alone do not prove live DNS/TLS/SMTP or every network/config deployment boundary","hard":true}
+      ]
+    },
+    {
+      "id": "critical",
+      "size": "L",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "question": "Assess the tenant, authorization and concurrency safety of external-identity list/merge/split, including identity-code retirement and privacy impact. Start from packages/server/src/modules/external-identities/external-identity-admin.usecases.ts and prisma-external-identity-admin.repository.ts. Trace relevant HTTP caller identity, permission/workspace checks, transaction/locking/recheck paths and tests. Identify what source and tests do or do not establish about concurrency and privacy. Propose bounded missing regression cases where warranted; do not implement or claim an exploitable bug without a concrete supported path.",
+      "criteria": [
+        {"id":"C1","expected":"HTTP user from scopedPrincipal; authorization uses current workspace, resolveAccessSubject and connectors.manage rather than role-name-only","hard":true},
+        {"id":"C2","expected":"list constrained to active/nonempty current workspace, up to1000 with truncated flag; DTO may expose real names to authorized administration","hard":true},
+        {"id":"C3","expected":"merge validates schema and different IDs, transaction authorizes, ordered workspace-scoped FOR UPDATE locks, workspace-scoped states ensure 404 foreign/missing and 409 retired","hard":true},
+        {"id":"C4","expected":"merge moves source accounts to target and retires source code; retired code stays reserved; id-only read/update safe only in context of preceding scoped checks, not universal RLS guarantee","hard":true},
+        {"id":"C5","expected":"split scopes composite account key, finds owner, locks then re-reads, refuses missing/one-account cases, creates fresh identity and moves only one account","hard":true},
+        {"id":"C6","expected":"analyze concurrency limits of split recheck if account owner changed while waiting: re-read does not automatically lock a different current identity; distinguish hypothesis from demonstrated exploit; propose interleaving regression","hard":true},
+        {"id":"C7","expected":"tests cover foreign workspace/unauthorized/permission override plus merge retirement/split; real-name privacy is separate non-admin read/pseudonymization requirement, not proved solely by admin DTO","hard":true},
+        {"id":"C8","expected":"cite implementation and tests, state no DB/tests executed and no exhaustive race/privacy guarantee; no unrelated auth/deployment changes proposed","hard":true}
+      ]
+    }
+  ]
+}

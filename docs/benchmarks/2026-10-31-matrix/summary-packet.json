@@ -1,0 +1,392 @@
+{
+  "candidate": "packet",
+  "per_task": {
+    "low": {
+      "arms": {
+        "v4.17.0": {
+          "all_completed": true,
+          "mean_total_tokens": 280926.5,
+          "total_token_samples": [
+            310132,
+            251721
+          ],
+          "mean_uncached_input": 49199.5,
+          "mean_cached_input": 229504,
+          "mean_output": 2223,
+          "mean_commands": 11.5,
+          "mean_quality": 1.0,
+          "all_hard_pass": true,
+          "no_unsupported_claims": true,
+          "quality_samples": [
+            {
+              "id": "low-r1-v4.17.0",
+              "score": 1.0,
+              "hard_pass": true,
+              "unsupported_claims": []
+            },
+            {
+              "id": "low-r2-v4.17.0",
+              "score": 1.0,
+              "hard_pass": true,
+              "unsupported_claims": []
+            }
+          ]
+        },
+        "v5.8.0": {
+          "all_completed": true,
+          "mean_total_tokens": 282176,
+          "total_token_samples": [
+            283090,
+            281262
+          ],
+          "mean_uncached_input": 36952,
+          "mean_cached_input": 242816,
+          "mean_output": 2408,
+          "mean_commands": 12.5,
+          "mean_quality": 1.0,
+          "all_hard_pass": true,
+          "no_unsupported_claims": true,
+          "quality_samples": [
+            {
+              "id": "low-r1-v5.8.0",
+              "score": 1.0,
+              "hard_pass": true,
+              "unsupported_claims": []
+            },
+            {
+              "id": "low-r2-v5.8.0",
+              "score": 1.0,
+              "hard_pass": true,
+              "unsupported_claims": []
+            }
+          ]
+        },
+        "packet": {
+          "all_completed": true,
+          "mean_total_tokens": 181161.5,
+          "total_token_samples": [
+            185492,
+            176831
+          ],
+          "mean_uncached_input": 32762.5,
+          "mean_cached_input": 146496,
+          "mean_output": 1903,
+          "mean_commands": 9,
+          "mean_quality": 1.0,
+          "all_hard_pass": true,
+          "no_unsupported_claims": true,
+          "quality_samples": [
+            {
+              "id": "low-r1-packet",
+              "score": 1.0,
+              "hard_pass": true,
+              "unsupported_claims": []
+            },
+            {
+              "id": "low-r2-packet",
+              "score": 1.0,
+              "hard_pass": true,
+              "unsupported_claims": []
+            }
+          ]
+        }
+      },
+      "focused_reduction_vs_4_17_pct": 35.51284766656047,
+      "focused_reduction_vs_5_8_pct": 35.79840241551372,
+      "no_quality_loss": true,
+      "meets_20_pct": true,
+      "target_met": true
+    },
+    "medium": {
+      "arms": {
+        "v4.17.0": {
+          "all_completed": true,
+          "mean_total_tokens": 210014.5,
+          "total_token_samples": [
+            200516,
+            219513
+          ],
+          "mean_uncached_input": 37966.5,
+          "mean_cached_input": 170048,
+          "mean_output": 2000,
+          "mean_commands": 9,
+          "mean_quality": 0.8333333333333334,
+          "all_hard_pass": false,
+          "no_unsupported_claims": true,
+          "quality_samples": [
+            {
+              "id": "medium-r1-v4.17.0",
+              "score": 0.8333333333333334,
+              "hard_pass": false,
+              "unsupported_claims": []
+            },
+            {
+              "id": "medium-r2-v4.17.0",
+              "score": 0.8333333333333334,
+              "hard_pass": false,
+              "unsupported_claims": []
+            }
+          ]
+        },
+        "v5.8.0": {
+          "all_completed": true,
+          "mean_total_tokens": 325703,
+          "total_token_samples": [
+            362045,
+            289361
+          ],
+          "mean_uncached_input": 56702.5,
+          "mean_cached_input": 266624,
+          "mean_output": 2376.5,
+          "mean_commands": 13,
+          "mean_quality": 0.9166666666666667,
+          "all_hard_pass": false,
+          "no_unsupported_claims": true,
+          "quality_samples": [
+            {
+              "id": "medium-r1-v5.8.0",
+              "score": 0.8333333333333334,
+              "hard_pass": false,
+              "unsupported_claims": []
+            },
+            {
+              "id": "medium-r2-v5.8.0",
+              "score": 1.0,
+              "hard_pass": true,
+              "unsupported_claims": []
+            }
+          ]
+        },
+        "packet": {
+          "all_completed": true,
+          "mean_total_tokens": 234558.5,
+          "total_token_samples": [
+            213048,
+            256069
+          ],
+          "mean_uncached_input": 39990,
+          "mean_cached_input": 192576,
+          "mean_output": 1992.5,
+          "mean_commands": 11,
+          "mean_quality": 0.8333333333333334,
+          "all_hard_pass": false,
+          "no_unsupported_claims": true,
+          "quality_samples": [
+            {
+              "id": "medium-r1-packet",
+              "score": 0.8333333333333334,
+              "hard_pass": false,
+              "unsupported_claims": []
+            },
+            {
+              "id": "medium-r2-packet",
+              "score": 0.8333333333333334,
+              "hard_pass": false,
+              "unsupported_claims": []
+            }
+          ]
+        }
+      },
+      "focused_reduction_vs_4_17_pct": -11.686812101069211,
+      "focused_reduction_vs_5_8_pct": 27.983930144947998,
+      "no_quality_loss": false,
+      "meets_20_pct": false,
+      "target_met": false
+    },
+    "high": {
+      "arms": {
+        "v4.17.0": {
+          "all_completed": true,
+          "mean_total_tokens": 216118.5,
+          "total_token_samples": [
+            216652,
+            215585
+          ],
+          "mean_uncached_input": 45719.5,
+          "mean_cached_input": 167552,
+          "mean_output": 2847,
+          "mean_commands": 10.5,
+          "mean_quality": 1.0,
+          "all_hard_pass": true,
+          "no_unsupported_claims": true,
+          "quality_samples": [
+            {
+              "id": "high-r1-v4.17.0",
+              "score": 1.0,
+              "hard_pass": true,
+              "unsupported_claims": []
+            },
+            {
+              "id": "high-r2-v4.17.0",
+              "score": 1.0,
+              "hard_pass": true,
+              "unsupported_claims": []
+            }
+          ]
+        },
+        "v5.8.0": {
+          "all_completed": true,
+          "mean_total_tokens": 289304.5,
+          "total_token_samples": [
+            274776,
+            303833
+          ],
+          "mean_uncached_input": 44618,
+          "mean_cached_input": 241344,
+          "mean_output": 3342.5,
+          "mean_commands": 12,
+          "mean_quality": 1.0,
+          "all_hard_pass": true,
+          "no_unsupported_claims": true,
+          "quality_samples": [
+            {
+              "id": "high-r1-v5.8.0",
+              "score": 1.0,
+              "hard_pass": true,
+              "unsupported_claims": []
+            },
+            {
+              "id": "high-r2-v5.8.0",
+              "score": 1.0,
+              "hard_pass": true,
+              "unsupported_claims": []
+            }
+          ]
+        },
+        "packet": {
+          "all_completed": true,
+          "mean_total_tokens": 316828,
+          "total_token_samples": [
+            332850,
+            300806
+          ],
+          "mean_uncached_input": 48485,
+          "mean_cached_input": 264512,
+          "mean_output": 3831,
+          "mean_commands": 12,
+          "mean_quality": 1.0,
+          "all_hard_pass": true,
+          "no_unsupported_claims": true,
+          "quality_samples": [
+            {
+              "id": "high-r1-packet",
+              "score": 1.0,
+              "hard_pass": true,
+              "unsupported_claims": []
+            },
+            {
+              "id": "high-r2-packet",
+              "score": 1.0,
+              "hard_pass": true,
+              "unsupported_claims": []
+            }
+          ]
+        }
+      },
+      "focused_reduction_vs_4_17_pct": -46.59920367761205,
+      "focused_reduction_vs_5_8_pct": -9.513678494458254,
+      "no_quality_loss": true,
+      "meets_20_pct": false,
+      "target_met": false
+    },
+    "critical": {
+      "arms": {
+        "v4.17.0": {
+          "all_completed": true,
+          "mean_total_tokens": 524299,
+          "total_token_samples": [
+            523148,
+            525450
+          ],
+          "mean_uncached_input": 62418.5,
+          "mean_cached_input": 458112,
+          "mean_output": 3768.5,
+          "mean_commands": 18,
+          "mean_quality": 0.625,
+          "all_hard_pass": false,
+          "no_unsupported_claims": true,
+          "quality_samples": [
+            {
+              "id": "critical-r1-v4.17.0",
+              "score": 0.625,
+              "hard_pass": false,
+              "unsupported_claims": []
+            },
+            {
+              "id": "critical-r2-v4.17.0",
+              "score": 0.625,
+              "hard_pass": false,
+              "unsupported_claims": []
+            }
+          ]
+        },
+        "v5.8.0": {
+          "all_completed": false,
+          "mean_total_tokens": null,
+          "total_token_samples": [
+            null,
+            667995
+          ],
+          "mean_uncached_input": null,
+          "mean_cached_input": null,
+          "mean_output": null,
+          "mean_commands": 19.5,
+          "mean_quality": 0.25,
+          "all_hard_pass": false,
+          "no_unsupported_claims": true,
+          "quality_samples": [
+            {
+              "id": "critical-r1-v5.8.0",
+              "score": 0.0,
+              "hard_pass": false,
+              "unsupported_claims": []
+            },
+            {
+              "id": "critical-r2-v5.8.0",
+              "score": 0.5,
+              "hard_pass": false,
+              "unsupported_claims": []
+            }
+          ]
+        },
+        "packet": {
+          "all_completed": true,
+          "mean_total_tokens": 611839.5,
+          "total_token_samples": [
+            638979,
+            584700
+          ],
+          "mean_uncached_input": 83658.5,
+          "mean_cached_input": 523264,
+          "mean_output": 4917,
+          "mean_commands": 15.5,
+          "mean_quality": 0.625,
+          "all_hard_pass": false,
+          "no_unsupported_claims": true,
+          "quality_samples": [
+            {
+              "id": "critical-r1-packet",
+              "score": 0.625,
+              "hard_pass": false,
+              "unsupported_claims": []
+            },
+            {
+              "id": "critical-r2-packet",
+              "score": 0.625,
+              "hard_pass": false,
+              "unsupported_claims": []
+            }
+          ]
+        }
+      },
+      "focused_reduction_vs_4_17_pct": -16.69667498888994,
+      "focused_reduction_vs_5_8_pct": null,
+      "no_quality_loss": false,
+      "meets_20_pct": false,
+      "target_met": false
+    }
+  },
+  "equal_weight_reduction_vs_4_17_pct": -9.867460775252685,
+  "target_met": false,
+  "note": "Two observations per arm/task; descriptive result, not statistical noninferiority or exact quota cost."
+}
