@@ -466,7 +466,7 @@ class GuardHookTests(HookFixture):
         allowed = (f"mkdir -p {scratch}/x", f"touch {scratch}/a {scratch}/b", f"echo hi > {scratch}/f",
                    f"rm -rf {scratch}/x && mkdir {scratch}/y", f"cat x.py | tee {scratch}/copy")
         denied = (f"cp x.py {scratch}/x", f"mv {scratch}/a x.py", f"touch {scratch}/a && touch x.py",
-                  f"mkdir {scratch}/$HOME", f"rm -rf {scratch}/../../{self.root.name}/x", f"echo > {self.root}/f",
+                  f"mkdir {scratch}/$HOME", f"rm -rf {scratch}/../../{self.root.name}/x", f"echo > {shlex.quote(str(self.root / 'f'))}",
                   f"mkdir -m 700 {scratch}/x", f"python3 -c 'open(\"{scratch}/f\", \"w\")'",
                   f"git -C {scratch} init", f"mkdir {scratch}/x\ntouch x.py",
                   # Review 5.7 round 1: the shell rewrites these words, or an option carries the target.
